@@ -263,15 +263,24 @@ Priority order discussed:
 
 ## Session-end state (2026-07-13)
 
-- Everything through commit `c32ddbd` is installed into the user's Server checkout
-  and pack-rebuilt. Current table: seed 777, **315 overrides** (48 connector gates
-  incl. 39 map-scanned, 107 floor-shift gates, 5 one-ways), coord+op keys.
+- Everything through commit `4d16341` is installed into the user's Server checkout
+  and pack-rebuilt. Current table: seed 777, **719 overrides** (48 connector gates
+  incl. 39 map-scanned, 309 floor-shift gates incl. 202 map-scanned generic
+  ladders, 5 one-ways), coord+op keys.
+- Generic building ladders (Lumbridge castle walls etc.) were the last
+  user-reported gap: their handlers use a relative "same tile, plane +/-1" rule,
+  so they're map-scanned like the cellars and paired vertically (up-edge at plane
+  p with down-edge at p+1, radius 3; laddermiddle contributes op2-up/op3-down
+  edges). Scan exclusion uses ALL parsed literal source coords - not just shuffle
+  candidates - so special-cased ladders (quest-gated dwarf trapdoor, black
+  knights aggro ladder, Zanaris) can never be scanned-shuffled past their
+  scripted behavior.
 - **Verified in-game by the user**: the original 23-override cross-map shuffle
   (server logged `loaded 23 redirect(s)`, entrances redirected). Everything after
   that - the floor-shift pool, scanned cellar gates (incl. cook's basement), the
   walkability nudge, and especially the coord+op keying - is verified only by the
-  offline checks (typecheck, pack build, loader unit test 315/315, machine
-  round-trips 155/155), **not yet by playing**.
+  offline checks (typecheck, pack build, loader unit test 719/719, machine
+  round-trips 357/357), **not yet by playing**.
 - **Highest-risk untested piece**: the patched `stair_options`/`ladder_options`
   menu labels assume `loc_coord` stays valid after an `@jump` within the same
   script run. If a middle-landing *menu* errors or acts vanilla while right-click
