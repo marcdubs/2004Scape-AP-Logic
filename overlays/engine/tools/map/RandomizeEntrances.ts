@@ -25,11 +25,38 @@ const SPOILER_OUTPUT = path.join(import.meta.dirname, 'entrance-seed.json');
 // the same physical staircase/ladder.
 const PAIR_RADIUS = 10;
 
+// mapsquares that must never be touched by the shuffle, regardless of classification -
+// currently just Tutorial Island (48,48), so a brand-new player can never get stranded
+// mid-tutorial. None of today's cross-map entries fall in these squares anyway (the
+// tutorial's own stairs are same-building floor-shifts, already excluded), but this is
+// cheap insurance against a future classification change quietly picking one up.
+const PROTECTED_MAPSQUARES: [number, number][] = [[48, 48]];
+
 type Indexed<T> = T & { _index: number };
 type Candidate = Indexed<Entrance> & { source: { type: 'literal'; coord: CoordLiteral }; destination: CoordLiteral };
 
+function isProtected(e: Indexed<Entrance>): boolean {
+    if (e.description && /tutorial/i.test(e.description)) {
+        return true;
+    }
+    const source = e.source;
+    if (source.type === 'literal') {
+        const coord = source.coord;
+        if (PROTECTED_MAPSQUARES.some(([mx, mz]) => mx === coord.mapX && mz === coord.mapZ)) {
+            return true;
+        }
+    }
+    const destination = e.destination;
+    if (destination?.type === 'literal') {
+        if (PROTECTED_MAPSQUARES.some(([mx, mz]) => mx === destination.mapX && mz === destination.mapZ)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function isCandidate(e: Indexed<Entrance>): e is Candidate {
-    return e.kind === 'cross-map' && e.source.type === 'literal' && e.destination?.type === 'literal';
+    return e.kind === 'cross-map' && e.source.type === 'literal' && e.destination?.type === 'literal' && !isProtected(e);
 }
 
 // mulberry32 - small, fast, seedable PRNG (Math.random() isn't seedable).
@@ -221,7 +248,7 @@ function main() {
     const { pairs, oneWay } = findGatePairs(candidates);
     const excludedCount = allEntrances.filter(e => e.kind === 'cross-map').length - candidates.length;
 
-    printInfo(`seed ${seed}: ${pairs.length} bidirectional gate(s), ${oneWay.length} one-way entrance(s), ${excludedCount} excluded (generic/relative fallback, can't be safely rewritten)`);
+    printInfo(`seed ${seed}: ${pairs.length} bidirectional gate(s), ${oneWay.length} one-way entrance(s), ${excludedCount} excluded (protected regions, or generic/relative fallback that can't be safely rewritten)`);
 
     const edits: Edit[] = [];
     const spoilerGates: unknown[] = [];
@@ -277,7 +304,12 @@ function main() {
 
     const excluded = allEntrances
         .filter(e => e.kind === 'cross-map' && !isCandidate(e))
-        .map(e => ({ category: e.category, op: e.op, description: e.description, reason: e.source.type !== 'literal' ? 'non-literal source' : 'non-literal destination' }));
+        .map(e => ({
+            category: e.category,
+            op: e.op,
+            description: e.description,
+            reason: isProtected(e) ? 'protected region (tutorial)' : e.source.type !== 'literal' ? 'non-literal source' : 'non-literal destination'
+        }));
 
     fs.writeFileSync(
         SPOILER_OUTPUT,
@@ -298,6 +330,8 @@ function main() {
     const changedCount = edits.filter(e => e.oldRaw !== e.newRaw).length;
     printInfo(`${dryRun ? '[dry run] ' : ''}applied ${changedCount} edit(s) across ${files.length} file(s); spoiler written to ${SPOILER_OUTPUT}`);
     if (!dryRun) {
+        printInfo('these edits only affect content/scripts/*.rs2 - the running server loads compiled scripts');
+        printInfo('from engine/data/pack/server/script.dat, so rebuild before testing: npx tsx tools/pack/Build.ts');
         printInfo('re-run ExportEntrances.ts if you need an updated entrances.json for the new layout');
     }
 }

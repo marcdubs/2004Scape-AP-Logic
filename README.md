@@ -57,4 +57,21 @@ file under the overlay and it replaces the vanilla one wholesale on install.
 
 Extras that don't have a fixed source/destination we can enumerate from script analysis
 alone (generic `any`-source cellar ladders, `phoenixladder`) are left untouched and
-listed in the spoiler's `excluded` array.
+listed in the spoiler's `excluded` array. Tutorial Island (mapsquare 48,48) is always
+excluded too, regardless of classification - see `PROTECTED_MAPSQUARES` in
+`RandomizeEntrances.ts` if that ever needs to grow.
+
+**Required step before testing:** the randomizer only edits
+`content/scripts/ladders+stairs/scripts/*.rs2`. The running server loads *compiled*
+scripts from `engine/data/pack/server/script.dat`/`.idx`, not the raw `.rs2` source, and
+in production mode (`node.production: true` in `world.json`) it does not live-recompile.
+After randomizing (and before starting/restarting the server), rebuild:
+```
+cd Server/engine && npx tsx tools/pack/Build.ts
+```
+This is a full asset pack build (~1-2 minutes) - there isn't currently a narrower
+"just recompile scripts" path. It may also touch unrelated tracked files in `content/`
+as a side effect (seen once: an NPC config got auto-filled with missing equipment
+slots, and `pack/map.pack` got its checksum bumped) - those are pre-existing build-tool
+behavior, not caused by the randomizer, safe to `git checkout --` if you want to keep
+the diff scoped to just the entrance shuffle.
