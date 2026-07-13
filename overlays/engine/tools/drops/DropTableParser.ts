@@ -89,6 +89,21 @@ export function bucketFor(probability: number): string {
 const BLOCK_HEADER_RE = /^\[(ai_queue[0-9]|label|proc),([a-zA-Z0-9_]+)\]/;
 const DEF_RANDOM_RE = /def_int \$([a-zA-Z_0-9]+) = random\((\d+)\);/g;
 const OBJ_ADD_RE = /obj_add\(npc_coord,\s*([a-zA-Z0-9_~]+),\s*([0-9]+),\s*\^lootdrop_duration\)/g;
+const OBJ_ADD_LINE_RE = /obj_add\(npc_coord,\s*[a-zA-Z0-9_~]+,\s*[0-9]+,\s*\^lootdrop_duration\)/;
+
+// finds the CURRENT obj_add(...) call text on a single line, whatever it currently
+// holds - vanilla or already reassigned by a prior run. DropSlot.raw (captured at
+// PARSE time from the pristine backup) must NOT be used to locate the text to replace
+// at edit time: on the very first run the live file still matches the backup so it
+// works, but on any reseed the live line already contains the PREVIOUS run's shuffled
+// text, so searching for the stale vanilla substring finds nothing and the edit
+// silently no-ops. Found via a real reseed (tiered -> chaos, same seed) where the
+// spoiler showed correctly-computed new values that never actually reached the live
+// `.rs2` file.
+export function findObjAddCall(lineText: string): string | null {
+    const m = lineText.match(OBJ_ADD_LINE_RE);
+    return m ? m[0] : null;
+}
 
 function walkRs2(dir: string, out: string[]): void {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -126,6 +141,20 @@ export function ensureDropScriptBackup(): number {
         created++;
     }
     return created;
+}
+
+// copies every backed-up drop-table script back onto its live path - see
+// restoreNpcBackup() in NpcDripParser.ts for why this is deliberately not called
+// automatically by RandomizeDrops.ts itself, only by RegenerateAll.ts.
+export function restoreDropScriptBackup(): number {
+    let restored = 0;
+    for (const file of findDropScriptFiles(DROP_BACKUP_DIR)) {
+        const rel = path.relative(DROP_BACKUP_DIR, file);
+        const livePath = path.join(DROP_SCRIPTS_DIR, rel);
+        fs.copyFileSync(file, livePath);
+        restored++;
+    }
+    return restored;
 }
 
 export function parseDropSlots(filePath: string, relFile: string): DropSlot[] {

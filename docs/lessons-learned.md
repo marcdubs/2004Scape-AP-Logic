@@ -819,3 +819,209 @@ detection pattern).
   wouldn't match `inv_total(inv|bank, item)` literally. If a future session or the user
   finds a quest broken by a missing drop-table item, that's the first place to look,
   and the fix is either widening the regex or adding the specific item to `--exclude`.
+
+## Session-end addendum 6: two real bugs found via actual in-game testing (2026-07-13)
+
+The user finally booted the (pack-built) Windows server against seed-777 drip + seed-777
+drops and played against it - the first real in-game verification any content-mutation
+tool in this repo has had. It immediately surfaced two genuine bugs neither offline
+check (typecheck, pack build, spoiler-vs-corpus cross-checks) had caught, because both
+were about *visual/runtime correctness*, not data validity.
+
+**Bug 1 - drip's torso/arms/legs pools had no cross-category awareness.** The user
+reported an NPC with `model3=man_torso_chainmail`/`model4=man_arms_platemail` rendering
+with "no torso and a floating platebody, almost like it's in the backpack slot." First
+instinct was to suspect array-order-dependent rendering - re-checked
+`webclient/src/dash3d/Model.ts`'s `combineForAnim()` and `NpcType.ts` directly rather
+than trust the earlier "no positional meaning" claim blindly, and confirmed it still
+holds (pure unordered vertex/face concatenation, no hiding logic). The real cause: torso/
+arms/legs pieces are sculpted as matched pairs per armor "set", and drip's pools were
+category-only (`man_torso`, `man_arms`) with no notion of this. Counted every vanilla
+torso<->arms pairing before writing any fix (same discipline as the original weapon/
+shield check): every one of 34 vanilla `man_arms_platemail` occurrences pairs with a
+plate-family torso, zero with a generic one; `man_torso_chainmail` never once pairs with
+platemail arms in 17 occurrences. torso<->legs showed the same pattern (weaker, ~78%,
+still enforced fully rather than reproducing vanilla's own inconsistency); feet/hands
+were checked too and do NOT need this (boots/gloves/basic dominate regardless of torso
+material in vanilla - the only "set" variant there, `split_bark_armour`, is a single
+vanilla occurrence).
+  - Fix: `bodySetFor()` in `NpcDripParser.ts` classifies a torso/arms/legs value as
+    `platemail`/`plaguesuit`/`split_bark_armour`/`null` (generic) by detail substring
+    (`platemail`, `paladin`, `armouredskirt`, anything containing `forplate` -> the
+    "platemail" family; the "forplate" arms variants are a self-documenting naming
+    signal, confirmed against real pairings, not guessed). `RandomizeDrip.ts` groups
+    each NPC's torso/arms/legs slots by `(file, block)`, picks the group's target set
+    from whatever it already is in vanilla, and reassigns every slot in the group from
+    ONLY that set's sub-pool (or the generic sub-pool if the group has no protected set)
+    - so a shuffle can never CREATE a mismatched pairing that didn't exist before, even
+    though it freely reassigns WITHIN a set (chainmail torso can become any other
+    generic torso; platemail arms can become any other plate-family arms).
+  - Verified: re-ran seed 555, 703 groups reassigned set-aware, 2118 slots changed, 122
+    left vanilla (target set had <2 candidates - small pools like plaguesuit/
+    split_bark_armour). Rebuilt a re-derivation check straight from the spoiler:
+    grouped every torso/arms/legs swap by (file,block) again and confirmed zero groups
+    contain more than one distinct non-null `bodySetFor()` result post-shuffle (0/702
+    violations) - this is the load-bearing check, same pattern as the original weapon
+    shield-safety verification.
+
+**Bug 2 - reseeding drop randomization silently failed to write changes.** User reseeded
+drops from `--mode tiered` to `--mode chaos` (same seed 777) and reported the in-game
+drops looked unchanged. The spoiler proved the chaos-mode logic HAD computed genuinely
+different values (`brass_necklace -> rune_knife`, not the tiered run's `brass_necklace
+-> black_mace`) - so the bug was specifically in the WRITE step, not the decision logic.
+Root cause: the edit searched the live line for `slot.raw`, the EXACT VANILLA TEXT
+captured when parsing the pristine backup, and replaced that substring with the new
+value. On the very first run (live file fresh from `node scripts/install.js`, identical
+to the backup) this matches fine. On any SUBSEQUENT run, the live line already contains
+the PREVIOUS run's shuffled text, so searching for the stale vanilla substring finds
+nothing and `.replace()` silently no-ops - the file is never actually rewritten, even
+though the spoiler (and every offline check derived from it) shows the "correct" new
+value. This is a different, narrower bug than the compounding-drift problem the
+existing backup-then-write-live convention already solves (see the shopsanity
+domain-knowledge section) - the VALUE decision was correctly re-derived from backup
+every time (no drift), only the mechanical act of locating text-to-replace on an
+already-modified line was broken. `.npc`-config tools (drip/shops) don't have this
+class of bug because their edits replace a line wholesale BY INDEX, which doesn't care
+what the line currently contains.
+  - Fix: `findObjAddCall()` in `DropTableParser.ts` finds whatever `obj_add(npc_coord,
+    ITEM, QTY, ^lootdrop_duration)` text is CURRENTLY on a line (vanilla or
+    already-shuffled) via a plain (non-DropSlot-tied) regex match, and `RandomizeDrops.ts`
+    replaces that instead of `slot.raw`. Any future `.rs2`-editing tool that does
+    targeted substring replacement (rather than whole-line replacement) needs the same
+    "find current text at edit time, don't reuse text captured at parse time from the
+    backup" discipline - `slot.raw` is still useful for other purposes (it's what parse
+    time actually saw) but must never be used as the substring to search-and-replace
+    against a potentially-already-edited live file.
+  - The live corpus was left in a genuinely inconsistent state by this bug (each
+    previously-touched line stuck holding the FIRST run's value even after later reseeds
+    claimed to change it) - fixed by restoring `content/scripts/drop tables/scripts/`
+    from the pristine `content/.ap-backup/scripts/drop tables/scripts/` backup before
+    re-running, rather than trying to patch forward from an inconsistent state.
+  - Verified: re-ran seed 777 chaos mode after the fix, then wrote a whole-corpus check
+    (not just one sample file) confirming all 559 spoiler `dropSwaps` entries are
+    actually present in their live files (0/559 mismatches), plus re-ran the
+    quest-critical-pinning/no-op/universe-membership checks from addendum 5 (all still
+    0 violations). Also re-verified at the compiled-bytecode level (see below) that the
+    correct chaos-mode values, not the stale tiered-mode ones, are what's actually
+    loaded by the running server.
+
+**New verification technique worth keeping**: decompiling the actual compiled
+`script.dat`/`.idx` directly, without booting the full server, to settle "is my source
+edit actually what the server will run" definitively:
+```
+npx tsx --input-type=module -e "
+import ScriptProvider from './src/engine/script/ScriptProvider.ts';
+ScriptProvider.load('data/pack');           // NOT 'data/pack/server' - load() appends that itself
+const s = ScriptProvider.getByName('[label,goblin_drop_table]');
+// s.intOperands are the resolved obj/int constants baked into this script's bytecode;
+// cross-reference against content/pack/obj.pack's id->name mapping to check
+// which items are actually compiled in, independent of what the .rs2 SOURCE says.
+"
+```
+This resolved two rounds of "is this actually working or is the server just stale"
+uncertainty in this session faster than any other method available from WSL (can't
+boot the real server here - see the Environment gotchas section) - worth reaching for
+again whenever a script-based feature's in-game behavior is in doubt. Script names for
+bracket blocks are the literal source text, e.g. `[ai_queue3,goblin]` and
+`[label,goblin_drop_table]` are two SEPARATE addressable compiled scripts (an `@label`
+jump crosses script boundaries, it's not inlined) - `ScriptProvider.getByName()` needs
+the exact bracket-and-all string.
+
+**Also confirmed while investigating the user's "goblins look vanilla" report**: giant
+spiders (`giantspider1`/`giantspider2` in `_unpack/225/all.npc`) have
+`param=death_drop,null` and no `ai_queue3` script anywhere in the content tree - this
+vanilla LostCityRS rev-274 content set simply hasn't implemented a drop table for them
+yet. Not a randomizer gap; nothing exists there to shuffle. General lesson: when a
+specific monster "isn't randomized," check whether it ever had scriptable drop content
+in the first place before assuming the tool missed it.
+
+The esbuild win32/linux flip (see Environment gotchas) recurred TWICE more this session,
+confirming the user was actively running things from Windows in between WSL tool
+invocations - a useful tell for "has the user touched this checkout since I last built
+it" in future sessions, worth noticing rather than just silently re-running `npm
+install` each time.
+
+## Session-end addendum 7: two more drip bugs, and a RegenerateAll.ts pipeline (2026-07-13, same session continued)
+
+The user kept testing in-game after addendum 6 and found two more real problems, both
+in drip - plus asked a design question ("can the rando script restore to pristine
+before every run?") that led to a genuinely useful new tool.
+
+**Bug 3 - `man_torso_backpack` is an accessory, not a torso.** Tanner (Al Kharid) had
+"no torso." `model.pack` tags `man_torso_backpack` with the `torso` category by naming
+convention, but its ONLY vanilla usage (`quest_death.npc`'s `death_sherpa`/Tenzing) is
+as a SECOND torso-tagged value layered alongside a real one
+(`model3=man_torso_basic`, `model9=man_torso_backpack` - a hiking pack worn over a
+normal torso). Landing it in an NPC's only torso slot leaves no actual body mesh.
+Checking for this pattern surfaced something bigger: **multiple same-category model#
+values within one NPC block is a common, intentional vanilla convention**, not an
+anomaly - `legs: basic+combats`, `head: viking_helmet+viking_helmet_basic`,
+`torsoextra: cloak+buttons`, `necklaces: basic+stylesaradomin` all layer routinely
+(logged via a full-corpus scan before writing the fix, same discipline as every other
+finding this session). `backpack` is the one torso-category value that's actually an
+accessory hiding in the wrong category name, not a genuine second torso.
+
+**Bug 4 - `everyone has demon hands`.** Checked the distribution first (not a sampling
+bug - `man_hands_demon` gets roughly its fair ~1/7 share of the tiny hands pool, same as
+every other option) before concluding it's a data problem: every `_demon` variant
+(arms/legs/feet/hands, both genders) has ZERO vanilla usage in ANY category - a
+complete, never-touched reserved family, unlike the ~120 other never-worn model.pack
+values (mostly unused holiday hats/hairstyles, exactly the "extra variety" this tool
+is supposed to surface). Strong signal it's reserved for an actual Demon-type creature,
+not generic human wear.
+
+- Fix for both: `isNeverSwappable()` in `NpcDripParser.ts` excludes
+  `man_torso_backpack`/`woman_torso_backpack` (by exact value) and any value whose
+  detail is exactly `demon` (by category-stripped suffix), used by BOTH `parseSlots()`
+  (so an NPC's OWN occurrence, like Tenzing's, is never treated as swappable - left
+  permanently vanilla, same treatment `human_weaponsextra_stafforb` gets) and
+  `loadModelUniverse()` (so it can never be sampled INTO any other slot).
+- **A subtlety this surfaced**: fixing the code doesn't retroactively fix data a
+  PREVIOUS, buggier run already wrote. `mourner_armed`'s vanilla
+  torso/arms/legs are all `plaguesuit` - but `plaguesuit` torso has only ONE valid
+  value in the whole cache, so the (correctly working) armor-set-aware group logic
+  sees a pool of size 1, decides "nothing different to reassign to," and skips writing
+  that slot. The bug: this NPC's torso had ALREADY been corrupted to
+  `man_torso_backpack` by the run that happened BEFORE the armor-set fix existed (back
+  when torso/arms/legs were still independently, unconstrained-ly sampled). "Skip" in
+  the current code means "leave current content alone," not "restore to vanilla" - so
+  the old mistake persisted across every reseed since, even after the code that
+  produced it was fixed. Manually spot-checking a couple of "should be fixed now" NPCs
+  after the demon/backpack fix (rather than assuming the fix alone was sufficient) is
+  what caught this.
+- Fix: restored the ENTIRE `.npc`/drop-table-script tree to pristine vanilla (not just
+  the one affected file - drip and shopsanity share the same live files, so a targeted
+  restore would risk clobbering shopsanity's edits) and re-ran drip + shops + drops
+  together from clean. This is the same remedy as bug 2's reseed fix - "restore
+  pristine, don't try to patch forward from an inconsistent state" - now confirmed as a
+  recurring need whenever a content-mutation tool's OWN logic changes, not just when
+  two tools collide.
+
+**New tool: `overlays/engine/tools/RegenerateAll.ts`.** The user asked whether "the
+rando script" should restore to pristine before every run. Direct answer: not by
+default, and deliberately - drip/shops/drops all write onto the CURRENT LIVE file
+specifically so reseeding one tool doesn't erase another's edits (see the shopsanity
+domain-knowledge section for the original cross-tool data-loss bug this convention
+fixes); if every tool restored to pristine on its own before running, running drip
+after shops would wipe shops' `owned_shop` reassignments, and vice versa. Instead, this
+new script is a single pipeline that restores ONCE, then runs drip + shops + drops
+(`--mode` forwarded) in sequence, then rebuilds the pack - the exact manual sequence
+used to fix bug 3, now a real command:
+```
+npx tsx tools/RegenerateAll.ts [--seed <n>] [--drip-seed <n>] [--shops-seed <n>] [--drops-seed <n>] [--mode tiered|chaos] [--skip-drip] [--skip-shops] [--skip-drops] [--no-rebuild]
+```
+Backed by two new exports: `restoreNpcBackup()` in `NpcDripParser.ts` and
+`restoreDropScriptBackup()` in `DropTableParser.ts` (both copy backup -> live for every
+file; NOT called by any individual tool automatically, only by this orchestrator -
+their own doc comments repeat why). This is the right entry point going forward
+whenever a content-mutation tool's logic changes and old data needs a clean re-derive,
+not just for the user's original "start fresh" ask.
+
+- Verified: ran `RegenerateAll.ts --drip-seed 555 --shops-seed 777 --drops-seed 777
+  --mode chaos` end to end (restore -> drip -> shops -> drops -> pack build, ~1:50
+  total). Re-checked `mourner_armed` (now correctly stays vanilla plaguesuit, not
+  `backpack`), `tanner` (now a real generic torso, `man_torso_model_300`), a full-corpus
+  grep for any remaining `backpack`-as-primary-torso or `_demon` value (zero), and
+  re-ran every drops-side offline check (quest-pinning, no-op, universe-membership,
+  live-vs-spoiler consistency) plus the drip group-mismatch check (0/702 violations) -
+  all clean on the freshly regenerated state.

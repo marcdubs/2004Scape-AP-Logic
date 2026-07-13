@@ -195,6 +195,15 @@ those two are meaningfully different sizes (e.g. `woman_hat` has 23 valid models
 the cache but only 8 ever appear on a vanilla NPC). This means swaps can and do
 produce combinations no vanilla NPC ever wore.
 
+Two specific values are excluded from the pool entirely (`isNeverSwappable()` in
+`NpcDripParser.ts`), found via real in-game reports rather than guessed: `*_torso_
+backpack` (vanilla's only use of it layers it alongside a separate real torso - it's an
+accessory, not a substitute for full coverage, and landing it in an NPC's only torso
+slot left them with "no torso") and `*_<part>_demon` (zero vanilla NPCs use any `_demon`
+variant, in any category - unlike the ~120 other never-worn model.pack values, which are
+mostly just unused holiday hats/hairstyles, a value unused across every category it
+appears in is a strong signal it's reserved for an actual Demon-type creature).
+
 ### Weapons
 
 `human_weapons_*` values (weapons and generic held props alike - vanilla already mixes
@@ -223,6 +232,24 @@ both slots at once:
 
 `--no-weapons` disables all of the above and leaves every `human_weapons_*` value
 untouched.
+
+### Armor sets (torso/arms/legs)
+
+Torso/arms/legs are also reassigned per NPC block rather than per slot, for the same
+reason weapons are: these three pieces are sculpted as matched pairs per armor "set"
+(platemail/plaguesuit/split_bark_armour), and independent per-slot sampling could (and,
+found via actual in-game testing, did) produce combinations vanilla never uses - e.g. a
+`man_torso_chainmail` + `man_arms_platemail` combo that renders with a visible gap and a
+floating, disconnected arm mesh, since the plate sleeve's shoulder geometry is sculpted
+to dock against a plate torso specifically. `bodySetFor()` in `NpcDripParser.ts`
+classifies each torso/arms/legs value into a set family (or `null`/generic for the vast
+majority - bare/basic/buff/leather/tatty/chainmail/...) by checking real vanilla
+pairings first (every vanilla `arms_platemail` occurrence pairs with a plate-family
+torso, zero with a generic one). Each NPC's torso/arms/legs slots are grouped, the
+group's target set is read from whatever it already is in vanilla, and every slot in
+the group reassigns from ONLY that set's sub-pool (or the generic sub-pool if the NPC
+has no protected set) - so a shuffle can freely reassign WITHIN a set but can never
+create a new mismatched pairing.
 
 **Known risk, not yet mitigated**: some NPCs may be visually load-bearing for quest
 recognition (a disguise, an NPC you're told to identify by appearance). There's no
@@ -361,8 +388,36 @@ pattern after checking real usage.
 `death_drop` shuffling excludes `quests/` and `tutorial/` npc configs (Tutorial Island
 is protected the same way entrance randomization protects it).
 
-**Known risk, not yet mitigated**: no in-game testing yet, only offline checks
-(typecheck, pack build success, and scripted verification that no quest-critical slot
-was reassigned, tiered-mode swaps never cross their probability band, and every
-swapped-in item resolves against the vanilla corpus). See
-docs/lessons-learned.md for the full verification process.
+**Verified in-game**: the user tested a seed-777 run and confirmed monster drops
+changed as expected; a subsequent reseed (`--mode tiered` -> `--mode chaos`, same seed)
+surfaced a real bug where the edit step searched the live `.rs2` line for the exact
+vanilla text captured at parse time, which only matches on the very first run - any
+later reseed silently failed to write its new values even though the spoiler showed
+them correctly. Fixed by having the edit step look at whatever text is CURRENTLY on the
+line instead (`findObjAddCall()` in `DropTableParser.ts`) - see
+docs/lessons-learned.md's "two real bugs found via actual in-game testing" addendum for
+the full story and the verification method (decompiling the compiled `script.dat`
+directly to confirm what the server will actually run, without needing to boot it).
+
+## Regenerating everything at once
+
+`overlays/engine/tools/RegenerateAll.ts` restores the `.npc`/drop-table-script tree to
+pristine vanilla ONCE, then runs drip, shopsanity, and drop randomization in sequence,
+then rebuilds the pack:
+
+```
+cd Server/engine && npx tsx tools/RegenerateAll.ts [--seed <n>] [--drip-seed <n>] [--shops-seed <n>] [--drops-seed <n>] [--mode tiered|chaos] [--skip-drip] [--skip-shops] [--skip-drops] [--no-rebuild]
+```
+
+This is deliberately NOT what each individual tool does on its own - drip/shops/drops
+all write onto the *current live* file rather than a fresh copy of the backup,
+specifically so reseeding one tool doesn't erase another's edits (see the shopsanity
+section above). Restoring to pristine is only safe as one step in a pipeline that then
+re-runs every tool that's supposed to be part of the seed; doing it inside a single
+tool would silently wipe whatever the others had already written. Use this script
+whenever you want a fully clean regeneration (e.g. after a tool's own logic changes -
+"skip this slot" in the current code means "leave it as whatever's already there," not
+"restore to vanilla," so stale mistakes from an older version of a tool can otherwise
+persist across reseeds indefinitely) or when reseeding everything for a fresh test.
+`--seed` sets a shared default for all three tools; the per-tool `--*-seed` flags
+override it individually.

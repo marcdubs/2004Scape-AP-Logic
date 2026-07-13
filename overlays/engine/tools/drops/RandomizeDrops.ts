@@ -12,6 +12,7 @@ import {
     type DropSlot,
     ensureDropScriptBackup,
     findDropScriptFiles,
+    findObjAddCall,
     loadQuestCriticalItems,
     loadStackableItems,
     parseDeathDropSlots,
@@ -203,7 +204,15 @@ function randomizeDropSlots(seed: number, mode: 'tiered' | 'chaos', exclude: str
             const newItem = newItemBySlot.get(slot)!;
             const newQty = newQtyBySlot.get(slot)!;
             const newRaw = `obj_add(npc_coord, ${newItem}, ${newQty}, ^lootdrop_duration)`;
-            lines[slot.line] = lines[slot.line].replace(slot.raw, newRaw);
+            // find the CURRENT call text on this line, not slot.raw (that's the
+            // pristine backup text - see findObjAddCall's comment for why using it
+            // here would silently no-op on a reseed).
+            const currentRaw = findObjAddCall(lines[slot.line]);
+            if (!currentRaw) {
+                printWarning(`could not find obj_add(...) on ${rel}:${slot.line + 1} to edit - left unchanged`);
+                continue;
+            }
+            lines[slot.line] = lines[slot.line].replace(currentRaw, newRaw);
             spoilerEntries.push({ file: rel, block: slot.block, wasItem: slot.item, wasQty: slot.qty, nowItem: newItem, nowQty: newQty, bucket: slot.bucket, probability: slot.probability });
         }
 

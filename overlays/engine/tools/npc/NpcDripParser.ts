@@ -51,6 +51,36 @@ export type ModelSlot = {
 const MODEL_LINE_RE = /^model(\d+)=(.+)$/;
 const SWAPPABLE_RE = /^(man|woman)_([a-z]+)_.+$/;
 
+// Some model.pack values pass the (man|woman)_<part>_<detail> naming convention but
+// are NOT safe general-purpose replacements for that slot - found from real in-game
+// reports, not guessed, same "check the data" discipline as bodySetFor() below. Used
+// by both parseSlots() (so an NPC's OWN occurrence of one of these is never treated as
+// a swappable slot - left vanilla, same treatment as the human_weaponsextra_* companion
+// pieces) and loadModelUniverse() (so it can never be sampled INTO any other slot
+// either):
+// - `*_torso_backpack`: vanilla's only occurrence (quest_death.npc's death_sherpa /
+//   Tenzing) uses it ALONGSIDE a separate real torso value in the same block
+//   (model3=man_torso_basic, model9=man_torso_backpack) - it's a layered accessory, not
+//   a substitute for full torso coverage. Landing it in an NPC's primary (and only)
+//   torso slot leaves them with no actual body mesh - reported as "no torso" on the
+//   Tanner NPC.
+// - `*_<part>_demon` (arms/legs/feet/hands all have one): zero vanilla NPC uses ANY of
+//   these, in ANY category - checked all of them before excluding anything. Unlike the
+//   ~120 OTHER never-worn model.pack values (mostly unused holiday hats/hairstyles,
+//   exactly the kind of extra variety this tool is supposed to surface), a detail
+//   that's unused across EVERY category it appears in is a strong signal it's a
+//   reserved, unvalidated asset for an actual Demon-type creature rather than generic
+//   human wear. Reported as "everyone has demon hands" once it started appearing at
+//   its ordinary ~1/7 share of the (small, 7-value) hands pool - not a sampling-bias
+//   bug, just a visually jarring value that shouldn't have been in the pool at all.
+function isNeverSwappable(value: string): boolean {
+    if (value === 'man_torso_backpack' || value === 'woman_torso_backpack') {
+        return true;
+    }
+    const detail = value.replace(/^(man|woman)_[a-z]+_/, '');
+    return detail === 'demon';
+}
+
 function walk(dir: string, out: string[]): void {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
@@ -93,6 +123,25 @@ export function ensureNpcBackup(): number {
     return created;
 }
 
+// copies every backed-up .npc file back onto its live path, undoing every randomizer's
+// output. NOT called by any individual tool automatically - see RegenerateAll.ts for
+// why a per-tool "restore before I run" would reintroduce the exact cross-tool
+// data-loss bug ensureNpcBackup()'s "derive values from backup, write onto live"
+// convention was built to prevent (running drip after shops would erase shops' edits,
+// and vice versa, if each tool wiped to pristine on its own before doing its own
+// thing). Restoring is only safe as a step in a pipeline that then re-runs every tool
+// that should be part of the seed, atomically.
+export function restoreNpcBackup(): number {
+    let restored = 0;
+    for (const file of findNpcFiles(BACKUP_ROOT)) {
+        const rel = path.relative(BACKUP_ROOT, file);
+        const livePath = path.join(SCRIPTS_ROOT, rel);
+        fs.copyFileSync(file, livePath);
+        restored++;
+    }
+    return restored;
+}
+
 // content files are CRLF - normalize on read, caller restores CRLF on write (see the
 // same convention in EntranceParser.ts's readSource).
 export function readNpcSource(filePath: string): string {
@@ -120,7 +169,7 @@ export function parseSlots(filePath: string, relFile: string): ModelSlot[] {
 
         const value = modelMatch[2];
         const swapMatch = value.match(SWAPPABLE_RE);
-        if (!swapMatch) {
+        if (!swapMatch || isNeverSwappable(value)) {
             continue;
         }
 
@@ -162,7 +211,7 @@ export function loadModelUniverse(): Map<string, string[]> {
         }
         const value = line.slice(eq + 1).trim();
         const swapMatch = value.match(SWAPPABLE_RE);
-        if (!swapMatch) {
+        if (!swapMatch || isNeverSwappable(value)) {
             continue;
         }
         const key = `${swapMatch[1]}_${swapMatch[2]}`;
@@ -286,3 +335,52 @@ export function loadWeaponUniverse(): WeaponUniverse {
     universe.oneHand.sort();
     return universe;
 }
+
+// torso/arms/legs pieces are sculpted as matched pairs per armor "set" - the client's
+// Model.combineForAnim() has no positional/hiding logic (confirmed by reading
+// webclient/src/dash3d/Model.ts and NpcType.ts directly - it's a pure unordered vertex/
+// face concatenation), so this isn't an engine bug, it's a geometry-authoring fact the
+// swap pools didn't originally account for. Found by counting every torso<->arms
+// pairing that exists anywhere in vanilla .npc content before writing any
+// classification code (same discipline as the weapon/shield check above): every one of
+// the 34 vanilla `man_arms_platemail` occurrences pairs with a plate-family torso
+// (`platemail`/`platemail_trim`/`platemailfat`/`paladin`), zero pair with a generic one
+// (chainmail, leather, basic, ...); conversely `man_torso_chainmail` pairs with
+// bare/basic/buff/leather/longsleeves arms in every one of its 17 occurrences and NEVER
+// with platemail arms. torso<->legs shows the same pattern (38/49 platemail-torso
+// occurrences pair with platemail legs). feet/hands were checked too and do NOT need
+// this treatment - boots/gloves/basic dominate regardless of torso material in vanilla,
+// the only "set" variant either category has is split_bark_armour's own dedicated
+// piece, and that's a single vanilla occurrence, low-stakes either way.
+//
+// "forplate" arms values (bareforplate/basicforplate/fatforplate/longsleevesforplate/
+// longsleevesforplate2) are their own self-documenting signal - the name literally says
+// what they're for - and vanilla data confirms it: they only ever appear alongside
+// plate-family torsos, same as literal `arms_platemail`. `paladin` torso and
+// `armouredskirt`(_trim) legs don't share the "platemail" substring with their category
+// siblings, but the pairing data puts them in the same family (paladin torso: 11/19
+// occurrences pair with platemail-family arms; armouredskirt legs pairs with
+// platemail torso in vanilla) - included on data, not on the name alone.
+//
+// Returns null for "generic" values (the vast majority - bare/basic/buff/leather/tatty/
+// fat/chainmail/...), which vanilla mixes freely with each other and which must never
+// be paired with a protected-set value from a different category (that's exactly the
+// combination the user found broken: chainmail torso + platemail arms).
+export function bodySetFor(value: string): string | null {
+    const detail = value.replace(/^(man|woman)_[a-z]+_/, '');
+    if (detail.startsWith('plaguesuit')) {
+        return 'plaguesuit';
+    }
+    if (detail.startsWith('split_bark_armour')) {
+        return 'split_bark_armour';
+    }
+    if (detail.startsWith('platemail') || detail === 'paladin' || detail.startsWith('armouredskirt') || detail.includes('forplate')) {
+        return 'platemail';
+    }
+    return null;
+}
+
+// the three categories where set-mismatch is an actual visual problem (see
+// bodySetFor's comment) - hat/jaw/head/feet/hands/torsoextra/necklaces/etc. keep the
+// existing fully-independent per-category sampling in RandomizeDrip.ts.
+export const BODY_SET_CATEGORIES = new Set(['torso', 'arms', 'legs']);

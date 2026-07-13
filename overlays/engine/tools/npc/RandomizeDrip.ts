@@ -5,10 +5,12 @@ import { printInfo, printWarning } from '#/util/Logger.js';
 
 import {
     BACKUP_ROOT,
+    BODY_SET_CATEGORIES,
     SCRIPTS_ROOT,
     type ModelSlot,
     type WeaponGroup,
     type WeaponSlot,
+    bodySetFor,
     ensureNpcBackup,
     findNpcFiles,
     isShieldName,
@@ -41,6 +43,16 @@ import { mulberry32 } from '../shared/Prng.js';
 // Values that don't match the `(man|woman)_<part>_<detail>` naming convention (creature
 // models) are left untouched - see NpcDripParser.ts for why that convention is a safe
 // swap boundary.
+//
+// torso/arms/legs are the exception to "fully independent per-slot sampling" above -
+// they're reassigned per NPC block (like weapons, see below) restricted to the same
+// "armor set" family (platemail/plaguesuit/split_bark_armour/generic) the NPC already
+// belongs to in vanilla, via bodySetFor() in NpcDripParser.ts. These three pieces are
+// sculpted to dock together (a plate arm sleeve's shoulder geometry assumes a plate
+// torso underneath it) - independent per-slot sampling could and did produce
+// combinations like chainmail torso + platemail arms that leave a visible gap/floating
+// mesh, found via user report and confirmed against real vanilla pairing data (every
+// platemail-arms occurrence in vanilla pairs with a plate-family torso, zero exceptions).
 //
 // Held items (human_weapons_*) are shuffled separately, per NPC block rather than per
 // slot, so that a two-handed weapon (bow/staff/halberd/scythe/harpoon - see
@@ -112,6 +124,11 @@ function main() {
 
     const pools = new Map<string, ModelSlot[]>();
     for (const s of eligible) {
+        // torso/arms/legs are set-aware group-reassigned below (see file header) -
+        // excluded here so they don't ALSO get independently flat-sampled.
+        if (BODY_SET_CATEGORIES.has(s.category)) {
+            continue;
+        }
         const key = mixedGender ? s.category : `${s.gender}_${s.category}`;
         (pools.get(key) ?? pools.set(key, []).get(key)!).push(s);
     }
@@ -147,6 +164,61 @@ function main() {
             }
         }
         poolSummaries.push({ pool: key, universeSize: universe.length, occurrences: slots.length, changed });
+    }
+
+    // --- torso/arms/legs: set-aware group-level, not per-slot - see file header for
+    // why (platemail arms landing on a chainmail torso leaves a visible gap/floating
+    // mesh - the two pieces were never sculpted to dock together). Grouped by
+    // (file, block) since duplicate block names within one file are a compile error
+    // elsewhere in this content, so that pairing is always unique. ---
+    const bodySetGroups = new Map<string, ModelSlot[]>();
+    for (const s of eligible) {
+        if (!BODY_SET_CATEGORIES.has(s.category)) {
+            continue;
+        }
+        const key = `${s.file} ${s.block}`;
+        (bodySetGroups.get(key) ?? bodySetGroups.set(key, []).get(key)!).push(s);
+    }
+
+    const bodySetRand = mulberry32(seed ^ hashKey('bodyset'));
+    let bodySetGroupsTouched = 0;
+    let bodySetSlotsChanged = 0;
+    let bodySetSlotsSkipped = 0;
+
+    for (const slots of bodySetGroups.values()) {
+        // the group's target set comes from whatever it ALREADY is in vanilla - if any
+        // slot in the group is platemail/plaguesuit/split_bark_armour, every slot in
+        // the group must be reassigned within that same set; otherwise (fully generic
+        // group) every slot draws from the generic (non-set) sub-pool only, so a
+        // shuffle can never CREATE a mismatched pairing that didn't exist before.
+        let targetSet: string | null = null;
+        for (const s of slots) {
+            const set = bodySetFor(s.value);
+            if (set) {
+                targetSet = set;
+                break;
+            }
+        }
+
+        let touchedThisGroup = false;
+        for (const slot of slots) {
+            const key = mixedGender ? slot.category : `${slot.gender}_${slot.category}`;
+            const universe = universeFor(key).filter(v => bodySetFor(v) === targetSet);
+            if (universe.length < 2) {
+                bodySetSlotsSkipped++;
+                continue;
+            }
+
+            const candidate = pickDifferent(universe, slot.value, bodySetRand)!;
+            newValueBySlot.set(slot, candidate);
+            touchedThisGroup = true;
+            if (candidate !== slot.value) {
+                bodySetSlotsChanged++;
+            }
+        }
+        if (touchedThisGroup) {
+            bodySetGroupsTouched++;
+        }
     }
 
     // --- weapons/held items: group-level, not per-slot - see file header. ---
@@ -268,7 +340,8 @@ function main() {
     }
 
     const weaponSummary = noWeapons ? 'weapons: disabled (--no-weapons)' : `weapons: ${weaponGroupsTouched} group(s) reassigned, ${weaponGroupsSkipped} left vanilla (companion piece/ambiguous role)`;
-    printInfo(`${dryRun ? '[dry run] ' : ''}seed ${seed}: ${pools.size} body pool(s), ${slotsChanged} total swap(s) across ${filesWritten} file(s) (${excludedSet.size} body slot(s) excluded); ${weaponSummary}`);
+    const bodySetSummary = `torso/arms/legs: ${bodySetGroupsTouched} group(s) reassigned set-aware, ${bodySetSlotsChanged} slot(s) changed, ${bodySetSlotsSkipped} left vanilla (target set had <2 candidates)`;
+    printInfo(`${dryRun ? '[dry run] ' : ''}seed ${seed}: ${pools.size} body pool(s), ${slotsChanged} total swap(s) across ${filesWritten} file(s) (${excludedSet.size} body slot(s) excluded); ${bodySetSummary}; ${weaponSummary}`);
 
     fs.writeFileSync(
         SPOILER_OUTPUT,
@@ -281,6 +354,9 @@ function main() {
                 generatedAt: new Date().toISOString(),
                 dryRun,
                 pools: poolSummaries,
+                bodySetGroupsTouched,
+                bodySetSlotsChanged,
+                bodySetSlotsSkipped,
                 weaponUniverse: { shield: weaponUniverse.shield.length, twoHand: weaponUniverse.twoHand.length, oneHand: weaponUniverse.oneHand.length },
                 weaponGroupsTouched,
                 weaponGroupsSkipped,
