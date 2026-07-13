@@ -278,3 +278,91 @@ at its new location.
 **Known risk, not yet mitigated**: since players may rely on specific shops for quest
 items, a shuffled seed needs its spoiler treated as load-bearing data once real AP
 logic-gen exists, not just a nice-to-have log. Not yet verified in-game.
+
+## Drop randomization
+
+Reassigns which item sits in each weighted monster loot-drop slot, plus a separate
+shuffle of the `death_drop` guaranteed-item npc param (bones/ashes on death). Pure
+script/config mutation, same class of change as drip/shops - not the runtime-override
+pattern. Reseeding needs a content pack rebuild.
+
+### Pieces
+
+Tools (`overlays/engine/tools/drops/`):
+
+- `DropTableParser.ts` - parses `content/scripts/drop tables/scripts/*.rs2`, the 73
+  files holding monster loot cascades (`def_int $var = random(total); if ($var < N)
+  obj_add(npc_coord, item, qty, ^lootdrop_duration); else if (...) ...`). Finds branch
+  boundaries by text position rather than brace-tracking, so it handles both
+  brace-delimited and brace-less single-line branch styles uniformly (both occur in
+  vanilla). Every slot's rarity is `weight/total` (probability), never the raw
+  threshold delta - cascades use different `random()` denominators (128 is by far the
+  most common, but 6/8/65/138/512 all occur too), so raw weight numbers aren't
+  comparable across monsters. Also provides `loadQuestCriticalItems()` (pins any drop
+  slot whose item is checked via `inv_total`/`inv_del` somewhere in `content/scripts/
+  quests/`), `loadStackableItems()` (scans `.obj` configs for `stackable=yes`, used to
+  decide whether a reassigned slot keeps its original quantity or gets forced to 1),
+  and `parseDeathDropSlots()` for the separate `death_drop` axis.
+- `RandomizeDrops.ts` - reassigns eligible slots' items (mode-dependent, see Scope
+  below) and separately deranges `death_drop` values across every eligible NPC.
+
+### Usage
+
+```
+cd Server/engine && npx tsx tools/drops/RandomizeDrops.ts [--seed <number>] [--dry-run] [--mode tiered|chaos] [--no-death-drop] [--exclude <substr,substr,...>]
+cd Server/engine && npx tsx tools/pack/Build.ts
+```
+
+...then restart the server. First run backs up every vanilla drop-table script under
+`content/.ap-backup/scripts/drop tables/scripts/` (same convention as the `.npc` backup
+drip/shops use) and re-derives from that backup every run, so reseeding never
+compounds. Spoiler is `engine/tools/drops/drop-seed.json`.
+
+### Scope
+
+Only the 73-file monster drop-table corpus and the `death_drop` npc param are in
+scope - the shared reward sub-tables called via `~procname` (`~randomherb`,
+`~randomjewel`, `~ultrarare_getitem`, `~megararetable`, `~randomjunk` in
+`shared_droptables.rs2`) and any `obj_add(...)` drops outside that folder (quest/area
+scripts) are deliberately left untouched.
+
+`--mode` picks how a slot's replacement item is sampled (kept as a flag rather than one
+fixed design, since it's intended to become an Archipelago per-slot option):
+
+- `tiered` (default): every slot is bucketed by probability into
+  ultra(≤1%)/rare(1-4%)/uncommon(4-10%)/common(10-25%)/verycommon(>25%) bands (derived
+  from the corpus's own distribution, not guessed), then reassigned to a different item
+  independently sampled from everything else observed in that same band. A monster's
+  1%-chance slot always stays a 1%-chance slot, but which item fills it moves.
+- `chaos`: every eligible slot samples from the full corpus-wide item pool regardless
+  of band - a common slot can roll what used to be someone's 1% drop.
+
+Both modes sample from items actually observed in the vanilla drop-table corpus, not
+the full `obj.pack` catalog - unlike drip's `model.pack` widening, item names have no
+safe structural naming convention to filter the full catalog down to "plausible monster
+loot" (`man_torso_basic` self-describes a category; `dragonstone` doesn't self-describe
+"drop-table-appropriate"), so the vanilla tables' own item set is the only vetted pool.
+
+Quantity: a reassigned slot keeps its original quantity if the new item is stackable
+(per its `.obj` config), otherwise gets forced to 1 - so a slot that used to read "1
+iron_dagger" can't land on "35 abyssal_whip".
+
+**Quest-critical items are pinned**: any item referenced as the argument to
+`inv_total(inv|bank, item)` or `inv_del(inv|bank, item)` anywhere in `content/scripts/
+quests/` has its original slot(s) excluded from reassignment (found 53 such items empirically,
+not guessed - e.g. the four coloured beads used in a Myreque-line quest). They remain
+eligible as a *replacement* value for other slots though, since that can only add
+availability, never remove it. An earlier, broader version of this check (any mention
+anywhere in quest scripts, not just requirement checks) pinned 82% of all slots because
+common items like coins/runes/ores are mentioned constantly in quest dialogue and
+rewards without ever gating anything - narrowed to the `inv_total`/`inv_del`-argument
+pattern after checking real usage.
+
+`death_drop` shuffling excludes `quests/` and `tutorial/` npc configs (Tutorial Island
+is protected the same way entrance randomization protects it).
+
+**Known risk, not yet mitigated**: no in-game testing yet, only offline checks
+(typecheck, pack build success, and scripted verification that no quest-critical slot
+was reassigned, tiered-mode swaps never cross their probability band, and every
+swapped-in item resolves against the vanilla corpus). See
+docs/lessons-learned.md for the full verification process.

@@ -416,6 +416,145 @@ drip vs. shops split for when each is actually justified).
   (only `model#=`/weapon/`param=` lines touched). Seed 777: 113/117 shops reassigned,
   4 excluded (the hardcoded ones above), pack build clean. Not yet verified in-game.
 
+## Domain knowledge: drop randomization
+
+Built after shopsanity, in a later session (2026-07-13, per the addendum below).
+Encoded in `DropTableParser.ts`/`RandomizeDrops.ts`, config/script-mutation approach
+like drip/shops (see README's "Drop randomization" section for the user-facing
+usage/scope). The reasoning that isn't obvious from the code:
+
+- **Two coexisting drop systems exist; only one is actually used.** The dbtable system
+  (`content/scripts/drop tables/configs/drop_table.dbtable` + `roll_on_drop_table` proc
+  in `shared_droptables.rs2`) looked like the "declarative, trivial to shuffle" path
+  archipelago-ideas.md #2 called out, but it's essentially unused - only
+  `skill_mining/scripts/mining.rs2` calls it (for gem rocks), no monster in the 73-file
+  drop-table corpus does. The REAL loot system, for every monster, is ad-hoc inline
+  `if ($random < N) obj_add(npc_coord, item, qty, ^lootdrop_duration) else if (...)`
+  cascades, one per `[ai_queue3,name]`/`[label,name]` block. Checked every file before
+  writing any parsing code, same discipline as every prior tool.
+- **Probability is `weight/total`, never the raw threshold delta - cascades use
+  different `random()` denominators.** 128 is overwhelmingly the most common (64 of the
+  73 files), but 6, 8, 65, 138, and 512 all occur too (werewolf.rs2 uses
+  `random(512)`). A raw weight of 100 means ~78% in a `/128` cascade and ~20% in a
+  `/512` one - bucketing by raw weight instead of normalized probability was the first
+  design that got caught and fixed by actually reading werewolf.rs2's numbers rather
+  than assuming every file shared bandit.rs2's `/128` shape.
+- **Branch bodies come in two syntactically different styles, and a third file
+  (salarin_the_twisted.rs2) has an unrelated `if(random(6)...)` that must NOT be
+  mistaken for a cascade.** Most files brace-delimit each branch
+  (`if ($random < N) { obj_add(...); }`), but werewolf.rs2 writes every branch as a
+  single brace-less statement (`if ($random < 32) obj_add(...);`). Character-by-character
+  brace-depth tracking (the natural first instinct, and what NpcDripParser-style parsers
+  don't need since `.npc`/`.obj` configs have no control flow at all) would need two
+  separate code paths for these styles and is fragile. The parser instead finds every
+  branch header's *text position* via regex and treats the span between consecutive
+  headers as that branch's body, scanning for `obj_add(...)` within the span regardless
+  of bracketing - this handles braced, brace-less, and nested-conditional bodies (e.g.
+  `if (map_members = ^true) {...} else {...}` gating two alternate drops at the same
+  weight) uniformly with one code path. Verified against all 73 files via a throwaway
+  survey script (1127 slots, 243 distinct items, 63 cascades across 119 blocks) before
+  committing to this as the real parser, cross-checked against an independent
+  brace-stack-based first attempt that produced identical totals.
+- **Editing must be a targeted substring replace within the line, not a whole-line
+  replace.** Unlike `.npc`/`.obj` config lines (always bare `key=value`, safe to
+  replace wholesale - see NpcDripParser.ts), an `obj_add(...)` call shares its physical
+  line with arbitrary surrounding code: `if`/`else if` prefixes, trailing comments, and
+  (in werewolf.rs2's brace-less style) the entire branch condition. `DropSlot.raw`
+  captures the exact matched `obj_add(npc_coord, item, qty, ^lootdrop_duration)`
+  substring at parse time; the edit does `line.replace(slot.raw, newRaw)`, a single
+  non-global replace, leaving everything else on the line untouched.
+- **Only literal-item, literal-qty `obj_add(...)` calls inside an actual cascade are
+  captured - this excludes several categories of drop with no per-file exclusion list
+  needed, mirroring the "non-conforming values are the safety net" pattern from drip's
+  model-swap scope:**
+  - `~procname` calls (`~randomherb`, `~randomjewel`, `~ultrarare_getitem`,
+    `~megararetable`, `~randomjunk` in `shared_droptables.rs2`) - out of scope per an
+    explicit user scoping decision, left as opaque calls other monsters route through.
+  - `npc_param(death_drop)` - always precedes the cascade (never inside a `def_int
+    $var = random(...)` span), so it's structurally never mistaken for a weighted slot.
+    Handled as its own axis (see below).
+  - Non-literal quantities like kalphite_queen's `iron_arrow, add(random(335), 1)` (one
+    occurrence in the whole corpus) - the qty regex requires a literal int and simply
+    doesn't match, so the line is silently left vanilla rather than guessed at.
+  - Anything outside a cascade entirely: rat.rs2's quest-gated `rats_tail` drop,
+    jailer.rs2's fixed `obj_add(npc_coord, jail_key, 1, 100)` (note: literal `100` tick
+    duration instead of `^lootdrop_duration`, another reason this couldn't be mistaken
+    for a cascade slot) - both are guaranteed drops with their own bespoke conditions,
+    16 of the 73 files have no cascade at all.
+- **Quest-critical-item detection needed a real, data-checked pattern - a first,
+  broader attempt pinned 82% of all slots and was caught by looking at the actual
+  numbers, not by assumption.** The first version tokenized every identifier appearing
+  ANYWHERE in `content/scripts/quests/**/*.rs2` and treated any match against a
+  candidate item as quest-critical - this flagged 131 of 243 corpus items (922 of 1127
+  slots!) because coins, ores, bars, and basic food are mentioned constantly in quest
+  dialogue/rewards without ever gating anything. Reading real usage
+  (`content/scripts/quests/quest_imp/scripts/imp_journal.rs2`'s
+  `inv_total(inv, black_bead) > 0`) found the actual gating idiom: `inv_total(inv|bank,
+  item)` / `inv_del(inv|bank, item)`. Narrowing to that pattern dropped the pinned set
+  to 53 items (568 of 1127 slots, since a handful of those 53 - coins chief among them,
+  278 corpus occurrences - are extremely common drops) and, just as importantly,
+  correctly UN-pinned false positives like `unidentified_rogues_purse` (mentioned in
+  two quests, but always via `inv_add` - handed to the player directly through a
+  search-box/herb-pick interaction, never gated by an `inv_total` check, so its
+  drop-table copy isn't actually load-bearing). Pinned items stay eligible as
+  *replacement* values for other slots - only their own original slot is protected,
+  since being sampled INTO another slot can only add availability.
+- **Rarity buckets (ultra/rare/uncommon/common/verycommon) are corpus-derived
+  percentile bands, not arbitrary round numbers** - computed from the actual
+  probability distribution of all 1127 slots (roughly 300/550/170/80/30 across
+  ≤1%/1-4%/4-10%/10-25%/>25%) via a throwaway survey script before picking the
+  boundaries, then spot-checked against familiar drops (coin slots land in
+  common/verycommon, rune sets in rare/uncommon, one-off dragon-tier items in ultra) to
+  confirm the bands feel right, not just that they're statistically even.
+- **`--mode tiered|chaos` is a flag because the user explicitly said they want this to
+  be an Archipelago slot option eventually, not a single fixed design.** Asked directly
+  which swap strategy to use (preserve-rarity-tier vs. full chaos) and the user
+  declined to pick one, saying they'd want it as an AP option - so both are implemented
+  behind one flag rather than picking a default and closing the door on the other.
+- **No safe "widen to the full catalog" move exists here, unlike drip's `model.pack`
+  widening.** Model values self-describe their category via naming convention
+  (`man_torso_basic`), so widening drip's pool to everything in `model.pack` was safe.
+  Item names have no equivalent convention (`dragonstone` doesn't self-describe
+  "monster-loot-appropriate" the way `man_torso_basic` self-describes "torso"), so both
+  swap modes sample only from items already observed in the vanilla drop-table corpus -
+  the narrower, "check the data" choice this codebase favors when there's no structural
+  signal to safely widen with.
+- **Quantity: stackable-aware, not blanket-preserved or blanket-reset.** A reassigned
+  slot keeps its original quantity only if the new item is stackable (per its `.obj`
+  config's `stackable=yes` - the same per-item config convention `owned_shop` uses for
+  shops), otherwise forced to 1. Verified this isn't a false signal by manually reading
+  a swapped `.rs2` diff line-by-line: a `rune_knife` landing at quantity 9 was initially
+  suspected as a bug (assumed knives aren't stackable) until checking the actual `.obj`
+  config confirmed rune_knife genuinely has `stackable=yes` in this content set (it's
+  thrown ammo, same as darts) - a reminder to verify against the data before concluding
+  something is a bug.
+- **`death_drop` is a separate, much simpler axis** - a single guaranteed-on-death
+  namedobj param (`big_bones`/`dragon_bones`/`ashes`/... - and at least one legitimately
+  odd vanilla value, `shellpoint_swamp`, a real registered `obj.pack` entry that turned
+  out to be a Mort Myre snail-minigame point token, not a bug) set on ~30 `.npc` files
+  scattered across `areas/`/`quests/`/`tutorial/`/minigames. Structurally identical to
+  shopsanity's `owned_shop` - a lone pointer field, shuffled via a straight
+  `derangement()`. Deliberately excludes `quests/` and `tutorial/` (Tutorial Island
+  protected the same way entrance randomization protects it; quest-NPC death drops are
+  left alone for the same "don't touch quest logic" caution applied to the main
+  cascade, even though none of their actual values were found to be quest-critical
+  items themselves). A handful of "fixed points" in the spoiler (`was === now`) are
+  expected, not a bug: `derangement()` guarantees no INDEX maps to itself, but two
+  different NPCs can and do share the same death_drop VALUE (multiple monsters drop
+  `big_bones`), so a genuine index-level reassignment can still show the same value.
+- **Verified with the same rigor as prior tools, each check re-derived independently
+  rather than trusted from the write path**: typecheck clean, a full `tools/pack/
+  Build.ts` run completing without error (confirms every sampled item resolves against
+  `obj.pack`), and three scripted checks against the seed-777 spoiler - zero
+  quest-critical slots reassigned (re-cross-referenced `loadQuestCriticalItems()`
+  against every `dropSwaps` entry's `wasItem`), zero tiered-mode swaps crossing their
+  probability bucket (rebuilt each bucket's vanilla item universe independently and
+  confirmed every `nowItem` is a member of the bucket recorded on its own spoiler
+  entry), and a line-diff spot-check across a brace-delimited file (bandit.rs2) and the
+  brace-less file (werewolf.rs2) confirming only the intended item/qty tokens changed,
+  CRLF intact, `if`/`else if` prefixes and comments untouched. **Not yet verified
+  in-game** - same caveat as every other content-mutation tool in this repo.
+
 ## Where this is heading (agreed with the user)
 
 Priority order discussed:
@@ -426,11 +565,13 @@ Priority order discussed:
    scanned placements in the spoiler)
 3. ~~NPC cosmetic ("drip") shuffle~~ (done: `model#=`/weapons shuffled by
    gender+body-part pool and shield-safe weapon pool, config-mutation approach per
-   archipelago-ideas.md #3, not yet played) and ~~shop-location shuffle~~ (done:
+   archipelago-ideas.md #3, not yet played), ~~shop-location shuffle~~ (done:
    whole-bundle derangement across shopkeepers, config-mutation approach per
    archipelago-ideas.md #4, not yet played - see the shopsanity domain-knowledge
-   section above for why this also skipped the runtime-override pattern). Drop
-   randomization remains - see [archipelago-ideas.md](archipelago-ideas.md).
+   section above for why this also skipped the runtime-override pattern), and
+   ~~drop randomization~~ (done: weighted loot-slot item reassignment + death_drop
+   shuffle, config/script-mutation approach per archipelago-ideas.md #2, not yet
+   played - see the "Domain knowledge: drop randomization" section below).
 4. Actual Archipelago protocol integration (AP world Python package, item/location
    handling, `xpRate`/`NODE_XPRATE` as a slot option, junk rewards straight to bank
    via `inv_add(bank, ...)`)
@@ -600,3 +741,56 @@ New files: `overlays/engine/tools/npc/{ShopParser,RandomizeShops}.ts`. Modified:
   have feedback later - don't assume the current design choices (whole-bundle
   derangement as default, `--mismatched-titles` as the opt-in chaos variant) are
   final until then.
+
+## Session-end addendum 5: drop randomization (2026-07-13, later session)
+
+User asked to work on NPC drop randomization next (archipelago-ideas.md #2, the last
+remaining item from the original six-idea brainstorm). Unlike drip/shops, this one has
+real gameplay-balance stakes rather than being purely cosmetic, so it started with
+`AskUserQuestion` rather than diving straight to implementation - see the "Domain
+knowledge: drop randomization" section above for the full design reasoning, including
+two real course-corrections found by checking real data (the `random()` denominator
+normalization bug caught by reading werewolf.rs2, and the quest-critical-item
+over-pinning bug caught by comparing pinned-slot counts before/after narrowing the
+detection pattern).
+
+- User's answers to the upfront questions: scope = monster drop-table corpus (73
+  files) + `death_drop` param, explicitly NOT the shared reward sub-tables or
+  quest/area inline drops; swap strategy = user declined to pick one, said they'd want
+  it as an Archipelago slot option - so both `tiered` (rarity-band-preserving, default)
+  and `chaos` (full corpus-wide sampling) modes are implemented behind `--mode`.
+- New files: `overlays/engine/tools/drops/{DropTableParser,RandomizeDrops}.ts`. No
+  existing files modified - reuses `BACKUP_ROOT`/`SCRIPTS_ROOT`/`ensureNpcBackup()`/
+  `findNpcFiles()`/`readNpcSource()` from `NpcDripParser.ts` directly for the
+  `death_drop` .npc-side pass, and gets its own `ensureDropScriptBackup()` for the
+  `.rs2` side (different file extension/subtree, same backup-root convention). README.md
+  has a new "Drop randomization" section.
+- Installed, typechecked (clean), and run end-to-end: seed 777, tiered mode - 559 of
+  1127 drop slots reassigned across 54 files (568 pinned: 53 quest-critical items'
+  original slots + 0 via `--exclude` in this run), 84 of ~94 eligible `death_drop`
+  params reassigned across 11 files. `npx tsx tools/pack/Build.ts` completed clean
+  (~1:20) afterward, confirming every sampled item/death_drop value resolves against
+  `obj.pack`.
+- **Verified** (all re-derived independently from the spoiler + a fresh parse, not just
+  trusted from the write path): 0 quest-critical slots reassigned away, 0 tiered-mode
+  swaps landed outside their recorded probability bucket, 0 no-op "swaps" (every
+  spoiler entry actually changed something), every swapped-in item traced back to the
+  vanilla corpus. Line-diff spot-checked `bandit.rs2` (brace-delimited style) and
+  `werewolf.rs2` (brace-less style) - only the intended item/qty tokens changed, CRLF
+  intact, surrounding `if`/`else if` code and comments untouched in both styles.
+- The esbuild win32/linux ping-pong (see the Environment gotchas section) recurred this
+  session; the documented fix's second half (`npm install --no-save --force
+  @esbuild/win32-x64`) hit an `ENOTEMPTY` error mid-run, but the plain `npm install`
+  half alone was sufficient to unblock `tsx` from WSL - didn't chase the win32
+  reinstall further since nothing in this session needed to run from Windows.
+- **Not yet verified in-game** - same caveat as every other content-mutation tool in
+  this repo. The live Server checkout currently has seed-777 drop randomization
+  (tiered mode) layered on top of the drip seed 555 + shops seed 777 + entrance seed
+  777 state from prior sessions, all coexisting, all pack-built.
+- **Known open risk, not yet mitigated**: the `inv_total`/`inv_del`-argument pattern
+  for quest-critical detection is a real improvement over "any mention" but is still a
+  heuristic, not a proof - a quest could theoretically gate on an item through some
+  other check shape (a `switch` on the item, a custom proc, a param comparison) that
+  wouldn't match `inv_total(inv|bank, item)` literally. If a future session or the user
+  finds a quest broken by a missing drop-table item, that's the first place to look,
+  and the fix is either widening the regex or adding the specific item to `--exclude`.
