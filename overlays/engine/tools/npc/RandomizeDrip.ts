@@ -3,10 +3,10 @@ import path from 'path';
 
 import { printInfo, printWarning } from '#/util/Logger.js';
 
-import { CONTENT_ROOT, SCRIPTS_ROOT, type ModelSlot, findNpcFiles, parseSlots, readNpcSource } from './NpcDripParser.js';
-import { derangement, mulberry32 } from '../shared/Prng.js';
+import { CONTENT_ROOT, SCRIPTS_ROOT, type ModelSlot, findNpcFiles, loadModelUniverse, parseSlots, readNpcSource } from './NpcDripParser.js';
+import { mulberry32 } from '../shared/Prng.js';
 
-// Shuffles NPC cosmetics (outfits/hair/etc) by permuting model# values within matching
+// Shuffles NPC cosmetics (outfits/hair/etc) by reassigning model# values within matching
 // slot pools across every .npc config in the content tree. Pure config mutation - no
 // engine or script changes, no gameplay coupling (see docs/archipelago-ideas.md #3,
 // which explicitly calls this the easiest of the six ideas and recommends exactly this
@@ -15,12 +15,14 @@ import { derangement, mulberry32 } from '../shared/Prng.js';
 // (npx tsx tools/pack/Build.ts) since model# is compiled into npc.dat, not read at
 // runtime.
 //
-// Pools are keyed by gender + body-part category (e.g. "man_torso", "woman_hat"), each
-// built from every occurrence of a matching model value across all NPCs, then
-// deranged (a value-preserving permutation - see derangement() in ../shared/Prng.ts)
-// so the same set of models still exists in the game, just redistributed. This is the
-// same technique RandomizeEntrances.ts uses for gate pairs, applied here to individual
-// model slots.
+// Pools are keyed by gender + body-part category (e.g. "man_torso", "woman_hat"). Each
+// model# slot gets an independently-sampled replacement drawn from every valid model in
+// that category across the WHOLE cache (content/pack/model.pack via
+// loadModelUniverse()), not just the values some NPC already happens to be wearing -
+// that pool is meaningfully bigger (e.g. woman_hat: 23 valid models vs only 8 ever worn
+// by a vanilla NPC), so this surfaces combinations vanilla never used. Every slot is
+// guaranteed to actually change (resampled until it differs from its own original
+// value, unless the category has fewer than 2 valid models total).
 //
 // Values that don't match the `(man|woman)_<part>_<detail>` naming convention (creature
 // models, held-item models like human_weapons_*) are left untouched - see
@@ -100,23 +102,42 @@ function main() {
         (pools.get(key) ?? pools.set(key, []).get(key)!).push(s);
     }
 
+    const modelUniverse = loadModelUniverse();
+    // in --mixed-gender mode a pool key is just the category ("torso") - merge both
+    // genders' cache universes so a man_ NPC can end up in woman_ gear and vice versa.
+    function universeFor(key: string): string[] {
+        if (!mixedGender) {
+            return modelUniverse.get(key) ?? [];
+        }
+        const man = modelUniverse.get(`man_${key}`) ?? [];
+        const woman = modelUniverse.get(`woman_${key}`) ?? [];
+        return [...new Set([...man, ...woman])];
+    }
+
     const newValueBySlot = new Map<ModelSlot, string>();
-    const poolSummaries: { pool: string; size: number; changed: number }[] = [];
+    const poolSummaries: { pool: string; universeSize: number; occurrences: number; changed: number }[] = [];
     for (const [key, slots] of [...pools].sort(([a], [b]) => a.localeCompare(b))) {
-        if (slots.length < 2) {
-            printWarning(`pool "${key}" has only ${slots.length} value(s) - left vanilla`);
+        const universe = universeFor(key);
+        if (universe.length < 2) {
+            printWarning(`pool "${key}" has only ${universe.length} model(s) in model.pack - left vanilla`);
             continue;
         }
-        const perm = derangement(slots.length, mulberry32(seed ^ hashKey(key)));
+
+        const rand = mulberry32(seed ^ hashKey(key));
         let changed = 0;
-        for (let i = 0; i < slots.length; i++) {
-            const newValue = slots[perm[i]].value;
-            newValueBySlot.set(slots[i], newValue);
-            if (newValue !== slots[i].value) {
+        for (const slot of slots) {
+            let candidate = slot.value;
+            // resample until it actually differs from the slot's own original value -
+            // bounded so a pathological universe can't spin forever.
+            for (let attempt = 0; attempt < 50 && candidate === slot.value; attempt++) {
+                candidate = universe[Math.floor(rand() * universe.length)];
+            }
+            newValueBySlot.set(slot, candidate);
+            if (candidate !== slot.value) {
                 changed++;
             }
         }
-        poolSummaries.push({ pool: key, size: slots.length, changed });
+        poolSummaries.push({ pool: key, universeSize: universe.length, occurrences: slots.length, changed });
     }
 
     let filesWritten = 0;
@@ -170,8 +191,7 @@ function main() {
 }
 
 // derives a distinct per-pool sub-seed so pools don't all draw from the same PRNG
-// stream in lockstep (e.g. every "size 12" pool getting an identical-shaped
-// permutation) while staying fully reproducible from the one --seed value.
+// stream in lockstep while staying fully reproducible from the one --seed value.
 function hashKey(key: string): number {
     let h = 0;
     for (let i = 0; i < key.length; i++) {

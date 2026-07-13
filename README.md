@@ -146,12 +146,16 @@ Tools (`overlays/engine/tools/npc/`):
   The value's own naming convention is the only real signal, which is why grouping is
   by that instead of by index.
 - `RandomizeDrip.ts` - groups those values into pools keyed by gender + body-part
-  category, deranges each pool (same value-preserving-permutation technique as the
-  entrance gate shuffle), and writes the result back into the live `.npc` files.
+  category, and reassigns every slot to a value independently sampled from
+  `loadModelUniverse()` (every valid model for that category in `content/pack/
+  model.pack`, not just the ones some NPC already happens to be wearing - see Scope
+  below), then writes the result back into the live `.npc` files. Each slot is
+  resampled until it actually differs from its own original value.
 
-Shared (`overlays/engine/tools/shared/Prng.ts`): the seedable PRNG + `derangement()`
-helper, factored out so entrance and drip randomization use the exact same tested
-shuffle algorithm.
+Shared (`overlays/engine/tools/shared/Prng.ts`): the seedable PRNG used for the
+per-pool sampling streams, and the `derangement()` helper the entrance gate shuffle
+uses (drip doesn't use `derangement()` itself - its pool is bigger than its occurrence
+count, so it's independent sampling rather than a permutation of a fixed list).
 
 ### Usage
 
@@ -182,6 +186,12 @@ left vanilla, since swapping them in would produce nonsense (a torso slot gettin
 weapon model, a monster getting a human body part). `head#=` (chat-portrait models) and
 `recol#s`/`recol#d` (palette color swaps) are untouched in this pass - a possible
 future extension.
+
+The replacement pool per category is every valid model in `content/pack/model.pack`
+matching that category, not just the values vanilla NPCs happen to already wear -
+those two are meaningfully different sizes (e.g. `woman_hat` has 23 valid models in
+the cache but only 8 ever appear on a vanilla NPC). This means swaps can and do
+produce combinations no vanilla NPC ever wore.
 
 **Known risk, not yet mitigated**: some NPCs may be visually load-bearing for quest
 recognition (a disguise, an NPC you're told to identify by appearance). There's no

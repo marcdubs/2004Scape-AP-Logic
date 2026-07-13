@@ -289,27 +289,38 @@ feature (see [archipelago-ideas.md](archipelago-ideas.md) #3). Encoded in
   `scripts/` with no `_unpack` exclusion at the load level (only a structural lint
   rule in `crawlConfigNames` exempts that folder from the "must live in a `configs/`
   folder" check). They're included in the shuffle scan for that reason.
-- **Derangement, not a distinct-value substitution cipher.** Pools permute
-  *occurrences* (every `model#=` line site), not distinct values - reuses
-  `derangement()` from `../shared/Prng.ts` (the same function entrance randomization's
-  gate shuffle uses, factored out this session). This preserves the vanilla frequency
-  distribution of each model (a common value like `man_torso_basic` still shows up
-  about as often, just on different NPCs) rather than a cipher's tendency to amplify
-  whichever distinct value a popular one happens to map to.
-- **Per-pool sub-seeding** (`seed ^ hashKey(poolName)`): without it every same-sized
-  pool draws from the PRNG in lockstep and produces suspiciously-correlated
-  permutations. Cheap, fully reproducible from one `--seed`.
+- **Sample from the full cache universe, not just what vanilla NPCs already wear.**
+  The first version of this tool deranged *occurrences* (a permutation of the values
+  already found across `.npc` files) - the user asked directly whether it was
+  randomizing "against a list of all possible wearables," which it wasn't, and the gap
+  was real: `content/pack/model.pack` (a static id=name catalog, checked into vanilla
+  content, NOT build-generated/gitignored like script.pack/map.pack) has meaningfully
+  more valid models per category than vanilla ever assigns to an NPC - e.g. `woman_hat`
+  has 23 valid models in the cache but only 8 ever show up on a vanilla NPC, `man_hands`
+  7 vs 3. `NpcDripParser.ts`'s `loadModelUniverse()` now parses `model.pack` directly
+  (same `SWAPPABLE_RE` convention) to build the real per-category universe, and
+  `RandomizeDrip.ts` samples each slot independently from it (resampled up to 50x until
+  it differs from the slot's own original value) instead of deranging a fixed list.
+  Lesson for future sessions: when a randomizer's pool source is "whatever this repo's
+  authors happened to already use" vs. "everything the underlying system actually
+  supports," check which one was asked for - they silently produce very different
+  amounts of variety, and the narrower one is easy to reach for first because it's
+  already sitting there parsed.
+- **Per-pool sub-seeding** (`seed ^ hashKey(poolName)`): without it every pool draws
+  from the PRNG in lockstep and produces suspiciously-correlated results. Cheap, fully
+  reproducible from one `--seed`.
 - **`head#=` (chat-portrait bust models) and `recol#s`/`recol#d` (palette color
   swaps) are out of scope for this pass** - deliberate, not an oversight. Recoloring
   in particular is a plausible follow-up (recolors are generic palette-index remaps,
   not model-specific, so they'd very likely still apply cleanly to a swapped model)
   but adds a second axis of chaos that wasn't asked for yet.
 - **No verified in-game testing yet** - offline checks only: typecheck, a full
-  `tools/pack/Build.ts` run completing without error (confirms every swapped value
-  resolved against `model.pack`, since swap values are always values scraped from
-  *some* real vanilla `.npc` line, never invented), and a line-diff spot-check against
-  the vanilla backup showing only the intended `model#=` lines changed, CRLF intact.
-  Hand off actual visual verification to the user (see WSL boot restriction above).
+  `tools/pack/Build.ts` run completing without error (confirms every sampled value
+  resolves against `model.pack` - trivially true now since `loadModelUniverse()` reads
+  its candidate values directly from `model.pack`, so nothing sampled can be an invalid
+  name), and a line-diff spot-check against the vanilla backup showing only the
+  intended `model#=` lines changed, CRLF intact. Hand off actual visual verification to
+  the user (see WSL boot restriction above).
 
 ## Where this is heading (agreed with the user)
 
@@ -397,3 +408,31 @@ reasoning.
 - The live Server checkout currently has the seed-777 drip shuffle applied and
   pack-built (on top of the seed-777 entrance shuffle from the earlier session) - both
   randomizers' outputs currently coexist in the same running-ready state.
+
+## Session-end addendum 2: drip pool widened to the full model.pack universe (2026-07-13)
+
+The user asked "are you randomizing against a list of all possible wearables?" - the
+honest answer was no (see the domain-knowledge section's "Sample from the full cache
+universe" bullet for the full reasoning and numbers), and they asked for it to be
+fixed. `RandomizeDrip.ts` no longer deranges occurrences; it samples each `model#`
+slot independently from `NpcDripParser.ts`'s new `loadModelUniverse()` (parses
+`content/pack/model.pack` directly). `derangement()` is no longer used by drip at all
+(still used by `RandomizeEntrances.ts` - only removed the import in `RandomizeDrip.ts`).
+
+- Re-ran seed 777 end-to-end after the change: 21 pools, **5520** model swaps (up from
+  4193 - every eligible slot changes now, since resampling from a bigger pool almost
+  never lands on the original value on the first draw, and the tool retries up to 50x
+  when it does). Universe sizes per pool now logged in the spoiler
+  (`engine/tools/npc/drip-seed.json`) alongside occurrence counts, e.g. `man_hat`:
+  25 available / 111 occurrences / 111 changed.
+- Re-typechecked (clean) and re-ran a full `tools/pack/Build.ts` (clean, ~1:24) -
+  confirms every sampled value resolves, which is now closer to a tautology than a
+  test (`loadModelUniverse()` sources candidates straight from `model.pack`'s own
+  entries), but still confirms the parsing/regex logic didn't drift.
+- Spot-checked `banker1`/`banker2`/`banker3` diffs against the vanilla backup again:
+  every `model#=` line for these blocks changed this time (previously derangement left
+  some unchanged when a slot happened to keep its own value in the permutation), values
+  now include combinations no vanilla NPC wears (`man_hands_hook`,
+  `man_feet_climbingboots_crampons`, `woman_hands_dragon_vambrace`).
+- Same caveats as addendum 1 still apply: no in-game testing yet, no disguise/quest
+  exclude list populated by default.

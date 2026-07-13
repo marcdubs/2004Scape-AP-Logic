@@ -21,6 +21,7 @@ import path from 'path';
 
 export const CONTENT_ROOT = path.resolve(process.cwd(), '../content');
 export const SCRIPTS_ROOT = path.join(CONTENT_ROOT, 'scripts');
+const MODEL_PACK_PATH = path.join(CONTENT_ROOT, 'pack', 'model.pack');
 
 export type Gender = 'man' | 'woman';
 
@@ -102,4 +103,42 @@ export function parseSlots(filePath: string, relFile: string): ModelSlot[] {
     }
 
     return slots;
+}
+
+// the full universe of swappable model values, keyed by "gender_category" (e.g.
+// "man_hat") - every entry the cache actually has, not just the ones some NPC happens
+// to already be wearing. content/pack/model.pack is a static id=name catalog checked
+// into vanilla content (unlike script.pack/map.pack, it's not build-generated and not
+// gitignored), so this is safe to read directly.
+//
+// This is deliberately a *bigger* pool than parseSlots() finds across .npc files -
+// e.g. woman_hat has 23 valid models in the cache but vanilla NPCs only ever wear 8 of
+// them. Sampling from here instead of just deranging what's already in use is what
+// makes previously-unseen combinations possible.
+export function loadModelUniverse(): Map<string, string[]> {
+    const bySwapKey = new Map<string, Set<string>>();
+    if (!fs.existsSync(MODEL_PACK_PATH)) {
+        return new Map();
+    }
+
+    const lines = fs.readFileSync(MODEL_PACK_PATH, 'utf8').split(/\r?\n/);
+    for (const line of lines) {
+        const eq = line.indexOf('=');
+        if (eq === -1) {
+            continue;
+        }
+        const value = line.slice(eq + 1).trim();
+        const swapMatch = value.match(SWAPPABLE_RE);
+        if (!swapMatch) {
+            continue;
+        }
+        const key = `${swapMatch[1]}_${swapMatch[2]}`;
+        (bySwapKey.get(key) ?? bySwapKey.set(key, new Set()).get(key)!).add(value);
+    }
+
+    const out = new Map<string, string[]>();
+    for (const [key, values] of bySwapKey) {
+        out.set(key, [...values].sort());
+    }
+    return out;
 }
