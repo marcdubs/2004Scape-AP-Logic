@@ -355,6 +355,67 @@ feature (see [archipelago-ideas.md](archipelago-ideas.md) #3). Encoded in
   and a two-handed-tagged value present (259/259 reassigned groups clean). Same offline
   caveats as the body-part pools apply - pack build succeeds, no in-game check yet.
 
+## Domain knowledge: shopsanity (shop location randomization)
+
+Built right after weapon shuffling, same day. Encoded in `ShopParser.ts`/
+`RandomizeShops.ts`, config-mutation approach like drip (see the file header comment
+in `RandomizeShops.ts` for why this deliberately does NOT use the runtime-override
+pattern, despite an earlier session's note in this doc suggesting shop-location
+randomization should - that note was an aspiration written before drip proved config
+mutation is the right call whenever the field being swapped isn't a single scalar and
+the reseed-speed win doesn't matter enough to justify the complexity. Treat "build on
+the override pattern" as a default to consider, not a hard rule - see the entrance vs.
+drip vs. shops split for when each is actually justified).
+
+- **Shop stock lives in `.inv` config files** (e.g. `content/scripts/areas/
+  area_alkharid/configs/alkharid.inv`), each holding multiple `[shopname]` blocks
+  with `size`/`restock`/`stock1=obj,qty,respawn` etc - same "one file, multiple named
+  blocks" shape as `.npc`. An NPC points at one via `param=owned_shop,<name>` (an
+  `inv`-typed param, validated against `inv.pack`'s id<->name registry at build time -
+  same validation mechanism as `model.pack` for `model#=`). This tool never touches
+  `.inv` stock files at all - "stock stays put, access moves" (archipelago-ideas.md
+  #4's own framing) falls out naturally from only ever moving the *pointer*.
+- **All 117 vanilla `owned_shop` occurrences carry the full 5-param bundle** (`shop_
+  sell_multiplier`/`shop_buy_multiplier`/`shop_delta`/`shop_title` alongside
+  `owned_shop` itself) - verified by scanning every occurrence before writing any
+  shuffle logic, same "check the data first" discipline as the weapon
+  classification. This is what makes a clean whole-bundle derangement safe: no
+  partial/default-value cases to special-case.
+- **Found real hardcoded-shop NPCs by grepping every `~openshop(` call site**, not by
+  assuming the param path is universal. `~openshop_activenpc` (reads
+  `state.activeNpc.type` params) is the common path (~109 NPCs), but `dommik`/`rommik`
+  branch on `map_members` with a **literal** `~openshop(craftingshop2, ...)` /
+  `~openshop(craftingshop2_free, ...)` call in their own `opnpc3` handler - their
+  `opnpc1` dialogue path DOES read the param (inconsistent even in vanilla), so
+  reassigning their param would make talk-to and right-click-Trade show different
+  shops. `duel_fadli` and `regicidegeneralshopkeeper` have the same pattern. All 4
+  were caught automatically by `loadHardcodedShopIds()` (collects every literal id
+  argument to `~openshop(`, excludes any bundle whose current value matches) - a
+  manual first-pass inspection of a handful of these files missed 2 of the 4
+  (`duel_fadli`, `regicidegeneralshopkeeper` - eyeballing a narrow grep context around
+  the debugname isn't reliable; the automated whole-file scan caught what manual
+  spot-checking didn't). Lesson: when a "does X read from data or is it hardcoded"
+  question matters for correctness, write the check as code and run it over
+  everything, don't eyeball a sample.
+- **Found and fixed a real cross-tool data-loss bug while designing this**: both
+  `RandomizeDrip.ts` and `RandomizeShops.ts` touch the same `.npc` files. The
+  original `RandomizeDrip.ts` write step rebuilt each file's full text from the
+  *pristine backup* every run (by design, so re-seeding drip alone never compounds) -
+  but that means if shops had run first, drip's rewrite-from-backup would silently
+  erase the shop edits (and vice versa, whichever tool runs last wins). Fixed by
+  splitting the two roles: parse/decide *values* from the backup (unaffected by any
+  prior tool run, keeps seeds reproducible), but read the base text to edit from the
+  **current live file**, not the backup - safe because line indices are identical
+  between backup and live (edits only ever replace a line's value, never add/remove
+  lines). `ensureNpcBackup()`/`BACKUP_ROOT`/`findNpcFiles`/`readNpcSource` moved into
+  `NpcDripParser.ts` as shared infrastructure so every future `.npc`-config tool
+  reuses the same backup + read-live-write-live convention automatically instead of
+  re-deriving it (and re-risking the same bug) per tool.
+- **Verified**: re-ran drip after shops (and shops after drip) and confirmed via diff
+  that both tools' edits coexist in the same file with zero unexpected lines changed
+  (only `model#=`/weapon/`param=` lines touched). Seed 777: 113/117 shops reassigned,
+  4 excluded (the hardcoded ones above), pack build clean. Not yet verified in-game.
+
 ## Where this is heading (agreed with the user)
 
 Priority order discussed:
@@ -363,11 +424,13 @@ Priority order discussed:
 2. ~~Any-source placements via a `.jm2` LOC scanner~~ (done for
    trapdoor/cellar-ladder types; more surface loc types remain - see unpaired
    scanned placements in the spoiler)
-3. ~~NPC cosmetic ("drip") shuffle~~ (done: `model#=` shuffled by gender+body-part
-   pool, config-mutation approach per archipelago-ideas.md #3, not yet played).
-   Drop randomization and shop-location shuffle remain - see
-   [archipelago-ideas.md](archipelago-ideas.md); reuse the runtime override-table
-   pattern from entrances for those two (drip deliberately did NOT - see above).
+3. ~~NPC cosmetic ("drip") shuffle~~ (done: `model#=`/weapons shuffled by
+   gender+body-part pool and shield-safe weapon pool, config-mutation approach per
+   archipelago-ideas.md #3, not yet played) and ~~shop-location shuffle~~ (done:
+   whole-bundle derangement across shopkeepers, config-mutation approach per
+   archipelago-ideas.md #4, not yet played - see the shopsanity domain-knowledge
+   section above for why this also skipped the runtime-override pattern). Drop
+   randomization remains - see [archipelago-ideas.md](archipelago-ideas.md).
 4. Actual Archipelago protocol integration (AP world Python package, item/location
    handling, `xpRate`/`NODE_XPRATE` as a slot option, junk rewards straight to bank
    via `inv_add(bank, ...)`)
@@ -499,3 +562,41 @@ vanilla despite reading as two-handed).
 - Same caveats as addenda 1-2: no in-game testing yet (so no confirmation the "one
   weapon + one shield" pairing actually looks right rendered, only that the data-level
   constraint holds), no disguise/quest exclude list populated by default.
+
+## Session-end addendum 4: shopsanity (2026-07-13)
+
+User asked to add shopsanity next. See the "Domain knowledge: shopsanity" section
+above for the full design - the two things most worth a future session knowing:
+
+1. **A real bug was caught and fixed while building this**: `RandomizeDrip.ts` used
+   to rebuild each `.npc` file from the pristine backup on every run, which would have
+   silently erased `RandomizeShops.ts`'s edits (or vice versa) whenever both tools
+   touch the same file. Fixed by making every `.npc`-config tool parse values from the
+   backup but write onto the current live file. If a future tool is added that also
+   edits `.npc` files, use `ensureNpcBackup()`/`BACKUP_ROOT`/`findNpcFiles()` from
+   `NpcDripParser.ts` rather than reinventing backup/write logic - that's exactly the
+   mistake this bug came from.
+2. **4 shopkeepers are permanently excluded** because their shop is hardcoded in
+   script rather than read from their `.npc` param: `dommik`, `rommik`,
+   `duel_fadli`, `regicidegeneralshopkeeper`. Found by grepping every `~openshop(`
+   call site across all scripts, not by inspecting a sample - a manual first pass at
+   a handful of files only caught 2 of the 4.
+
+New files: `overlays/engine/tools/npc/{ShopParser,RandomizeShops}.ts`. Modified:
+`NpcDripParser.ts` (added `BACKUP_ROOT`/`ensureNpcBackup()`), `RandomizeDrip.ts`
+(uses the shared backup helper, write-from-live fix). README.md has a new
+"Shopsanity" section.
+
+- Re-ran seed 777: 113/117 shops reassigned (4 excluded as above), pack build clean.
+  Cross-tool composition verified: ran drip (seed 555) after shops (seed 777) and
+  confirmed via diff that both tools' edits survive in the same files with zero
+  unexpected lines touched.
+- The live Server checkout currently has: drip seed 555 (outfits + weapons) + shops
+  seed 777 (shop reassignments) + entrance seed 777 (from the first session), all
+  coexisting, all pack-built. Seeds are independent per tool/run right now - there's
+  no single "one seed drives everything" entry point yet; that's natural follow-up
+  work once actual AP integration needs one.
+- Not yet verified in-game. User said they'll test when they get a chance and may
+  have feedback later - don't assume the current design choices (whole-bundle
+  derangement as default, `--mismatched-titles` as the opt-in chaos variant) are
+  final until then.

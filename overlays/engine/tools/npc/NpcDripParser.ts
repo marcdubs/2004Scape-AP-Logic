@@ -22,9 +22,17 @@ import path from 'path';
 // `key=value` - no inline comments, no inheritance (`readConfigs` in the engine's own
 // pack tooling treats duplicate block names as a hard build error), so a line-indexed
 // read-modify-write is safe and exact.
+//
+// This file also hosts the file-discovery/backup helpers shared by every .npc-config
+// randomizer (currently RandomizeDrip.ts and RandomizeShops.ts) - CONTENT_ROOT,
+// SCRIPTS_ROOT, BACKUP_ROOT, findNpcFiles(), readNpcSource(), ensureNpcBackup(). All
+// of them touch the same underlying .npc files, so they share ONE backup convention
+// and ONE "write onto the current live file, not a fresh copy of the backup" rule -
+// see ensureNpcBackup()'s comment for why the latter matters.
 
 export const CONTENT_ROOT = path.resolve(process.cwd(), '../content');
 export const SCRIPTS_ROOT = path.join(CONTENT_ROOT, 'scripts');
+export const BACKUP_ROOT = path.join(CONTENT_ROOT, '.ap-backup', 'scripts');
 const MODEL_PACK_PATH = path.join(CONTENT_ROOT, 'pack', 'model.pack');
 
 export type Gender = 'man' | 'woman';
@@ -62,6 +70,27 @@ export function findNpcFiles(root: string): string[] {
         walk(root, out);
     }
     return out.sort();
+}
+
+// backs up every live .npc file the first time it's touched, so any randomizer's
+// output always derives from pristine vanilla instead of compounding onto a previous
+// run's output. Per-file (not per-directory) since these files are scattered across
+// the whole content tree - a partial/interrupted first run still leaves every
+// untouched file's backup intact. Shared across every .npc-config tool (drip,
+// shops, ...) so they all agree on one pristine baseline.
+export function ensureNpcBackup(): number {
+    let created = 0;
+    for (const file of findNpcFiles(SCRIPTS_ROOT)) {
+        const rel = path.relative(SCRIPTS_ROOT, file);
+        const backupPath = path.join(BACKUP_ROOT, rel);
+        if (fs.existsSync(backupPath)) {
+            continue;
+        }
+        fs.mkdirSync(path.dirname(backupPath), { recursive: true });
+        fs.copyFileSync(file, backupPath);
+        created++;
+    }
+    return created;
 }
 
 // content files are CRLF - normalize on read, caller restores CRLF on write (see the

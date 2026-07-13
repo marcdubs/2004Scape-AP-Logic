@@ -4,11 +4,12 @@ import path from 'path';
 import { printInfo, printWarning } from '#/util/Logger.js';
 
 import {
-    CONTENT_ROOT,
+    BACKUP_ROOT,
     SCRIPTS_ROOT,
     type ModelSlot,
     type WeaponGroup,
     type WeaponSlot,
+    ensureNpcBackup,
     findNpcFiles,
     isShieldName,
     loadModelUniverse,
@@ -52,28 +53,7 @@ import { mulberry32 } from '../shared/Prng.js';
 //
 // Usage: npx tsx tools/npc/RandomizeDrip.ts [--seed <number>] [--dry-run] [--mixed-gender] [--no-weapons] [--exclude <substr,substr,...>]
 
-const BACKUP_ROOT = path.join(CONTENT_ROOT, '.ap-backup', 'scripts');
 const SPOILER_OUTPUT = path.join(import.meta.dirname, 'drip-seed.json');
-
-// backs up every live .npc file the first time it's touched, so re-randomizing always
-// derives from pristine vanilla instead of compounding onto a previous seed's output.
-// per-file (not per-directory, unlike the entrance backup) since drip spans ~140 files
-// scattered across the whole content tree - a partial/interrupted first run should
-// still leave every untouched file's backup intact.
-function ensureBackup(liveFiles: string[]): number {
-    let created = 0;
-    for (const file of liveFiles) {
-        const rel = path.relative(SCRIPTS_ROOT, file);
-        const backupPath = path.join(BACKUP_ROOT, rel);
-        if (fs.existsSync(backupPath)) {
-            continue;
-        }
-        fs.mkdirSync(path.dirname(backupPath), { recursive: true });
-        fs.copyFileSync(file, backupPath);
-        created++;
-    }
-    return created;
-}
 
 function parseArgs() {
     const args = process.argv.slice(2);
@@ -111,8 +91,7 @@ function main() {
 
     const { seed, dryRun, mixedGender, noWeapons, exclude } = parseArgs();
 
-    const liveFiles = findNpcFiles(SCRIPTS_ROOT);
-    const backedUp = ensureBackup(liveFiles);
+    const backedUp = ensureNpcBackup();
     if (backedUp) {
         printInfo(`created vanilla content backup for ${backedUp} file(s) at ${BACKUP_ROOT}`);
     }
@@ -264,7 +243,12 @@ function main() {
             continue;
         }
 
-        const lines = readNpcSource(file).split('\n');
+        // base text is the CURRENT LIVE file, not the backup - line indices are stable
+        // across backup/live (edits only ever replace a line's value, never add/remove
+        // lines), but reading the backup here would silently erase any edits another
+        // .npc-config tool (e.g. RandomizeShops.ts) already applied to this same file.
+        const livePath = path.join(SCRIPTS_ROOT, rel);
+        const lines = readNpcSource(livePath).split('\n');
         for (const slot of bodyEdits) {
             const newValue = newValueBySlot.get(slot)!;
             lines[slot.line] = `${slot.field}=${newValue}`;
@@ -279,7 +263,7 @@ function main() {
         filesWritten++;
         slotsChanged += bodyEdits.length + weaponEdits.length;
         if (!dryRun) {
-            fs.writeFileSync(path.join(SCRIPTS_ROOT, rel), lines.join('\n').replace(/\n/g, '\r\n'));
+            fs.writeFileSync(livePath, lines.join('\n').replace(/\n/g, '\r\n'));
         }
     }
 

@@ -227,3 +227,54 @@ untouched.
 **Known risk, not yet mitigated**: some NPCs may be visually load-bearing for quest
 recognition (a disguise, an NPC you're told to identify by appearance). There's no
 built-in exclude list for this - use `--exclude` once such NPCs are identified.
+
+## Shopsanity (shop location randomization)
+
+Shuffles which NPC has which shop. Pure config mutation on `.npc` files, same class of
+change as drip - **not** the runtime-override pattern entrances use (a shop reassignment
+touches 5 fields at once and several shop-opening code paths are bespoke scripts that
+don't even read the NPC's params, so a runtime override wouldn't cover meaningfully more
+ground while being far more complex). Reseeding needs a content pack rebuild, same as
+drip - the two tools share one vanilla backup and compose correctly with each other
+(each reads its *values* to shuffle from the pristine backup, but writes its edits onto
+the *current live* file, so running drip and shops in either order, or re-running either
+one, never erases the other's changes).
+
+### Pieces
+
+Tools (`overlays/engine/tools/npc/`):
+
+- `ShopParser.ts` - a shopkeeper NPC points at its stock via `param=owned_shop,<inv
+  name>` (`content/scripts/shop/scripts/shop.rs2`'s `~openshop_activenpc` reads it,
+  along with `shop_sell_multiplier`/`shop_buy_multiplier`/`shop_delta`/`shop_title`
+  from the same NPC). Every one of the 117 `owned_shop` occurrences in vanilla has all
+  5 params present, so `parseShopBundles()` treats them as one atomic 5-field bundle.
+  `loadHardcodedShopIds()` finds every shop id that's hardcoded as a literal argument
+  to `~openshop(...)` somewhere in scripts instead of read from the param (vanilla has
+  4: `dommik`, `rommik` pick a members/f2p shop id in a hardcoded if/else in their own
+  `opnpc3` handler; `duel_fadli` and `regicidegeneralshopkeeper` similarly have a
+  same-shop-id hardcoded elsewhere) - any bundle whose current shop matches one of
+  these is excluded, since reassigning its param would silently do nothing (or worse,
+  make its dialogue path and its right-click-Trade path show different shops).
+- `RandomizeShops.ts` - deranges the whole bundle across every eligible shopkeeper by
+  default, so a shop's title/pricing stays internally consistent, just relocated to a
+  different NPC ("stock stays put, access moves").
+
+### Usage
+
+```
+cd Server/engine && npx tsx tools/npc/RandomizeShops.ts [--seed <number>] [--dry-run] [--mismatched-titles] [--exclude <substr,substr,...>]
+cd Server/engine && npx tsx tools/pack/Build.ts
+```
+
+...then restart the server. Spoiler is `engine/tools/npc/shop-seed.json`.
+
+`--mismatched-titles` deranges only the `owned_shop` field, leaving each NPC's own
+title/pricing in place - a shopkeeper's personality/prices no longer match what
+they're actually selling (chaos/comedy variant, per archipelago-ideas.md #4's own
+suggestion). Default carries the whole bundle so the shop still makes internal sense
+at its new location.
+
+**Known risk, not yet mitigated**: since players may rely on specific shops for quest
+items, a shuffled seed needs its spoiler treated as load-bearing data once real AP
+logic-gen exists, not just a nice-to-have log. Not yet verified in-game.
