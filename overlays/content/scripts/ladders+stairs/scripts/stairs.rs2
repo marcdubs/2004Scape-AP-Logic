@@ -1,5 +1,5 @@
 [oploc1,stairs]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -47,7 +47,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,stairstop]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -96,7 +96,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,yanillestairsdown]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -108,7 +108,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,yanillestairsup]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -120,7 +120,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,spookystairs]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -134,7 +134,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,spookystairstop]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -149,7 +149,7 @@ switch_coord (loc_coord) {
 
 
 [oploc1,stairs_cellar]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -166,7 +166,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,loc_1734]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -183,7 +183,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,loc_1736]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -201,7 +201,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,outdoorstairs_wooden_bottom]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -219,7 +219,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,spiralstairs]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -280,7 +280,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,spiralstairsmiddle]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -300,7 +300,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc2,spiralstairsmiddle]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 2);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -320,7 +320,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc3,spiralstairsmiddle]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 3);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -340,7 +340,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,spiralstairstop]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -401,7 +401,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,spiralstairs_wooden]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -415,7 +415,7 @@ switch_int (loc_angle) {
 }
 
 [oploc1,spiralstairstop_wooden]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -429,7 +429,7 @@ switch_int (loc_angle) {
 }
 
 [oploc1,balance40up]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -444,7 +444,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,cryptstairsdown]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -459,7 +459,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,cryptstairsup]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -471,7 +471,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,woodenstairs]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -490,7 +490,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,woodenstairstop]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -509,7 +509,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,board_game_stairs_top]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -521,7 +521,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,board_game_stairs_top2]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -531,7 +531,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,board_game_stairs_base]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -543,7 +543,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,board_game_stairs_base2]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -553,7 +553,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,board_game_stairs_grey_all]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -567,7 +567,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,board_game_stairs_grey_top]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -578,7 +578,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,board_game_stairs_grey_base]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -589,7 +589,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,board_game_stairs_grey_base2]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -604,9 +604,19 @@ switch_coord (loc_coord) {
 
 [label,stair_options](coord $up, coord $down)
 def_int $option = ~p_choice2_header("Climb up the stairs.", 1, "Climb down the stairs.", 2, "Climb up or down the stairs?");
+def_coord $ap_up = ap_entrance_override(loc_coord, 2);
+def_coord $ap_down = ap_entrance_override(loc_coord, 3);
 if ($option = 1) {
+    if ($ap_up ! null) {
+        p_telejump($ap_up);
+        return;
+    }
     p_telejump($up);
 } else if ($option = 2) {
+    if ($ap_down ! null) {
+        p_telejump($ap_down);
+        return;
+    }
     p_telejump($down);
 }
 

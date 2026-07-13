@@ -1,6 +1,6 @@
 // Ship ladder (climb up)
 [oploc1,shipladder_angled]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -14,7 +14,7 @@ switch_int (loc_angle) {
 
 // Ship ladder (climb down)
 [oploc1,shipladder_top_angled]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -28,7 +28,7 @@ switch_int (loc_angle) {
 
 // Climb Up
 [oploc1,ship_ladder]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -37,7 +37,7 @@ p_arrivedelay;
 
 // Climb Down
 [oploc1,ship_laddertop]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -46,7 +46,7 @@ p_arrivedelay;
 
 // Climb-down op
 [oploc1,wizards_tower_laddertop]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -60,7 +60,7 @@ if ($coord = 0_48_49_32_26) {
 }
 
 [oploc1,laddertop]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -71,7 +71,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,ladder]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -82,7 +82,7 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,laddermiddle]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -90,7 +90,7 @@ p_arrivedelay;
 @ladder_options(movecoord(coord(), 0, 1, 0), movecoord(coord(), 0, -1, 0));
 
 [oploc2,laddermiddle]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 2);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -98,7 +98,7 @@ p_arrivedelay;
 ~climb_ladder(movecoord(coord(), 0, 1, 0), true);
 
 [oploc3,laddermiddle]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 3);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -106,7 +106,7 @@ p_arrivedelay;
 ~climb_ladder(movecoord(coord(), 0, -1, 0), true);
 
 [oploc1,laddertop_directional]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -121,7 +121,7 @@ switch_coord (loc_coord) {
 ~climb_ladder(movecoord(coord(), 0, -1, 0), false);
 
 [oploc1,ladder_directional]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -129,7 +129,7 @@ p_arrivedelay;
 ~climb_ladder(movecoord(coord(), 0, 1, 0), true);
 
 [oploc1,ladder_cellar]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -137,7 +137,7 @@ p_arrivedelay;
 ~climb_ladder(movecoord(coord(), 0, 0, 6400), false);
 
 [oploc1,ladder_from_cellar] // mining guild ladder
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -150,7 +150,7 @@ if(loc_coord = 0_50_149_22_52) { // Zanaris ladder (entrance room)
 ~climb_ladder(movecoord(coord(), 0, 0, -6400), true);
 
 [oploc1,ladder_from_cellar_directional] 
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -158,7 +158,7 @@ p_arrivedelay;
 ~climb_ladder(movecoord(coord(), 0, 0, -6400), true);
 
 [oploc1,ladder_cellar_inside_down]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -166,7 +166,7 @@ p_arrivedelay;
 ~climb_ladder(movecoord(coord(), 0, 0, 6400), false);
 
 [oploc1,wildymirrorladdertop1]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -180,7 +180,7 @@ switch_coord ($coord) {
 
 // Climb-up op
 [oploc1,wizards_tower_ladder]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -194,7 +194,7 @@ if ($coord = 0_48_149_31_40) {
 }
 
 [oploc1,phoenixladder]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -202,7 +202,7 @@ p_arrivedelay;
 ~climb_ladder(0_50_52_44_54, true);
 
 [oploc1,grandtree_laddermiddle]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -219,7 +219,7 @@ if ($option = 1) {
 }
 
 [oploc2,grandtree_laddermiddle]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 2);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -228,7 +228,7 @@ p_arrivedelay;
 ~climb_ladder(movecoord(coord(), 0, 1, 0), true);
 
 [oploc3,grandtree_laddermiddle]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 3);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -236,7 +236,7 @@ p_arrivedelay;
 ~climb_ladder(movecoord(coord(), 0, -1, 0), true);
 
 [oploc1,laddertop_norim]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }
@@ -257,9 +257,19 @@ def_int $option = ~p_choice2_header("Climb Up.", 1, "Climb Down.", 2, "Climb up 
 if_close;
 anim(human_reachforladder, 0);
 p_delay(1);
+def_coord $ap_up = ap_entrance_override(loc_coord, 2);
+def_coord $ap_down = ap_entrance_override(loc_coord, 3);
 if ($option = 1) {
+    if ($ap_up ! null) {
+        p_telejump($ap_up);
+        return;
+    }
     p_telejump($up);
 } else if ($option = 2) {
+    if ($ap_down ! null) {
+        p_telejump($ap_down);
+        return;
+    }
     p_telejump($down);
 }
 

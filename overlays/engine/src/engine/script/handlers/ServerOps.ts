@@ -401,11 +401,11 @@ const ServerOps: CommandHandlers = {
     // custom: Archipelago entrance randomizer - look up a shuffled destination for
     // an entrance trigger coord; returns null when the entrance is unrandomized.
     [ScriptOpcode.AP_ENTRANCE_OVERRIDE]: state => {
-        const coord = state.popInt();
+        const [coord, op] = state.popInts(2);
 
         check(coord, CoordValid);
 
-        const override = getEntranceOverride(coord);
+        const override = getEntranceOverride(coord, op);
         if (override === -1) {
             state.pushInt(-1);
             return;

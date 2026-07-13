@@ -7,7 +7,7 @@ loc_change(trapdoor_open, 500);
 
 // https://youtu.be/0lPiEWFcXTM?t=196
 [oploc1,trapdoor_open]
-def_coord $ap_dest = ap_entrance_override(loc_coord);
+def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
 if ($ap_dest ! null) {
     @ap_entrance_go($ap_dest);
 }

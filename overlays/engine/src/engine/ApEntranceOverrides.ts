@@ -14,7 +14,10 @@ import { printInfo, printWarning } from '#/util/Logger.js';
 
 const OVERRIDES_PATH = 'data/config/ap-entrances.json';
 
-// coords in the JSON use the rs2 literal format: level_mapX_mapZ_localX_localZ
+// keys are "level_mapX_mapZ_localX_localZ:op" (op distinguishes climb-up from
+// climb-down on the same tile, e.g. spiral staircase middle landings); values are
+// plain coord literals.
+const KEY_RE = /^\d+_\d+_\d+_\d+_\d+:\d+$/;
 const COORD_RE = /^\d+_\d+_\d+_\d+_\d+$/;
 
 function packFromString(raw: string): number {
@@ -22,10 +25,10 @@ function packFromString(raw: string): number {
     return CoordGrid.packCoord(level, (mapX << 6) + localX, (mapZ << 6) + localZ);
 }
 
-let overrides: Map<number, number> | null = null;
+let overrides: Map<string, number> | null = null;
 
-function load(): Map<number, number> {
-    const table = new Map<number, number>();
+function load(): Map<string, number> {
+    const table = new Map<string, number>();
 
     if (!fs.existsSync(OVERRIDES_PATH)) {
         printInfo(`AP entrance overrides: no ${path.basename(OVERRIDES_PATH)}, entrances are vanilla`);
@@ -35,11 +38,12 @@ function load(): Map<number, number> {
     try {
         const parsed = JSON.parse(fs.readFileSync(OVERRIDES_PATH, 'utf8')) as { overrides?: Record<string, string> };
         for (const [from, to] of Object.entries(parsed.overrides ?? {})) {
-            if (!COORD_RE.test(from) || !COORD_RE.test(to)) {
+            if (!KEY_RE.test(from) || !COORD_RE.test(to)) {
                 printWarning(`AP entrance overrides: skipping malformed entry ${from} -> ${to}`);
                 continue;
             }
-            table.set(packFromString(from), packFromString(to));
+            const [coordRaw, op] = from.split(':');
+            table.set(`${packFromString(coordRaw)}:${op}`, packFromString(to));
         }
         printInfo(`AP entrance overrides: loaded ${table.size} redirect(s)`);
     } catch (err) {
@@ -50,9 +54,9 @@ function load(): Map<number, number> {
 }
 
 // returns the override destination as a packed coord, or -1 (script null) on miss.
-export function getEntranceOverride(packedCoord: number): number {
+export function getEntranceOverride(packedCoord: number, op: number): number {
     if (overrides === null) {
         overrides = load();
     }
-    return overrides.get(packedCoord) ?? -1;
+    return overrides.get(`${packedCoord}:${op}`) ?? -1;
 }

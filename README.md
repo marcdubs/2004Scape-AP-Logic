@@ -109,12 +109,15 @@ pool):
 - **floor-shift pool**: same-building staircases with literal coordinates (the bulk
   of town buildings, ~90 gates).
 
+Overrides are keyed by trigger coord **and op** (`"coord:op"`), so the middle
+landings of multi-storey towers (Lumbridge castle, Clock Tower, ...) shuffle their
+climb-up and climb-down independently; the choice menu on those landings consults the
+same op2/op3 keys via the patched `stair_options`/`ladder_options` labels.
+
 Left vanilla on purpose: unpaired floor-shift halves (a one-way redirect on a house
 staircase breaks the "come back the way you came" guarantee), unpaired scanned
 placements (cellars whose surface entrance is a loc type we don't handle yet),
-multi-destination trigger coords (middle floors of 3+ storey buildings - the override
-table is keyed by coord alone and can't tell climb-up from climb-down on the same
-tile), quest-gated entrances, and Tutorial Island (mapsquare 48,48 -
+quest-gated entrances, and Tutorial Island (mapsquare 48,48 -
 `PROTECTED_MAPSQUARES`).
 
 Reciprocity is guaranteed for every shuffled gate: the far side of wherever you land

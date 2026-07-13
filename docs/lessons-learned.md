@@ -218,11 +218,16 @@ Floor-shift stairs and map-scanned cellars are now in. Additional lessons:
   the `[oploc1,trapdoor_open]` (descend) handler gets the preamble - opening/closing
   handlers must stay vanilla. Expect more of this pattern if scope grows (caves,
   manholes, dungeon holes all have their own handler files).
-- **Override table is keyed by coord alone**, so any tile that triggers multiple
-  distinct transitions (spiralstairsmiddle: same coord has climb-up, climb-down and a
-  menu) is unshuffleable and must be excluded - that rules out the middle floors of
-  3+ storey buildings. If per-op keying is ever needed, the preamble would have to
-  pass its op number into the command (per-handler preamble variants).
+- **Override table is keyed by coord + op** (`"coord:op"` keys). It started
+  coord-only, which forced excluding any tile with multiple distinct transitions
+  (spiralstairsmiddle: climb-up, climb-down and a menu on one coord) - the user
+  immediately noticed Lumbridge castle stairs were vanilla. The fix: the command
+  takes an op argument, each handler's preamble passes its own op number, and the
+  `stair_options`/`ladder_options` menu labels consult the op2/op3 keys (mirroring
+  the explicit oploc2/oploc3 handlers on the same locs) so both entry paths agree.
+  The op1 menu record still auto-drops out via multi-destination exclusion - by
+  design, its redirects ride on the op2/op3 keys. Note the menu labels rely on
+  loc_coord remaining valid after an @jump within the same script run.
 - **Pairing needed a plane-equality check** once floor-shifts entered the pool (an
   up-stairs' destination is on a different plane than its own trigger; without the
   check, dense towns mispair). Floor pairing radius 6, cross-map 10, scanned 6.

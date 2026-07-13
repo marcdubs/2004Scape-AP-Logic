@@ -62,9 +62,18 @@ type Candidate = Indexed<Entrance> & { source: { type: 'literal'; coord: CoordLi
 // one side of a physical two-way connection: the tile that triggers the transition,
 // and the (walkable) tile the transition delivers you to - which is next to the far
 // side's trigger.
-type GateSide = { trigger: CoordLiteral; arrival: CoordLiteral; description: string | null };
+type GateSide = { trigger: CoordLiteral; triggerOp: number; arrival: CoordLiteral; description: string | null };
 type Gate = { a: GateSide; b: GateSide; pool: 'connector' | 'floor-shift'; scanned?: boolean };
-type OneWayEntry = { trigger: CoordLiteral; arrival: CoordLiteral; description: string | null };
+type OneWayEntry = { trigger: CoordLiteral; triggerOp: number; arrival: CoordLiteral; description: string | null };
+
+// entrance records carry op as 'oploc<N>'
+function opNum(e: Entrance): number {
+    return parseInt(e.op.replace('oploc', ''), 10);
+}
+
+function overrideKey(coord: CoordLiteral, op: number): string {
+    return `${coord.raw}:${op}`;
+}
 
 function inProtectedMapsquare(coord: CoordLiteral): boolean {
     return PROTECTED_MAPSQUARES.some(([mx, mz]) => mx === coord.mapX && mz === coord.mapZ);
@@ -183,8 +192,8 @@ function findGatePairs(candidates: Candidate[], radius: number): { pairs: [Candi
 
 function toGate([a, b]: [Candidate, Candidate], pool: Gate['pool']): Gate {
     return {
-        a: { trigger: a.source.coord, arrival: a.destination, description: a.description },
-        b: { trigger: b.source.coord, arrival: b.destination, description: b.description },
+        a: { trigger: a.source.coord, triggerOp: opNum(a), arrival: a.destination, description: a.description },
+        b: { trigger: b.source.coord, triggerOp: opNum(b), arrival: b.destination, description: b.description },
         pool
     };
 }
@@ -283,8 +292,8 @@ function buildScannedGates(knownTriggers: Set<string>): { gates: Gate[]; skipped
         }
         usedUps.add(best);
         gates.push({
-            a: { trigger: down.coord, arrival: best.coord, description: `${down.locName} at ${down.coord.raw}` },
-            b: { trigger: best.coord, arrival: down.coord, description: `${best.locName} at ${best.coord.raw}` },
+            a: { trigger: down.coord, triggerOp: 1, arrival: best.coord, description: `${down.locName} at ${down.coord.raw}` },
+            b: { trigger: best.coord, triggerOp: 1, arrival: down.coord, description: `${best.locName} at ${best.coord.raw}` },
             pool: 'connector',
             scanned: true
         });
@@ -335,15 +344,17 @@ function main() {
     const literalCandidates = allEntrances.filter(isLiteral);
     const destsBySource = new Map<string, Set<string>>();
     for (const e of literalCandidates) {
-        (destsBySource.get(e.source.coord.raw) ?? destsBySource.set(e.source.coord.raw, new Set()).get(e.source.coord.raw)!).add(e.destination.raw);
+        const key = overrideKey(e.source.coord, opNum(e));
+        (destsBySource.get(key) ?? destsBySource.set(key, new Set()).get(key)!).add(e.destination.raw);
     }
     const multiDest = new Set([...destsBySource.entries()].filter(([, dests]) => dests.size > 1).map(([src]) => src));
     const seenSources = new Set<string>();
     const usable = literalCandidates.filter(e => {
-        if (multiDest.has(e.source.coord.raw) || seenSources.has(e.source.coord.raw)) {
+        const key = overrideKey(e.source.coord, opNum(e));
+        if (multiDest.has(key) || seenSources.has(key)) {
             return false;
         }
-        seenSources.add(e.source.coord.raw);
+        seenSources.add(key);
         return true;
     });
 
@@ -363,7 +374,7 @@ function main() {
     // candidate. floor-shift unpaired halves stay vanilla instead - a one-way redirect
     // on a building staircase breaks the "come back the way you came" guarantee for no
     // real payoff.
-    const oneWays: OneWayEntry[] = cross.unpaired.map(e => ({ trigger: e.source.coord, arrival: e.destination, description: e.description }));
+    const oneWays: OneWayEntry[] = cross.unpaired.map(e => ({ trigger: e.source.coord, triggerOp: opNum(e), arrival: e.destination, description: e.description }));
 
     printInfo(`seed ${seed}: ${connectorGates.length} connector gate(s) (${scanned.gates.length} map-scanned), ${floorGates.length} floor-shift gate(s), ${oneWays.length} one-way(s)`);
     printInfo(`left vanilla: ${floor.unpaired.length} unpaired floor-shift(s), ${scanned.skipped} unpaired scanned placement(s), ${multiDest.size} multi-destination coord(s)`);
@@ -461,8 +472,8 @@ function main() {
             // entering gate i's A side lands where gate j's A side used to deliver
             // (next to j's B trigger); using j's B side returns you to where gate i's
             // B side used to deliver (next to i's A trigger).
-            addOverride(pool[i].a.trigger.raw, pool[j].a.arrival.raw);
-            addOverride(pool[j].b.trigger.raw, pool[i].b.arrival.raw);
+            addOverride(overrideKey(pool[i].a.trigger, pool[i].a.triggerOp), pool[j].a.arrival.raw);
+            addOverride(overrideKey(pool[j].b.trigger, pool[j].b.triggerOp), pool[i].b.arrival.raw);
             spoilerGates.push({
                 pool: pool[i].pool,
                 locA: describe(pool[i].a.trigger, pool[i].a.description),
@@ -477,7 +488,7 @@ function main() {
         for (let i = 0; i < oneWays.length; i++) {
             const entry = oneWays[i];
             const target = oneWays[perm[i]];
-            addOverride(entry.trigger.raw, target.arrival.raw);
+            addOverride(overrideKey(entry.trigger, entry.triggerOp), target.arrival.raw);
             spoilerOneWay.push({
                 from: describe(entry.trigger, entry.description),
                 originallyLedTo: describe(entry.arrival, null),
