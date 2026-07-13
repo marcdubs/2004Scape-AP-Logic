@@ -4,23 +4,29 @@ import path from 'path';
 import { printInfo, printWarning } from '#/util/Logger.js';
 
 import { CONTENT_ROOT, ENTRANCE_DIR, type CoordLiteral, type Entrance, parseFile } from './EntranceParser.js';
+import { scanPlacements } from './LocPlacementScanner.js';
 
-// Shuffles the ladder/stair entrances classified `cross-map` by EntranceParser.ts
-// (real dungeon/area connectors - not same-building floor shifts).
+// Shuffles game entrances and writes a runtime override table
+// (data/config/ap-entrances.json) that the engine's ap_entrance_override command
+// consults - no content changes, no pack rebuild; reseed by re-running and restarting
+// the server. Requires the patched handlers + ap.rs2 from 2004Scape-AP-Logic to be
+// installed and built into the pack once.
 //
-// Default mode writes a runtime override table (data/config/ap-entrances.json) that
-// the engine's ap_entrance_override command consults - no content changes, no pack
-// rebuild; reseed by re-running and restarting the server. Requires the patched
-// ladder/stair handlers + ap.rs2 from 2004Scape-AP-Logic to be installed and built
-// into the pack once.
+// Three candidate sources:
+//   - parsed cross-map entrances (dungeon/area connectors from ladders.rs2/stairs.rs2)
+//   - parsed floor-shift entrances (same-building stairs with literal coords)
+//   - map-scanned placements of the generic "any-source" cellar locs (trapdoors,
+//     cellar ladders), whose scripts have no coordinates to parse
 //
-// Legacy --rewrite mode bakes the shuffle into content/scripts/ladders+stairs/
-// scripts/*.rs2 instead (needs a full pack rebuild per seed). Candidates are always
-// parsed from the vanilla backup (content/.ap-backup/), never from whatever currently
-// sits in content/, so re-running never compounds onto a previous shuffle. See
-// ARCHIPELAGO_IDEAS.md #1 for the design rationale.
+// Cross-map + scanned gates shuffle in one pool, floor-shift gates in another, so
+// building stairs lead to other buildings and dungeon entrances to other dungeons.
+// --mixed merges both pools into full chaos. Reciprocity is always preserved: the
+// far side of wherever you land leads back next to where you entered.
 //
-// Usage: npx tsx tools/map/RandomizeEntrances.ts [--seed <number>] [--dry-run] [--rewrite]
+// Legacy --rewrite mode bakes the (cross-map only) shuffle into the .rs2 source
+// instead and needs a full pack rebuild per seed; kept as a fallback.
+//
+// Usage: npx tsx tools/map/RandomizeEntrances.ts [--seed <number>] [--dry-run] [--mixed] [--rewrite]
 
 const RELATIVE_ENTRANCE_DIR = 'scripts/ladders+stairs/scripts';
 const BACKUP_DIR = path.join(CONTENT_ROOT, '.ap-backup', RELATIVE_ENTRANCE_DIR);
@@ -29,43 +35,58 @@ const SPOILER_OUTPUT = path.join(import.meta.dirname, 'entrance-seed.json');
 // engine working directory, same convention as the engine's own loader.
 const OVERRIDES_OUTPUT = path.resolve('data/config/ap-entrances.json');
 
-// tiles - how close a candidate's (source, destination) pair has to be to another
-// candidate's (destination, source) for the two to be treated as the up/down sides of
-// the same physical staircase/ladder.
-const PAIR_RADIUS = 10;
+// how close a candidate's (source, destination) pair has to be to another candidate's
+// (destination, source) for the two to be treated as the up/down sides of the same
+// physical staircase/ladder. Floor-shift pairing is tighter because town staircases
+// are packed much closer together than dungeon entrances.
+const CROSS_PAIR_RADIUS = 10;
+const FLOOR_PAIR_RADIUS = 6;
+const SCAN_PAIR_RADIUS = 6;
+
+// the "underground layer" convention: cellars/dungeons live at the overworld
+// coordinate +6400 tiles on Z (mapZ +100).
+const UNDERGROUND_DZ = 6400;
+
+// any-source locs whose descend/ascend rule is the fixed underground offset.
+const SCAN_DOWN_LOCS = ['trapdoor', 'trapdoor_open', 'ladder_cellar', 'ladder_cellar_inside_down'];
+const SCAN_UP_LOCS = ['ladder_from_cellar', 'ladder_from_cellar_directional'];
 
 // mapsquares that must never be touched by the shuffle, regardless of classification -
 // currently just Tutorial Island (48,48), so a brand-new player can never get stranded
-// mid-tutorial. None of today's cross-map entries fall in these squares anyway (the
-// tutorial's own stairs are same-building floor-shifts, already excluded), but this is
-// cheap insurance against a future classification change quietly picking one up.
+// mid-tutorial.
 const PROTECTED_MAPSQUARES: [number, number][] = [[48, 48]];
 
 type Indexed<T> = T & { _index: number };
 type Candidate = Indexed<Entrance> & { source: { type: 'literal'; coord: CoordLiteral }; destination: CoordLiteral };
+
+// one side of a physical two-way connection: the tile that triggers the transition,
+// and the (walkable) tile the transition delivers you to - which is next to the far
+// side's trigger.
+type GateSide = { trigger: CoordLiteral; arrival: CoordLiteral; description: string | null };
+type Gate = { a: GateSide; b: GateSide; pool: 'connector' | 'floor-shift'; scanned?: boolean };
+type OneWayEntry = { trigger: CoordLiteral; arrival: CoordLiteral; description: string | null };
+
+function inProtectedMapsquare(coord: CoordLiteral): boolean {
+    return PROTECTED_MAPSQUARES.some(([mx, mz]) => mx === coord.mapX && mz === coord.mapZ);
+}
 
 function isProtected(e: Indexed<Entrance>): boolean {
     if (e.description && /tutorial/i.test(e.description)) {
         return true;
     }
     const source = e.source;
-    if (source.type === 'literal') {
-        const coord = source.coord;
-        if (PROTECTED_MAPSQUARES.some(([mx, mz]) => mx === coord.mapX && mz === coord.mapZ)) {
-            return true;
-        }
+    if (source.type === 'literal' && inProtectedMapsquare(source.coord)) {
+        return true;
     }
     const destination = e.destination;
-    if (destination?.type === 'literal') {
-        if (PROTECTED_MAPSQUARES.some(([mx, mz]) => mx === destination.mapX && mz === destination.mapZ)) {
-            return true;
-        }
+    if (destination?.type === 'literal' && inProtectedMapsquare(destination)) {
+        return true;
     }
     return false;
 }
 
-function isCandidate(e: Indexed<Entrance>): e is Candidate {
-    return e.kind === 'cross-map' && e.source.type === 'literal' && e.destination?.type === 'literal' && !isProtected(e);
+function isLiteral(e: Indexed<Entrance>): e is Candidate {
+    return e.source.type === 'literal' && e.destination?.type === 'literal' && !isProtected(e);
 }
 
 // mulberry32 - small, fast, seedable PRNG (Math.random() isn't seedable).
@@ -120,10 +141,10 @@ function worldDist(a: CoordLiteral, b: CoordLiteral): number {
 }
 
 // pairs up candidates that are the two ends of the same physical staircase/ladder (A's
-// destination sits near B's source, and B's destination sits near A's source).
-// unpaired candidates are one-way connections (secret shortcuts, dungeon entrances with
-// a generic "any" return path we can't safely rewrite, etc).
-function findGatePairs(candidates: Candidate[]): { pairs: [Candidate, Candidate][]; oneWay: Candidate[] } {
+// destination sits near B's source on the same plane, and B's destination sits near
+// A's source). unpaired candidates are one-way connections or halves whose other side
+// isn't in the candidate set.
+function findGatePairs(candidates: Candidate[], radius: number): { pairs: [Candidate, Candidate][]; unpaired: Candidate[] } {
     const used = new Set<Candidate>();
     const pairs: [Candidate, Candidate][] = [];
 
@@ -137,9 +158,12 @@ function findGatePairs(candidates: Candidate[]): { pairs: [Candidate, Candidate]
             if (other === e || used.has(other)) {
                 continue;
             }
+            if (other.source.coord.plane !== e.destination.plane || e.source.coord.plane !== other.destination.plane) {
+                continue;
+            }
             const d1 = worldDist(other.source.coord, e.destination);
             const d2 = worldDist(other.destination, e.source.coord);
-            if (d1 <= PAIR_RADIUS && d2 <= PAIR_RADIUS) {
+            if (d1 <= radius && d2 <= radius) {
                 const score = d1 + d2;
                 if (score < bestScore) {
                     bestScore = score;
@@ -154,7 +178,15 @@ function findGatePairs(candidates: Candidate[]): { pairs: [Candidate, Candidate]
         }
     }
 
-    return { pairs, oneWay: candidates.filter(e => !used.has(e)) };
+    return { pairs, unpaired: candidates.filter(e => !used.has(e)) };
+}
+
+function toGate([a, b]: [Candidate, Candidate], pool: Gate['pool']): Gate {
+    return {
+        a: { trigger: a.source.coord, arrival: a.destination, description: a.description },
+        b: { trigger: b.source.coord, arrival: b.destination, description: b.description },
+        pool
+    };
 }
 
 function describe(coord: CoordLiteral, description: string | null) {
@@ -183,8 +215,7 @@ function findDestinationOccurrence(text: string, raw: string, searchFrom: number
 
 function applyEdits(text: string, edits: Edit[]): string {
     // process in original file order so a destination literal that appears more than
-    // once (stairs.rs2 genuinely has one duplicate case) resolves to the matching
-    // occurrence rather than always the first.
+    // once resolves to the matching occurrence rather than always the first.
     const ordered = edits.filter(e => e.oldRaw !== e.newRaw).sort((a, b) => a.originalIndex - b.originalIndex);
     const cursors = new Map<string, number>();
     const located: { idx: number; oldLen: number; newRaw: string }[] = [];
@@ -218,11 +249,55 @@ function ensureBackup(): void {
     printInfo(`created vanilla content backup at ${BACKUP_DIR}`);
 }
 
+// builds gates from the map-scanned any-source cellar locs: a "down" placement (trapdoor
+// or cellar ladder) pairs with an "up" placement at the mirrored underground coordinate.
+// arrival tiles are the far placement's own tile - the engine nudges to a walkable
+// neighbor at teleport time (see AP_ENTRANCE_OVERRIDE in ServerOps.ts).
+function buildScannedGates(knownTriggers: Set<string>): { gates: Gate[]; skipped: number } {
+    const placements = scanPlacements([...SCAN_DOWN_LOCS, ...SCAN_UP_LOCS]).filter(p => !inProtectedMapsquare(p.coord) && !knownTriggers.has(p.coord.raw));
+
+    // a closed trapdoor and its open variant occupy the same tile - dedupe.
+    const seen = new Set<string>();
+    const downs = placements.filter(p => SCAN_DOWN_LOCS.includes(p.locName) && !seen.has(p.coord.raw) && seen.add(p.coord.raw) !== undefined);
+    const ups = placements.filter(p => SCAN_UP_LOCS.includes(p.locName));
+
+    const gates: Gate[] = [];
+    const usedUps = new Set<(typeof ups)[number]>();
+
+    for (const down of downs) {
+        const expected = { ...down.coord, worldZ: down.coord.worldZ + UNDERGROUND_DZ };
+        let best: (typeof ups)[number] | null = null;
+        let bestDist = Infinity;
+        for (const up of ups) {
+            if (usedUps.has(up) || up.coord.plane !== down.coord.plane) {
+                continue;
+            }
+            const d = Math.hypot(up.coord.worldX - expected.worldX, up.coord.worldZ - expected.worldZ);
+            if (d <= SCAN_PAIR_RADIUS && d < bestDist) {
+                bestDist = d;
+                best = up;
+            }
+        }
+        if (!best) {
+            continue;
+        }
+        usedUps.add(best);
+        gates.push({
+            a: { trigger: down.coord, arrival: best.coord, description: `${down.locName} at ${down.coord.raw}` },
+            b: { trigger: best.coord, arrival: down.coord, description: `${best.locName} at ${best.coord.raw}` },
+            pool: 'connector',
+            scanned: true
+        });
+    }
+
+    return { gates, skipped: downs.length + ups.length - gates.length * 2 };
+}
+
 function parseArgs() {
     const args = process.argv.slice(2);
     const seedIdx = args.indexOf('--seed');
     const seed = seedIdx !== -1 ? parseInt(args[seedIdx + 1], 10) : Math.floor(Math.random() * 0xffffffff);
-    return { seed, dryRun: args.includes('--dry-run'), rewrite: args.includes('--rewrite') };
+    return { seed, dryRun: args.includes('--dry-run'), rewrite: args.includes('--rewrite'), mixed: args.includes('--mixed') };
 }
 
 function main() {
@@ -231,7 +306,7 @@ function main() {
         process.exit(1);
     }
 
-    const { seed, dryRun, rewrite } = parseArgs();
+    const { seed, dryRun, rewrite, mixed } = parseArgs();
 
     // always (re)derive from the untouched vanilla backup, creating it on first run,
     // so re-randomizing never compounds onto a previous shuffle's output.
@@ -253,28 +328,114 @@ function main() {
         textByFile.set(file, fs.readFileSync(backupPath, 'utf8').replace(/\r\n/g, '\n'));
     }
 
-    // dedupe on trigger tile: stairs.rs2 has a few literally duplicated cases (e.g.
-    // the blackarm hideout / "Varrock thief house" stairs appear twice with the same
-    // source and destination). Without this, the two copies pair with *each other* and
-    // form a bogus zero-length gate.
+    // the override table is keyed by trigger coord alone, so a coord that triggers
+    // multiple distinct transitions (e.g. spiralstairsmiddle: one coord with climb-up,
+    // climb-down and a choice menu) cannot be shuffled - exclude it entirely. plain
+    // duplicated script entries (same coord, same destination) collapse to one.
+    const literalCandidates = allEntrances.filter(isLiteral);
+    const destsBySource = new Map<string, Set<string>>();
+    for (const e of literalCandidates) {
+        (destsBySource.get(e.source.coord.raw) ?? destsBySource.set(e.source.coord.raw, new Set()).get(e.source.coord.raw)!).add(e.destination.raw);
+    }
+    const multiDest = new Set([...destsBySource.entries()].filter(([, dests]) => dests.size > 1).map(([src]) => src));
     const seenSources = new Set<string>();
-    const candidates = allEntrances.filter(isCandidate).filter(e => {
-        if (seenSources.has(e.source.coord.raw)) {
+    const usable = literalCandidates.filter(e => {
+        if (multiDest.has(e.source.coord.raw) || seenSources.has(e.source.coord.raw)) {
             return false;
         }
         seenSources.add(e.source.coord.raw);
         return true;
     });
-    const { pairs, oneWay } = findGatePairs(candidates);
-    const excludedCount = allEntrances.filter(e => e.kind === 'cross-map').length - candidates.length;
 
-    printInfo(`seed ${seed}: ${pairs.length} bidirectional gate(s), ${oneWay.length} one-way entrance(s), ${excludedCount} excluded (protected regions, or generic/relative fallback that can't be safely rewritten)`);
+    const crossCands = usable.filter(e => e.kind === 'cross-map');
+    const floorCands = usable.filter(e => e.kind === 'floor-shift');
 
-    const edits: Edit[] = [];
+    const cross = findGatePairs(crossCands, CROSS_PAIR_RADIUS);
+    const floor = findGatePairs(floorCands, FLOOR_PAIR_RADIUS);
+
+    const knownTriggers = new Set(usable.map(e => e.source.coord.raw));
+    const scanned = buildScannedGates(knownTriggers);
+
+    const connectorGates = [...cross.pairs.map(p => toGate(p, 'connector')), ...scanned.gates];
+    const floorGates = floor.pairs.map(p => toGate(p, 'floor-shift'));
+
+    // genuine one-ways (KBD entrance etc) plus connector halves whose far side isn't a
+    // candidate. floor-shift unpaired halves stay vanilla instead - a one-way redirect
+    // on a building staircase breaks the "come back the way you came" guarantee for no
+    // real payoff.
+    const oneWays: OneWayEntry[] = cross.unpaired.map(e => ({ trigger: e.source.coord, arrival: e.destination, description: e.description }));
+
+    printInfo(`seed ${seed}: ${connectorGates.length} connector gate(s) (${scanned.gates.length} map-scanned), ${floorGates.length} floor-shift gate(s), ${oneWays.length} one-way(s)`);
+    printInfo(`left vanilla: ${floor.unpaired.length} unpaired floor-shift(s), ${scanned.skipped} unpaired scanned placement(s), ${multiDest.size} multi-destination coord(s)`);
+
+    const excluded = allEntrances
+        .filter(e => e.kind === 'cross-map' && !isLiteral(e))
+        .map(e => ({
+            category: e.category,
+            op: e.op,
+            description: e.description,
+            reason: isProtected(e) ? 'protected region (tutorial)' : e.source.type !== 'literal' ? 'non-literal source' : 'non-literal destination'
+        }));
+
+    if (rewrite) {
+        // legacy mode: bake the (cross-map only) shuffle into the .rs2 source text.
+        // branches before the pool shuffle so the seed drives these derangements
+        // directly (seeds are not comparable between modes).
+        printWarning('--rewrite is legacy: floor-shift and map-scanned entrances are NOT included in this mode');
+
+        const edits: Edit[] = [];
+        const legacyGates: unknown[] = [];
+        const legacyOneWay: unknown[] = [];
+
+        if (cross.pairs.length >= 2) {
+            const perm = derangement(cross.pairs.length, rand);
+            for (let i = 0; i < cross.pairs.length; i++) {
+                const [aTrigger] = cross.pairs[i];
+                const [, bTrigger] = cross.pairs[perm[i]];
+                edits.push({ file: path.basename(aTrigger.file), oldRaw: aTrigger.destination.raw, newRaw: bTrigger.source.coord.raw, originalIndex: aTrigger._index });
+                edits.push({ file: path.basename(bTrigger.file), oldRaw: bTrigger.destination.raw, newRaw: cross.pairs[i][0].source.coord.raw, originalIndex: bTrigger._index });
+                legacyGates.push({
+                    locA: describe(cross.pairs[i][0].source.coord, cross.pairs[i][0].description),
+                    locB: describe(cross.pairs[i][1].source.coord, cross.pairs[i][1].description),
+                    nowLeadsTo: describe(cross.pairs[perm[i]][1].source.coord, cross.pairs[perm[i]][1].description)
+                });
+            }
+        }
+        if (cross.unpaired.length >= 2) {
+            const perm = derangement(cross.unpaired.length, rand);
+            for (let i = 0; i < cross.unpaired.length; i++) {
+                const entry = cross.unpaired[i];
+                const target = cross.unpaired[perm[i]];
+                edits.push({ file: path.basename(entry.file), oldRaw: entry.destination.raw, newRaw: target.destination.raw, originalIndex: entry._index });
+                legacyOneWay.push({
+                    from: describe(entry.source.coord, entry.description),
+                    originallyLedTo: describe(entry.destination, null),
+                    nowLeadsTo: describe(target.destination, target.description)
+                });
+            }
+        }
+
+        for (const [file, text] of textByFile) {
+            const fileEdits = edits.filter(e => e.file === file);
+            const newText = applyEdits(text, fileEdits);
+            if (!dryRun) {
+                // source files use CRLF (see readSource in EntranceParser.ts) - restore
+                // it so the diff against vanilla is just the coordinate edits.
+                fs.writeFileSync(path.join(ENTRANCE_DIR, file), newText.replace(/\n/g, '\r\n'));
+            }
+        }
+
+        fs.writeFileSync(SPOILER_OUTPUT, JSON.stringify({ seed, generatedAt: new Date().toISOString(), dryRun, gates: legacyGates, oneWay: legacyOneWay, excluded }, null, 2));
+
+        const changedCount = edits.filter(e => e.oldRaw !== e.newRaw).length;
+        printInfo(`${dryRun ? '[dry run] ' : ''}applied ${changedCount} edit(s) across ${files.length} file(s); spoiler written to ${SPOILER_OUTPUT}`);
+        if (!dryRun) {
+            printInfo('rebuild the pack before testing: npx tsx tools/pack/Build.ts');
+        }
+        return;
+    }
+
     const overrides: Record<string, string> = {};
-    const spoilerGates: unknown[] = [];
-    const spoilerOneWay: unknown[] = [];
-
     const addOverride = (from: string, to: string) => {
         if (overrides[from] !== undefined) {
             printWarning(`override collision on ${from} - keeping first assignment`);
@@ -283,117 +444,72 @@ function main() {
         overrides[from] = to;
     };
 
-    if (pairs.length >= 2) {
-        const perm = derangement(pairs.length, rand);
-        for (let i = 0; i < pairs.length; i++) {
+    const spoilerGates: unknown[] = [];
+    const spoilerOneWay: unknown[] = [];
+
+    const gatePools: Gate[][] = mixed ? [[...connectorGates, ...floorGates]] : [connectorGates, floorGates];
+    for (const pool of gatePools) {
+        if (pool.length < 2) {
+            if (pool.length) {
+                printWarning(`pool of ${pool.length} gate(s) too small to shuffle`);
+            }
+            continue;
+        }
+        const perm = derangement(pool.length, rand);
+        for (let i = 0; i < pool.length; i++) {
             const j = perm[i];
-            const [aTrigger] = pairs[i];
-            const [, bTrigger] = pairs[j];
-
-            // legacy rewrite mode swaps the destination literals in the script text.
-            edits.push({ file: path.basename(aTrigger.file), oldRaw: aTrigger.destination.raw, newRaw: bTrigger.source.coord.raw, originalIndex: aTrigger._index });
-            edits.push({ file: path.basename(bTrigger.file), oldRaw: bTrigger.destination.raw, newRaw: pairs[i][0].source.coord.raw, originalIndex: bTrigger._index });
-
-            // override mode redirects to the vanilla *arrival* tiles (a walkable tile
-            // next to the far-side trigger) rather than the far trigger's own tile,
-            // which the loc itself may block:
-            //   entering gate i's A side lands where gate j's A side used to deliver
-            //   (next to j's B trigger), and using j's B side returns you to where
-            //   gate i's B side used to deliver (next to i's A trigger).
-            addOverride(pairs[i][0].source.coord.raw, pairs[j][0].destination.raw);
-            addOverride(pairs[j][1].source.coord.raw, pairs[i][1].destination.raw);
-
+            // entering gate i's A side lands where gate j's A side used to deliver
+            // (next to j's B trigger); using j's B side returns you to where gate i's
+            // B side used to deliver (next to i's A trigger).
+            addOverride(pool[i].a.trigger.raw, pool[j].a.arrival.raw);
+            addOverride(pool[j].b.trigger.raw, pool[i].b.arrival.raw);
             spoilerGates.push({
-                locA: describe(pairs[i][0].source.coord, pairs[i][0].description),
-                locB: describe(pairs[i][1].source.coord, pairs[i][1].description),
-                nowLeadsTo: describe(pairs[j][1].source.coord, pairs[j][1].description)
+                pool: pool[i].pool,
+                locA: describe(pool[i].a.trigger, pool[i].a.description),
+                locB: describe(pool[i].b.trigger, pool[i].b.description),
+                nowLeadsTo: describe(pool[j].b.trigger, pool[j].b.description)
             });
         }
-    } else {
-        printWarning(`only ${pairs.length} bidirectional gate(s) found - nothing to shuffle there`);
     }
 
-    if (oneWay.length >= 2) {
-        const perm = derangement(oneWay.length, rand);
-        for (let i = 0; i < oneWay.length; i++) {
-            const entry = oneWay[i];
-            const target = oneWay[perm[i]];
-            edits.push({ file: path.basename(entry.file), oldRaw: entry.destination.raw, newRaw: target.destination.raw, originalIndex: entry._index });
-            addOverride(entry.source.coord.raw, target.destination.raw);
+    if (oneWays.length >= 2) {
+        const perm = derangement(oneWays.length, rand);
+        for (let i = 0; i < oneWays.length; i++) {
+            const entry = oneWays[i];
+            const target = oneWays[perm[i]];
+            addOverride(entry.trigger.raw, target.arrival.raw);
             spoilerOneWay.push({
-                from: describe(entry.source.coord, entry.description),
-                originallyLedTo: describe(entry.destination, null),
-                nowLeadsTo: describe(target.destination, target.description)
+                from: describe(entry.trigger, entry.description),
+                originallyLedTo: describe(entry.arrival, null),
+                nowLeadsTo: describe(target.arrival, target.description)
             });
         }
-    } else {
-        printWarning(`only ${oneWay.length} one-way entrance(s) found - nothing to shuffle there`);
+    } else if (oneWays.length) {
+        printWarning(`only ${oneWays.length} one-way entrance(s) found - left vanilla`);
     }
 
-    const excluded = allEntrances
-        .filter(e => e.kind === 'cross-map' && !isCandidate(e))
-        .map(e => ({
-            category: e.category,
-            op: e.op,
-            description: e.description,
-            reason: isProtected(e) ? 'protected region (tutorial)' : e.source.type !== 'literal' ? 'non-literal source' : 'non-literal destination'
-        }));
-
-    if (!rewrite) {
-        // default mode: emit the runtime override table consumed by the engine's
-        // ap_entrance_override command (see ApEntranceOverrides.ts). No content
-        // changes, no pack rebuild - swap the file and restart the server.
-        const output = {
-            seed,
-            generatedAt: new Date().toISOString(),
-            spoiler: { gates: spoilerGates, oneWay: spoilerOneWay, excluded },
-            overrides
-        };
-        if (!dryRun) {
-            fs.writeFileSync(OVERRIDES_OUTPUT, JSON.stringify(output, null, 2));
-        }
-        printInfo(`${dryRun ? '[dry run] ' : ''}wrote ${Object.keys(overrides).length} override(s) to ${OVERRIDES_OUTPUT}`);
-        if (!dryRun) {
-            printInfo('restart the server to load the new entrance layout (no content rebuild needed)');
-        }
-        return;
-    }
-
-    // legacy --rewrite mode: bake the shuffle into the .rs2 source text.
-    for (const [file, text] of textByFile) {
-        const fileEdits = edits.filter(e => e.file === file);
-        const newText = applyEdits(text, fileEdits);
-        textByFile.set(file, newText);
-        if (!dryRun) {
-            // source files use CRLF (see readSource in EntranceParser.ts) - restore it
-            // so the diff against vanilla is just the actual coordinate edits, not a
-            // whole-file line-ending rewrite.
-            fs.writeFileSync(path.join(ENTRANCE_DIR, file), newText.replace(/\n/g, '\r\n'));
-        }
-    }
-
-    fs.writeFileSync(
-        SPOILER_OUTPUT,
-        JSON.stringify(
-            {
-                seed,
-                generatedAt: new Date().toISOString(),
-                dryRun,
-                gates: spoilerGates,
-                oneWay: spoilerOneWay,
-                excluded
-            },
-            null,
-            2
-        )
-    );
-
-    const changedCount = edits.filter(e => e.oldRaw !== e.newRaw).length;
-    printInfo(`${dryRun ? '[dry run] ' : ''}applied ${changedCount} edit(s) across ${files.length} file(s); spoiler written to ${SPOILER_OUTPUT}`);
+    // default mode: emit the runtime override table consumed by the engine's
+    // ap_entrance_override command (see ApEntranceOverrides.ts). No content changes,
+    // no pack rebuild - swap the file and restart the server.
+    const output = {
+        seed,
+        mixed,
+        generatedAt: new Date().toISOString(),
+        spoiler: {
+            gates: spoilerGates,
+            oneWay: spoilerOneWay,
+            vanillaUnpairedFloorShifts: floor.unpaired.length,
+            vanillaUnpairedScanned: scanned.skipped,
+            excluded
+        },
+        overrides
+    };
     if (!dryRun) {
-        printInfo('these edits only affect content/scripts/*.rs2 - the running server loads compiled scripts');
-        printInfo('from engine/data/pack/server/script.dat, so rebuild before testing: npx tsx tools/pack/Build.ts');
-        printInfo('re-run ExportEntrances.ts if you need an updated entrances.json for the new layout');
+        fs.writeFileSync(OVERRIDES_OUTPUT, JSON.stringify(output, null, 2));
+    }
+    printInfo(`${dryRun ? '[dry run] ' : ''}wrote ${Object.keys(overrides).length} override(s) to ${OVERRIDES_OUTPUT}`);
+    if (!dryRun) {
+        printInfo('restart the server to load the new entrance layout (no content rebuild needed)');
     }
 }
 

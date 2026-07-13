@@ -204,15 +204,55 @@ reasoning:
   architecture it's less load-bearing, but keep it - it's also the base the patched
   overlay files were generated from.
 
+## Expansion pass (same day, after the user asked for wider scope)
+
+Floor-shift stairs and map-scanned cellars are now in. Additional lessons:
+
+- **jm2 LOC lines have optional fields.** Format is `level lx lz: id [shape] [angle]`
+  - `0 9 16: 1568 22` (no angle) and `0 9 15: 278` (neither) are valid. A regex
+  requiring all three silently dropped the cook's-basement trapdoor; symptom was
+  "placement not found" with zero errors. Both default to 0.
+- **The cellar "down" side is often a different loc type than expected.** Lumbridge
+  kitchen's entrance is loc `trapdoor` (id 1568) handled in
+  `content/scripts/general_use/scripts/trapdoors.rs2`, not a `ladder_cellar`. Only
+  the `[oploc1,trapdoor_open]` (descend) handler gets the preamble - opening/closing
+  handlers must stay vanilla. Expect more of this pattern if scope grows (caves,
+  manholes, dungeon holes all have their own handler files).
+- **Override table is keyed by coord alone**, so any tile that triggers multiple
+  distinct transitions (spiralstairsmiddle: same coord has climb-up, climb-down and a
+  menu) is unshuffleable and must be excluded - that rules out the middle floors of
+  3+ storey buildings. If per-op keying is ever needed, the preamble would have to
+  pass its op number into the command (per-handler preamble variants).
+- **Pairing needed a plane-equality check** once floor-shifts entered the pool (an
+  up-stairs' destination is on a different plane than its own trigger; without the
+  check, dense towns mispair). Floor pairing radius 6, cross-map 10, scanned 6.
+- **Unpaired floor-shift halves stay vanilla** rather than becoming one-way shuffles:
+  a one-way redirect on a building staircase breaks the return-trip guarantee for no
+  payoff. Unpaired scanned placements (cellar ups whose surface side is an unhandled
+  loc type) also stay vanilla - 24 of them at time of writing.
+- **Scanned gates land on the far loc's own tile**, which is usually blocked - the
+  engine op nudges to the nearest walkable neighbor via `isMapBlocked` at teleport
+  time. This runtime safety net means arrival math can be approximate everywhere.
+- **Reciprocity is machine-verified**: for every gate, entering A must land within 8
+  tiles of some trigger whose own override lands within 8 tiles of A. 137/137 gates
+  passed. Keep this check in the loop after any pairing change (it caught nothing
+  this time, but it's the cheapest strong invariant we have).
+- `--rewrite` legacy mode branches off *before* the pool shuffle so its derangements
+  consume the PRNG deterministically - seeds are not comparable between modes (and
+  not comparable across tool versions either).
+- phoenixladder scanned to zero placements (the hideout may use a different loc or
+  dynamic spawning) - silently absent, fine to ignore.
+
 ## Where this is heading (agreed with the user)
 
 Priority order discussed:
-1. ~~Entrance randomization~~ (done, pending the user's in-game test)
-2. Floor-shift (same-building stairs) shuffling - needs tighter/exact pairing first
-3. Any-source placements via a `.jm2` LOC scanner
-4. Drop randomization, shop-location shuffle, NPC cosmetic ("drip") shuffle - see
+1. ~~Entrance randomization~~ (done: connector + floor-shift pools, --mixed flag)
+2. ~~Any-source placements via a `.jm2` LOC scanner~~ (done for
+   trapdoor/cellar-ladder types; more surface loc types remain - see unpaired
+   scanned placements in the spoiler)
+3. Drop randomization, shop-location shuffle, NPC cosmetic ("drip") shuffle - see
    [archipelago-ideas.md](archipelago-ideas.md); reuse the override-table pattern
-5. Actual Archipelago protocol integration (AP world Python package, item/location
+4. Actual Archipelago protocol integration (AP world Python package, item/location
    handling, `xpRate`/`NODE_XPRATE` as a slot option, junk rewards straight to bank
    via `inv_add(bank, ...)`)
 

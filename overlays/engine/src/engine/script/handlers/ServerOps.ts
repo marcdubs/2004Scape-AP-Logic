@@ -404,7 +404,37 @@ const ServerOps: CommandHandlers = {
         const coord = state.popInt();
 
         check(coord, CoordValid);
-        state.pushInt(getEntranceOverride(coord));
+
+        const override = getEntranceOverride(coord);
+        if (override === -1) {
+            state.pushInt(-1);
+            return;
+        }
+
+        // map-scanned destinations may be the far ladder's own (blocked) tile -
+        // nudge to the nearest walkable neighbor so a teleport can't strand the
+        // player inside a loc.
+        const pos: CoordGrid = check(override, CoordValid);
+        if (!isMapBlocked(pos.x, pos.z, pos.level)) {
+            state.pushInt(override);
+            return;
+        }
+        for (const [dx, dz] of [
+            [0, 1],
+            [0, -1],
+            [1, 0],
+            [-1, 0],
+            [1, 1],
+            [1, -1],
+            [-1, 1],
+            [-1, -1]
+        ]) {
+            if (!isMapBlocked(pos.x + dx, pos.z + dz, pos.level)) {
+                state.pushInt(CoordGrid.packCoord(pos.level, pos.x + dx, pos.z + dz));
+                return;
+            }
+        }
+        state.pushInt(override);
     },
 
     [ScriptOpcode.MIDI_LENGTH]: state => {

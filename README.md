@@ -99,10 +99,25 @@ path has been played end-to-end.
 
 ### Scope
 
-Currently shuffled: literal-coordinate `cross-map` entrances (real dungeon/area
-connectors). Same-building floor shifts are untouched. Generic `any`-source categories
-(cellar ladders etc.) can't be *enumerated* from script analysis alone - their
-placements live in the map files - but the runtime override path already handles them
-on the application side, so bringing them in scope only needs a placement scanner, not
-another architecture change. Tutorial Island (mapsquare 48,48) is always excluded -
-see `PROTECTED_MAPSQUARES` in `RandomizeEntrances.ts`.
+Two gate pools, shuffled separately by default (`--mixed` merges them into one chaos
+pool):
+
+- **connector pool**: dungeon/area entrances - the parsed literal cross-map
+  transitions plus map-scanned placements of the generic cellar locs (`trapdoor`,
+  `ladder_cellar`, `ladder_from_cellar`, ...) found by `LocPlacementScanner.ts` in
+  `content/maps/*.jm2`. The cook's-basement class of entrance lives here.
+- **floor-shift pool**: same-building staircases with literal coordinates (the bulk
+  of town buildings, ~90 gates).
+
+Left vanilla on purpose: unpaired floor-shift halves (a one-way redirect on a house
+staircase breaks the "come back the way you came" guarantee), unpaired scanned
+placements (cellars whose surface entrance is a loc type we don't handle yet),
+multi-destination trigger coords (middle floors of 3+ storey buildings - the override
+table is keyed by coord alone and can't tell climb-up from climb-down on the same
+tile), quest-gated entrances, and Tutorial Island (mapsquare 48,48 -
+`PROTECTED_MAPSQUARES`).
+
+Reciprocity is guaranteed for every shuffled gate: the far side of wherever you land
+leads back to next to where you entered. Scanned-gate arrival tiles are the far
+ladder's own tile, nudged to the nearest walkable neighbor at teleport time by the
+engine (see the `AP_ENTRANCE_OVERRIDE` handler).
