@@ -29,8 +29,32 @@ with `node scripts/install.js --server-root /path/to/Server`.
 ## Adding something new
 
 Drop the file under `overlays/<target>/<path it should land at>`, then re-run
-`node scripts/install.js`. No manifest to update.
+`node scripts/install.js`. No manifest to update. This works for edits to *existing*
+vanilla files too (e.g. `ClientCheatHandler.ts`) - just keep a full copy of the edited
+file under the overlay and it replaces the vanilla one wholesale on install.
 
-Right now this only covers plain file drops (new/replaced files). If a change needs to
-edit an *existing* vanilla file in place, that's not handled by this script yet - keep
-that in mind as the entrance/drop-table override hooks get built.
+## Entrance randomization
+
+`overlays/engine/tools/map/`:
+
+- `EntranceParser.ts` - shared parser for `content/scripts/ladders+stairs/scripts/*.rs2`
+  (ladder/stair oploc handlers). Not reused directly; imported by the two tools below.
+- `ExportEntrances.ts` - dumps the parsed entrance edge list to
+  `engine/tools/map/entrances.json`. Read-only, no content changes.
+  ```
+  cd Server/engine && npx tsx tools/map/ExportEntrances.ts
+  ```
+- `RandomizeEntrances.ts` - shuffles the `cross-map` entrances (real dungeon/area
+  connectors - same-building floor shifts are left alone) and rewrites the destination
+  coordinates directly in `content/scripts/ladders+stairs/scripts/*.rs2`.
+  ```
+  cd Server/engine && npx tsx tools/map/RandomizeEntrances.ts [--seed <number>] [--dry-run]
+  ```
+  Always regenerates from `content/.ap-backup/` (created automatically on first run, a
+  straight copy of the untouched vanilla scripts), so re-running with a new seed never
+  compounds onto a previous shuffle. Writes a spoiler log to
+  `engine/tools/map/entrance-seed.json`.
+
+Extras that don't have a fixed source/destination we can enumerate from script analysis
+alone (generic `any`-source cellar ladders, `phoenixladder`) are left untouched and
+listed in the spoiler's `excluded` array.
