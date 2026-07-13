@@ -106,8 +106,10 @@ pool):
   transitions plus map-scanned placements of the generic cellar locs (`trapdoor`,
   `ladder_cellar`, `ladder_from_cellar`, ...) found by `LocPlacementScanner.ts` in
   `content/maps/*.jm2`. The cook's-basement class of entrance lives here.
-- **floor-shift pool**: same-building staircases with literal coordinates (the bulk
-  of town buildings, ~90 gates).
+- **floor-shift pool**: same-building staircases with literal coordinates plus
+  map-scanned generic building ladders (`ladder`/`laddertop`/`laddermiddle`/ship
+  ladders - the "same tile, one plane up/down" handlers, e.g. the Lumbridge castle
+  wall ladders). ~300 gates.
 
 Overrides are keyed by trigger coord **and op** (`"coord:op"`), so the middle
 landings of multi-storey towers (Lumbridge castle, Clock Tower, ...) shuffle their

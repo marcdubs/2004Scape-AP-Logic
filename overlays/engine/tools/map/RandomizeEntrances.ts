@@ -51,6 +51,15 @@ const UNDERGROUND_DZ = 6400;
 const SCAN_DOWN_LOCS = ['trapdoor', 'trapdoor_open', 'ladder_cellar', 'ladder_cellar_inside_down'];
 const SCAN_UP_LOCS = ['ladder_from_cellar', 'ladder_from_cellar_directional'];
 
+// generic building ladders: the handler rule is "same tile, one plane up/down", so an
+// up-ladder at plane p pairs with a top at the same spot on plane p+1. laddermiddle
+// sits on intermediate floors and contributes both directions (climb-up is oploc2,
+// climb-down oploc3 - the oploc1 menu consults the same keys via ~ladder_options).
+const SCAN_LADDER_UP: Record<string, number> = { ladder: 1, ladder_directional: 1, ship_ladder: 1 };
+const SCAN_LADDER_DOWN: Record<string, number> = { laddertop: 1, laddertop_directional: 1, laddertop_norim: 1, ship_laddertop: 1 };
+const SCAN_LADDER_MIDDLE = 'laddermiddle';
+const LADDER_PAIR_RADIUS = 3;
+
 // mapsquares that must never be touched by the shuffle, regardless of classification -
 // currently just Tutorial Island (48,48), so a brand-new player can never get stranded
 // mid-tutorial.
@@ -302,6 +311,57 @@ function buildScannedGates(knownTriggers: Set<string>): { gates: Gate[]; skipped
     return { gates, skipped: downs.length + ups.length - gates.length * 2 };
 }
 
+// builds floor-shift gates from the map-scanned generic building ladders. directed
+// edges: ups (ladder/ship_ladder/... + laddermiddle op2) pair with downs (laddertop
+// variants + laddermiddle op3) one plane above at (nearly) the same tile.
+function buildScannedLadderGates(knownTriggers: Set<string>): { gates: Gate[]; skipped: number } {
+    const names = [...Object.keys(SCAN_LADDER_UP), ...Object.keys(SCAN_LADDER_DOWN), SCAN_LADDER_MIDDLE];
+    const placements = scanPlacements(names).filter(p => !inProtectedMapsquare(p.coord) && !knownTriggers.has(p.coord.raw));
+
+    type Edge = { coord: CoordLiteral; op: number; locName: string };
+    const ups: Edge[] = [];
+    const downs: Edge[] = [];
+    for (const p of placements) {
+        if (p.locName === SCAN_LADDER_MIDDLE) {
+            ups.push({ coord: p.coord, op: 2, locName: p.locName });
+            downs.push({ coord: p.coord, op: 3, locName: p.locName });
+        } else if (SCAN_LADDER_UP[p.locName] !== undefined) {
+            ups.push({ coord: p.coord, op: SCAN_LADDER_UP[p.locName], locName: p.locName });
+        } else {
+            downs.push({ coord: p.coord, op: SCAN_LADDER_DOWN[p.locName], locName: p.locName });
+        }
+    }
+
+    const gates: Gate[] = [];
+    const usedDowns = new Set<Edge>();
+    for (const up of ups) {
+        let best: Edge | null = null;
+        let bestDist = Infinity;
+        for (const down of downs) {
+            if (usedDowns.has(down) || down.coord.plane !== up.coord.plane + 1) {
+                continue;
+            }
+            const d = worldDist(down.coord, up.coord);
+            if (d <= LADDER_PAIR_RADIUS && d < bestDist) {
+                bestDist = d;
+                best = down;
+            }
+        }
+        if (!best) {
+            continue;
+        }
+        usedDowns.add(best);
+        gates.push({
+            a: { trigger: up.coord, triggerOp: up.op, arrival: best.coord, description: `${up.locName} at ${up.coord.raw}` },
+            b: { trigger: best.coord, triggerOp: best.op, arrival: up.coord, description: `${best.locName} at ${best.coord.raw}` },
+            pool: 'floor-shift',
+            scanned: true
+        });
+    }
+
+    return { gates, skipped: ups.length + downs.length - gates.length * 2 };
+}
+
 function parseArgs() {
     const args = process.argv.slice(2);
     const seedIdx = args.indexOf('--seed');
@@ -364,11 +424,15 @@ function main() {
     const cross = findGatePairs(crossCands, CROSS_PAIR_RADIUS);
     const floor = findGatePairs(floorCands, FLOOR_PAIR_RADIUS);
 
-    const knownTriggers = new Set(usable.map(e => e.source.coord.raw));
+    // exclude every coord the scripts mention as a literal source - including
+    // non-candidates like the quest-gated dwarf trapdoor and the black knights
+    // aggro ladder, whose special behavior an override would bypass.
+    const knownTriggers = new Set(allEntrances.filter(e => e.source.type === 'literal').map(e => (e.source as { coord: CoordLiteral }).coord.raw));
     const scanned = buildScannedGates(knownTriggers);
+    const scannedLadders = buildScannedLadderGates(knownTriggers);
 
     const connectorGates = [...cross.pairs.map(p => toGate(p, 'connector')), ...scanned.gates];
-    const floorGates = floor.pairs.map(p => toGate(p, 'floor-shift'));
+    const floorGates = [...floor.pairs.map(p => toGate(p, 'floor-shift')), ...scannedLadders.gates];
 
     // genuine one-ways (KBD entrance etc) plus connector halves whose far side isn't a
     // candidate. floor-shift unpaired halves stay vanilla instead - a one-way redirect
@@ -376,8 +440,8 @@ function main() {
     // real payoff.
     const oneWays: OneWayEntry[] = cross.unpaired.map(e => ({ trigger: e.source.coord, triggerOp: opNum(e), arrival: e.destination, description: e.description }));
 
-    printInfo(`seed ${seed}: ${connectorGates.length} connector gate(s) (${scanned.gates.length} map-scanned), ${floorGates.length} floor-shift gate(s), ${oneWays.length} one-way(s)`);
-    printInfo(`left vanilla: ${floor.unpaired.length} unpaired floor-shift(s), ${scanned.skipped} unpaired scanned placement(s), ${multiDest.size} multi-destination coord(s)`);
+    printInfo(`seed ${seed}: ${connectorGates.length} connector gate(s) (${scanned.gates.length} map-scanned), ${floorGates.length} floor-shift gate(s) (${scannedLadders.gates.length} map-scanned), ${oneWays.length} one-way(s)`);
+    printInfo(`left vanilla: ${floor.unpaired.length} unpaired floor-shift(s), ${scanned.skipped + scannedLadders.skipped} unpaired scanned placement(s), ${multiDest.size} multi-destination coord(s)`);
 
     const excluded = allEntrances
         .filter(e => e.kind === 'cross-map' && !isLiteral(e))
