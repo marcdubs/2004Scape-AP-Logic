@@ -6,19 +6,28 @@ import { printInfo, printWarning } from '#/util/Logger.js';
 import { CONTENT_ROOT, ENTRANCE_DIR, type CoordLiteral, type Entrance, parseFile } from './EntranceParser.js';
 
 // Shuffles the ladder/stair entrances classified `cross-map` by EntranceParser.ts
-// (real dungeon/area connectors - not same-building floor shifts) and rewrites the
-// destination coordinates directly in content/scripts/ladders+stairs/scripts/*.rs2.
+// (real dungeon/area connectors - not same-building floor shifts).
 //
-// Always regenerates from a vanilla backup (content/.ap-backup/), never from whatever
-// currently sits in content/ - so re-running with a different --seed always starts
-// from the original layout instead of compounding onto a previous shuffle. See
+// Default mode writes a runtime override table (data/config/ap-entrances.json) that
+// the engine's ap_entrance_override command consults - no content changes, no pack
+// rebuild; reseed by re-running and restarting the server. Requires the patched
+// ladder/stair handlers + ap.rs2 from 2004Scape-AP-Logic to be installed and built
+// into the pack once.
+//
+// Legacy --rewrite mode bakes the shuffle into content/scripts/ladders+stairs/
+// scripts/*.rs2 instead (needs a full pack rebuild per seed). Candidates are always
+// parsed from the vanilla backup (content/.ap-backup/), never from whatever currently
+// sits in content/, so re-running never compounds onto a previous shuffle. See
 // ARCHIPELAGO_IDEAS.md #1 for the design rationale.
 //
-// Usage: npx tsx tools/map/RandomizeEntrances.ts [--seed <number>] [--dry-run]
+// Usage: npx tsx tools/map/RandomizeEntrances.ts [--seed <number>] [--dry-run] [--rewrite]
 
 const RELATIVE_ENTRANCE_DIR = 'scripts/ladders+stairs/scripts';
 const BACKUP_DIR = path.join(CONTENT_ROOT, '.ap-backup', RELATIVE_ENTRANCE_DIR);
 const SPOILER_OUTPUT = path.join(import.meta.dirname, 'entrance-seed.json');
+// runtime override table read by the engine (ApEntranceOverrides.ts); relative to the
+// engine working directory, same convention as the engine's own loader.
+const OVERRIDES_OUTPUT = path.resolve('data/config/ap-entrances.json');
 
 // tiles - how close a candidate's (source, destination) pair has to be to another
 // candidate's (destination, source) for the two to be treated as the up/down sides of
@@ -213,7 +222,7 @@ function parseArgs() {
     const args = process.argv.slice(2);
     const seedIdx = args.indexOf('--seed');
     const seed = seedIdx !== -1 ? parseInt(args[seedIdx + 1], 10) : Math.floor(Math.random() * 0xffffffff);
-    return { seed, dryRun: args.includes('--dry-run') };
+    return { seed, dryRun: args.includes('--dry-run'), rewrite: args.includes('--rewrite') };
 }
 
 function main() {
@@ -222,7 +231,7 @@ function main() {
         process.exit(1);
     }
 
-    const { seed, dryRun } = parseArgs();
+    const { seed, dryRun, rewrite } = parseArgs();
 
     // always (re)derive from the untouched vanilla backup, creating it on first run,
     // so re-randomizing never compounds onto a previous shuffle's output.
@@ -244,15 +253,35 @@ function main() {
         textByFile.set(file, fs.readFileSync(backupPath, 'utf8').replace(/\r\n/g, '\n'));
     }
 
-    const candidates = allEntrances.filter(isCandidate);
+    // dedupe on trigger tile: stairs.rs2 has a few literally duplicated cases (e.g.
+    // the blackarm hideout / "Varrock thief house" stairs appear twice with the same
+    // source and destination). Without this, the two copies pair with *each other* and
+    // form a bogus zero-length gate.
+    const seenSources = new Set<string>();
+    const candidates = allEntrances.filter(isCandidate).filter(e => {
+        if (seenSources.has(e.source.coord.raw)) {
+            return false;
+        }
+        seenSources.add(e.source.coord.raw);
+        return true;
+    });
     const { pairs, oneWay } = findGatePairs(candidates);
     const excludedCount = allEntrances.filter(e => e.kind === 'cross-map').length - candidates.length;
 
     printInfo(`seed ${seed}: ${pairs.length} bidirectional gate(s), ${oneWay.length} one-way entrance(s), ${excludedCount} excluded (protected regions, or generic/relative fallback that can't be safely rewritten)`);
 
     const edits: Edit[] = [];
+    const overrides: Record<string, string> = {};
     const spoilerGates: unknown[] = [];
     const spoilerOneWay: unknown[] = [];
+
+    const addOverride = (from: string, to: string) => {
+        if (overrides[from] !== undefined) {
+            printWarning(`override collision on ${from} - keeping first assignment`);
+            return;
+        }
+        overrides[from] = to;
+    };
 
     if (pairs.length >= 2) {
         const perm = derangement(pairs.length, rand);
@@ -261,8 +290,18 @@ function main() {
             const [aTrigger] = pairs[i];
             const [, bTrigger] = pairs[j];
 
+            // legacy rewrite mode swaps the destination literals in the script text.
             edits.push({ file: path.basename(aTrigger.file), oldRaw: aTrigger.destination.raw, newRaw: bTrigger.source.coord.raw, originalIndex: aTrigger._index });
             edits.push({ file: path.basename(bTrigger.file), oldRaw: bTrigger.destination.raw, newRaw: pairs[i][0].source.coord.raw, originalIndex: bTrigger._index });
+
+            // override mode redirects to the vanilla *arrival* tiles (a walkable tile
+            // next to the far-side trigger) rather than the far trigger's own tile,
+            // which the loc itself may block:
+            //   entering gate i's A side lands where gate j's A side used to deliver
+            //   (next to j's B trigger), and using j's B side returns you to where
+            //   gate i's B side used to deliver (next to i's A trigger).
+            addOverride(pairs[i][0].source.coord.raw, pairs[j][0].destination.raw);
+            addOverride(pairs[j][1].source.coord.raw, pairs[i][1].destination.raw);
 
             spoilerGates.push({
                 locA: describe(pairs[i][0].source.coord, pairs[i][0].description),
@@ -280,6 +319,7 @@ function main() {
             const entry = oneWay[i];
             const target = oneWay[perm[i]];
             edits.push({ file: path.basename(entry.file), oldRaw: entry.destination.raw, newRaw: target.destination.raw, originalIndex: entry._index });
+            addOverride(entry.source.coord.raw, target.destination.raw);
             spoilerOneWay.push({
                 from: describe(entry.source.coord, entry.description),
                 originallyLedTo: describe(entry.destination, null),
@@ -290,6 +330,36 @@ function main() {
         printWarning(`only ${oneWay.length} one-way entrance(s) found - nothing to shuffle there`);
     }
 
+    const excluded = allEntrances
+        .filter(e => e.kind === 'cross-map' && !isCandidate(e))
+        .map(e => ({
+            category: e.category,
+            op: e.op,
+            description: e.description,
+            reason: isProtected(e) ? 'protected region (tutorial)' : e.source.type !== 'literal' ? 'non-literal source' : 'non-literal destination'
+        }));
+
+    if (!rewrite) {
+        // default mode: emit the runtime override table consumed by the engine's
+        // ap_entrance_override command (see ApEntranceOverrides.ts). No content
+        // changes, no pack rebuild - swap the file and restart the server.
+        const output = {
+            seed,
+            generatedAt: new Date().toISOString(),
+            spoiler: { gates: spoilerGates, oneWay: spoilerOneWay, excluded },
+            overrides
+        };
+        if (!dryRun) {
+            fs.writeFileSync(OVERRIDES_OUTPUT, JSON.stringify(output, null, 2));
+        }
+        printInfo(`${dryRun ? '[dry run] ' : ''}wrote ${Object.keys(overrides).length} override(s) to ${OVERRIDES_OUTPUT}`);
+        if (!dryRun) {
+            printInfo('restart the server to load the new entrance layout (no content rebuild needed)');
+        }
+        return;
+    }
+
+    // legacy --rewrite mode: bake the shuffle into the .rs2 source text.
     for (const [file, text] of textByFile) {
         const fileEdits = edits.filter(e => e.file === file);
         const newText = applyEdits(text, fileEdits);
@@ -301,15 +371,6 @@ function main() {
             fs.writeFileSync(path.join(ENTRANCE_DIR, file), newText.replace(/\n/g, '\r\n'));
         }
     }
-
-    const excluded = allEntrances
-        .filter(e => e.kind === 'cross-map' && !isCandidate(e))
-        .map(e => ({
-            category: e.category,
-            op: e.op,
-            description: e.description,
-            reason: isProtected(e) ? 'protected region (tutorial)' : e.source.type !== 'literal' ? 'non-literal source' : 'non-literal destination'
-        }));
 
     fs.writeFileSync(
         SPOILER_OUTPUT,

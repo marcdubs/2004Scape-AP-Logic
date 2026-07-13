@@ -1,0 +1,12 @@
+// Archipelago randomizer support. See 2004Scape-AP-Logic for the tooling that
+// generates engine/data/config/ap-entrances.json (the override table this reads).
+
+// info: custom - look up a randomized destination for an entrance trigger coord; null when the entrance is unrandomized
+[command,ap_entrance_override](coord $coord)(coord)
+
+// Jump target for the preamble injected into every ladder/stair oploc handler.
+// Jumping (rather than a gosub) aborts the vanilla handler, so the override teleport
+// and the vanilla transition can never both run.
+[label,ap_entrance_go](coord $dest)
+p_arrivedelay;
+p_telejump($dest);

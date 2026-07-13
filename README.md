@@ -7,9 +7,14 @@ This repo does **not** fork LostCityRS. `Server`, `engine`, `content`, `webclien
 the normal way via `Server/start.sh`). Everything Archipelago-specific lives here
 instead, and gets deployed on top via `scripts/install.js`.
 
+**New session / new agent?** Read [docs/lessons-learned.md](docs/lessons-learned.md)
+first - it captures the architecture decisions, the rs2/engine recipes, the
+environment gotchas, and where the project is heading.
+
 ## Layout
 
-- `docs/` - design notes.
+- `docs/` - design notes ([archipelago-ideas.md](docs/archipelago-ideas.md)) and
+  process/domain knowledge ([lessons-learned.md](docs/lessons-learned.md)).
 - `overlays/<target>/...` - files to be copied on top of the matching directory in the
   `Server` checkout. `overlays/engine/tools/map/ExportEntrances.ts` deploys to
   `Server/engine/tools/map/ExportEntrances.ts`, and so on. Directory name under
@@ -35,43 +40,69 @@ file under the overlay and it replaces the vanilla one wholesale on install.
 
 ## Entrance randomization
 
-`overlays/engine/tools/map/`:
+Runtime-override architecture: the shuffle lives in a JSON table the engine reads at
+runtime, not in the scripts. Reseeding = re-run one command + restart the server. No
+per-seed content rebuild.
 
-- `EntranceParser.ts` - shared parser for `content/scripts/ladders+stairs/scripts/*.rs2`
-  (ladder/stair oploc handlers). Not reused directly; imported by the two tools below.
+### Pieces
+
+Engine (`overlays/engine/src/`):
+
+- `engine/ApEntranceOverrides.ts` - loads `engine/data/config/ap-entrances.json`
+  (lazily, on first lookup) into a coord -> coord map. Missing file = everything
+  vanilla.
+- `engine/script/ScriptOpcode.ts` + `engine/script/handlers/ServerOps.ts` - add the
+  custom `AP_ENTRANCE_OVERRIDE` script command (opcode 1900, explicitly numbered high
+  in the server-ops range so upstream additions can't collide).
+
+Content (`overlays/content/scripts/`):
+
+- `ap/ap.rs2` - declares `[command,ap_entrance_override](coord)(coord)` for the script
+  compiler, plus the `ap_entrance_go` jump label the handler preambles use.
+- `ladders+stairs/scripts/*.rs2` - vanilla handlers with a 4-line preamble injected at
+  the top of every `[oploc*]` handler: look up `loc_coord` in the override table, and
+  if present jump to `ap_entrance_go` (a jump, not a gosub, so the vanilla transition
+  can never also run). Preamble is deliberately invisible to `EntranceParser.ts`
+  (verified byte-identical parse output vs vanilla).
+
+Tools (`overlays/engine/tools/map/`):
+
+- `EntranceParser.ts` - shared parser for the ladder/stair oploc handlers.
 - `ExportEntrances.ts` - dumps the parsed entrance edge list to
-  `engine/tools/map/entrances.json`. Read-only, no content changes.
-  ```
-  cd Server/engine && npx tsx tools/map/ExportEntrances.ts
-  ```
-- `RandomizeEntrances.ts` - shuffles the `cross-map` entrances (real dungeon/area
-  connectors - same-building floor shifts are left alone) and rewrites the destination
-  coordinates directly in `content/scripts/ladders+stairs/scripts/*.rs2`.
-  ```
-  cd Server/engine && npx tsx tools/map/RandomizeEntrances.ts [--seed <number>] [--dry-run]
-  ```
-  Always regenerates from `content/.ap-backup/` (created automatically on first run, a
-  straight copy of the untouched vanilla scripts), so re-running with a new seed never
-  compounds onto a previous shuffle. Writes a spoiler log to
-  `engine/tools/map/entrance-seed.json`.
+  `engine/tools/map/entrances.json`. Read-only.
+- `RandomizeEntrances.ts` - pairs up entrances into bidirectional gates, shuffles with
+  a seeded derangement, writes `engine/data/config/ap-entrances.json` (override table +
+  spoiler in one file).
 
-Extras that don't have a fixed source/destination we can enumerate from script analysis
-alone (generic `any`-source cellar ladders, `phoenixladder`) are left untouched and
-listed in the spoiler's `excluded` array. Tutorial Island (mapsquare 48,48) is always
-excluded too, regardless of classification - see `PROTECTED_MAPSQUARES` in
-`RandomizeEntrances.ts` if that ever needs to grow.
+### Usage
 
-**Required step before testing:** the randomizer only edits
-`content/scripts/ladders+stairs/scripts/*.rs2`. The running server loads *compiled*
-scripts from `engine/data/pack/server/script.dat`/`.idx`, not the raw `.rs2` source, and
-in production mode (`node.production: true` in `world.json`) it does not live-recompile.
-After randomizing (and before starting/restarting the server), rebuild:
+One-time setup (after `node scripts/install.js`): rebuild the content pack so the
+patched handlers + new command exist in the compiled scripts:
+
 ```
 cd Server/engine && npx tsx tools/pack/Build.ts
 ```
-This is a full asset pack build (~1-2 minutes) - there isn't currently a narrower
-"just recompile scripts" path. It may also touch unrelated tracked files in `content/`
-as a side effect (seen once: an NPC config got auto-filled with missing equipment
-slots, and `pack/map.pack` got its checksum bumped) - those are pre-existing build-tool
-behavior, not caused by the randomizer, safe to `git checkout --` if you want to keep
-the diff scoped to just the entrance shuffle.
+
+Then, per seed (seconds, repeat as often as you like):
+
+```
+cd Server/engine && npx tsx tools/map/RandomizeEntrances.ts [--seed <number>] [--dry-run]
+```
+
+...and restart the server. The spoiler is the `spoiler` section inside
+`engine/data/config/ap-entrances.json`. To go back to vanilla entrances, delete that
+file and restart.
+
+The legacy `--rewrite` flag still bakes the shuffle into the `.rs2` source instead
+(requires a full pack rebuild per seed); it's kept as a fallback until the override
+path has been played end-to-end.
+
+### Scope
+
+Currently shuffled: literal-coordinate `cross-map` entrances (real dungeon/area
+connectors). Same-building floor shifts are untouched. Generic `any`-source categories
+(cellar ladders etc.) can't be *enumerated* from script analysis alone - their
+placements live in the map files - but the runtime override path already handles them
+on the application side, so bringing them in scope only needs a placement scanner, not
+another architecture change. Tutorial Island (mapsquare 48,48) is always excluded -
+see `PROTECTED_MAPSQUARES` in `RandomizeEntrances.ts`.
