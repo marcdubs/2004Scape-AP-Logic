@@ -248,15 +248,77 @@ Floor-shift stairs and map-scanned cellars are now in. Additional lessons:
 - phoenixladder scanned to zero placements (the hideout may use a different loc or
   dynamic spawning) - silently absent, fine to ignore.
 
+## Domain knowledge: NPC drip randomization
+
+Built same day as the entrance ladder-scanning expansion, as a separate/unrelated
+feature (see [archipelago-ideas.md](archipelago-ideas.md) #3). Encoded in
+`NpcDripParser.ts` / `RandomizeDrip.ts`, but the reasoning:
+
+- **This is config mutation, not runtime override** - deliberately does NOT reuse the
+  JSON-table-plus-engine-command pattern entrance randomization uses. `model#=` is
+  compiled into `npc.dat` at pack-build time (see `NpcConfig.ts`'s
+  `parseNpcConfig`/`packNpcConfigs` - `ModelPack.getByName(value)` resolves the config
+  text value to an id), there's no runtime hook reading it, and archipelago-ideas.md
+  reasoned explicitly that drip is cosmetic/no-gameplay-coupling and doesn't need one.
+  Consequence: reseeding needs `npx tsx tools/pack/Build.ts` (~1-2 min), unlike
+  entrances. Don't "fix" this into a runtime table without a reason - it was a
+  deliberate choice, not an oversight.
+- **The swap boundary is the model-name convention, not position.** `.npc` files list
+  `model1=`..`model9=` but the index does NOT correspond to a fixed body slot across
+  different NPCs (Duke Horacio's `model2` is a necklace, the Cook's `model2` is a hat) -
+  confirmed by grepping every `.npc` in the tree. The only reliable slot signal is the
+  value's own naming convention: `(man|woman)_<part>_<detail>` (e.g. `man_torso_basic`,
+  `woman_hat_witch`). Swap pools are keyed by `gender_part` extracted from the value,
+  never by the `model<N>` index.
+- **Non-conforming model values are the safety net, not an explicit exclude list.**
+  Creature-specific models (`npc_troll_head`, `model_2909_npc`, `npc_1095i3`, ...) and
+  held-item/weapon overlays (`human_weapons_longsword`, ...) don't match the
+  `man_`/`woman_` convention and are left alone automatically - no per-NPC exclusion
+  needed to keep monsters and quest-specific NPCs from getting corrupted into nonsense.
+  ~563 distinct model values exist across the tree; roughly half don't match the
+  convention and are correctly never touched.
+- **`content/scripts/_unpack/{225,244,254,274}/all.npc`** (old-cache-revision dumps,
+  coordinate-keyed debugnames like `[0_45_48_seabird1]`) turned out to be **live
+  content, not dead reference material** - confirmed via `PackFile.ts`'s
+  `NpcPack = new PackFile('npc', ..., true)`, which scans `.npc` recursively under
+  `scripts/` with no `_unpack` exclusion at the load level (only a structural lint
+  rule in `crawlConfigNames` exempts that folder from the "must live in a `configs/`
+  folder" check). They're included in the shuffle scan for that reason.
+- **Derangement, not a distinct-value substitution cipher.** Pools permute
+  *occurrences* (every `model#=` line site), not distinct values - reuses
+  `derangement()` from `../shared/Prng.ts` (the same function entrance randomization's
+  gate shuffle uses, factored out this session). This preserves the vanilla frequency
+  distribution of each model (a common value like `man_torso_basic` still shows up
+  about as often, just on different NPCs) rather than a cipher's tendency to amplify
+  whichever distinct value a popular one happens to map to.
+- **Per-pool sub-seeding** (`seed ^ hashKey(poolName)`): without it every same-sized
+  pool draws from the PRNG in lockstep and produces suspiciously-correlated
+  permutations. Cheap, fully reproducible from one `--seed`.
+- **`head#=` (chat-portrait bust models) and `recol#s`/`recol#d` (palette color
+  swaps) are out of scope for this pass** - deliberate, not an oversight. Recoloring
+  in particular is a plausible follow-up (recolors are generic palette-index remaps,
+  not model-specific, so they'd very likely still apply cleanly to a swapped model)
+  but adds a second axis of chaos that wasn't asked for yet.
+- **No verified in-game testing yet** - offline checks only: typecheck, a full
+  `tools/pack/Build.ts` run completing without error (confirms every swapped value
+  resolved against `model.pack`, since swap values are always values scraped from
+  *some* real vanilla `.npc` line, never invented), and a line-diff spot-check against
+  the vanilla backup showing only the intended `model#=` lines changed, CRLF intact.
+  Hand off actual visual verification to the user (see WSL boot restriction above).
+
 ## Where this is heading (agreed with the user)
 
 Priority order discussed:
-1. ~~Entrance randomization~~ (done: connector + floor-shift pools, --mixed flag)
+1. ~~Entrance randomization~~ (done: connector + floor-shift pools, incl. generic
+   building ladders, --mixed flag)
 2. ~~Any-source placements via a `.jm2` LOC scanner~~ (done for
    trapdoor/cellar-ladder types; more surface loc types remain - see unpaired
    scanned placements in the spoiler)
-3. Drop randomization, shop-location shuffle, NPC cosmetic ("drip") shuffle - see
-   [archipelago-ideas.md](archipelago-ideas.md); reuse the override-table pattern
+3. ~~NPC cosmetic ("drip") shuffle~~ (done: `model#=` shuffled by gender+body-part
+   pool, config-mutation approach per archipelago-ideas.md #3, not yet played).
+   Drop randomization and shop-location shuffle remain - see
+   [archipelago-ideas.md](archipelago-ideas.md); reuse the runtime override-table
+   pattern from entrances for those two (drip deliberately did NOT - see above).
 4. Actual Archipelago protocol integration (AP world Python package, item/location
    handling, `xpRate`/`NODE_XPRATE` as a slot option, junk rewards straight to bank
    via `inv_add(bank, ...)`)
@@ -297,3 +359,36 @@ Priority order discussed:
 - Future sessions should be started in this repo (CLAUDE.md is auto-loaded;
   `.claude/settings.json` pre-authorizes `../Server`). The old agent memory keyed
   to the Server/ directory is superseded by these docs.
+
+## Session-end addendum: NPC drip randomization (2026-07-13, later same day)
+
+Built entirely independently of the entrance-ladder work above (different files, no
+overlap) - see the "Domain knowledge: NPC drip randomization" section for the design
+reasoning.
+
+- New files: `overlays/engine/tools/npc/{NpcDripParser,RandomizeDrip}.ts`,
+  `overlays/engine/tools/shared/Prng.ts` (mulberry32/shuffle/derangement factored out
+  of `RandomizeEntrances.ts` so both tools share the exact same tested shuffle code -
+  `RandomizeEntrances.ts` now imports from it instead of defining its own copies).
+  README.md has a new "NPC drip randomization" section with usage.
+- Installed, typechecked (`npx tsc --noEmit -p .` clean), and run end-to-end: seed 777
+  produced 21 gender+body-part pools, 4193 model swaps across 113 of the 138 `.npc`
+  files in the tree, `content/.ap-backup/scripts/` now also holds pristine `.npc`
+  backups (138 files, same backup root the entrance scripts already used - just a
+  different subtree). `npx tsx tools/pack/Build.ts` completed clean afterward
+  (confirms every swapped value resolved against `model.pack`).
+- **Verified**: typecheck, pack build success, line-diff spot check (only `model#=`
+  lines changed, CRLF intact, category-correct swaps e.g. torso->torso). **Not yet
+  verified**: nothing in-game. The user needs to boot the (already pack-rebuilt)
+  Windows server and eyeball a few NPCs (bank in Lumbridge is an easy one - `banker1`
+  changed jaw/arms/torsoextra in the seed-777 run above) before trusting this beyond
+  "it compiles."
+- **Known open risk, called out in both README and the domain-knowledge section
+  above**: no exclude list exists yet for NPCs whose vanilla appearance might be
+  load-bearing for quest recognition/disguises. `--exclude <substr,...>` is wired up
+  and works, but nothing is populated into it by default - future session should
+  either audit quest scripts for appearance-dependent checks, or wait for the user to
+  report a broken quest and pin that NPC reactively.
+- The live Server checkout currently has the seed-777 drip shuffle applied and
+  pack-built (on top of the seed-777 entrance shuffle from the earlier session) - both
+  randomizers' outputs currently coexist in the same running-ready state.

@@ -126,3 +126,59 @@ Reciprocity is guaranteed for every shuffled gate: the far side of wherever you 
 leads back to next to where you entered. Scanned-gate arrival tiles are the far
 ladder's own tile, nudged to the nearest walkable neighbor at teleport time by the
 engine (see the `AP_ENTRANCE_OVERRIDE` handler).
+
+## NPC drip randomization
+
+Pure config mutation, no engine or script changes - unlike entrance randomization,
+this shuffles the `.npc` config files themselves, so a reseed needs a content pack
+rebuild (not just a server restart).
+
+### Pieces
+
+Tools (`overlays/engine/tools/npc/`):
+
+- `NpcDripParser.ts` - recursively finds every `.npc` file under `content/scripts/`
+  and extracts `model<N>=<value>` lines whose value matches the composable human body
+  part naming convention (`man_<part>_<detail>` / `woman_<part>_<detail>`, e.g.
+  `man_torso_basic`, `woman_hat_witch`).
+- `RandomizeDrip.ts` - groups those values into pools keyed by gender + body-part
+  category, deranges each pool (same value-preserving-permutation technique as the
+  entrance gate shuffle), and writes the result back into the live `.npc` files.
+
+Shared (`overlays/engine/tools/shared/Prng.ts`): the seedable PRNG + `derangement()`
+helper, factored out so entrance and drip randomization use the exact same tested
+shuffle algorithm.
+
+### Usage
+
+```
+cd Server/engine && npx tsx tools/npc/RandomizeDrip.ts [--seed <number>] [--dry-run] [--mixed-gender] [--exclude <substr,substr,...>]
+cd Server/engine && npx tsx tools/pack/Build.ts
+```
+
+...then restart the server. First run backs up every vanilla `.npc` file under
+`content/.ap-backup/scripts/` (mirroring the same backup convention entrance
+randomization uses) and every subsequent reseed re-derives from that backup, so
+reseeding never compounds onto a previous seed's output. The spoiler is
+`engine/tools/npc/drip-seed.json`. To go back to vanilla outfits, restore the `.npc`
+files from `content/.ap-backup/scripts/` and rebuild the pack.
+
+`--mixed-gender` merges the `man_*`/`woman_*` pools per category (e.g. `man_torso` and
+`woman_torso` become one pool) for more chaotic results; default keeps them separate.
+`--exclude` takes a comma-separated list of substrings matched against either the npc's
+debugname or its file path - any matching model slot is left vanilla, for pinning
+NPCs whose appearance might be load-bearing (quest recognition/disguises).
+
+### Scope
+
+Only `model#=` values matching the `man_`/`woman_` body-part convention are shuffle
+candidates - creature-specific models (`npc_troll_head`, `model_2909_npc`, ...) and
+held-item/weapon models (`human_weapons_*`) don't match that convention and are always
+left vanilla, since swapping them in would produce nonsense (a torso slot getting a
+weapon model, a monster getting a human body part). `head#=` (chat-portrait models) and
+`recol#s`/`recol#d` (palette color swaps) are untouched in this pass - a possible
+future extension.
+
+**Known risk, not yet mitigated**: some NPCs may be visually load-bearing for quest
+recognition (a disguise, an NPC you're told to identify by appearance). There's no
+built-in exclude list for this - use `--exclude` once such NPCs are identified.
