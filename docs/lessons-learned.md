@@ -555,6 +555,31 @@ usage/scope). The reasoning that isn't obvious from the code:
   CRLF intact, `if`/`else if` prefixes and comments untouched. **Not yet verified
   in-game** - same caveat as every other content-mutation tool in this repo.
 
+## Session-end addendum 5: goals/checks/rewards plan decided (2026-07-13)
+
+The user chose the pre-AP direction; the full work plan lives in
+[goals-and-checks.md](goals-and-checks.md) - **read it before building any of
+this**. Summary of the decisions:
+
+- **Goals:** Barcrawl, Dragon Slayer, KBD kill. All three's tracking mechanisms
+  are verified in that doc (barcrawl bitfield, `%dragonquest`, a new varp set in
+  the KBD death script after `npc_findhero`).
+- **Quest completions are checks**, firing a random **level-based reward**
+  (runes/ranged/arrows/weapons/armour/cash/potions/food, tiered by the relevant
+  stat) - single choke point `send_quest_complete` in `general/scripts/quests.rs2`,
+  called by all ~64 quests. This reward roll is the future AP junk/filler handler.
+- **Approved randomizers:** groundsanity (jm2 `==== OBJ ====` remap, runtime
+  loader hook preferred), random respawn/home point (constrained to the 7 vanilla
+  spellbook teleport coords; hits `death.rs2:32` + `::home`), teleport
+  destination shuffle (derange the 7 `tele_coord` dbrow values).
+- **Rejected by the user - do not build:** shop stock shuffle, NPC recolors,
+  NPC spawn shuffle.
+- **Every feature must ship with a test command.** Production mode blocks
+  debugprocs (`ClientCheatHandler.ts` gates on `!production && staffModLevel >= 4`),
+  so the plan is one ungated `ap*`-prefix dispatcher in the overlaid handler that
+  runs `[debugproc,ap_<name>]` content scripts; all test commands then live in
+  content. Build this dispatcher first.
+
 ## Where this is heading (agreed with the user)
 
 Priority order discussed:

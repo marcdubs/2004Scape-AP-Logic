@@ -4,6 +4,8 @@ Archipelago randomizer for 2004scape (LostCityRS rev 274). **Before doing anythi
 read `docs/lessons-learned.md`** - it has the architecture rationale, engine/rs2
 recipes, environment gotchas, and the roadmap. `README.md` covers layout and usage.
 `docs/archipelago-ideas.md` is the original design brainstorm.
+`docs/goals-and-checks.md` is the decided plan for goals, quest-completion checks,
+the level-based reward system, and the next randomizers - build from it.
 
 ## The one-paragraph mental model
 
