@@ -263,13 +263,28 @@ Priority order discussed:
 
 ## Session-end state (2026-07-13)
 
-- Everything installed into the user's Server checkout and pack-rebuilt; seed
-  1803231336 written to `ap-entrances.json` (9 gates, 5 one-way, 23 overrides).
-  Engine loader unit-verified. NOT yet verified by playing - the user was about to
-  boot on Windows and test climbing something from the spoiler (e.g. Varrock West
-  Bank basement stairs).
+- Everything through commit `c32ddbd` is installed into the user's Server checkout
+  and pack-rebuilt. Current table: seed 777, **315 overrides** (48 connector gates
+  incl. 39 map-scanned, 107 floor-shift gates, 5 one-ways), coord+op keys.
+- **Verified in-game by the user**: the original 23-override cross-map shuffle
+  (server logged `loaded 23 redirect(s)`, entrances redirected). Everything after
+  that - the floor-shift pool, scanned cellar gates (incl. cook's basement), the
+  walkability nudge, and especially the coord+op keying - is verified only by the
+  offline checks (typecheck, pack build, loader unit test 315/315, machine
+  round-trips 155/155), **not yet by playing**.
+- **Highest-risk untested piece**: the patched `stair_options`/`ladder_options`
+  menu labels assume `loc_coord` stays valid after an `@jump` within the same
+  script run. If a middle-landing *menu* errors or acts vanilla while right-click
+  Climb-up/Climb-down shuffle correctly, that assumption is wrong - rework by
+  passing the coord into the label as a parameter instead.
+- Second-risk untested piece: scanned-gate arrivals land on the far ladder's own
+  tile and rely on the engine-side walkability nudge; watch for players stuck in
+  walls at cellar destinations.
 - The user's local `world.json` has `web.port: 8080` (changed from 80 for WSL; file
   is gitignored so this won't propagate anywhere).
 - Old artifacts that may still exist and are safe to delete:
   `engine/tools/map/entrance-seed.json` (legacy spoiler), `engine/tools/map/
   entrances.json` (export tool output, regenerate at will).
+- Future sessions should be started in this repo (CLAUDE.md is auto-loaded;
+  `.claude/settings.json` pre-authorizes `../Server`). The old agent memory keyed
+  to the Server/ directory is superseded by these docs.
