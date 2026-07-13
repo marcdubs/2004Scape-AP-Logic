@@ -140,7 +140,11 @@ Tools (`overlays/engine/tools/npc/`):
 - `NpcDripParser.ts` - recursively finds every `.npc` file under `content/scripts/`
   and extracts `model<N>=<value>` lines whose value matches the composable human body
   part naming convention (`man_<part>_<detail>` / `woman_<part>_<detail>`, e.g.
-  `man_torso_basic`, `woman_hat_witch`).
+  `man_torso_basic`, `woman_hat_witch`). `model<N>` is NOT a fixed body-part slot - the
+  client just merges every `model#` entry into one composite mesh in array order
+  (`Model.combineForAnim`), so `model2` is a necklace on one NPC and a hat on another.
+  The value's own naming convention is the only real signal, which is why grouping is
+  by that instead of by index.
 - `RandomizeDrip.ts` - groups those values into pools keyed by gender + body-part
   category, deranges each pool (same value-preserving-permutation technique as the
   entrance gate shuffle), and writes the result back into the live `.npc` files.

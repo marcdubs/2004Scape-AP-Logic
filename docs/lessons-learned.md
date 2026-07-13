@@ -263,13 +263,18 @@ feature (see [archipelago-ideas.md](archipelago-ideas.md) #3). Encoded in
   Consequence: reseeding needs `npx tsx tools/pack/Build.ts` (~1-2 min), unlike
   entrances. Don't "fix" this into a runtime table without a reason - it was a
   deliberate choice, not an oversight.
-- **The swap boundary is the model-name convention, not position.** `.npc` files list
-  `model1=`..`model9=` but the index does NOT correspond to a fixed body slot across
-  different NPCs (Duke Horacio's `model2` is a necklace, the Cook's `model2` is a hat) -
-  confirmed by grepping every `.npc` in the tree. The only reliable slot signal is the
-  value's own naming convention: `(man|woman)_<part>_<detail>` (e.g. `man_torso_basic`,
-  `woman_hat_witch`). Swap pools are keyed by `gender_part` extracted from the value,
-  never by the `model<N>` index.
+- **There is no body-slot system at all - `model#=` is just an unordered list of mesh
+  parts to merge, not a struct with a head/torso/legs field.** Verified in the client:
+  `NpcType.ts` calls `Model.load()` on every `model#` entry and hands the whole array to
+  `Model.combineForAnim()` (`webclient/src/dash3d/Model.ts`), which just concatenates
+  every model's points/faces/vertex-labels into one composite mesh in array order - no
+  positional meaning anywhere. That's *why* `model2` is a necklace on Duke Horacio but a
+  hat on the Cook: there's no schema being violated, because there was never a schema to
+  violate. The only real semantic signal in the data is each value's own naming
+  convention, `(man|woman)_<part>_<detail>` (e.g. `man_torso_basic`, `woman_hat_witch`).
+  Swap pools are keyed by `gender_part` extracted from the *value*, never by the
+  `model<N>` field name - and since the tool only ever replaces a value in place (never
+  reorders the array), merge/draw order stays byte-identical to vanilla too.
 - **Non-conforming model values are the safety net, not an explicit exclude list.**
   Creature-specific models (`npc_troll_head`, `model_2909_npc`, `npc_1095i3`, ...) and
   held-item/weapon overlays (`human_weapons_longsword`, ...) don't match the
