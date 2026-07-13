@@ -3,7 +3,20 @@ import path from 'path';
 
 import { printInfo, printWarning } from '#/util/Logger.js';
 
-import { CONTENT_ROOT, SCRIPTS_ROOT, type ModelSlot, findNpcFiles, loadModelUniverse, parseSlots, readNpcSource } from './NpcDripParser.js';
+import {
+    CONTENT_ROOT,
+    SCRIPTS_ROOT,
+    type ModelSlot,
+    type WeaponGroup,
+    type WeaponSlot,
+    findNpcFiles,
+    isShieldName,
+    loadModelUniverse,
+    loadWeaponUniverse,
+    parseSlots,
+    parseWeaponGroups,
+    readNpcSource
+} from './NpcDripParser.js';
 import { mulberry32 } from '../shared/Prng.js';
 
 // Shuffles NPC cosmetics (outfits/hair/etc) by reassigning model# values within matching
@@ -25,10 +38,19 @@ import { mulberry32 } from '../shared/Prng.js';
 // value, unless the category has fewer than 2 valid models total).
 //
 // Values that don't match the `(man|woman)_<part>_<detail>` naming convention (creature
-// models, held-item models like human_weapons_*) are left untouched - see
-// NpcDripParser.ts for why that convention is a safe swap boundary.
+// models) are left untouched - see NpcDripParser.ts for why that convention is a safe
+// swap boundary.
 //
-// Usage: npx tsx tools/npc/RandomizeDrip.ts [--seed <number>] [--dry-run] [--mixed-gender] [--exclude <substr,substr,...>]
+// Held items (human_weapons_*) are shuffled separately, per NPC block rather than per
+// slot, so that a two-handed weapon (bow/staff/halberd/scythe/harpoon - see
+// isTwoHandedName()) can never land in the same block as a shield. A block with a
+// single weapon slot draws from the full weapon+prop pool (anything goes when there's
+// no shield to clip with); a block with a weapon+shield pair draws the weapon from the
+// one-handed pool only and the shield from the shield pool. Blocks using the
+// human_weaponsextra_* companion piece (currently just the staff orb) are left vanilla
+// entirely - see the weapon-assignment loop below for why.
+//
+// Usage: npx tsx tools/npc/RandomizeDrip.ts [--seed <number>] [--dry-run] [--mixed-gender] [--no-weapons] [--exclude <substr,substr,...>]
 
 const BACKUP_ROOT = path.join(CONTENT_ROOT, '.ap-backup', 'scripts');
 const SPOILER_OUTPUT = path.join(import.meta.dirname, 'drip-seed.json');
@@ -65,7 +87,20 @@ function parseArgs() {
                   .map(s => s.trim())
                   .filter(Boolean)
             : [];
-    return { seed, dryRun: args.includes('--dry-run'), mixedGender: args.includes('--mixed-gender'), exclude };
+    return { seed, dryRun: args.includes('--dry-run'), mixedGender: args.includes('--mixed-gender'), noWeapons: args.includes('--no-weapons'), exclude };
+}
+
+// picks a value from pool that differs from avoid, resampling up to 50x - bounded so a
+// pathologically small pool can't spin forever. Returns null if pool is empty.
+function pickDifferent(pool: string[], avoid: string, rand: () => number): string | null {
+    if (pool.length === 0) {
+        return null;
+    }
+    let candidate = avoid;
+    for (let attempt = 0; attempt < 50 && candidate === avoid; attempt++) {
+        candidate = pool[Math.floor(rand() * pool.length)];
+    }
+    return candidate;
 }
 
 function main() {
@@ -74,7 +109,7 @@ function main() {
         process.exit(1);
     }
 
-    const { seed, dryRun, mixedGender, exclude } = parseArgs();
+    const { seed, dryRun, mixedGender, noWeapons, exclude } = parseArgs();
 
     const liveFiles = findNpcFiles(SCRIPTS_ROOT);
     const backedUp = ensureBackup(liveFiles);
@@ -126,18 +161,83 @@ function main() {
         const rand = mulberry32(seed ^ hashKey(key));
         let changed = 0;
         for (const slot of slots) {
-            let candidate = slot.value;
-            // resample until it actually differs from the slot's own original value -
-            // bounded so a pathological universe can't spin forever.
-            for (let attempt = 0; attempt < 50 && candidate === slot.value; attempt++) {
-                candidate = universe[Math.floor(rand() * universe.length)];
-            }
+            const candidate = pickDifferent(universe, slot.value, rand)!;
             newValueBySlot.set(slot, candidate);
             if (candidate !== slot.value) {
                 changed++;
             }
         }
         poolSummaries.push({ pool: key, universeSize: universe.length, occurrences: slots.length, changed });
+    }
+
+    // --- weapons/held items: group-level, not per-slot - see file header. ---
+    const weaponGroupsByFile = new Map<string, WeaponGroup[]>();
+    const allWeaponGroups: WeaponGroup[] = [];
+    if (!noWeapons) {
+        for (const file of backupFiles) {
+            const rel = path.relative(BACKUP_ROOT, file);
+            const groups = parseWeaponGroups(file, rel);
+            weaponGroupsByFile.set(rel, groups);
+            allWeaponGroups.push(...groups);
+        }
+    }
+
+    const excludedGroups = new Set(allWeaponGroups.filter(g => exclude.some(x => g.block.includes(x) || g.file.includes(x))));
+    const weaponUniverse = loadWeaponUniverse();
+    const weaponRand = mulberry32(seed ^ hashKey('weapons'));
+    const newWeaponValue = new Map<WeaponSlot, string>();
+    let weaponGroupsTouched = 0;
+    let weaponGroupsSkipped = 0;
+
+    for (const group of allWeaponGroups) {
+        if (excludedGroups.has(group)) {
+            continue;
+        }
+
+        // the staff-orb companion piece is tied to one specific weapon, not an
+        // independent slot - leave the whole group vanilla rather than risk stranding
+        // it on a mismatched weapon.
+        if (group.slots.some(s => s.value.startsWith('human_weaponsextra_'))) {
+            weaponGroupsSkipped++;
+            continue;
+        }
+
+        if (group.slots.length === 1) {
+            const slot = group.slots[0];
+            const pool = [...weaponUniverse.oneHand, ...weaponUniverse.twoHand];
+            const value = pickDifferent(pool, slot.value, weaponRand);
+            if (value) {
+                newWeaponValue.set(slot, value);
+                weaponGroupsTouched++;
+            }
+            continue;
+        }
+
+        if (group.slots.length === 2) {
+            const shieldSlot = group.slots.find(s => isShieldName(s.value));
+            const weaponSlot = group.slots.find(s => s !== shieldSlot);
+            // both shields, or neither is a shield (e.g. vanilla's one excalibur +
+            // model_526 two-piece item) - the weapon/shield role can't be inferred
+            // safely, leave vanilla.
+            if (!shieldSlot || !weaponSlot || !isShieldName(shieldSlot.value) || isShieldName(weaponSlot.value)) {
+                weaponGroupsSkipped++;
+                continue;
+            }
+
+            const newShield = pickDifferent(weaponUniverse.shield, shieldSlot.value, weaponRand);
+            // one-handed only - this is what keeps a 2h weapon out of a shield pairing.
+            const newWeapon = pickDifferent(weaponUniverse.oneHand, weaponSlot.value, weaponRand);
+            if (newShield && newWeapon) {
+                newWeaponValue.set(shieldSlot, newShield);
+                newWeaponValue.set(weaponSlot, newWeapon);
+                weaponGroupsTouched++;
+            }
+            continue;
+        }
+
+        // 3+ weapon-slot values in one block has never been observed in vanilla - bail
+        // rather than guess a structural role.
+        weaponGroupsSkipped++;
     }
 
     let filesWritten = 0;
@@ -147,26 +247,44 @@ function main() {
     for (const file of backupFiles) {
         const rel = path.relative(BACKUP_ROOT, file);
         const slots = slotsByFile.get(rel) ?? [];
-        const edits = slots.filter(s => !excludedSet.has(s) && newValueBySlot.get(s) !== undefined && newValueBySlot.get(s) !== s.value);
-        if (!edits.length) {
+        const bodyEdits = slots.filter(s => !excludedSet.has(s) && newValueBySlot.get(s) !== undefined && newValueBySlot.get(s) !== s.value);
+
+        const weaponGroups = weaponGroupsByFile.get(rel) ?? [];
+        const weaponEdits: WeaponSlot[] = [];
+        for (const group of weaponGroups) {
+            for (const slot of group.slots) {
+                const now = newWeaponValue.get(slot);
+                if (now !== undefined && now !== slot.value) {
+                    weaponEdits.push(slot);
+                }
+            }
+        }
+
+        if (!bodyEdits.length && !weaponEdits.length) {
             continue;
         }
 
         const lines = readNpcSource(file).split('\n');
-        for (const slot of edits) {
+        for (const slot of bodyEdits) {
             const newValue = newValueBySlot.get(slot)!;
+            lines[slot.line] = `${slot.field}=${newValue}`;
+            spoilerEntries.push({ file: rel, block: slot.block, field: slot.field, was: slot.value, now: newValue });
+        }
+        for (const slot of weaponEdits) {
+            const newValue = newWeaponValue.get(slot)!;
             lines[slot.line] = `${slot.field}=${newValue}`;
             spoilerEntries.push({ file: rel, block: slot.block, field: slot.field, was: slot.value, now: newValue });
         }
 
         filesWritten++;
-        slotsChanged += edits.length;
+        slotsChanged += bodyEdits.length + weaponEdits.length;
         if (!dryRun) {
             fs.writeFileSync(path.join(SCRIPTS_ROOT, rel), lines.join('\n').replace(/\n/g, '\r\n'));
         }
     }
 
-    printInfo(`${dryRun ? '[dry run] ' : ''}seed ${seed}: ${pools.size} pool(s), ${slotsChanged} model swap(s) across ${filesWritten} file(s) (${excludedSet.size} slot(s) excluded)`);
+    const weaponSummary = noWeapons ? 'weapons: disabled (--no-weapons)' : `weapons: ${weaponGroupsTouched} group(s) reassigned, ${weaponGroupsSkipped} left vanilla (companion piece/ambiguous role)`;
+    printInfo(`${dryRun ? '[dry run] ' : ''}seed ${seed}: ${pools.size} body pool(s), ${slotsChanged} total swap(s) across ${filesWritten} file(s) (${excludedSet.size} body slot(s) excluded); ${weaponSummary}`);
 
     fs.writeFileSync(
         SPOILER_OUTPUT,
@@ -174,10 +292,14 @@ function main() {
             {
                 seed,
                 mixedGender,
+                noWeapons,
                 exclude,
                 generatedAt: new Date().toISOString(),
                 dryRun,
                 pools: poolSummaries,
+                weaponUniverse: { shield: weaponUniverse.shield.length, twoHand: weaponUniverse.twoHand.length, oneHand: weaponUniverse.oneHand.length },
+                weaponGroupsTouched,
+                weaponGroupsSkipped,
                 swaps: spoilerEntries
             },
             null,

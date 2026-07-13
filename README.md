@@ -150,7 +150,9 @@ Tools (`overlays/engine/tools/npc/`):
   `loadModelUniverse()` (every valid model for that category in `content/pack/
   model.pack`, not just the ones some NPC already happens to be wearing - see Scope
   below), then writes the result back into the live `.npc` files. Each slot is
-  resampled until it actually differs from its own original value.
+  resampled until it actually differs from its own original value. Held items
+  (`human_weapons_*`) are shuffled too, but per-NPC-block instead of per-slot - see
+  "Weapons" below.
 
 Shared (`overlays/engine/tools/shared/Prng.ts`): the seedable PRNG used for the
 per-pool sampling streams, and the `derangement()` helper the entrance gate shuffle
@@ -160,7 +162,7 @@ count, so it's independent sampling rather than a permutation of a fixed list).
 ### Usage
 
 ```
-cd Server/engine && npx tsx tools/npc/RandomizeDrip.ts [--seed <number>] [--dry-run] [--mixed-gender] [--exclude <substr,substr,...>]
+cd Server/engine && npx tsx tools/npc/RandomizeDrip.ts [--seed <number>] [--dry-run] [--mixed-gender] [--no-weapons] [--exclude <substr,substr,...>]
 cd Server/engine && npx tsx tools/pack/Build.ts
 ```
 
@@ -192,6 +194,35 @@ matching that category, not just the values vanilla NPCs happen to already wear 
 those two are meaningfully different sizes (e.g. `woman_hat` has 23 valid models in
 the cache but only 8 ever appear on a vanilla NPC). This means swaps can and do
 produce combinations no vanilla NPC ever wore.
+
+### Weapons
+
+`human_weapons_*` values (weapons and generic held props alike - vanilla already mixes
+them, e.g. a farmer holding `human_weapons_chicken_drumstick`) are shuffled too, but
+handled per NPC block rather than per slot, because a block can hold one item (no
+shield) or two (a weapon + a shield), and getting that pairing right needs to know
+both slots at once:
+
+- **1 weapon slot**: reassigned to anything in the full weapon+prop pool (a farmer can
+  end up holding a crossbow, or a knight holding a chicken drumstick - no shield
+  present, so nothing to clip with).
+- **2 weapon slots (weapon + shield)**: the shield slot draws from the shield pool
+  only; the weapon slot draws from the **one-handed pool only** - this is what
+  guarantees a two-handed weapon never lands next to a shield. Two-handed is
+  determined by name (`bow`, `staff`, `halberd`, `scythe`, `harpoon` substrings) -
+  cross-checked against every weapon+shield pairing vanilla itself uses (e.g. `spear`
+  pairs with `viking_shield` in vanilla, so spear is treated as one-handed here even
+  though it reads as two-handed in plain English; vanilla's own precedent wins over
+  genre convention since this is a cosmetic system, not the real equipment rules).
+- **The `human_weaponsextra_*` companion piece** (currently just the staff orb) ties
+  to one specific weapon - any block using one is left vanilla entirely rather than
+  risk stranding the orb on a mismatched weapon.
+- Blocks with a two-item group that isn't a clean weapon+shield pair (both shields,
+  or neither is a shield - one vanilla item, `excalibur` + `model_526`, is like this)
+  are also left vanilla - the structural role can't be inferred safely.
+
+`--no-weapons` disables all of the above and leaves every `human_weapons_*` value
+untouched.
 
 **Known risk, not yet mitigated**: some NPCs may be visually load-bearing for quest
 recognition (a disguise, an NPC you're told to identify by appearance). There's no

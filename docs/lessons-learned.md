@@ -321,6 +321,39 @@ feature (see [archipelago-ideas.md](archipelago-ideas.md) #3). Encoded in
   name), and a line-diff spot-check against the vanilla backup showing only the
   intended `model#=` lines changed, CRLF intact. Hand off actual visual verification to
   the user (see WSL boot restriction above).
+- **Weapons/held items (`human_weapons_*`) need group-level reasoning, not per-slot -
+  the body-part pattern above doesn't fit them.** A `.npc` block can carry 0, 1, or 2
+  `human_weapons_*` values - counted directly off the vanilla backup: 1232 blocks with
+  0, 210 with exactly 1, 55 with exactly 2 (nothing observed above 2). A 2-value block is (almost) always a
+  weapon + a shield, never two independent slots, so swapping each value
+  independently (the body-part approach) could put a two-handed weapon next to a
+  shield - the user asked specifically to avoid this. `parseWeaponGroups()` in
+  `NpcDripParser.ts` groups by block instead of flattening to individual slots, and
+  `RandomizeDrip.ts` decides per-group: 1-slot blocks draw from the unrestricted pool
+  (nothing to clip with), 2-slot blocks identify the shield half by name (`isShieldName`)
+  and restrict the other half to the one-handed pool only.
+- **Two-handedness is classified by name substring
+  (`/bow|staff|halberd|scythe|harpoon/`), validated against vanilla's own
+  weapon+shield pairings, not assumed from real-world/RS-lore weapon logic.** Counted
+  every vanilla `human_weapons_*` pair via a Python one-off over the backup tree before
+  writing any classification code. This caught a real surprise: vanilla pairs
+  `warhammer` with a shield twice, and `spear` with `viking_shield` four times - both
+  read as two-handed by genre convention (and warhammers legitimately are 2h in real
+  OSRS combat), but this is a purely cosmetic model system with its own precedent, and
+  vanilla's own precedent should win. Trusting assumption over data here would have
+  produced a *more* restrictive (wrong) classification, not a less safe one, but wrong
+  either way - the same "check the data, don't assume" lesson as the earlier
+  wearables-universe fix.
+- **`human_weaponsextra_stafforb`** is a companion piece glued to one specific weapon
+  (`staff`/`staffstraight`), not an independent slot - any block containing one is left
+  vanilla entirely (5 blocks in vanilla). One more vanilla oddity, `excalibur` +
+  `model_526` (1 block), is a two-piece item where *neither* half is shield-named, so
+  the weapon/shield role can't be inferred - also left vanilla. Both exclusions were
+  found empirically (by enumerating every observed pair) rather than guessed.
+- **Verified**: a Python script re-derived every 2-slot group's final (post-swap)
+  values from the spoiler and confirmed zero groups end up with both a shield-tagged
+  and a two-handed-tagged value present (259/259 reassigned groups clean). Same offline
+  caveats as the body-part pools apply - pack build succeeds, no in-game check yet.
 
 ## Where this is heading (agreed with the user)
 
@@ -436,3 +469,33 @@ slot independently from `NpcDripParser.ts`'s new `loadModelUniverse()` (parses
   `man_feet_climbingboots_crampons`, `woman_hands_dragon_vambrace`).
 - Same caveats as addendum 1 still apply: no in-game testing yet, no disguise/quest
   exclude list populated by default.
+
+## Session-end addendum 3: weapon/held-item shuffling, shield-safe (2026-07-13)
+
+The user asked for NPC weapons to be randomized too ("would be funny"), with one
+explicit constraint: two-handed weapons must never end up paired with a shield. See
+the "Weapons/held items need group-level reasoning" bullets in the domain-knowledge
+section above for the full design and the empirical process (counted every vanilla
+weapon+shield pairing before writing any classification logic, which caught real
+surprises like `warhammer`+shield and `spear`+`viking_shield` both existing in
+vanilla despite reading as two-handed).
+
+- New exports in `NpcDripParser.ts`: `WeaponSlot`, `WeaponGroup`, `parseWeaponGroups()`,
+  `isShieldName()`, `isTwoHandedName()`, `loadWeaponUniverse()`. `RandomizeDrip.ts`
+  gained a second, group-aware assignment pass alongside the existing per-slot body-part
+  pass, merged into one write per file so both land in the same pack rebuild. New
+  `--no-weapons` flag to disable just this part.
+- Re-ran seed 777: 259/265 weapon-bearing blocks reassigned (6 left vanilla - 5
+  staff-orb companion pieces, 1 the excalibur/model_526 two-piece item). Universe:
+  9 shields, 15 two-handed, 84 one-handed values in `model.pack`.
+- **Verified the actual constraint, not just that it compiles**: wrote a one-off
+  Python check over the spoiler that reconstructs every 2-slot group's final values
+  and confirms none contain both a shield-tagged and two-handed-tagged value - 0
+  violations across all 259 reassigned groups. This is the load-bearing check for this
+  feature; typecheck and pack-build-succeeds are necessary but not sufficient (they'd
+  pass even if every guard ended up holding a longbow and a kiteshield at once).
+  Re-verify this same way after any future change to `isTwoHandedName`/`isShieldName`
+  or the group-assignment logic.
+- Same caveats as addenda 1-2: no in-game testing yet (so no confirmation the "one
+  weapon + one shield" pairing actually looks right rendered, only that the data-level
+  constraint holds), no disguise/quest exclude list populated by default.
