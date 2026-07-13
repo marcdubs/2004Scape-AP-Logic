@@ -10,3 +10,39 @@
 [label,ap_entrance_go](coord $dest)
 p_arrivedelay;
 p_telejump($dest);
+
+// Test commands, see docs/goals-and-checks.md "Test command infrastructure". Every
+// ::ap<name> cheat is dispatched here unconditionally by the overlaid
+// ClientCheatHandler.ts - no engine change needed to add another one, just a new
+// [debugproc,ap_<name>] block below.
+
+// ::apgoals - print progress on all 3 goals + QP
+[debugproc,ap_goals]
+if (p_finduid(uid) = false) {
+    return;
+}
+mes("Archipelago goals - QP: <tostring(%qp)>");
+mes("Barcrawl: <tostring(bitcount(getbit_range(%barcrawl, 3, 12)))>/10 bars visited");
+if (%dragonquest >= ^dragon_complete) {
+    mes("Dragon Slayer: complete");
+} else {
+    mes("Dragon Slayer: incomplete");
+}
+if (%ap_kbd_killed = 1) {
+    mes("King Black Dragon: killed");
+} else {
+    mes("King Black Dragon: not yet killed");
+}
+
+// ::apkbd - toggle the KBD-kill flag, so ::apgoals can be tested rendering both ways
+[debugproc,ap_kbd]
+if (p_finduid(uid) = false) {
+    return;
+}
+if (%ap_kbd_killed = 1) {
+    %ap_kbd_killed = 0;
+    mes("AP: King Black Dragon flag cleared.");
+} else {
+    %ap_kbd_killed = 1;
+    mes("AP: King Black Dragon flag set.");
+}

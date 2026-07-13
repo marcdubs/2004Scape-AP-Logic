@@ -905,6 +905,82 @@ what the line currently contains.
     correct chaos-mode values, not the stale tiered-mode ones, are what's actually
     loaded by the running server.
 
+## Session-end addendum: test-command dispatcher + goals (2026-07-14)
+
+Built the first two items of goals-and-checks.md's suggested build order: the
+ungated `ap`-prefix test-command dispatcher, and Feature 1 (goals system: `::apgoals`,
+`::apkbd`). See that doc for the design; the reasoning not obvious from the code:
+
+- **The dispatcher is a second, parallel mechanism to the vanilla `~`-prefixed
+  debugproc dispatch, not a modification of it** - `ClientCheatHandler.ts` now has
+  `cmd.startsWith('ap')` as a new `else if` branch alongside the existing `::home`
+  block, both unconditional (no `Environment.node.production`/`staffModLevel` gate).
+  It looks up `[debugproc,ap_<rest of cmd>]` (`::apgoals` -> `ap_goals`) and reuses
+  the vanilla debugproc's argument-parsing loop, which was extracted into a shared
+  `private static buildDebugProcParams()` so both dispatch paths build script params
+  identically. Adding a new test command from here on is content-only: a new
+  `[debugproc,ap_<name>]` block in `overlays/content/scripts/ap/ap.rs2` (or its own
+  file under `overlays/content/scripts/ap/`), no engine touch, no reinstall of
+  anything but content.
+- **Writing a player varp from inside an NPC's `ai_queue3` death script needs a
+  specific protected-access dance, and the compiler enforces it statically, not at
+  runtime.** Adding `%ap_kbd_killed = 1;` right after the `npc_findhero = ^false`
+  check (as goals-and-checks.md's Feature-1 section literally suggested) failed
+  `tools/pack/Build.ts` with `Attempt to access uninitialized pointer
+  ['p_active_player']` - a compile-time static pointer-flow check performed by the
+  `@lostcityrs/runescript` compiler package (grepped `node_modules` for the message
+  text since it doesn't appear anywhere in this repo or `engine/src`). Root cause,
+  traced through `ScriptOpcodePointers.ts`: `npc_findhero` only sets the *unprotected*
+  `active_player` pointer (enough for `mes(...)`, which only `require`s
+  `active_player`), but writing any `%varp` requires the *protected* `p_active_player`
+  pointer, which only `p_finduid(uid)` sets (`uid` itself requires `active_player`,
+  which is why the sequence npc_findhero -> uid -> p_finduid works). This is exactly
+  the same problem every other vanilla boss/hero-kill script with a varp-writing
+  reward already solves - once grepped for, the precedent was everywhere
+  (`khazard_ogre.rs2`, `kolodion_fight.rs2`, `count_draynor.rs2`, `alomone.rs2`,
+  `witches_experiement.rs2`, etc.), all following the identical shape:
+  ```
+  if (npc_findhero = ^true) {
+      if_close;
+      if (p_finduid(uid) = true) {
+          // varp writes / mes / whatever needs protected access, here or via @jump
+      } else {
+          queue(some_queue_label, 0, 0); // player was busy; retry once they're free
+      }
+  }
+  ```
+  `if_close` closes the hero's current modal first so `p_finduid` can actually claim
+  protected access; the `queue(...)` fallback re-enters via a `[queue,...]` trigger,
+  which (per `Player.ts`'s `processQueue()` - `ScriptRunner.init(request.script,
+  this, null, ...)`) always runs with the player as direct `self`, i.e. always has
+  full protected access already, no `p_finduid` needed inside the queue block itself.
+  `king_black_dragon.rs2`'s `ai_queue3` handler now follows this exact shape, with a
+  new `[queue,ap_kbd_mark_killed]` trigger as the busy-player fallback. **This will
+  recur for Feature 2** (the quest-completion reward roll's `inv_add`/bank-fallback
+  logic likely needs protected access too, though `send_quest_complete` already runs
+  in normal player-script context so it may not need the npc_findhero dance at all -
+  check `general/scripts/quests.rs2:15`'s calling context before assuming either way).
+- **`bitcount(int)` exists as a script command (`ScriptOpcode.BITCOUNT` in
+  `ScriptOpcode.ts`, handler in `NumberOps.ts`) but had zero usages anywhere in vanilla
+  content** - confirmed compiles and runs via the decompiled-bytecode check (see
+  below) before trusting it for `::apgoals`'s barcrawl bar-count
+  (`bitcount(getbit_range(%barcrawl, 3, 12))`).
+- New files: `overlays/content/scripts/ap/configs/ap.varp` (`ap_kbd_killed`, scope
+  perm, registered as varp id 359 - confirmed via `content/pack/varp.pack`). Modified:
+  `overlays/content/scripts/ap/ap.rs2` (added `ap_goals`/`ap_kbd` debugprocs),
+  `overlays/engine/src/network/game/client/handler/ClientCheatHandler.ts` (dispatcher
+  + shared param-builder), `overlays/content/scripts/areas/area_wilderness/scripts/
+  king_black_dragon.rs2` (whole-file overlay, CRLF-preserved, diffed clean against
+  vanilla except the added lines - only the death-hook lines changed).
+- **Verified**: typecheck clean, `tools/pack/Build.ts` clean (~1:19), both new
+  debugprocs resolve via `ScriptProvider.getByName()` in a no-boot script check
+  (`[debugproc,ap_goals]` compiled to 43 opcodes), new varp registered at id 359.
+  **Not yet verified in-game** - same caveat as every other feature in this repo;
+  the user needs to boot the Windows server and try `::apgoals`/`::apkbd`/`::home`
+  (regression-check the unrelated `::home` block still works) themselves.
+- Barcrawl/Dragon Slayer tracking needed no new plumbing (confirmed the doc's claim
+  that vanilla already tracks both) - only KBD needed the new varp + hook.
+
 **New verification technique worth keeping**: decompiling the actual compiled
 `script.dat`/`.idx` directly, without booting the full server, to settle "is my source
 edit actually what the server will run" definitively:

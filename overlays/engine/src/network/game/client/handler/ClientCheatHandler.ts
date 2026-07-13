@@ -24,6 +24,7 @@ import { isClientConnected } from '#/engine/entity/NetworkPlayer.js';
 import Npc from '#/engine/entity/Npc.js';
 import Player, { getExpByLevel } from '#/engine/entity/Player.js';
 import { PlayerStat, PlayerStatEnabled, PlayerStatMap } from '#/engine/entity/PlayerStat.js';
+import ScriptFile from '#/engine/script/ScriptFile.js';
 import ScriptProvider from '#/engine/script/ScriptProvider.js';
 import ScriptRunner from '#/engine/script/ScriptRunner.js';
 
@@ -37,6 +38,94 @@ import { printDebug } from '#/util/Logger.js';
 import { tryParseInt } from '#/util/TryParse.js';
 
 export default class ClientCheatHandler extends ClientGameMessageHandler<ClientCheat> {
+    // custom - shared by the vanilla `~`-prefixed debugproc dispatch and the
+    // ungated `ap`-prefixed test-command dispatch below, so both build script
+    // params from cheat args the same way. Returns null on a bad argument.
+    private static buildDebugProcParams(script: ScriptFile, args: string[], cheat: string): number[] | null {
+        const params = new Array(script.info.parameterTypes.length).fill(-1);
+        for (let i = 0; i < script.info.parameterTypes.length; i++) {
+            const type = script.info.parameterTypes[i];
+
+            try {
+                switch (type) {
+                    case ScriptVarType.STRING: {
+                        const value = args.shift();
+                        params[i] = value ?? '';
+                        break;
+                    }
+                    case ScriptVarType.INT: {
+                        const value = args.shift();
+                        params[i] = parseInt(value ?? '0', 10) | 0;
+                        break;
+                    }
+                    case ScriptVarType.OBJ:
+                    case ScriptVarType.NAMEDOBJ: {
+                        const name = args.shift();
+                        params[i] = ObjType.getId(name ?? '');
+                        break;
+                    }
+                    case ScriptVarType.NPC: {
+                        const name = args.shift();
+                        params[i] = NpcType.getId(name ?? '');
+                        break;
+                    }
+                    case ScriptVarType.LOC: {
+                        const name = args.shift();
+                        params[i] = LocType.getId(name ?? '');
+                        break;
+                    }
+                    case ScriptVarType.SEQ: {
+                        const name = args.shift();
+                        params[i] = SeqType.getId(name ?? '');
+                        break;
+                    }
+                    case ScriptVarType.STAT: {
+                        const name = args.shift() ?? '';
+                        params[i] = PlayerStatMap.get(name.toUpperCase());
+                        break;
+                    }
+                    case ScriptVarType.INV: {
+                        const name = args.shift();
+                        params[i] = InvType.getId(name ?? '');
+                        break;
+                    }
+                    case ScriptVarType.COORD: {
+                        const args2 = cheat.split('_');
+
+                        const level = parseInt(args2[0].slice(6));
+                        const mx = parseInt(args2[1]);
+                        const mz = parseInt(args2[2]);
+                        const lx = parseInt(args2[3]);
+                        const lz = parseInt(args2[4]);
+
+                        params[i] = CoordGrid.packCoord(level, (mx << 6) + lx, (mz << 6) + lz);
+                        break;
+                    }
+                    case ScriptVarType.INTERFACE: {
+                        const name = args.shift();
+                        params[i] = Component.getId(name ?? '');
+                        break;
+                    }
+                    case ScriptVarType.SPOTANIM: {
+                        const name = args.shift();
+                        params[i] = SpotanimType.getId(name ?? '');
+                        break;
+                    }
+                    case ScriptVarType.IDKIT: {
+                        const name = args.shift();
+                        params[i] = IdkType.getId(name ?? '');
+                        break;
+                    }
+                }
+            } catch (_) {
+                // invalid arguments
+                return null;
+            }
+        }
+
+        return params;
+    }
+
     handle(message: ClientCheat, player: Player): boolean {
         if (message.input.length > 80) {
             return false;
@@ -64,85 +153,9 @@ export default class ClientCheatHandler extends ClientGameMessageHandler<ClientC
                     return false;
                 }
 
-                const params = new Array(script.info.parameterTypes.length).fill(-1);
-                for (let i = 0; i < script.info.parameterTypes.length; i++) {
-                    const type = script.info.parameterTypes[i];
-
-                    try {
-                        switch (type) {
-                            case ScriptVarType.STRING: {
-                                const value = args.shift();
-                                params[i] = value ?? '';
-                                break;
-                            }
-                            case ScriptVarType.INT: {
-                                const value = args.shift();
-                                params[i] = parseInt(value ?? '0', 10) | 0;
-                                break;
-                            }
-                            case ScriptVarType.OBJ:
-                            case ScriptVarType.NAMEDOBJ: {
-                                const name = args.shift();
-                                params[i] = ObjType.getId(name ?? '');
-                                break;
-                            }
-                            case ScriptVarType.NPC: {
-                                const name = args.shift();
-                                params[i] = NpcType.getId(name ?? '');
-                                break;
-                            }
-                            case ScriptVarType.LOC: {
-                                const name = args.shift();
-                                params[i] = LocType.getId(name ?? '');
-                                break;
-                            }
-                            case ScriptVarType.SEQ: {
-                                const name = args.shift();
-                                params[i] = SeqType.getId(name ?? '');
-                                break;
-                            }
-                            case ScriptVarType.STAT: {
-                                const name = args.shift() ?? '';
-                                params[i] = PlayerStatMap.get(name.toUpperCase());
-                                break;
-                            }
-                            case ScriptVarType.INV: {
-                                const name = args.shift();
-                                params[i] = InvType.getId(name ?? '');
-                                break;
-                            }
-                            case ScriptVarType.COORD: {
-                                const args2 = cheat.split('_');
-
-                                const level = parseInt(args2[0].slice(6));
-                                const mx = parseInt(args2[1]);
-                                const mz = parseInt(args2[2]);
-                                const lx = parseInt(args2[3]);
-                                const lz = parseInt(args2[4]);
-
-                                params[i] = CoordGrid.packCoord(level, (mx << 6) + lx, (mz << 6) + lz);
-                                break;
-                            }
-                            case ScriptVarType.INTERFACE: {
-                                const name = args.shift();
-                                params[i] = Component.getId(name ?? '');
-                                break;
-                            }
-                            case ScriptVarType.SPOTANIM: {
-                                const name = args.shift();
-                                params[i] = SpotanimType.getId(name ?? '');
-                                break;
-                            }
-                            case ScriptVarType.IDKIT: {
-                                const name = args.shift();
-                                params[i] = IdkType.getId(name ?? '');
-                                break;
-                            }
-                        }
-                    } catch (_) {
-                        // invalid arguments
-                        return false;
-                    }
+                const params = ClientCheatHandler.buildDebugProcParams(script, args, cheat);
+                if (params === null) {
+                    return false;
                 }
 
                 player.executeScript(ScriptRunner.init(script, player, null, params), false);
@@ -712,6 +725,24 @@ export default class ClientCheatHandler extends ClientGameMessageHandler<ClientC
 
             // ::tele 0,50,50,22,22
             player.teleJump((50 << 6) + 22, (50 << 6) + 22, 0);
+        } else if (cmd.startsWith('ap')) {
+            // custom - Archipelago test-command dispatcher, unconditional (no
+            // production/staffmod gate, unlike the vanilla `~`-prefixed debugproc
+            // dispatch above). ::ap<name> [args] runs [debugproc,ap_<name>] so every
+            // AP feature's test command lives as a content script in
+            // overlays/content/scripts/ap/ - adding one never touches this file
+            // again. See docs/goals-and-checks.md "Test command infrastructure".
+            const script = ScriptProvider.getByName(`[debugproc,ap_${cmd.slice(2)}]`);
+            if (!script) {
+                return false;
+            }
+
+            const params = ClientCheatHandler.buildDebugProcParams(script, args, cheat);
+            if (params === null) {
+                return false;
+            }
+
+            player.executeScript(ScriptRunner.init(script, player, null, params), false);
         }
 
         return true;

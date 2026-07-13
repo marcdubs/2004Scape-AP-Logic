@@ -1,10 +1,11 @@
 # Goals, checks & rewards — the decided plan
 
-Status: **decided with the user 2026-07-13**, not yet built. This is the work plan
-for future sessions/agents. Every factual claim below (file paths, line numbers,
-varp names, hook points) was verified against the live `../Server` checkout on the
-date above — re-verify line numbers if upstream has moved, but the mechanisms are
-stable.
+Status: **decided with the user 2026-07-13**. Test-command infrastructure +
+Feature 1 (goals system) built 2026-07-14 — see the "Session-end addendum:
+test-command dispatcher + goals" section in lessons-learned.md. Features 2-5
+still unbuilt. Every factual claim below (file paths, line numbers, varp names,
+hook points) was verified against the live `../Server` checkout on 2026-07-13 —
+re-verify line numbers if upstream has moved, but the mechanisms are stable.
 
 ## Decisions (user-approved scope)
 
@@ -32,7 +33,7 @@ infrastructure") so each piece can be exercised in seconds without playing to it
 
 ---
 
-## Test command infrastructure (build this first)
+## Test command infrastructure (build this first) — DONE 2026-07-14
 
 Production mode blocks debugprocs: `ClientCheatHandler.ts` only dispatches
 `[debugproc,...]` scripts when `!Environment.node.production && staffModLevel >= 4`
@@ -62,7 +63,7 @@ Required test commands (each feature section references these):
 
 ---
 
-## Feature 1 — Goals system
+## Feature 1 — Goals system — DONE 2026-07-14 (offline-verified only, see lessons-learned)
 
 Three goals, tracked per-player, displayed via `::apgoals`. New varps go in
 `overlays/content/scripts/ap/configs/ap.varp` (format verified:
