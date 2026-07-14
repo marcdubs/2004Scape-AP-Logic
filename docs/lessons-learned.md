@@ -1430,3 +1430,50 @@ in-game** (same caveat as almost everything else in this doc).
   addendum's commit. If a future session finds this work still uncommitted, it's
   probably an interrupted session (or the user's own edits) rather than an accident -
   check with the user before assuming it's abandoned.
+
+## Session-end addendum 10: drip bug 6 - placeholder-named models are bespoke pieces ("invisible monk legs") (2026-07-14)
+
+Right after addendum 9's regeneration, user reported Monks of Entrana with invisible
+LEGS (partial, unlike Betty's whole-NPC invisibility). `entrana_monk` had drawn
+`model7=man_legs_model_270` - which PASSES the new hasModelData() gate (a real 360-byte
+.ob2 exists). The model is the Genie's floating smoke-tail: vanilla's only use is
+`macro_geni` layering it as a SECOND legs value (`model7=man_legs_crossed` +
+`model8=man_legs_model_270`) - the exact `torso_backpack` shape from addendum 7 again,
+an accessory/bespoke piece hiding in a primary category by naming convention.
+
+- **The generalization, not the one-off**: `*_model_<id>` names literally embed the
+  model id - they're the entries nobody ever identified when the cache was named. The
+  family only pattern-matches into gender/category pools because someone prefixed the
+  ids. 24 such entries were in the (data-filtered) pools; the current seed had put 289
+  of them into real (non-_unpack) areas. They can't be visually vetted one-by-one from
+  WSL, and "unidentified asset" is the same signal the `_demon` family exclusion was
+  built on - so the whole family is now excluded via `hasPlaceholderName()` in
+  `NpcDripParser.ts`: folded into `isNeverSwappable()` (bodies: never sampled into,
+  and vanilla wearers like the Genie's tail keep their slot - that's a fix in itself)
+  and checked separately in `loadWeaponUniverse()` (weapons don't go through
+  isNeverSwappable; `human_weapons_model_526` is one half of vanilla's two-piece
+  excalibur, sampling it alone would give half a sword).
+- Weapon slots ARE still allowed to swap AWAY from a placeholder (parseWeaponGroups
+  has no isNeverSwappable) - the fresh seed moved sir_mordred off
+  `human_weapons_model_513` and earthwarrior(225) off `human_weapons_model_520`;
+  swapping away from an unidentified prop to a real named one is an improvement, so
+  this asymmetry is deliberate.
+- **Pre-existing vanilla wart, do not "fix"**: `lady_pirate` in `_unpack/225/all.npc`
+  wears dataless `woman_legs_model_434` IN VANILLA (backup line 4754) - a full-corpus
+  dataless scan now reports exactly 1 hit and that's it; she's never spawned by any
+  .rs2. Same for the `_unpack` legacy dumps generally: they're old-revision config
+  archives, blocks there mostly aren't live NPCs.
+- Verified after `RegenerateAll --drip-seed 555 --shops-seed 777 --drops-seed 777
+  --mode mimic` + pack build: 0 placeholder assignments in the spoiler; live
+  placeholder occurrences == vanilla exactly (body) modulo the two weapon
+  swap-aways; dataless scan = only the vanilla lady_pirate wart; armor-set mismatch
+  check still 1/744 = the vanilla doorman; entrana_monk/shipmonk2 now wear real legs
+  (pirate/viking); Betty still all-valid; typecheck clean. **Not yet verified
+  in-game** - Monks of Entrana + Genie (should keep smoke tail) are the eyeball
+  targets.
+- Pipeline wrinkle: the esbuild flip hit DURING RegenerateAll this time - the
+  randomizer children succeeded, the Build.ts child died, and RegenerateAll's
+  execFileSync error hides the child's stderr (output [null,null,null]). If
+  RegenerateAll "fails at Build.ts", run `npx tsx tools/pack/Build.ts` directly to see
+  the real error / finish the pipeline - the randomizer steps before it completed fine
+  and don't need re-running.

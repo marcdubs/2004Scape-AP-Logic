@@ -10,8 +10,10 @@ import ScriptState from '#/engine/script/ScriptState.js';
 import { check, CoordValid, LocTypeValid, NumberPositive, SeqTypeValid, SpotAnimTypeValid, FindSquareValid } from '#/engine/script/ScriptValidators.js';
 import World from '#/engine/World.js';
 import Environment from '#/util/Environment.js';
+import { printDebug } from '#/util/Logger.js';
 import Midi from '#/cache/midi/Midi.js';
 import { getDropGroupOverride } from '#/engine/ApDropOverrides.js';
+import { getGatherSwap } from '#/engine/ApGatherOverrides.js';
 import { getEntranceOverride } from '#/engine/ApEntranceOverrides.js';
 
 const ServerOps: CommandHandlers = {
@@ -416,11 +418,28 @@ const ServerOps: CommandHandlers = {
         // nudge to the nearest walkable neighbor so a teleport can't strand the
         // player inside a loc.
         const pos: CoordGrid = check(override, CoordValid);
+        const logRedirect = (finalCoord: number, nudge: string) => {
+            const src = CoordGrid.unpackCoord(coord);
+            const dst = CoordGrid.unpackCoord(finalCoord);
+            printDebug(
+                `AP entrance: ${state.activePlayer?.username ?? '?'} op ${op} at ${CoordGrid.formatString(src.level, src.x, src.z)} -> ${CoordGrid.formatString(dst.level, dst.x, dst.z)}${nudge}`
+            );
+        };
         if (!isMapBlocked(pos.x, pos.z, pos.level)) {
+            logRedirect(override, '');
             state.pushInt(override);
             return;
         }
-        for (const [dx, dz] of [
+
+        // Prefer a neighbor that (a) isn't itself blocked, (b) has an unobstructed
+        // line back to the intended landing tile (so we can't hop through a wall
+        // onto the far side - e.g. outside the building), and (c) matches the
+        // intended tile's indoor/outdoor state (so we don't step off a roofed
+        // floor onto an unroofed ledge and end up floating in the sky). If no
+        // neighbor satisfies all of that, fall back to the old blind
+        // unblocked-only search rather than stranding the player.
+        const wantIndoors = isIndoors(pos.x, pos.z, pos.level);
+        const neighbors: ReadonlyArray<[number, number]> = [
             [0, 1],
             [0, -1],
             [1, 0],
@@ -429,12 +448,24 @@ const ServerOps: CommandHandlers = {
             [1, -1],
             [-1, 1],
             [-1, -1]
-        ]) {
-            if (!isMapBlocked(pos.x + dx, pos.z + dz, pos.level)) {
-                state.pushInt(CoordGrid.packCoord(pos.level, pos.x + dx, pos.z + dz));
+        ];
+        for (const strict of [true, false]) {
+            for (const [dx, dz] of neighbors) {
+                const nx = pos.x + dx;
+                const nz = pos.z + dz;
+                if (isMapBlocked(nx, nz, pos.level)) {
+                    continue;
+                }
+                if (strict && (!isLineOfWalk(pos.level, pos.x, pos.z, nx, nz) || isIndoors(nx, nz, pos.level) !== wantIndoors)) {
+                    continue;
+                }
+                const nudged = CoordGrid.packCoord(pos.level, nx, nz);
+                logRedirect(nudged, strict ? ' (nudged off blocked tile)' : ' (nudged off blocked tile, fallback: no safe neighbor found)');
+                state.pushInt(nudged);
                 return;
             }
         }
+        logRedirect(override, ' (WARNING: destination tile is blocked, no free neighbor found)');
         state.pushInt(override);
     },
 
@@ -445,6 +476,12 @@ const ServerOps: CommandHandlers = {
         const slot = state.popInt();
 
         state.pushInt(getDropGroupOverride(slot));
+    },
+
+    [ScriptOpcode.AP_GATHER_SWAP]: state => {
+        const product = state.popInt();
+
+        state.pushInt(getGatherSwap(product));
     },
 
     [ScriptOpcode.MIDI_LENGTH]: state => {

@@ -74,8 +74,30 @@ const SWAPPABLE_RE = /^(man|woman)_([a-z]+)_.+$/;
 //   human wear. Reported as "everyone has demon hands" once it started appearing at
 //   its ordinary ~1/7 share of the (small, 7-value) hands pool - not a sampling-bias
 //   bug, just a visually jarring value that shouldn't have been in the pool at all.
+// - `*_model_<id>` placeholder names (man_legs_model_270, man_arms_model_168, ...):
+//   the name literally embeds the model id, i.e. nobody ever identified what the
+//   asset IS - it only pattern-matched into a category because someone prefixed it
+//   with one. The ones that turn out to have geometry are bespoke one-off pieces, not
+//   general-purpose body kit: man_legs_model_270 is the Genie's floating smoke-tail,
+//   layered in vanilla as a SECOND legs value on macro_geni (model7=man_legs_crossed +
+//   model8=man_legs_model_270 - the exact torso_backpack shape again). Standing alone
+//   as an NPC's only legs model it renders as nothing - reported as "Monks of Entrana
+//   have invisible legs". We can't visually vet the rest of the family, and a name
+//   that says "unidentified model" is the same un-vetted-asset signal as the demon
+//   family, so the whole family is excluded - from parseSlots() too, which usefully
+//   keeps the Genie's own tail slot permanently vanilla. This also covers weapons
+//   (human_weapons_model_526 is one half of vanilla's two-piece excalibur, see
+//   loadWeaponUniverse) - hasPlaceholderName() is checked there separately since
+//   isNeverSwappable() only sees (man|woman)_* values.
+export function hasPlaceholderName(value: string): boolean {
+    return /_model_\d+$/.test(value);
+}
+
 function isNeverSwappable(value: string): boolean {
     if (value === 'man_torso_backpack' || value === 'woman_torso_backpack') {
+        return true;
+    }
+    if (hasPlaceholderName(value)) {
         return true;
     }
     const detail = value.replace(/^(man|woman)_[a-z]+_/, '');
@@ -353,7 +375,7 @@ export function loadWeaponUniverse(): WeaponUniverse {
             continue;
         }
         const value = line.slice(eq + 1).trim();
-        if (!value.startsWith('human_weapons_') || seen.has(value) || !hasModelData(value)) {
+        if (!value.startsWith('human_weapons_') || seen.has(value) || !hasModelData(value) || hasPlaceholderName(value)) {
             continue;
         }
         seen.add(value);
