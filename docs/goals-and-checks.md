@@ -95,7 +95,7 @@ to him with a randomized respawn point is part of the fun.
 **AP phase:** each goal maps to an AP goal/victory condition; barcrawl bar-bits
 and quest state are also candidate location checks.
 
-## Feature 2 — Quest-completion checks + level-based random rewards
+## Feature 2 — Quest-completion checks + level-based random rewards — DONE 2026-07-14 (offline-verified only, see lessons-learned)
 
 **The hook (verified single choke point):** `[proc,send_quest_complete]` in
 `general/scripts/quests.rs2:15` is called by all ~64 quest completion scripts

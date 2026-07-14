@@ -1,0 +1,135 @@
+// Archipelago quest-completion reward system. See docs/goals-and-checks.md
+// "Feature 2". Data lives in ap_rewards.dbtable/.dbrow (same directory); this
+// file is the roll + delivery logic, called from a preamble added to
+// [proc,send_quest_complete] in the overlaid general/scripts/quests.rs2, and
+// exercised directly by the ::apreward / ::apquestcheck test commands below.
+
+// info: custom - the check+reward hook. Pre-AP this rolls and grants a random
+// level-based reward; in the AP phase this also becomes the location-checked
+// emitter (see goals-and-checks.md). Always called from send_quest_complete,
+// which only ever runs from a [queue,...] trigger, so protected access
+// (bank fallback, varp writes) is already available here - no p_finduid dance
+// needed in this proc, unlike the KBD kill hook.
+[proc,ap_quest_complete]
+def_string $category = ~ap_random_category;
+~ap_deliver_reward(~ap_roll_reward($category, ~ap_level_for_category($category)));
+
+[proc,ap_random_category]()(string)
+def_int $r = random(8);
+if ($r = 0) {
+    return("armour");
+} else if ($r = 1) {
+    return("weapons");
+} else if ($r = 2) {
+    return("ranged_gear");
+} else if ($r = 3) {
+    return("arrows");
+} else if ($r = 4) {
+    return("runes");
+} else if ($r = 5) {
+    return("potions");
+} else if ($r = 6) {
+    return("food");
+}
+return("cash");
+
+// Maps a reward category to the stat (or %qp, for cash) that gates its tiers.
+[proc,ap_level_for_category](string $category)(int)
+if (compare($category, "armour") = 0) {
+    return(stat_base(defence));
+} else if (compare($category, "weapons") = 0) {
+    return(stat_base(attack));
+} else if (compare($category, "ranged_gear") = 0 | compare($category, "arrows") = 0) {
+    return(stat_base(ranged));
+} else if (compare($category, "runes") = 0) {
+    return(stat_base(magic));
+} else if (compare($category, "potions") = 0 | compare($category, "food") = 0) {
+    return(stat_base(hitpoints));
+} else if (compare($category, "cash") = 0) {
+    return(%qp);
+}
+return(1);
+
+// Weighted roll among ap_rewards rows in $category with min_level <= $level,
+// biased toward the top of the qualifying range (weight = min_level + 1).
+// Single-pass weighted reservoir sampling (A-Chao): after folding in each
+// eligible row, keep it with probability weight/running_total - this is
+// exactly proportional-to-weight selection without needing an array to
+// collect candidates first (this script language has none).
+[proc,ap_roll_reward](string $category, int $level)(namedobj, int)
+def_namedobj $chosen_item = null;
+def_int $chosen_qty = 0;
+def_int $total_weight = 0;
+
+db_find(ap_rewards:category, $category);
+def_dbrow $row = db_findnext;
+while ($row ! null) {
+    def_int $row_min_level = db_getfield($row, ap_rewards:min_level, 0);
+    if ($row_min_level <= $level) {
+        def_int $weight = calc($row_min_level + 1);
+        $total_weight = calc($total_weight + $weight);
+        if (random($total_weight) < $weight) {
+            $chosen_item = db_getfield($row, ap_rewards:reward, 0);
+            $chosen_qty = db_getfield($row, ap_rewards:qty, 0);
+        }
+    }
+    $row = db_findnext;
+}
+return($chosen_item, $chosen_qty);
+
+// Delivery: inventory first, bank fallback on a full inventory, never the
+// ground (archipelago-ideas.md #6's pattern, already used by e.g.
+// quest_legends.rs2). Requires protected access when the bank branch is hit -
+// callers that don't already have it (debugproc test commands) must acquire
+// it first via the usual if_close/p_finduid dance.
+[proc,ap_deliver_reward](namedobj $item, int $qty)
+if ($item = null) {
+    mes("AP: no reward available for that roll.");
+    return;
+}
+if (inv_freespace(inv) > 0 | inv_total(inv, $item) > 0) {
+    inv_add(inv, $item, $qty);
+    mes("Archipelago reward: <tostring($qty)> x <oc_name($item)>!");
+} else {
+    inv_add(bank, $item, $qty);
+    mes("Archipelago reward: <tostring($qty)> x <oc_name($item)> (inventory full, sent to your bank)!");
+}
+
+// ::apreward [category] [level] - bare = fully random category + the
+// player's own level in that category (same roll send_quest_complete would
+// make); with args, forces category/tier so every level bracket can be
+// eyeballed without playing to it.
+[debugproc,ap_reward](string $category, int $level)
+if_close;
+if (p_finduid(uid) = false) {
+    queue*(ap_reward_queue, 0)($category, $level);
+    return;
+}
+~ap_reward_do($category, $level);
+
+[queue,ap_reward_queue](string $category, int $level)
+~ap_reward_do($category, $level);
+
+[proc,ap_reward_do](string $category, int $level)
+if (compare($category, "") = 0) {
+    ~ap_quest_complete;
+    return;
+}
+if ($level <= 0) {
+    $level = 99;
+}
+~ap_deliver_reward(~ap_roll_reward($category, $level));
+
+// ::apquestcheck - fires the quest-completion check+reward path
+// (~ap_quest_complete, the same proc send_quest_complete calls) directly, so
+// it can be exercised without finishing a quest.
+[debugproc,ap_questcheck]
+if_close;
+if (p_finduid(uid) = false) {
+    queue(ap_questcheck_queue, 0, 0);
+    return;
+}
+~ap_quest_complete;
+
+[queue,ap_questcheck_queue]
+~ap_quest_complete;

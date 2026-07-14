@@ -1,0 +1,5 @@
+[ap_rewards]
+column=category,string,INDEXED,REQUIRED
+column=min_level,int
+column=reward,namedobj
+column=qty,int

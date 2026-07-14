@@ -981,6 +981,119 @@ ungated `ap`-prefix test-command dispatcher, and Feature 1 (goals system: `::apg
 - Barcrawl/Dragon Slayer tracking needed no new plumbing (confirmed the doc's claim
   that vanilla already tracks both) - only KBD needed the new varp + hook.
 
+## Session-end addendum: quest-completion reward system, Feature 2 (2026-07-14, same session continued)
+
+Built item 2 of goals-and-checks.md's suggested build order: the quest-completion
+check hook + level-based random reward system. New test commands `::apreward
+[category] [level]` and `::apquestcheck`.
+
+- **Every one of the 64 `~send_quest_complete(...)` call sites runs from a
+  `[queue,...]` trigger** - verified by scanning all 64 files with an awk one-liner
+  that prints the nearest preceding `[...]` block header for each call site, not by
+  spot-checking a few. This matters because `Player.ts`'s `processQueue()` calls
+  `executeScript(script, protect=true)` for queue triggers specifically (confirmed by
+  reading `runScript()`: `protect=true` adds the `ProtectedActivePlayer` script
+  pointer) - so `send_quest_complete`, and anything it calls, already has protected
+  access (bank writes, varp writes) with NO `p_finduid` dance needed. This is a
+  different, simpler situation than the KBD kill hook from Feature 1 (an
+  `ai_queue3` NPC-death script, executed unprotected by default) - don't assume the
+  KBD pattern is universally required; check what trigger type actually calls the
+  hook point first.
+- **`inv` (main inventory) and `bank` have opposite protection defaults** -
+  `InvType.protect` defaults to `true`; `player.inv` config explicitly sets
+  `protect=no`, `bank`'s config has no override so it stays protected. Consequence:
+  `inv_add(inv, ...)` never needs protected access, but `inv_add(bank, ...)` always
+  does. The reward delivery proc (`ap_deliver_reward` in the new
+  `overlays/content/scripts/ap/ap_rewards.rs2`) picks inventory-first with a bank
+  fallback on a full inventory (`inv_freespace(inv) > 0 | inv_total(inv, $item) > 0`),
+  so only the fallback branch needs protection - callers without it already (the two
+  new debugprocs) do the same `if_close`/`p_finduid`/`queue` dance as the KBD fix.
+  `queue*(label, delay)(args...)` (not plain `queue`, which only carries a single int
+  arg per its `(queue, int, int)` signature) is the syntax for passing typed args
+  through a queue retry - confirmed against `[queue,crafting_glass](namedobj $item,
+  string $name, ...)` and its `weakqueue*(crafting_glass, ...)($glass_item, $name,
+  ...)` call site.
+- **Reward data is a dbtable** (`ap_rewards.dbtable` + `.dbrow`, 94 rows across 8
+  categories: armour/weapons/ranged_gear/arrows/runes/potions/food/cash), one row
+  per (category, item, min_level) option rather than a LIST-column-per-tier design -
+  simpler, and `db_find(ap_rewards:category, $category)` + `db_findnext` already
+  gives one-row-at-a-time iteration so no need for the LIST/tuple-index machinery
+  `drop_table.dbtable` uses. Real OSRS-era level requirements were used for
+  `min_level` (bronze=1, steel=10, mithril=20, adamant=30, rune=40, dragon=60 for
+  armour/weapons) rather than made-up brackets - this wasn't just aesthetic, the
+  user's own example in the plan ("40 Defence → rune armour") is literally rune's
+  real OSRS defence requirement, so matching real tiers was the safer reading of
+  intent. Item names were verified against `content/pack/obj.pack` (a checked-in
+  id=name text registry, same mechanism as `model.pack`) before writing any dbrow,
+  catching one real gap: this content set has no `4dose1strength` potion (every
+  other `4dose1<stat>` exists) - used `3dose1strength` instead rather than guessing.
+- **Weighted-toward-the-top tier selection needed a single-pass algorithm, not an
+  array sort** - this rs2 dialect has no arrays/dynamic collections (confirmed
+  again this session; the only iteration-with-state primitives are counters and
+  dbrow cursors). Used weighted reservoir sampling (the "A-Chao" algorithm): iterate
+  eligible rows once, accumulate `total_weight`, and after each row keep it as the
+  selection with probability `weight/total_weight` (`if (random($total_weight) <
+  $weight)`), weighting by `min_level + 1` so higher tiers dominate among a player's
+  eligible set without ever discarding lower tiers entirely. **Verified with a
+  Python re-simulation of the exact same algorithm against the real armour tier
+  data** (20000 trials per level): level 1 only ever produces bronze/iron (the only
+  eligible tier), level 10 correctly favors steel/black over bronze/iron once they
+  unlock, level 40 and 99 both correctly skew hard toward rune (~35% each of the 3
+  rune pieces) over adamant (~26% each) - confirms the bias direction and that nothing
+  outside the eligible min_level window ever gets selected.
+- **Found and worked around a real, pre-existing race condition in the vanilla
+  build tooling's "should I even bother rebuilding" staleness check** - not
+  something this session introduced, but very likely to bite any future session
+  that adds a brand-new-*named* dbtable/dbrow/enum/inv/mesanim/struct/seq/loc/
+  npc/obj/idk/varp/varbit/spotanim entry (anything going through `PackFile.ts`'s
+  `validateConfigPack`). Symptom: `tools/pack/Build.ts` failed with `Invalid
+  property value: table=ap_rewards` from `DbRowConfig.ts` even though the new
+  `ap_rewards.dbtable` file was correctly formed and `crawlConfigNames('.dbtable')`
+  (the actual, reliable, synchronous crawl used once revalidation is triggered)
+  found it fine in isolation. Root cause, found by direct instrumentation (not
+  guessed): `validateConfigPack` first calls `shouldRevalidatePackFile`, which
+  decides whether to re-crawl at all by comparing `content/pack/dbtable.pack`'s own
+  mtime against the latest `.dbtable` file mtime *as computed by
+  `SourceSnapshot.ts`'s async parallel directory walk* - and that walk is racy on
+  this WSL-on-`/mnt/c` setup: instrumenting it directly (dumping its internal
+  `latest` map after a real scan) showed it repeatedly reported a DIFFERENT,
+  LOWER-than-actual max mtime across three consecutive runs, meaning some
+  `fs.readdir` calls in its unbounded `Promise.all(entries.map(...))` recursion are
+  silently failing (the `walk()` function's `catch { return; }` swallows any
+  readdir error with no logging) under the concurrency this creates against a 9P/
+  DrvFs-backed mount. This is DIFFERENT from `getLatestModified()`/`shouldBuild()`
+  (used for the actual `.dat`/`.idx` rebuild-needed checks) and from
+  `crawlConfigNames()`/`loadDirExtFull()` (used for the actual crawl once it runs) -
+  both of those use a synchronous `listFilesExt`-based walk and are NOT racy; only
+  the `SourceSnapshot`-gated "should I re-crawl the id registry at all" pre-check is
+  affected. **Workaround, not a real fix**: delete the stale registry text file(s)
+  (here, `content/pack/dbtable.pack` and `content/pack/dbrow.pack`) before
+  rebuilding - `validateConfigPack`'s `if (!fileExists(packFile)) return true;`
+  early-out forces the reliable crawl path unconditionally, regenerating the
+  registry (with fresh, possibly renumbered ids - harmless, since the compiled
+  `.dat`/`.idx` and all `.rs2` references get rebuilt fresh in the same pass, so
+  nothing else references the old numbers) from scratch. Left the vanilla tooling
+  itself unfixed (out of scope for an overlay repo, and it's an existing-upstream
+  bug, not something this repo introduced) - if this recurs, the fix is the same
+  delete-and-rebuild, or add a comment to whoever maintains upstream LostCityRS.
+- New files: `overlays/content/scripts/ap/ap_rewards.rs2` (roll/delivery logic +
+  both debugprocs), `overlays/content/scripts/ap/configs/ap_rewards.{dbtable,dbrow}`
+  (94 reward rows). Modified: `overlays/content/scripts/general/scripts/quests.rs2`
+  (whole-file overlay, one line added: `~ap_quest_complete;` at the very end of
+  `[proc,send_quest_complete]`, right after the vanilla "Congratulations!" mes -
+  diffed clean against vanilla, CRLF intact).
+- **Verified**: typecheck clean, pack build clean (~1:30, after the dbtable/dbrow
+  registry workaround above), all new scripts resolve via `ScriptProvider.getByName`
+  in a no-boot check (`[debugproc,ap_reward]` compiled with 2 correctly-typed
+  params, `[proc,send_quest_complete]` compiled successfully referencing
+  `~ap_quest_complete` with no undefined-proc error, which would have hard-failed
+  compilation if the hook wire-up were wrong), reward-roll algorithm
+  cross-verified via independent Python simulation (above). **Not yet verified
+  in-game** - same caveat as every content-mutation/addition in this repo; the user
+  should try `::apreward` bare, `::apreward armour 1/20/40/60/99`, fill their
+  inventory and confirm the bank-fallback message fires, and `::apquestcheck`, then
+  eventually complete a real quest to confirm the hook fires unprompted.
+
 **New verification technique worth keeping**: decompiling the actual compiled
 `script.dat`/`.idx` directly, without booting the full server, to settle "is my source
 edit actually what the server will run" definitively:
