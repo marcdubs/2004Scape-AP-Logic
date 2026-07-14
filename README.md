@@ -308,10 +308,13 @@ logic-gen exists, not just a nice-to-have log. Not yet verified in-game.
 
 ## Drop randomization
 
-Reassigns which item sits in each weighted monster loot-drop slot, plus a separate
-shuffle of the `death_drop` guaranteed-item npc param (bones/ashes on death). Pure
-script/config mutation, same class of change as drip/shops - not the runtime-override
-pattern. Reseeding needs a content pack rebuild.
+Three modes. `tiered`/`chaos` reassign which item sits in each weighted monster
+loot-drop slot, plus a separate shuffle of the `death_drop` guaranteed-item npc param
+(bones/ashes on death) - pure script/config mutation, same class of change as
+drip/shops, reseeding needs a content pack rebuild. `mimic` instead shuffles which
+monster runs which ENTIRE loot table ("chicken mimics green dragon" - complete drop
+profile including guaranteed drops, cascade, clue-trail table calls, and the bones) -
+runtime-override pattern like entrances, reseeding is restart-only (see below).
 
 ### Pieces
 
@@ -332,11 +335,20 @@ Tools (`overlays/engine/tools/drops/`):
   and `parseDeathDropSlots()` for the separate `death_drop` axis.
 - `RandomizeDrops.ts` - reassigns eligible slots' items (mode-dependent, see Scope
   below) and separately deranges `death_drop` values across every eligible NPC.
+- `MimicTransform.ts` - everything specific to `--mode mimic`: parses each
+  `[ai_queue3,...]` death handler out of the pristine backup, extracts its
+  post-prologue loot into a `[label,ap_drops_<n>]` block in one generated file
+  (`content/scripts/drop tables/ap_mimic.rs2` - deliberately NEXT TO the backed-up
+  `scripts/` subtree so backup/restore can't mistake it for vanilla), injects a
+  seed-independent preamble into each handler, and owns the artifact cleanup used when
+  switching back to tiered/chaos. The engine side is `ApDropOverrides.ts` +
+  `ScriptOpcode.AP_DROP_GROUP` (opcode 1901) + the `ap_drop_group(int)(int)` command
+  declared in `content/scripts/ap/ap.rs2`, mirroring the entrance-override plumbing.
 
 ### Usage
 
 ```
-cd Server/engine && npx tsx tools/drops/RandomizeDrops.ts [--seed <number>] [--dry-run] [--mode tiered|chaos] [--no-death-drop] [--exclude <substr,substr,...>]
+cd Server/engine && npx tsx tools/drops/RandomizeDrops.ts [--seed <number>] [--dry-run] [--mode tiered|chaos|mimic] [--no-death-drop] [--exclude <substr,substr,...>]
 cd Server/engine && npx tsx tools/pack/Build.ts
 ```
 
@@ -344,6 +356,39 @@ cd Server/engine && npx tsx tools/pack/Build.ts
 `content/.ap-backup/scripts/drop tables/scripts/` (same convention as the `.npc` backup
 drip/shops use) and re-derives from that backup every run, so reseeding never
 compounds. Spoiler is `engine/tools/drops/drop-seed.json`.
+
+Mimic-specific: the FIRST mimic run (or the first after `MimicTransform.ts` itself
+changes) rewrites the corpus and needs the pack rebuild + restart; every later mimic
+reseed only rewrites `engine/data/config/ap-drops.json` and needs a restart only - the
+tool prints which case you're in. Deleting `ap-drops.json` reverts to fully vanilla
+drops without a rebuild (the preambles fall through). Switching mimic -> tiered/chaos
+is handled automatically (the corpus is restored from backup first, which DOES need a
+rebuild).
+
+### Scope (mimic)
+
+Every `ai_queue3` handler in the corpus is a shuffle "slot"; every distinct
+post-prologue loot body is a "unit". 95 of 97 slots are mappable across 77 units. A
+seeded permutation (no slot may keep its own unit - shared-label variants like the four
+goblin types count as the same unit for this) is written to `ap-drops.json`; the
+`ap_drop_group` command resolves it at runtime and the handler jumps to the mapped
+unit's label, or falls through to its untouched vanilla loot on a miss.
+
+- `death_drop` travels WITH the table: `npc_param(death_drop)` reads the DYING npc's
+  config, so extraction inlines each unit's own uniform value as a literal (verified
+  uniform across category members for all 77 units; `otherworldly_being`'s explicit
+  `death_drop,null` becomes "drop nothing", the faithful translation).
+- Structurally pinned, always vanilla: `grip` (bespoke Heroes' Quest kill-credit
+  handler, no standard prologue) and `_mountain_troll` (its shared label carries
+  npc_type-gated Trollheim prison keys BEFORE the prologue, and is jumped to from
+  outside the corpus). Pre-prologue logic in INLINE handlers (guard/guard_dog clue
+  checks, troll_commander's prison keys) stays in place and still runs - those slots
+  are mappable.
+- Quest-gated drops whose conditions read only the killer's quest state (rat's tail,
+  jailer's key, chaos druid's mould, firebird feather) travel with their table and stay
+  obtainable - from whichever monster now mimics that table. The spoiler is
+  load-bearing for finding them, same caveat as shopsanity.
+- The death_drop .npc-param shuffle is skipped in mimic mode by design.
 
 ### Scope
 
@@ -406,7 +451,7 @@ pristine vanilla ONCE, then runs drip, shopsanity, and drop randomization in seq
 then rebuilds the pack:
 
 ```
-cd Server/engine && npx tsx tools/RegenerateAll.ts [--seed <n>] [--drip-seed <n>] [--shops-seed <n>] [--drops-seed <n>] [--mode tiered|chaos] [--skip-drip] [--skip-shops] [--skip-drops] [--no-rebuild]
+cd Server/engine && npx tsx tools/RegenerateAll.ts [--seed <n>] [--drip-seed <n>] [--shops-seed <n>] [--drops-seed <n>] [--mode tiered|chaos|mimic] [--skip-drip] [--skip-shops] [--skip-drops] [--no-rebuild]
 ```
 
 This is deliberately NOT what each individual tool does on its own - drip/shops/drops

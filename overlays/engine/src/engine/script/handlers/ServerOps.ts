@@ -11,6 +11,7 @@ import { check, CoordValid, LocTypeValid, NumberPositive, SeqTypeValid, SpotAnim
 import World from '#/engine/World.js';
 import Environment from '#/util/Environment.js';
 import Midi from '#/cache/midi/Midi.js';
+import { getDropGroupOverride } from '#/engine/ApDropOverrides.js';
 import { getEntranceOverride } from '#/engine/ApEntranceOverrides.js';
 
 const ServerOps: CommandHandlers = {
@@ -435,6 +436,15 @@ const ServerOps: CommandHandlers = {
             }
         }
         state.pushInt(override);
+    },
+
+    // custom: Archipelago drop randomizer (--mode mimic) - look up which loot-table
+    // unit a monster death handler should run instead of its own; returns null when
+    // the slot is unrandomized (the preamble then falls through to vanilla loot).
+    [ScriptOpcode.AP_DROP_GROUP]: state => {
+        const slot = state.popInt();
+
+        state.pushInt(getDropGroupOverride(slot));
     },
 
     [ScriptOpcode.MIDI_LENGTH]: state => {

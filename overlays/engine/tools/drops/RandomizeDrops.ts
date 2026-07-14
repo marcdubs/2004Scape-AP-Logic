@@ -16,9 +16,11 @@ import {
     loadQuestCriticalItems,
     loadStackableItems,
     parseDeathDropSlots,
-    parseDropSlots
+    parseDropSlots,
+    restoreDropScriptBackup
 } from './DropTableParser.js';
-import { derangement, mulberry32 } from '../shared/Prng.js';
+import { AP_DROPS_JSON, applyMimicTransform, liveCorpusIsMimicTransformed, parseMimic, removeMimicArtifacts } from './MimicTransform.js';
+import { derangement, mulberry32, shuffle } from '../shared/Prng.js';
 
 // Drop randomization: reassigns which item sits in each weighted loot-drop slot across
 // the monster drop-table corpus (content/scripts/drop tables/scripts/*.rs2), plus a
@@ -27,7 +29,7 @@ import { derangement, mulberry32 } from '../shared/Prng.js';
 // reseeding needs a content pack rebuild. See docs/archipelago-ideas.md #2 and the
 // "Domain knowledge: drop randomization" section of docs/lessons-learned.md.
 //
-// Two swap modes, picked with --mode (the user explicitly wants this to eventually be
+// Three swap modes, picked with --mode (the user explicitly wants this to eventually be
 // an Archipelago per-slot option rather than a single fixed design choice):
 // - tiered (default): every slot is bucketed by probability (weight/total, NOT the raw
 //   threshold delta - see DropTableParser.ts for why cascades with different random()
@@ -38,6 +40,17 @@ import { derangement, mulberry32 } from '../shared/Prng.js';
 //   "structure stays put, content moves" philosophy as shopsanity's bundle derangement.
 // - chaos: every eligible slot samples from the full corpus-wide item pool regardless
 //   of band - a common slot can roll what used to be someone's 1% drop.
+// - mimic: doesn't touch items at all - it shuffles which monster runs which ENTIRE
+//   loot table ("chicken mimics green dragon", complete drop profile including bones).
+//   Unlike tiered/chaos this is a runtime-override design (JSON + engine command +
+//   injected preambles - see MimicTransform.ts's header for the whole story): only the
+//   FIRST mimic run (or the first after this tool's logic changes) needs a pack
+//   rebuild; reseeding rewrites engine/data/config/ap-drops.json and needs a server
+//   restart only. Mimic skips the death_drop .npc pass below by design - each
+//   extracted table carries its own monster's death drop inlined as a literal.
+//   Tiered/chaos and mimic are mutually exclusive states of the live corpus: the
+//   items passes edit live lines by BACKUP line index, so switching mimic -> tiered/
+//   chaos auto-restores the corpus (and deletes the mimic artifacts) first.
 //
 // Both universes are built from items actually observed in the corpus, not the full
 // obj.pack catalog - unlike drip's model.pack widening, there's no safe structural
@@ -50,7 +63,7 @@ import { derangement, mulberry32 } from '../shared/Prng.js';
 // so the item stays obtainable at least where it always was. They remain eligible as a
 // SAMPLED-IN value for other slots though (can only add availability, never remove it).
 //
-// Usage: npx tsx tools/drops/RandomizeDrops.ts [--seed <number>] [--dry-run] [--mode tiered|chaos] [--no-death-drop] [--exclude <substr,substr,...>]
+// Usage: npx tsx tools/drops/RandomizeDrops.ts [--seed <number>] [--dry-run] [--mode tiered|chaos|mimic] [--no-death-drop] [--exclude <substr,substr,...>]
 
 const SPOILER_OUTPUT = path.join(import.meta.dirname, 'drop-seed.json');
 
@@ -60,8 +73,8 @@ function parseArgs() {
     const seed = seedIdx !== -1 ? parseInt(args[seedIdx + 1], 10) : Math.floor(Math.random() * 0xffffffff);
     const modeIdx = args.indexOf('--mode');
     const mode = modeIdx !== -1 ? args[modeIdx + 1] : 'tiered';
-    if (mode !== 'tiered' && mode !== 'chaos') {
-        printWarning(`unknown --mode "${mode}" - expected "tiered" or "chaos"`);
+    if (mode !== 'tiered' && mode !== 'chaos' && mode !== 'mimic') {
+        printWarning(`unknown --mode "${mode}" - expected "tiered", "chaos" or "mimic"`);
         process.exit(1);
     }
     const excludeIdx = args.indexOf('--exclude');
@@ -72,7 +85,7 @@ function parseArgs() {
                   .map(s => s.trim())
                   .filter(Boolean)
             : [];
-    return { seed, dryRun: args.includes('--dry-run'), mode: mode as 'tiered' | 'chaos', noDeathDrop: args.includes('--no-death-drop'), exclude };
+    return { seed, dryRun: args.includes('--dry-run'), mode: mode as 'tiered' | 'chaos' | 'mimic', noDeathDrop: args.includes('--no-death-drop'), exclude };
 }
 
 // picks a value from pool that differs from avoid, resampling up to 50x - bounded so a
@@ -100,6 +113,19 @@ function randomizeDropSlots(seed: number, mode: 'tiered' | 'chaos', exclude: str
     const backedUp = ensureDropScriptBackup();
     if (backedUp) {
         printInfo(`created vanilla content backup for ${backedUp} drop-table script file(s) at ${DROP_BACKUP_DIR}`);
+    }
+
+    // the edits below locate lines by BACKUP line index - a mimic-transformed live
+    // corpus has extra preamble lines, so indices would land on the wrong lines and
+    // silently corrupt scripts. Restore to pristine first and drop the mimic artifacts.
+    if (liveCorpusIsMimicTransformed()) {
+        if (dryRun) {
+            printWarning('live corpus is mimic-transformed - a real run will restore it from backup first (results below are derived from the backup either way)');
+        } else {
+            const restored = restoreDropScriptBackup();
+            const removed = removeMimicArtifacts();
+            printInfo(`live corpus was mimic-transformed: restored ${restored} file(s) from backup, removed ${removed.length} mimic artifact(s) - this switch needs a pack rebuild`);
+        }
     }
 
     const backupFiles = findDropScriptFiles(DROP_BACKUP_DIR);
@@ -279,6 +305,85 @@ function randomizeDeathDrops(seed: number, exclude: string[], dryRun: boolean) {
     return { eligibleCount: eligible.length, excludedCount: excludedSlots.size, filesWritten, reassigned, spoilerEntries };
 }
 
+// --mode mimic: shuffle whole loot tables across monsters (see MimicTransform.ts for
+// the transform itself). The seed only decides the slot->unit permutation written to
+// ap-drops.json; the corpus preambles / dispatch / loot labels are seed-independent.
+function randomizeMimic(seed: number, exclude: string[], dryRun: boolean) {
+    const backedUp = ensureDropScriptBackup();
+    if (backedUp) {
+        printInfo(`created vanilla content backup for ${backedUp} drop-table script file(s) at ${DROP_BACKUP_DIR}`);
+    }
+
+    const parse = parseMimic();
+    const eligible = parse.slots.filter(s => !s.pinned).sort((a, b) => a.index - b.index);
+    const excluded = new Set(eligible.filter(s => exclude.some(x => s.handler.includes(x) || s.file.includes(x))));
+    const pool = eligible.filter(s => !excluded.has(s));
+
+    // a permutation of the pool with no UNIT-level fixed point. derangement() only
+    // guarantees no INDEX maps to itself, which isn't enough here: several slots share
+    // one unit (all four goblin variants run goblin_drop_table), and goblin ->
+    // goblin_armed would be an index-level swap that changes nothing in game. Reject
+    // and reshuffle instead - with ~90 slots and only a handful of shared-unit groups
+    // the zero-fixed-point probability per attempt is high, so this converges fast and
+    // deterministically (seeded PRNG).
+    const rand = mulberry32(seed ^ hashKey('mimic'));
+    let perm: number[] | null = null;
+    for (let attempt = 0; attempt < 10000 && !perm; attempt++) {
+        const cand = shuffle(
+            pool.map((_, i) => i),
+            rand
+        );
+        if (pool.every((s, i) => pool[cand[i]].unitKey !== s.unitKey)) {
+            perm = cand;
+        }
+    }
+    if (!perm) {
+        printWarning('mimic: could not find a unit-level derangement (pool too small/degenerate?) - aborting');
+        process.exit(1);
+    }
+
+    const map: Record<string, number> = {};
+    const spoilerEntries: { file: string; handler: string; wasUnit: string; nowUnit: string; nowDeathDrop: string | null }[] = [];
+    for (let i = 0; i < pool.length; i++) {
+        const source = parse.unitByKey.get(pool[perm[i]].unitKey)!;
+        map[String(pool[i].index)] = source.index;
+        spoilerEntries.push({ file: pool[i].file, handler: pool[i].handler, wasUnit: pool[i].unitKey, nowUnit: `${source.file}:${source.name}`, nowDeathDrop: source.deathDrop });
+    }
+
+    const { changedFiles, rebuildNeeded } = applyMimicTransform(parse, dryRun);
+
+    if (!dryRun) {
+        fs.mkdirSync(path.dirname(AP_DROPS_JSON), { recursive: true });
+        fs.writeFileSync(
+            AP_DROPS_JSON,
+            JSON.stringify(
+                {
+                    seed,
+                    mode: 'mimic',
+                    generatedAt: new Date().toISOString(),
+                    // the engine (ApDropOverrides.ts) only reads "map"; slots/units are
+                    // here so a human can decode the indices without the spoiler.
+                    map,
+                    slots: eligible.map(s => `${s.index}: ${s.file}:${s.handler}`),
+                    units: parse.units.map(u => `${u.index}: ${u.file}:${u.name}`)
+                },
+                null,
+                2
+            )
+        );
+    }
+
+    return {
+        parse,
+        mapped: pool.length,
+        excludedCount: excluded.size,
+        pinned: parse.slots.filter(s => s.pinned).map(s => ({ file: s.file, handler: s.handler, reason: s.pinned! })),
+        changedFiles,
+        rebuildNeeded,
+        spoilerEntries
+    };
+}
+
 function main() {
     if (!fs.existsSync(DROP_SCRIPTS_DIR)) {
         printWarning(`drop table scripts directory not found: ${DROP_SCRIPTS_DIR}`);
@@ -290,6 +395,38 @@ function main() {
     const npcBackedUp = ensureNpcBackup();
     if (npcBackedUp) {
         printInfo(`created vanilla content backup for ${npcBackedUp} .npc file(s) at ${BACKUP_ROOT}`);
+    }
+
+    if (mode === 'mimic') {
+        const mimicResult = randomizeMimic(seed, exclude, dryRun);
+        printInfo(
+            `${dryRun ? '[dry run] ' : ''}seed ${seed} (mimic): ${mimicResult.mapped} monster death handler(s) redirected to another monster's loot table across ${mimicResult.parse.units.length} table unit(s) (${mimicResult.pinned.length} pinned structurally, ${mimicResult.excludedCount} via --exclude)`
+        );
+        printInfo('death_drop .npc shuffle: skipped in mimic mode (each table carries its own death drop inlined)');
+        fs.writeFileSync(
+            SPOILER_OUTPUT,
+            JSON.stringify(
+                {
+                    seed,
+                    mode,
+                    exclude,
+                    generatedAt: new Date().toISOString(),
+                    mimicSwaps: mimicResult.spoilerEntries,
+                    mimicPinned: mimicResult.pinned
+                },
+                null,
+                2
+            )
+        );
+        printInfo(`${dryRun ? '[dry run] ' : ''}spoiler written to ${SPOILER_OUTPUT}`);
+        if (dryRun) {
+            printInfo(`[dry run] transform would change ${mimicResult.changedFiles} file(s)`);
+        } else if (mimicResult.rebuildNeeded) {
+            printInfo(`transform changed ${mimicResult.changedFiles} file(s) - rebuild the pack before testing: npx tsx tools/pack/Build.ts (then restart the server)`);
+        } else {
+            printInfo('corpus already carried this transform - reseed complete, only ap-drops.json changed: restart the server, NO rebuild needed');
+        }
+        return;
     }
 
     const dropResult = randomizeDropSlots(seed, mode, exclude, dryRun);

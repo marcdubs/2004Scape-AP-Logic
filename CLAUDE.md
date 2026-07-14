@@ -11,9 +11,10 @@ the level-based reward system, and the next randomizers - build from it.
 
 This repo holds everything custom. The vanilla LostCityRS checkout lives at
 `../Server` (engine/content/webclient/javaclient inside it). `node scripts/install.js`
-copies `overlays/<target>/...` on top of it. Entrance randomization works via a
-runtime JSON table (`../Server/engine/data/config/ap-entrances.json`) consulted by a
-custom script command - reseeding never needs a content rebuild, only a server
+copies `overlays/<target>/...` on top of it. Entrance randomization and drop
+randomization's mimic mode work via runtime JSON tables
+(`../Server/engine/data/config/ap-entrances.json` / `ap-drops.json`) consulted by
+custom script commands - reseeding never needs a content rebuild, only a server
 restart. Content/engine overlay changes DO need `npx tsx tools/pack/Build.ts` (run in
 `../Server/engine`, ~1-2 min) plus a restart.
 

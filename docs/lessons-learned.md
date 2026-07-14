@@ -1214,3 +1214,96 @@ not just for the user's original "start fresh" ask.
   re-ran every drops-side offline check (quest-pinning, no-op, universe-membership,
   live-vs-spoiler consistency) plus the drip group-mismatch check (0/702 violations) -
   all clean on the freshly regenerated state.
+
+## Session-end addendum 8: mimic mode - whole-table drop shuffle via runtime override (2026-07-14)
+
+The user asked (after testing chaos mode in-game) for a third drop mode: instead of
+shuffling items WITHIN tables, shuffle which monster runs which ENTIRE drop table -
+"chicken replaces green dragon", full profile. They explicitly asked for it to work
+"kinda like how random locations was implemented" (runtime JSON + dispatch), named
+`--mode mimic` (kept alongside tiered/chaos as a future AP slot option). New files:
+`overlays/engine/tools/drops/MimicTransform.ts`, `overlays/engine/src/engine/
+ApDropOverrides.ts`; modified: `RandomizeDrops.ts`, `RegenerateAll.ts`,
+`ScriptOpcode.ts` (AP_DROP_GROUP = 1901), `ServerOps.ts`, `ap.rs2`
+(`[command,ap_drop_group](int)(int)`). See README "Drop randomization" for usage/scope.
+Design knowledge that isn't obvious from the code:
+
+- **The transform is entrance-style preamble injection, NOT script rewriting.** Each
+  eligible `[ai_queue3,...]` handler gets a seed-independent preamble
+  (`def_int $ap_group = ap_drop_group(<slot idx>); if ($ap_group >= 0) { <standard
+  prologue>; @ap_drops_go($ap_group); }`) inserted immediately before its own
+  `gosub(npc_death);` line (inline handlers) or between header and jump (jump-style
+  handlers). On a JSON miss the engine returns -1 and the handler falls through to its
+  UNTOUCHED vanilla loot - delete `ap-drops.json` and drops are vanilla with no
+  rebuild. Each unit's post-prologue loot is extracted into `[label,ap_drops_<n>]`
+  blocks in ONE generated file plus an if-chain dispatch label `ap_drops_go`. The
+  preamble runs the prologue itself because jump-style handlers' vanilla prologue
+  lives inside the label being bypassed (jumping to a loot label after the vanilla
+  path had already gosub'd npc_death would double-run the death logic - this shape
+  avoids both double-run and skip).
+- **`if ($ap_group >= 0)` not `! null`**: int null IS -1 engine-side, but `>= 0` with
+  the engine returning -1 on miss is unambiguous to the compiler; didn't want to
+  find out mid-build whether the type checker unifies `null` with a plain int local.
+- **The generated file lives at `drop tables/ap_mimic.rs2`, deliberately NOT under
+  `drop tables/scripts/`** - `ensureDropScriptBackup()`/`restoreDropScriptBackup()`
+  walk only `scripts/`, so generated output can never be mistaken for (or backed up
+  as) vanilla content. It's fully self-contained (dispatch + labels), so a stale copy
+  after a restore still compiles - but `removeMimicArtifacts()` deletes it (+ the
+  JSON) whenever switching back to tiered/chaos (RandomizeDrops auto-detects a
+  mimic-transformed live corpus via the `ap_drop_group(` marker and restores first -
+  the item modes edit live lines by BACKUP line index, which the preamble insertions
+  would shift).
+- **Slot indices are baked into compiled preambles; the JSON only maps slot->unit.**
+  Both index spaces are deterministic sorts of the backup corpus, so a mimic RESEED
+  is a byte-identical transform + new JSON = restart only, no rebuild (the tool
+  byte-compares and prints which case you're in). 97 slots, 95 eligible, 77 units
+  (multiple handlers share one label unit - all four goblin variants run
+  goblin_drop_table; each variant is its own SLOT though, so they can mimic four
+  different monsters).
+- **The permutation must reject UNIT-level fixed points, not just index-level.**
+  `derangement()` guarantees no index maps to itself, but goblin -> goblin_armed is an
+  index-level move that lands on the SAME unit (no in-game change). Reshuffle-until-
+  no-unit-fixpoint converges in a few attempts at this pool shape.
+- **death_drop travels with the table via literal inlining.** `npc_param(death_drop)`
+  resolves against the DYING npc, so a green dragon running chicken loot would still
+  drop dragon bones; extraction replaces it with the unit's own value. Verified every
+  unit's value is uniform across its handlers' category members before inlining
+  (parse `.npc` backups: name -> category/death_drop, `_x` handler = category x
+  members, default `bones` per npc_combat.param). One special case found by running,
+  not guessing: `otherworldly_being` has an EXPLICIT `param=death_drop,null` ("drops
+  nothing"), so its unit's death-drop line is REMOVED rather than inlined (first
+  implementation kept npc_param as a fallback there, which would have wrongly given
+  mimics their own bones). The .npc death_drop shuffle pass is skipped in mimic mode.
+- **Structural pins are about code that can't run on the wrong npc, not about item
+  availability**: `grip` (bespoke prologue - Heroes' Quest kill credit via
+  `finduid(%npc_aggressive_player)`, no npc_findhero gate) and `_mountain_troll`
+  (jump-style, and its label `troll_drop_table` carries npc_type-gated Trollheim
+  prison keys BEFORE the prologue; the label is also jumped to by `_troll_thrower`/
+  `_troll_spectator` from OUTSIDE the corpus - originals stay untouched, so those
+  external jumpers are unaffected). Pre-prologue logic in INLINE handlers
+  (guard/guard_dog `~trail_checkmediumdrop`, troll_commander's keys) stays put
+  because the preamble inserts AFTER it - those slots stay mappable. Quest-gated
+  drops that only read the killer's quest state (rats_tail, jail_key, unholy mould,
+  hot_feather) travel WITH their tables - still obtainable, spoiler is load-bearing.
+- **Same-line handler bodies exist**: `[ai_queue3,goblin] @goblin_drop_table; //lvl 2`
+  puts the whole body on the header line - a line-based block parser that starts
+  bodies at header+1 sees them as empty (bit the survey script first). The transform
+  parses header rest-of-line as body and rewrites jump headers to header + preamble +
+  original jump text.
+- **Verified offline** (in addition to typecheck + clean pack build ~1:25): a
+  decompile-level check via `ScriptProvider.getByName()` (77/77 unit labels + dispatch
+  compiled; the cow unit's bytecode intOperands contain the inlined
+  bones/raw_beef/cow_hide; the cow handler's bytecode carries its slot index), engine
+  loader round-trip 95/95 with misses returning -1, zero self-mimics in the spoiler,
+  JSON<->spoiler consistency for all 95 mappings, every live handler carries its
+  preamble, CRLF intact. Behavior checks: reseed over a transformed corpus correctly
+  reports "restart only, no rebuild"; running `--mode chaos` over a mimic corpus
+  correctly restores + cleans up first. **Not yet verified in-game.**
+- The live Server checkout now has: mimic seed 777 (`ap-drops.json` + transformed
+  corpus + `ap_mimic.rs2`, pack-built) layered with drip seed 555 + shops seed 777 +
+  entrance seed 777. The tiered/chaos seed-777 item shuffle from the previous session
+  was REPLACED by the mimic state (modes are mutually exclusive by design). Cows mimic
+  paladins, chickens mimic goblins in this seed - easy first in-game checks.
+- The esbuild win32/linux flip recurred again (user ran from Windows in between);
+  plain `npm install` alone unblocked WSL, the win32 half hit the same ENOTEMPTY as
+  before and was skipped - re-run the pair if the user reports Windows breakage.

@@ -4,6 +4,7 @@ import { printInfo } from '#/util/Logger.js';
 
 import { BACKUP_ROOT, SCRIPTS_ROOT, ensureNpcBackup, restoreNpcBackup } from './npc/NpcDripParser.js';
 import { DROP_BACKUP_DIR, DROP_SCRIPTS_DIR, ensureDropScriptBackup, restoreDropScriptBackup } from './drops/DropTableParser.js';
+import { removeMimicArtifacts } from './drops/MimicTransform.js';
 
 // Single entry point for "start completely fresh and regenerate every content
 // randomizer together" - restores the .npc/drop-table tree to pristine vanilla ONCE,
@@ -32,7 +33,7 @@ import { DROP_BACKUP_DIR, DROP_SCRIPTS_DIR, ensureDropScriptBackup, restoreDropS
 // (`man_torso_backpack`) from BEFORE the armor-set fix existed, and skip-not-restore
 // meant it stayed wrong indefinitely.
 //
-// Usage: npx tsx tools/RegenerateAll.ts [--seed <number>] [--drip-seed <n>] [--shops-seed <n>] [--drops-seed <n>] [--mode tiered|chaos] [--skip-drip] [--skip-shops] [--skip-drops] [--no-rebuild]
+// Usage: npx tsx tools/RegenerateAll.ts [--seed <number>] [--drip-seed <n>] [--shops-seed <n>] [--drops-seed <n>] [--mode tiered|chaos|mimic] [--skip-drip] [--skip-shops] [--skip-drops] [--no-rebuild]
 
 function parseArgs() {
     const args = process.argv.slice(2);
@@ -82,6 +83,16 @@ function main() {
     const npcRestored = restoreNpcBackup();
     const dropRestored = restoreDropScriptBackup();
     printInfo(`restored ${npcRestored} .npc file(s) (${SCRIPTS_ROOT}) and ${dropRestored} drop-table script(s) (${DROP_SCRIPTS_DIR}) to pristine vanilla`);
+
+    // the mimic dispatch file/JSON live OUTSIDE the backed-up subtrees (deliberately -
+    // see MimicTransform.ts), so the restore above doesn't touch them. If this pipeline
+    // isn't about to re-run drops in mimic mode, they'd be stale leftovers.
+    if (skipDrops || mode !== 'mimic') {
+        const removed = removeMimicArtifacts();
+        if (removed.length) {
+            printInfo(`removed ${removed.length} stale mimic artifact(s): ${removed.join(', ')}`);
+        }
+    }
 
     if (!skipDrip) {
         run('tools/npc/RandomizeDrip.ts', ['--seed', dripSeed]);

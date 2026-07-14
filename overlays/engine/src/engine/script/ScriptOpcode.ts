@@ -69,6 +69,10 @@ export const enum ScriptOpcode {
     // collide with it (compiled scripts bake in opcode numbers).
     AP_ENTRANCE_OVERRIDE = 1900,
 
+    // custom: Archipelago drop randomizer (--mode mimic) loot-table redirect lookup -
+    // same explicit-numbering reasoning as AP_ENTRANCE_OVERRIDE above.
+    AP_DROP_GROUP = 1901,
+
     // Player ops (2000-2499)
     AFK_EVENT = 2000,
     ALLOWDESIGN,
@@ -518,6 +522,7 @@ export const ScriptOpcodeMap: Map<string, number> = new Map([
     ['WORLD_DELAY', ScriptOpcode.WORLD_DELAY],
     ['MIDI_LENGTH', ScriptOpcode.MIDI_LENGTH],
     ['AP_ENTRANCE_OVERRIDE', ScriptOpcode.AP_ENTRANCE_OVERRIDE],
+    ['AP_DROP_GROUP', ScriptOpcode.AP_DROP_GROUP],
 
     ['AFK_EVENT', ScriptOpcode.AFK_EVENT],
     ['ALLOWDESIGN', ScriptOpcode.ALLOWDESIGN],
