@@ -447,6 +447,74 @@ docs/lessons-learned.md's "two real bugs found via actual in-game testing" adden
 the full story and the verification method (decompiling the compiled `script.dat`
 directly to confirm what the server will actually run, without needing to boot it).
 
+## Gathering randomization (mining / fishing / woodcutting)
+
+Shuffles which item each gathering action actually hands the player - cut a tree and
+get a fish, fish and get a log, mine a rock and get either. Runtime-override design,
+the same plumbing as entrance randomization and drops `--mode mimic`: reseeding
+rewrites a JSON table and needs a server restart only, no pack rebuild. Deleting
+`engine/data/config/ap-gather.json` restores vanilla gathering.
+
+### Pieces
+
+- `overlays/engine/src/engine/ApGatherOverrides.ts` - runtime loader for
+  `engine/data/config/ap-gather.json` (obj id -> obj id). Unlike the entrance/mimic
+  loaders, a **miss returns the input id unchanged** (vanilla passthrough) rather than
+  -1 - the natural miss semantics for an item transform, and it keeps every content
+  hook a pure one-token wrap with no null branch.
+- `ScriptOpcode.ts` / `ServerOps.ts` - `AP_GATHER_SWAP = 1902`, declared in
+  `ap/ap.rs2` as `[command,ap_gather_swap](obj $product)(namedobj)`. The return type
+  is `namedobj` (not `obj`) because `inv_add`'s item param is namedobj-typed and obj
+  doesn't coerce upward.
+- Whole-file overlays of the vanilla skill scripts, each delivery point wrapped as
+  `inv_add(inv, ap_gather_swap($product), 1)` (12 wraps total, seed-independent -
+  one pack rebuild ever):
+  - `skill_mining/scripts/mining.rs2` - normal/fast/essence rock outputs (3)
+  - `skill_woodcutting/scripts/woodcut.rs2` - `get_logs` (1)
+  - `skill_fishing/scripts/fishing.rs2` - `fish_roll`/`fish_roll_loc`, the chokepoint
+    every fishing spot calls (4)
+  - `skill_fishing/scripts/fishing_spots/memberfish.rs2` - big-net mackerel/cod/bass (4)
+- `overlays/engine/tools/gather/RandomizeGathering.ts` - builds the product pool from
+  the game's own data (`mine.dbrow` rock_output, `trees.dbrow` product,
+  `~fish_roll`/`~fish_roll_loc` call-site literals + the big-net wraps), writes the
+  JSON table and a spoiler at `engine/tools/gather/gather-seed.json`.
+- `::apgather <item_debugname>` test command (e.g. `::apgather logs`) - prints what a
+  product is randomized into, via the same engine lookup the skill scripts use.
+
+### Usage
+
+```
+cd ../Server/engine
+npx tsx tools/gather/RandomizeGathering.ts [--seed <n>] [--mode shuffle|chaos]
+    [--skills mining,fishing,woodcutting] [--exclude <item,...>]
+    [--pin-quest-items] [--no-quest-pins] [--dry-run]
+```
+
+- `shuffle` (default): one derangement across the combined ~39-product pool - a
+  bijection, so every product is still obtainable from exactly one gathering action
+  and nothing maps to itself. Seed 777: 38 swapped, 30 land cross-skill.
+- `chaos`: every product independently resamples from the pool - duplicates allowed,
+  so some products can become unobtainable from gathering entirely.
+- `--skills` restricts which skills join the pool; unselected skills stay vanilla.
+
+**Quest-critical pinning is mode-aware**, unlike drop randomization's always-on pin:
+the `inv_total`/`inv_del` gating scan flags 16 of the 39 products (every log type,
+most basic ores) because common gathering products gate quests constantly. Shuffle
+mode doesn't pin by default - it's a bijection, everything stays obtainable, a quest
+just needs its item gathered from a different action (the spoiler says which). Chaos
+genuinely can orphan a product, so it pins by default. Override with
+`--pin-quest-items` / `--no-quest-pins`.
+
+### Scope
+
+Only the *item that lands in the inventory* changes. Success chances, xp, level
+requirements, bait consumption, and the catch/mine messages all stay vanilla - "You
+manage to mine some coal." followed by a raw shark in slot 1 is intentional. Stays
+vanilla by design: the mining gem bonus roll, Shilo gem rocks, big-net junk catches
+(boots/seaweed/oyster/casket), the Tai Bwo Wannai karambwan minigame, the Family
+Crest perfect-gold branch, and the Tourist Trap punishment rock (`thpunishrock`,
+hard-excluded).
+
 ## Infinite run energy
 
 A permanent world-config toggle, not a per-seed randomizer - same class of change as the
