@@ -1377,3 +1377,56 @@ The user asked for a chat print revealing whose table just dropped. Each generat
 - Verified same as before (typecheck, pack build ~1:30, full offline check suite
   still green) plus the compiled cow label's stringOperands containing
   "Smells like cow...". Still not verified in-game.
+
+## Session-end addendum 9: infinite run energy toggle (2026-07-14)
+
+User asked for "a parameter to the rando that makes run speed always stay at 100%".
+This is NOT a per-seed randomizer (nothing to shuffle, no spoiler) - it's a permanent
+world-config toggle, same class of feature as the already-planned `xpRate`/
+`NODE_XPRATE` XP multiplier (archipelago-ideas.md #5), and the intended model for how
+this becomes an AP slot option later. Built and installed, **not yet verified
+in-game** (same caveat as almost everything else in this doc).
+
+- **New WorldConfig field, not a new mechanism**: `node.infiniteRun: boolean` (default
+  `false`) added to `overlays/engine/src/util/WorldConfig.ts`, plus a
+  `NODE_INFINITERUN` env var mapping in `migrateFromLegacyEnv` mirroring `xpRate`/
+  `NODE_XPRATE` exactly. `Environment.ts` needed no change - it just spreads the config
+  object, so the new field flows through to `Environment.node.infiniteRun`
+  automatically.
+- **One-line short-circuit in `Player.ts:updateEnergy()`** (called once per player per
+  tick from `World.ts`'s main loop): when the flag is set, sets `runenergy = 10000`
+  (max, engine units are hundredths-of-a-percent) and returns before the normal
+  drain-while-moving/regen-while-idle logic. This automatically means the "energy hits
+  0 -> force player back to walk" branch never fires, since energy is pinned at max
+  before that check runs each tick. No changes needed to potions/graceful/agility
+  regen code (`HEALENERGY` opcode in `PlayerOps.ts`) or the walk/run toggle logic
+  (`P_RUN`/`VarPlayerType.RUN`) - those are orthogonal (still work normally, just moot
+  since energy never actually depletes) and the client UI orb needs no change either
+  (`UpdateRunEnergy` just mirrors whatever `runenergy` is each tick).
+- **Why an engine code change instead of the runtime-JSON-table pattern** (entrances,
+  drop mimic): that pattern exists specifically for values that vary *per seed* and
+  need to reseed without a rebuild. This is a static on/off world rule, not seeded
+  data, so a direct code overlay is the right fit - same reasoning as why `::home` in
+  `ClientCheatHandler.ts` is a hardcoded safety valve, not a data table.
+- **This required overlaying `Player.ts` for the first time** (2299-line core vanilla
+  file, previously never touched by this repo) - `cp`'d from the vanilla checkout
+  rather than retyped, to guarantee a byte-identical base before the 7-line patch (diff
+  against vanilla is exactly those 7 added lines, confirmed via `diff`). Same
+  "overlay copies go stale as upstream moves" caveat as every other overlaid vanilla
+  file applies here now too - worth diffing against a fresh vanilla `Player.ts` if this
+  ever needs revisiting after an upstream update.
+- **Enabled directly in the user's local `Server/engine/data/config/world.json`**
+  (`"infiniteRun": true` added next to their existing `"xpRate": 30`) since that file
+  is gitignored/local-only and the feature is inert until a field is added there or via
+  env var anyway - takes effect on next server restart, no pack rebuild needed (pure
+  engine TS change, nothing content-side).
+- Verified: typecheck clean (`npx tsc --noEmit -p .` in engine/), diff review against
+  vanilla for both touched files. **Not yet verified in-game.**
+- **Found unrelated concurrent uncommitted work in the tree while doing this**: a
+  gathersanity-shaped feature (`ApGatherOverrides.ts`, `skill_fishing`/`skill_mining`/
+  `skill_woodcutting` overlay scripts, modified `ap.rs2`/`ScriptOpcode.ts`/
+  `ServerOps.ts`) with file timestamps ~2 minutes before this session's work started -
+  not created by this session, deliberately left untouched and NOT included in this
+  addendum's commit. If a future session finds this work still uncommitted, it's
+  probably an interrupted session (or the user's own edits) rather than an accident -
+  check with the user before assuming it's abandoned.

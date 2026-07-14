@@ -447,6 +447,34 @@ docs/lessons-learned.md's "two real bugs found via actual in-game testing" adden
 the full story and the verification method (decompiling the compiled `script.dat`
 directly to confirm what the server will actually run, without needing to boot it).
 
+## Infinite run energy
+
+A permanent world-config toggle, not a per-seed randomizer - same class of change as the
+existing `xpRate`/`NODE_XPRATE` XP multiplier (see docs/archipelago-ideas.md #5), and
+intended to become an Archipelago slot option the same way. Unlike entrance/drop/drip/
+shop randomization, there's nothing to reseed: it's a boolean on or off.
+
+### Pieces
+
+- `overlays/engine/src/util/WorldConfig.ts` - adds `node.infiniteRun: boolean` (default
+  `false`) to the config schema, alongside a `NODE_INFINITERUN` env var mapping that
+  mirrors `xpRate`/`NODE_XPRATE` exactly.
+- `overlays/engine/src/engine/entity/Player.ts` - `updateEnergy()` (called once per
+  player per tick from `World.ts`) short-circuits to `this.runenergy = 10000` (max, in
+  the engine's hundredths-of-a-percent units) when the flag is set, skipping the normal
+  drain-while-moving/regen-while-idle logic entirely. This also means the "energy hits 0
+  -> force back to walk" branch never triggers, since energy is pinned at max every
+  tick before that check runs.
+
+### Usage
+
+Set `"infiniteRun": true` under `"node"` in the server's `data/config/world.json` (a
+local, gitignored file - not part of this repo), or set the `NODE_INFINITERUN` env var
+before the server's first boot (only applies when `world.json` doesn't exist yet and
+gets migrated from a legacy `.env` - see `WorldConfig.ts`). Takes effect on server
+restart; no content pack rebuild needed, since this only touches engine TS. Player run
+energy will read and display 100% at all times and running is never blocked.
+
 ## Regenerating everything at once
 
 `overlays/engine/tools/RegenerateAll.ts` restores the `.npc`/drop-table-script tree to
