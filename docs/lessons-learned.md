@@ -1307,3 +1307,53 @@ Design knowledge that isn't obvious from the code:
 - The esbuild win32/linux flip recurred again (user ran from Windows in between);
   plain `npm install` alone unblocked WSL, the win32 half hit the same ENOTEMPTY as
   before and was skipped - re-run the pair if the user reports Windows breakage.
+
+## Session-end addendum 9: drip bug 5 - model.pack names with no model data ("invisible Betty") (2026-07-14)
+
+User report: after the current rando run, Betty (Port Sarim mage shop) is completely
+invisible - yellow minimap dot present (server-side entity fine), no character model.
+Cause: drip had assigned her `model2=woman_torso_leatherfat`, which has an id in
+`content/pack/model.pack` (455) but **no `.ob2` file anywhere under
+`content/models/`**. When any model id in an NPC's compose list has no data, the
+client renders NOTHING for that NPC - not just a missing part. Betty was only the
+first one noticed: the same seed had written **272 dataless-model slots across ~200
+NPC blocks** (Duke of Lumbridge, King Roald, Sir Amik, Merlin, Aggie, Leela, ...).
+
+- **Root cause**: `loadModelUniverse()`/`loadWeaponUniverse()` treated model.pack as
+  ground truth ("every entry the cache actually has" - its comment even said so), but
+  model.pack is an id=NAME catalog only. 34 `(man|woman)_*` names + 1
+  `human_weapons_*` name are dangling: mostly placeholder names that literally embed
+  their id (`man_torso_model_300`, `woman_head_model_402`, ...) but ALSO a few
+  real-looking ones (`woman_torso_leatherfat`, `woman_legs_crossed`,
+  `woman_feet_spurboots`, `man_torsoextra_spotty_cloak`, `woman_necklaces_style2`) -
+  which is why name-based curation (isNeverSwappable) never caught them. No vanilla
+  NPC wears any of them; they entered the game exclusively via our sample pools.
+- **The pack build does NOT fail on these** - `tools/pack/graphics/pack.ts` packs
+  whatever `.ob2` files exist by basename and prints a buried per-id
+  `missing model <name> (<id>)` warning for referenced-but-absent ids. Grep future
+  Build.ts output for `missing model` after content-tool changes - it would have
+  caught this a session earlier.
+- **Fix**: `hasModelData()` in `NpcDripParser.ts` - lazily walks `content/models/`
+  once, collects `.ob2` basenames, and both universe loaders now require membership.
+  parseSlots() deliberately does NOT get the gate (vanilla never wears these; if it
+  somehow did, swapping away would be an improvement). Offline check: 448 pool
+  entries, 0 dangling (was 483/35).
+- **Embarrassing corollary**: addendum 7's "verified" tanner fix gave him
+  `man_torso_model_300` - itself dataless. A config-level spot check ("it's a
+  different name now") is not a render-level check. The in-game report is what
+  caught it.
+- Re-ran `RegenerateAll.ts --drip-seed 555 --shops-seed 777 --drops-seed 777
+  --mode mimic` (restore -> drip -> shops -> drops -> pack build 1:36). Verified:
+  full-corpus scan of live `.npc` files for all 35 dataless names = 0 hits; Betty's 8
+  models all resolve to real `.ob2` files; armor-set group-mismatch check 1/744 and
+  that one (`doorman` in lostcity.npc: plaguesuit torso + longsleeves arms +
+  platemail legs) is byte-identical to VANILLA - the set-aware logic correctly left
+  his plaguesuit group alone (pool of 1), i.e. 0 randomizer-introduced violations;
+  engine typecheck clean. **Not yet verified in-game** - user should restart the
+  server and eyeball Betty + a couple of the other formerly-broken NPCs (Duke of
+  Lumbridge, Aggie in Draynor are close to spawn).
+- esbuild flip recurred (same as addendum 8's note); this time the documented pair
+  ALSO hit `ENOTEMPTY ... rename @esbuild/win32-x64 -> .win32-x64-<hash>` on the
+  win32 half - fix is `rm -rf node_modules/@esbuild/.win32-x64-*` then re-run
+  `npm install --no-save --force @esbuild/win32-x64` (succeeded; both platforms now
+  installed).

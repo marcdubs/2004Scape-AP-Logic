@@ -34,6 +34,7 @@ export const CONTENT_ROOT = path.resolve(process.cwd(), '../content');
 export const SCRIPTS_ROOT = path.join(CONTENT_ROOT, 'scripts');
 export const BACKUP_ROOT = path.join(CONTENT_ROOT, '.ap-backup', 'scripts');
 const MODEL_PACK_PATH = path.join(CONTENT_ROOT, 'pack', 'model.pack');
+const MODELS_ROOT = path.join(CONTENT_ROOT, 'models');
 
 export type Gender = 'man' | 'woman';
 
@@ -79,6 +80,42 @@ function isNeverSwappable(value: string): boolean {
     }
     const detail = value.replace(/^(man|woman)_[a-z]+_/, '');
     return detail === 'demon';
+}
+
+// model.pack is only an id=name CATALOG - having an entry there does not mean the
+// model's geometry exists. 34 of its (man|woman)_* names plus one human_weapons_* name
+// have no .ob2 source anywhere under content/models: mostly placeholder names
+// (man_torso_model_300, woman_head_model_402, ...) but also a few real-looking ones
+// (woman_torso_leatherfat, woman_legs_crossed, woman_feet_spurboots,
+// man_torsoextra_spotty_cloak, woman_necklaces_style2) that slipped past the
+// isNeverSwappable() curation above. The pack build resolves the name to its id fine
+// and only prints a buried "missing model" warning (tools/pack/graphics/pack.ts), but
+// the client then can't build the NPC's composed model at all - the whole NPC renders
+// as nothing while its server-side yellow minimap dot survives. Found via user report
+// ("Betty in Port Sarim is completely invisible"); the same seed had assigned dataless
+// models to 272 slots across ~200 NPC blocks. No vanilla NPC wears any of these, so
+// gating the sample-INTO pools (loadModelUniverse/loadWeaponUniverse) is sufficient -
+// parseSlots() doesn't need it.
+let modelDataNames: Set<string> | null = null;
+function hasModelData(value: string): boolean {
+    if (!modelDataNames) {
+        modelDataNames = new Set();
+        const stack = [MODELS_ROOT];
+        while (stack.length) {
+            const dir = stack.pop()!;
+            if (!fs.existsSync(dir)) {
+                continue;
+            }
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                if (entry.isDirectory()) {
+                    stack.push(path.join(dir, entry.name));
+                } else if (entry.name.endsWith('.ob2')) {
+                    modelDataNames.add(entry.name.slice(0, -'.ob2'.length));
+                }
+            }
+        }
+    }
+    return modelDataNames.has(value);
 }
 
 function walk(dir: string, out: string[]): void {
@@ -211,7 +248,7 @@ export function loadModelUniverse(): Map<string, string[]> {
         }
         const value = line.slice(eq + 1).trim();
         const swapMatch = value.match(SWAPPABLE_RE);
-        if (!swapMatch || isNeverSwappable(value)) {
+        if (!swapMatch || isNeverSwappable(value) || !hasModelData(value)) {
             continue;
         }
         const key = `${swapMatch[1]}_${swapMatch[2]}`;
@@ -316,7 +353,7 @@ export function loadWeaponUniverse(): WeaponUniverse {
             continue;
         }
         const value = line.slice(eq + 1).trim();
-        if (!value.startsWith('human_weapons_') || seen.has(value)) {
+        if (!value.startsWith('human_weapons_') || seen.has(value) || !hasModelData(value)) {
             continue;
         }
         seen.add(value);
