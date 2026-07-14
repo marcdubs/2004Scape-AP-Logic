@@ -78,6 +78,7 @@ export type MimicUnit = {
     file: string;
     loot: string; // post-prologue loot text, death_drop already inlined
     deathDrop: string | null; // the inlined literal, or null if npc_param was kept
+    displayName: string; // npc name= for the "Smells like <X>..." chat line
     handlers: string[]; // corpus ai_queue3 handlers bound to this unit
 };
 
@@ -129,7 +130,7 @@ function isOnlyCommentsAndBlank(text: string): boolean {
 // The default when no explicit param exists is `bones` (npc_combat.param's declared
 // default - the reason most monsters have no death_drop line at all).
 
-type NpcInfo = { category: string | null; deathDrop: string | null };
+type NpcInfo = { category: string | null; deathDrop: string | null; displayName: string | null };
 
 function loadNpcInfo(): { byName: Map<string, NpcInfo>; byCategory: Map<string, string[]> } {
     const byName = new Map<string, NpcInfo>();
@@ -139,7 +140,7 @@ function loadNpcInfo(): { byName: Map<string, NpcInfo>; byCategory: Map<string, 
         let cur: NpcInfo | null = null;
         for (const line of lines) {
             if (line.startsWith('[')) {
-                cur = { category: null, deathDrop: null };
+                cur = { category: null, deathDrop: null, displayName: null };
                 byName.set(line.slice(1, line.lastIndexOf(']')), cur);
                 continue;
             }
@@ -150,6 +151,8 @@ function loadNpcInfo(): { byName: Map<string, NpcInfo>; byCategory: Map<string, 
                 cur.deathDrop = line.slice('param=death_drop,'.length).trim();
             } else if (line.startsWith('category=')) {
                 cur.category = line.slice('category='.length).trim();
+            } else if (line.startsWith('name=')) {
+                cur.displayName = line.slice('name='.length).trim();
             }
         }
     }
@@ -184,6 +187,34 @@ function resolveDeathDrop(handlers: string[], npcs: ReturnType<typeof loadNpcInf
     // death" - the faithful extraction removes the death-drop line entirely rather
     // than inlining anything.
     return value === 'null' ? { kind: 'none' } : { kind: 'literal', value };
+}
+
+// display name for the "Smells like <X>..." chat line each mimicked table prints -
+// the most common `name=` among the unit's handlers' npcs (category handlers span
+// several variants; e.g. man_drop_table covers Man/Woman/Thief and "Man" wins), falling
+// back to a prettified debugname when no config carries a name.
+function resolveDisplayName(unit: MimicUnit, npcs: ReturnType<typeof loadNpcInfo>): string {
+    const counts = new Map<string, number>();
+    for (const handler of unit.handlers) {
+        const members = handler.startsWith('_') ? (npcs.byCategory.get(handler.slice(1)) ?? []) : [handler];
+        for (const m of members) {
+            const name = npcs.byName.get(m)?.displayName;
+            if (name) {
+                counts.set(name, (counts.get(name) ?? 0) + 1);
+            }
+        }
+    }
+    let best: string | null = null;
+    for (const [name, count] of counts) {
+        if (best === null || count > counts.get(best)!) {
+            best = name;
+        }
+    }
+    if (best) {
+        return best;
+    }
+    const fallback = unit.name.replace(/^_/, '').replace(/_drop(_table|s)?$/, '').replace(/_/g, ' ');
+    return fallback.charAt(0).toUpperCase() + fallback.slice(1);
 }
 
 export type MimicParse = {
@@ -247,7 +278,7 @@ export function parseMimic(): MimicParse {
                 }
                 slot.unitKey = `${rel}:${jump[1]}`;
                 if (!unitByKey.has(slot.unitKey)) {
-                    unitByKey.set(slot.unitKey, { index: -1, name: jump[1], file: rel, loot: labelBody.slice(pm.index! + pm[0].length).replace(/^\n+/, ''), deathDrop: null, handlers: [] });
+                    unitByKey.set(slot.unitKey, { index: -1, name: jump[1], file: rel, loot: labelBody.slice(pm.index! + pm[0].length).replace(/^\n+/, ''), deathDrop: null, displayName: '', handlers: [] });
                 }
                 unitByKey.get(slot.unitKey)!.handlers.push(b.name);
                 if (!slot.pinned) {
@@ -278,7 +309,7 @@ export function parseMimic(): MimicParse {
                 continue;
             }
             slot.unitKey = `${rel}:${b.name}`;
-            unitByKey.set(slot.unitKey, { index: -1, name: b.name, file: rel, loot: body.slice(pm.index! + pm[0].length).replace(/^\n+/, ''), deathDrop: null, handlers: [b.name] });
+            unitByKey.set(slot.unitKey, { index: -1, name: b.name, file: rel, loot: body.slice(pm.index! + pm[0].length).replace(/^\n+/, ''), deathDrop: null, displayName: '', handlers: [b.name] });
             edits.push({ kind: 'insert-before', lineIdx: gosubIdx, slot });
         }
 
@@ -323,6 +354,10 @@ export function parseMimic(): MimicParse {
         }
         unit.deathDrop = resolved.value;
         unit.loot = unit.loot.replace(/npc_param\(death_drop\)/g, resolved.value);
+    }
+
+    for (const unit of unitByKey.values()) {
+        unit.displayName = resolveDisplayName(unit, npcs);
     }
 
     // stable, seed-independent indices (baked into compiled preambles - they must not
@@ -386,6 +421,15 @@ function generateMimicFile(units: MimicUnit[]): string {
         out.push('');
         out.push(`// unit ${u.index}: ${u.file} "${u.name}" (handlers: ${u.handlers.join(', ')})${u.deathDrop ? ` death_drop=${u.deathDrop}` : ''}`);
         out.push(`[label,ap_drops_${u.index}]`);
+        // tell the hero whose table just dropped. These labels are only ever reached
+        // via the dispatch (a mimicked kill) - the vanilla path falls through to the
+        // handler's own inline loot and stays silent. mes() needs the active_player
+        // pointer and the compiler checks pointer flow statically PER SCRIPT, so the
+        // preamble's npc_findhero (a different script) doesn't count here - re-check
+        // it locally, the same double-call vanilla's guard.rs2/guard_dog.rs2 use.
+        out.push('if (npc_findhero = ^true) {');
+        out.push(`    mes("Smells like ${u.displayName.toLowerCase()}...");`);
+        out.push('}');
         out.push(u.loot.replace(/\s+$/, ''));
     }
     out.push('');

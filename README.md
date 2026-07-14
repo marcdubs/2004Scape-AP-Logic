@@ -389,6 +389,9 @@ unit's label, or falls through to its untouched vanilla loot on a miss.
   obtainable - from whichever monster now mimics that table. The spoiler is
   load-bearing for finding them, same caveat as shopsanity.
 - The death_drop .npc-param shuffle is skipped in mimic mode by design.
+- Every mimicked kill prints `Smells like <monster>...` to the killer's chat (the
+  source table's npc display name, also recorded as `nowName` in the spoiler). Only
+  redirected kills print - the vanilla fallthrough path is silent.
 
 ### Scope
 

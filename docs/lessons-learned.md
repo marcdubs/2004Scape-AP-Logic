@@ -1357,3 +1357,23 @@ NPC blocks** (Duke of Lumbridge, King Roald, Sir Amik, Merlin, Aggie, Leela, ...
   win32 half - fix is `rm -rf node_modules/@esbuild/.win32-x64-*` then re-run
   `npm install --no-save --force @esbuild/win32-x64` (succeeded; both platforms now
   installed).
+
+### Addendum 8 follow-up: "Smells like <x>..." chat line on mimicked kills (2026-07-14)
+
+The user asked for a chat print revealing whose table just dropped. Each generated
+`[label,ap_drops_<n>]` now opens with `if (npc_findhero = ^true) { mes("Smells like
+<npc display name>..."); }` before the loot. Two things worth remembering:
+
+- **mes() needs the active_player pointer and the compiler's pointer-flow check is
+  static PER SCRIPT** - the preamble's npc_findhero (in the ai_queue3 script) doesn't
+  carry over into the label script for the static check, even though the runtime
+  pointer does carry across the @jump. Re-calling `npc_findhero` inside the label
+  satisfies the checker; the double-call is precedented by vanilla guard.rs2/
+  guard_dog.rs2 (they call it twice around their clue-trail check).
+- Display name = most common `name=` across the unit's handlers' category members
+  (man_drop_table spans Man/Woman/Thief -> "Man"), lowercased in the message,
+  recorded as `nowName` in the spoiler so in-game lines can be matched back. Labels
+  are only reachable via dispatch, so vanilla/unmapped kills stay silent.
+- Verified same as before (typecheck, pack build ~1:30, full offline check suite
+  still green) plus the compiled cow label's stringOperands containing
+  "Smells like cow...". Still not verified in-game.

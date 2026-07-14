@@ -343,11 +343,12 @@ function randomizeMimic(seed: number, exclude: string[], dryRun: boolean) {
     }
 
     const map: Record<string, number> = {};
-    const spoilerEntries: { file: string; handler: string; wasUnit: string; nowUnit: string; nowDeathDrop: string | null }[] = [];
+    const spoilerEntries: { file: string; handler: string; wasUnit: string; nowUnit: string; nowName: string; nowDeathDrop: string | null }[] = [];
     for (let i = 0; i < pool.length; i++) {
         const source = parse.unitByKey.get(pool[perm[i]].unitKey)!;
         map[String(pool[i].index)] = source.index;
-        spoilerEntries.push({ file: pool[i].file, handler: pool[i].handler, wasUnit: pool[i].unitKey, nowUnit: `${source.file}:${source.name}`, nowDeathDrop: source.deathDrop });
+        // nowName is the same display name the in-game "Smells like <x>..." line uses
+        spoilerEntries.push({ file: pool[i].file, handler: pool[i].handler, wasUnit: pool[i].unitKey, nowUnit: `${source.file}:${source.name}`, nowName: source.displayName, nowDeathDrop: source.deathDrop });
     }
 
     const { changedFiles, rebuildNeeded } = applyMimicTransform(parse, dryRun);
