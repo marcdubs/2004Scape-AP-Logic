@@ -171,6 +171,27 @@ reasoning:
 - Same seed number does NOT reproduce the same layout across algorithm changes (the
   dedupe fix changed the candidate list, which changed what seed 1803231336
   produces). Treat seeds as valid only within one tool version.
+- **Relative-destination stairs (`movecoord(coord, dx, dy, dz)`) used to be silently
+  dropped, no diagnostic** - found via the user reporting Falador's bar/smith
+  staircases stayed vanilla. Some handlers are reused verbatim across several
+  physically distinct staircases (e.g. `case 0_46_52_27_42 :
+  p_telejump(movecoord(coord, 0, 1, 4)); // Falador smith`), so their destination is
+  computed relative to the trigger's own coord instead of being a literal. The old
+  `isLiteral()` filter in `RandomizeEntrances.ts` required a literal destination, so
+  these never became candidates - and since `classify()` correctly calls them
+  `floor-shift`, not `cross-map`, they didn't even land in the printed `excluded`
+  list (which only logs non-literal `cross-map` kind). Fix: `EntranceParser.ts` now
+  has `resolveRelativeDestination()` - when the base is the bare `coord`/`loc_coord`
+  variable (not a `coord()` call, which is the unrelated any-source/map-scanned
+  pattern) and the source is already a literal, it resolves the offset into a real
+  literal at parse time, so these entrances flow through the normal pairing path
+  unmodified. Went from 309 to 317 floor-shift gates at seed 1 (~41 movecoord call
+  sites across both files, most any-source and handled by the map scanner instead;
+  ~8 pairs were literal-sourced and previously dropped). Any future "this specific
+  staircase stayed vanilla" report should first check whether its handler uses
+  `movecoord` with a non-`coord`/`loc_coord` base (e.g. `$randomX`/`$randomZ`, or an
+  explicit coord literal as base) - those are genuinely unresolvable and correctly
+  stay out of the pool.
 
 ## Testing & verification process that worked
 

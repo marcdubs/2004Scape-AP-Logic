@@ -136,6 +136,34 @@ export function parseCoordExpr(raw: string): CoordExpr {
     return { type: 'unknown', raw: trimmed };
 }
 
+// a relative destination whose base is the trigger's own coord (`coord`/`loc_coord`,
+// the bare variable - not a `coord()` call, which is a different "any source" pattern
+// handled by the map scanner instead) can be resolved to a real literal once the
+// source itself is a literal coord, since the offset is fixed at parse time. This
+// turns handlers like `p_telejump(movecoord(coord, 0, 1, 4))` (reused verbatim across
+// many physically distinct staircases, e.g. the Falador smith/pub stairs) into
+// ordinary literal-destination entrances so they're eligible for shuffling.
+function resolveRelativeDestination(source: SourceSpec, destination: CoordExpr): CoordExpr {
+    if (destination.type !== 'relative' || (destination.base !== 'coord' && destination.base !== 'loc_coord') || source.type !== 'literal') {
+        return destination;
+    }
+    if (![destination.dx, destination.dy, destination.dz].every(v => /^-?\d+$/.test(v.trim()))) {
+        return destination;
+    }
+    const dx = parseInt(destination.dx, 10);
+    const dy = parseInt(destination.dy, 10);
+    const dz = parseInt(destination.dz, 10);
+    const src = source.coord;
+    const plane = src.plane + dy;
+    const worldX = src.worldX + dx;
+    const worldZ = src.worldZ + dz;
+    const mapX = Math.floor(worldX / 64);
+    const mapZ = Math.floor(worldZ / 64);
+    const localX = worldX - mapX * 64;
+    const localZ = worldZ - mapZ * 64;
+    return { type: 'literal', raw: `${plane}_${mapX}_${mapZ}_${localX}_${localZ}`, plane, mapX, mapZ, localX, localZ, worldX, worldZ };
+}
+
 function extractComment(chunk: string): string | null {
     // only look at `//` that isn't inside the statement's own coord literal (there are
     // none in practice), so a plain search for the first `//` on the chunk is fine.
@@ -242,28 +270,28 @@ function buildEntrance(base: Omit<Entrance, 'kind' | 'destination' | 'method' | 
 
     const climb = findCall(chunk, '~climb_ladder') ?? findCall(chunk, 'climb_ladder');
     if (climb && climb.args.length === 2) {
-        const destination = parseCoordExpr(climb.args[0]);
+        const destination = resolveRelativeDestination(base.source, parseCoordExpr(climb.args[0]));
         const up = climb.args[1].trim() === 'true';
         return [{ ...base, description, method: 'climb_ladder', destination, up, kind: classify(base.source, destination) }];
     }
 
     const jump = findCall(chunk, 'p_telejump');
     if (jump && jump.args.length === 1) {
-        const destination = parseCoordExpr(jump.args[0]);
+        const destination = resolveRelativeDestination(base.source, parseCoordExpr(jump.args[0]));
         return [{ ...base, description, method: 'p_telejump', destination, up: null, kind: classify(base.source, destination) }];
     }
 
     const teleport = findCall(chunk, 'p_teleport');
     if (teleport && teleport.args.length === 1) {
-        const destination = parseCoordExpr(teleport.args[0]);
+        const destination = resolveRelativeDestination(base.source, parseCoordExpr(teleport.args[0]));
         return [{ ...base, description, method: 'p_teleport', destination, up: null, kind: classify(base.source, destination) }];
     }
 
     for (const choiceLabel of ['stair_options', 'ladder_options']) {
         const choice = findCall(chunk, choiceLabel);
         if (choice && choice.args.length === 2) {
-            const up = parseCoordExpr(choice.args[0]);
-            const down = parseCoordExpr(choice.args[1]);
+            const up = resolveRelativeDestination(base.source, parseCoordExpr(choice.args[0]));
+            const down = resolveRelativeDestination(base.source, parseCoordExpr(choice.args[1]));
             return [
                 { ...base, description, method: 'p_telejump', destination: up, up: true, kind: classify(base.source, up) },
                 { ...base, description, method: 'p_telejump', destination: down, up: false, kind: classify(base.source, down) }
