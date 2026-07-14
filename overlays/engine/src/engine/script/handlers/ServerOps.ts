@@ -3,7 +3,8 @@ import { LocLayer, LocAngle } from '#/engine/routefinder/index.js';
 import SpotanimType from '#/cache/config/SpotanimType.js';
 import { CoordGrid } from '#/engine/CoordGrid.js';
 import { MapFindSquareType } from '#/engine/entity/MapFindSquareType.js';
-import { isIndoors, isLineOfSight, isLineOfWalk, isMapBlocked } from '#/engine/GameMap.js';
+import { isIndoors, isLineOfSight, isLineOfWalk, isMapBlocked, reachedLoc } from '#/engine/GameMap.js';
+import LocType from '#/cache/config/LocType.js';
 import { ScriptOpcode } from '#/engine/script/ScriptOpcode.js';
 import { CommandHandlers } from '#/engine/script/ScriptRunner.js';
 import ScriptState from '#/engine/script/ScriptState.js';
@@ -15,6 +16,18 @@ import Midi from '#/cache/midi/Midi.js';
 import { getDropGroupOverride } from '#/engine/ApDropOverrides.js';
 import { getGatherSwap } from '#/engine/ApGatherOverrides.js';
 import { getEntranceOverride } from '#/engine/ApEntranceOverrides.js';
+
+// Archipelago entrance override support: the redirected destination is often the far
+// ladder/staircase's own (blocked) tile, so find that loc to check real reachability
+// (the same check the game uses for clicking it) when nudging the player off it.
+function findGroundLoc(x: number, z: number, level: number) {
+    for (const loc of World.gameMap.getZone(x, z, level).getLocsSafe(CoordGrid.packZoneCoord(x, z))) {
+        if (loc.layer === LocLayer.GROUND) {
+            return loc;
+        }
+    }
+    return null;
+}
 
 const ServerOps: CommandHandlers = {
     [ScriptOpcode.MAP_CLOCK]: state => {
@@ -431,13 +444,27 @@ const ServerOps: CommandHandlers = {
             return;
         }
 
-        // Prefer a neighbor that (a) isn't itself blocked, (b) has an unobstructed
-        // line back to the intended landing tile (so we can't hop through a wall
-        // onto the far side - e.g. outside the building), and (c) matches the
-        // intended tile's indoor/outdoor state (so we don't step off a roofed
-        // floor onto an unroofed ledge and end up floating in the sky). If no
-        // neighbor satisfies all of that, fall back to the old blind
-        // unblocked-only search rather than stranding the player.
+        // The destination tile is usually occupied by the far ladder/staircase loc
+        // itself. Find that loc so we can use reachedLoc - the same reachability
+        // check the game uses when a player clicks an object - to make sure the
+        // nudged tile can actually operate it (rather than just guessing via LOS).
+        const targetLoc = findGroundLoc(pos.x, pos.z, pos.level);
+        const targetForceApproach = targetLoc ? LocType.get(targetLoc.type).forceapproach : 0;
+        const canOperateFrom = (nx: number, nz: number): boolean => {
+            if (!targetLoc) {
+                // no loc found at the destination tile (e.g. a plain floor-shift
+                // landing) - nothing to validate reachability against.
+                return true;
+            }
+            return reachedLoc(pos.level, nx, nz, pos.x, pos.z, targetLoc.width, targetLoc.length, 1, targetLoc.angle, targetLoc.shape, targetForceApproach);
+        };
+
+        // Prefer a neighbor that (a) isn't itself blocked, (b) can actually reach/operate
+        // the destination loc from there, and (c) matches the intended tile's indoor/
+        // outdoor state (so we don't step off a roofed floor onto an unroofed ledge and
+        // end up floating in the sky - reachedLoc alone doesn't catch that, since it only
+        // checks line of sight, not whether there's a floor). If no neighbor satisfies all
+        // of that, relax a constraint at a time rather than stranding the player.
         const wantIndoors = isIndoors(pos.x, pos.z, pos.level);
         const neighbors: ReadonlyArray<[number, number]> = [
             [0, 1],
@@ -449,18 +476,20 @@ const ServerOps: CommandHandlers = {
             [-1, 1],
             [-1, -1]
         ];
-        for (const strict of [true, false]) {
+        const tiers: { label: string; ok: (nx: number, nz: number) => boolean }[] = [
+            { label: ' (nudged off blocked tile)', ok: (nx, nz) => canOperateFrom(nx, nz) && isIndoors(nx, nz, pos.level) === wantIndoors },
+            { label: ' (nudged off blocked tile, relaxed: indoor/outdoor mismatch)', ok: (nx, nz) => canOperateFrom(nx, nz) },
+            { label: ' (nudged off blocked tile, fallback: no safe neighbor found)', ok: () => true }
+        ];
+        for (const tier of tiers) {
             for (const [dx, dz] of neighbors) {
                 const nx = pos.x + dx;
                 const nz = pos.z + dz;
-                if (isMapBlocked(nx, nz, pos.level)) {
-                    continue;
-                }
-                if (strict && (!isLineOfWalk(pos.level, pos.x, pos.z, nx, nz) || isIndoors(nx, nz, pos.level) !== wantIndoors)) {
+                if (isMapBlocked(nx, nz, pos.level) || !tier.ok(nx, nz)) {
                     continue;
                 }
                 const nudged = CoordGrid.packCoord(pos.level, nx, nz);
-                logRedirect(nudged, strict ? ' (nudged off blocked tile)' : ' (nudged off blocked tile, fallback: no safe neighbor found)');
+                logRedirect(nudged, tier.label);
                 state.pushInt(nudged);
                 return;
             }
