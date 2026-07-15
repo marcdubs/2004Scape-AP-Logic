@@ -1884,3 +1884,29 @@ checks green incl. [queue,player_death] carrying opcode 1907. NOT in-game tested
   logic engine + narrator, hand-authored script-verified requirements JSON, fully
   seed-aware, spheres/steps/story verbosity levels - agent dispatched with that
   spec; see docs/progression-sim.md once it lands.
+
+## Session-end addendum: progression simulator (2026-07-15, same session)
+
+Third agent round (1 Sonnet agent), built to user-locked design decisions (logic
+engine + narrator / hand-authored script-verified quests.json / fully seed-aware /
+spheres-steps-story verbosity). See docs/progression-sim.md for the schema, model,
+simplifications and roadmap. Facts for future sessions:
+
+- `npx tsx tools/sim/SimulateProgression.ts [--verbosity 0|1|2] [--json out.json]
+  [--config-dir data/config]` from Server/engine. Exit 0 = all goals reachable,
+  exit 1 = blocked (CI-gateable). ORCHESTRATOR-VERIFIED both exit codes against the
+  live seed (0) and a scratch all-capped ap-unlocks.json (1, with precise per-skill
+  blocker diagnosis incl. recursive chain tracing Heroes'->Lost City->woodcutting/
+  crafting caps). Careful measuring exit codes through pipes in zsh - `cmd | tail;
+  echo $?` reports tail's status, not cmd's (bit this session).
+- quests.json: 63 entries (65 quest dirs minus interfaces + barcrawl-the-goal), QP
+  100% verified against quest.constant (sum 135), 21 skill-gated + 5 chain-gated
+  quests grep-verified INCLUDING absence-of-gates. Dragon Slayer = %qp>=32 only.
+  Vanilla sphere structure: sphere 1 = 57 ungated quests, sphere 2 = Dragon Slayer,
+  3 = Heroes/Regicide, 4 = Legends.
+- Judgment calls to relitigate via data files, not code: KBD goal uses a
+  40 atk/str/def/hp combat floor (no vanilla map gate exists); Karamja/Crandor/
+  Zanaris are narrative-only region tags; travel = one connected mainland
+  (entrances are flavor because gate pairing is bidirectional).
+- Roadmap (in progression-sim.md): AP item-receipt-order simulation, entrance
+  flavor mining for -v2, CI gate wiring, --json feed into the browser tracker.

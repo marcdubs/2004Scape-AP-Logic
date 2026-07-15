@@ -1,0 +1,24 @@
+{
+  "goals": [
+    {
+      "id": "barcrawl",
+      "name": "Alfred Grimhand's Barcrawl",
+      "regions": ["karamja"],
+      "items": ["barcrawl_card (given by the Barbarian Outpost guard)"],
+      "notes": "Script-verified win condition: getbit_range(%barcrawl, 3, 12) = 1023 (quest_barcrawl.rs2:13), i.e. all 10 bar bits set. The 10 bars (quest_barcrawl.constant): Blue Moon Inn + Jolly Boar Inn (Varrock), Rising Sun (Falador), Flying Horse Inn (Ardougne East), Forester's Arms (Seers' Village), Rusty Anchor (Port Sarim), Dragon Inn (Yanille), Blurberry's Bar (Tree Gnome Village), Dead Man's Chest (Brimhaven, Karamja) and Karamja Spirits (Zambo's, Karamja). No skill or QP requirement - purely a travel checklist. Two of the ten bars are on Karamja, both behind the 30gp Port Sarim boat fare, which per the travel-simplification convention is trivially reachable from sphere 0 (any starting gold or a single low-value drop covers it) and is only NOTED, not modeled as a hard gate."
+    },
+    {
+      "id": "dragon_slayer",
+      "name": "Kill Elvarg (Dragon Slayer)",
+      "quests": ["dragon"],
+      "notes": "Reduces to completing the 'dragon' quest entry in quests.json (32 QP to start, no skill gate, Elvarg kill on Crandor). Kept as a separate goal id from the quest id because in the AP-phase mapping this becomes a distinct yaml goal option, not just a location."
+    },
+    {
+      "id": "kbd",
+      "name": "Kill the King Black Dragon",
+      "skills": { "attack": 40, "strength": 40, "defence": 40, "hitpoints": 40 },
+      "regions": ["wilderness_deep"],
+      "notes": "JUDGMENT CALL - not a vanilla script-enforced requirement. King Black Dragon's own kill hook (areas/area_wilderness/scripts/king_black_dragon.rs2) has no coded level or quest gate; Dragon Slayer completion is explicitly NOT required (the design brief calls this out). His lair sits deep in the Wilderness past the Lava Maze, reachable by walking under the travel-simplification model (no formal region lock), so the engine instead encodes a minimum combat readiness floor - 40 Attack/Strength/Defence/Hitpoints - as a stand-in for 'can plausibly survive a multi-headed, poison-capable, dragonfire-breathing boss alone in deep Wilderness'. This is deliberately conservative and easy to relitigate: raise or lower the thresholds here, or swap them for a progressive_melee gear-tier check (ap_unlock_count('progressive_melee') >= N), without touching the engine code - see docs/progression-sim.md 'KBD gate: the judgment call' for the reasoning and how to change it. An antidragonbreathshield is recommended in narration but not required numerically."
+    }
+  ]
+}
