@@ -63,6 +63,10 @@ export type Entrance = {
     resolvedFrom?: string;
     gated?: boolean;
     kind: 'floor-shift' | 'cross-map' | 'unresolved' | 'no-transition';
+    // set by ApproachResolver.ts when a player-relative movecoord destination was
+    // converted to a validated literal / when the attempt failed (and why).
+    approachResolved?: boolean;
+    approachFail?: string;
 };
 
 export const COORD_RE = /^\d+_\d+_\d+_\d+_\d+$/;

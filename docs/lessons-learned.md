@@ -171,34 +171,42 @@ reasoning:
 - Same seed number does NOT reproduce the same layout across algorithm changes (the
   dedupe fix changed the candidate list, which changed what seed 1803231336
   produces). Treat seeds as valid only within one tool version.
-- **Relative-destination stairs (`movecoord(coord, dx, dy, dz)`) are correctly left
-  vanilla - do NOT try to resolve them to a literal using the trigger's own
-  coordinate.** Tried this once (found via the user reporting Falador's bar/smith
-  staircases stayed vanilla - some handlers are reused verbatim across several
-  physically distinct staircases, e.g. `case 0_46_52_27_42 :
-  p_telejump(movecoord(coord, 0, 1, 4)); // Falador smith`). The bare `coord` token
-  in that expression is **not** the loc's own switch-case coordinate - it's
-  `ScriptOpcode.COORD` (`PlayerOps.ts`), which reads `state.activePlayer`: the
-  *operating player's own live tile* at the moment they click the object. A player
-  can't stand on the staircase loc's own tile (it's the thing blocking movement
-  there), so they're actually standing on whichever adjacent tile the loc's
-  shape/angle lets you approach from - which the trigger's switch-case coordinate
-  does not tell you. Approximating `coord` with the trigger tile added a
-  `resolveRelativeDestination()` step to `EntranceParser.ts` that got these ~8 pairs
-  (309 -> 317 floor-shift gates at seed 1) into the shuffle pool, and it looked fine
-  in the dry-run pairing math - but live-testing immediately caught it: climbing
-  Falador smith's stairs down landed the player two tiles outside the building,
-  because the computed "vanilla" landing tile was never where a real player
-  triggering that script actually stands. Reverted. Resolving this correctly would
-  need the loc's placed shape/angle at the trigger coordinate to compute the true
-  approach tile (same class of lookup `LocPlacementScanner` already does for
-  map-scanned gates) - not attempted. These entries are still silently invisible to
-  `isLiteral()`, but `RandomizeEntrances.ts`'s `excluded` diagnostic now reports
-  every non-candidate `floor-shift`/`cross-map` entrance (not just `cross-map` as
-  before), with `'relative destination (movecoord depends on player position, not
-  resolvable from the loc coord alone)'` as the reason - so a future "why is this
-  staircase vanilla" question is answerable from `ap-entrances.json`'s
-  `spoiler.excluded` without re-deriving this.
+- **Relative-destination stairs (`movecoord(coord, dx, dy, dz)`) are resolved via
+  forceapproach geometry (`ApproachResolver.ts`), never via the trigger's own
+  coordinate.** History: the user reported Falador's bar/smith staircases stayed
+  vanilla (some handlers encode the destination relative to the player, e.g.
+  `case 0_46_52_27_42 : p_telejump(movecoord(coord, 0, 1, 4)); // Falador smith`).
+  The bare `coord` token in that expression is **not** the loc's own switch-case
+  coordinate - it's `ScriptOpcode.COORD` (`PlayerOps.ts`), which reads
+  `state.activePlayer`: the *operating player's own live tile*. First attempt
+  approximated it with the trigger tile; dry-run math looked fine but live testing
+  caught players landing two tiles outside the Falador smith wall - reverted.
+  The correct fix (implemented): the player's tile isn't arbitrary - every affected
+  loc has `forceapproach=<side>` in its `.loc` config, so the pathfinder parks the
+  player on one specific footprint edge before the script runs. `ApproachResolver.ts`
+  computes that edge from config width/length + forceapproach and the placement's
+  angle from map data (conventions: placement coord = SW corner, odd angles swap
+  width/length, forceapproach side rotates **clockwise** with angle - all confirmed
+  by the script authors' own literals, e.g. Yanille West Gate's level-1 down cases
+  land exactly on the computed level-0 approach tiles). `edge_tile + offset` is then
+  a genuine vanilla landing. Safety gate: a resolution is only accepted if it
+  validates *reciprocally* - the computed landing must sit on the counterpart loc's
+  own approach edge one plane over, and the counterpart's landing (literal or
+  computed) must sit on ours; failures keep the entrance vanilla/excluded, so the
+  failure mode is "stays vanilla", never "lands in a wall". All 14 player-relative
+  `p_telejump` cases resolve (8 gate pairs: Falador smith/pub, Yanille West Gate x2,
+  Ardy Arlenas/Carnillean, Draynor manor, Varrock lumbermill; 309 -> 317 floor-shift
+  gates at seed 1). Deliberately NOT resolved: quest-gated transitions (`gated` flag,
+  e.g. dwarf guard tower ladder), `~climb_ladder` relatives (the literal-source ones
+  carry side effects like the black knights aggro; generic ones are covered by
+  scanned ladder gates), and non-constant offsets (board-game stairs use
+  `random()`). `spoiler.approachResolved` in `ap-entrances.json` lists every
+  trigger -> landing pair for in-game spot-checks, and `spoiler.excluded` explains
+  every remaining non-candidate.
+- The "byte-identical parser output on patched files" regression gate needs a
+  `line`-field strip before comparing: the installed handlers carry a 5-line
+  override preamble per handler, so record line numbers legitimately differ from
+  the vanilla backup. Everything else must match exactly (353 records).
 
 ## Testing & verification process that worked
 

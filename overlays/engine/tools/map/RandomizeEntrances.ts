@@ -3,6 +3,7 @@ import path from 'path';
 
 import { printInfo, printWarning } from '#/util/Logger.js';
 
+import { resolveApproachDestinations } from './ApproachResolver.js';
 import { CONTENT_ROOT, ENTRANCE_DIR, type CoordLiteral, type Entrance, parseFile } from './EntranceParser.js';
 import { scanPlacements } from './LocPlacementScanner.js';
 import { derangement, mulberry32 } from '../shared/Prng.js';
@@ -351,6 +352,11 @@ function main() {
         textByFile.set(file, fs.readFileSync(backupPath, 'utf8').replace(/\r\n/g, '\n'));
     }
 
+    // upgrade player-relative movecoord destinations (Falador smith/pub etc.) to
+    // validated literals so they can join the floor-shift pool - see ApproachResolver.
+    const approach = resolveApproachDestinations(allEntrances);
+    printInfo(`resolved ${approach.resolved} player-relative destination(s) via forceapproach geometry (${approach.failed} left vanilla)`);
+
     // the override table is keyed by trigger coord alone, so a coord that triggers
     // multiple distinct transitions (e.g. spiralstairsmiddle: one coord with climb-up,
     // climb-down and a choice menu) cannot be shuffled - exclude it entirely. plain
@@ -400,15 +406,12 @@ function main() {
     // reported regardless of kind (not just cross-map) - a floor-shift entrance with a
     // relative movecoord destination is just as invisible to isLiteral() and was
     // previously silently dropped with no trace anywhere in these diagnostics (found via
-    // live testing: the Falador smith/pub stairs). Tried resolving movecoord(coord, ...)
-    // to a literal at parse time once (see git history) and reverted it - the bare
-    // `coord` token in that expression is the OPERATING PLAYER's live tile
-    // (ScriptOpcode.COORD in PlayerOps.ts reads state.activePlayer), not the loc's own
-    // switch-case coordinate, so approximating it with the trigger tile silently landed
-    // players outside the building by however far the real approach tile differs from
-    // the loc's own tile. Resolving it correctly would need the loc's placed
-    // shape/angle to compute the real approach tile (same class of lookup
-    // LocPlacementScanner does for map-scanned gates) - not attempted yet.
+    // live testing: the Falador smith/pub stairs). Most player-relative movecoord
+    // destinations are upgraded to validated literals before this point (see
+    // ApproachResolver.ts); what remains here is the deliberate residue - quest-gated
+    // transitions, side-effect handlers (black knights aggro), randomized destinations
+    // (board-game stairs), and anything whose geometry failed the reciprocal
+    // validation.
     const excluded = allEntrances
         .filter(e => !isLiteral(e) && (e.kind === 'cross-map' || e.kind === 'floor-shift'))
         .map(e => ({
@@ -420,9 +423,14 @@ function main() {
                 ? 'protected region (tutorial)'
                 : e.source.type !== 'literal'
                   ? 'non-literal source'
-                  : e.destination?.type === 'relative'
-                    ? 'relative destination (movecoord depends on player position, not resolvable from the loc coord alone)'
-                    : 'non-literal destination'
+                  : e.gated
+                    ? 'quest-gated transition (an override would bypass the gate)'
+                    : (e.approachFail ??
+                      (e.destination?.type !== 'relative'
+                          ? 'non-literal destination'
+                          : /^coord(\(\))?$/.test(e.destination.base.trim())
+                            ? 'relative destination (movecoord depends on player position; only p_telejump/p_teleport handlers get approach-resolved)'
+                            : 'relative destination with non-constant offsets (randomized landing)'))
         }));
 
     if (rewrite) {
@@ -548,6 +556,16 @@ function main() {
             oneWay: spoilerOneWay,
             vanillaUnpairedFloorShifts: floor.unpaired.length,
             vanillaUnpairedScanned: scanned.skipped,
+            // player-relative movecoord destinations upgraded to literals by
+            // ApproachResolver.ts - trigger/landing pairs for spot-checking in game.
+            approachResolved: allEntrances
+                .filter(e => e.approachResolved)
+                .map(e => ({
+                    category: e.category,
+                    description: e.description,
+                    trigger: (e.source as { coord: CoordLiteral }).coord.raw,
+                    landing: (e.destination as CoordLiteral).raw
+                })),
             excluded
         },
         overrides
