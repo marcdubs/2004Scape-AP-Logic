@@ -6,6 +6,10 @@ recipes, environment gotchas, and the roadmap. `README.md` covers layout and usa
 `docs/archipelago-ideas.md` is the original design brainstorm.
 `docs/goals-and-checks.md` is the decided plan for goals, quest-completion checks,
 the level-based reward system, and the next randomizers - build from it.
+`docs/checks-and-unlocks.md` is the researched proposal for the full check
+catalog (first-time/kill/level/stage checks), reward expansion (XP drops,
+supply categories), and AP unlock items (gear tiers, tools, skill caps, quest
+gates) - decisions pending at the bottom of that doc.
 
 ## The one-paragraph mental model
 

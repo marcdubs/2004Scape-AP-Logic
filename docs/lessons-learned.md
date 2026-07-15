@@ -1681,3 +1681,44 @@ code:
   have failed the build) instead. Worth building a decompile-based verification step
   if a future randomizer wants the same level of bytecode-level confidence gathering
   got.
+
+## Session addendum: checks-and-unlocks design research (2026-07-15)
+
+Docs-only session: researched and wrote [checks-and-unlocks.md](checks-and-unlocks.md)
+(the full check catalog / reward expansion / unlock-item proposal). No code written,
+nothing installed. Hook-point facts verified this session, worth not re-deriving:
+
+- **`Player.setVar(id, value)` (`Player.ts:1767`) is the single varp-write
+  chokepoint** (all script writes route POP_VARP -> setVar) - the proposed generic
+  "quest progression stage / barcrawl bit" check watcher hangs there. Engine
+  internals also call it (e.g. RUN toggle at Player.ts:724), so any watcher must be
+  a cheap by-varp-id map lookup.
+- **`Player.addXp(stat, xp, allowMulti)` (`Player.ts:1821`)**: XP units are tenths
+  of a point; `allowMulti` defaults true and multiplies by `Environment.node.xpRate`
+  (user runs 30x) - any fixed-size XP reward must pass `false` via a new opcode
+  (1903 proposed; 1900-1902 taken). `stats[stat] === 0` before an add = "first XP in
+  skill" (hitpoints never qualifies - starts at level 10 / 11540 units).
+- **`[proc,npc_death]` (`skill_combat/scripts/npc/npc_death.rs2:10`) is the global
+  NPC death chokepoint** and already does `finduid(%npc_aggressive_player)` - the
+  right overlay point for first-kill/notable-kill checks. Mimic mode doesn't affect
+  it (npc identity is real there; only loot lies).
+- **All 19 `[advancestat,<stat>]` triggers exist** (`levelup/scripts/levelup.rs2:3-21`)
+  funneling into one `@levelup(stat)` label - the level-milestone check hook.
+  The `[stats]` enum (`player/configs/stat.enum`, vals 1-19 int->stat) is how to
+  pick a random skill from script.
+- **Every tiered equipable routes its wear-op through
+  `levelrequire/scripts/levelrequire.rs2`** (17 `levelrequire_*` labels; per-item
+  trigger lists in `tier*.rs2`) - overlaying that ONE file gates all gear tiers,
+  the proposed flagship "Progressive Melee/Armour/Ranged/Magic" unlock. Quest-gated
+  variants (`levelrequire_dragon_slayer_quest_defence` etc.) live in the same file.
+- **Dragon Slayer's start is gated `%qp >= 32`**
+  (`quests/quest_dragon/scripts/dragon_journal.rs2:7`) - this is why quest-based
+  progression works as the "region system": the goal quest already forces a wide
+  quest spread. 65 quest dirs exist; 88 quest varps.
+- **Prior art**: the official OSRS Archipelago world's goal is also Dragon Slayer,
+  items = chunk unlocks + progressive gear tiers, locations = skill tasks + quests
+  (https://archipelago.gg/games/Old%20School%20Runescape/info/en). We adopt gear
+  tiers/skill tasks, drop chunks.
+- Proposed opcode allocations to keep collision-free: **1903 =
+  ap_stat_advance_raw, 1904 = ap_unlock_count** (unlock table needs a RELOAD path,
+  unlike entrances - AP items arrive mid-session).

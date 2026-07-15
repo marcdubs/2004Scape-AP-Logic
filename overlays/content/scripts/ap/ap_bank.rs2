@@ -1,0 +1,199 @@
+// Archipelago testing bank kit. Additive only - never inv_clear(bank) - so it's safe
+// to run on a character with an existing bank; it just tops up tools/materials for
+// exercising every non-combat skill in one pass (including the gathering and
+// processing randomizers). Dispatched via the ungated ::ap<name> test-command
+// infrastructure (see docs/goals-and-checks.md), so it works even with
+// node.production: true set.
+//
+// Bank capacity is 240 distinct slots (interface_bank/configs/bank.constant) and
+// `stackall=yes` there means quantity never costs extra slots - only distinct items
+// do. This kit is ~140 distinct items, leaving headroom for whatever's already
+// banked.
+
+// ::apbank - top up the caller's bank with tools + materials for every gathering and
+// processing skill (mining/fishing/woodcutting, cooking/smithing/crafting/fletching,
+// plus herblore basics).
+[debugproc,ap_bank]
+if (p_finduid(uid) = false) {
+    return;
+}
+
+// --- tools ---
+inv_add(bank, bronze_pickaxe, 1);
+inv_add(bank, iron_pickaxe, 1);
+inv_add(bank, steel_pickaxe, 1);
+inv_add(bank, mithril_pickaxe, 1);
+inv_add(bank, adamant_pickaxe, 1);
+inv_add(bank, rune_pickaxe, 1);
+
+inv_add(bank, bronze_axe, 1);
+inv_add(bank, iron_axe, 1);
+inv_add(bank, steel_axe, 1);
+inv_add(bank, mithril_axe, 1);
+inv_add(bank, adamant_axe, 1);
+inv_add(bank, rune_axe, 1);
+
+inv_add(bank, fishing_rod, 1);
+inv_add(bank, fly_fishing_rod, 1);
+inv_add(bank, harpoon, 1);
+inv_add(bank, lobster_pot, 1);
+inv_add(bank, net, 1);
+inv_add(bank, big_net, 1);
+inv_add(bank, fishing_bait, 1000);
+
+inv_add(bank, hammer, 1);
+inv_add(bank, chisel, 1);
+inv_add(bank, needle, 1);
+inv_add(bank, thread, 100);
+inv_add(bank, knife, 1);
+inv_add(bank, tinderbox, 1);
+inv_add(bank, pestle_and_mortar, 1);
+
+// --- mining / smithing ---
+inv_add(bank, clay, 1000);
+inv_add(bank, copper_ore, 1000);
+inv_add(bank, tin_ore, 1000);
+inv_add(bank, iron_ore, 1000);
+inv_add(bank, silver_ore, 1000);
+inv_add(bank, coal, 1000);
+inv_add(bank, gold_ore, 1000);
+inv_add(bank, mithril_ore, 1000);
+inv_add(bank, adamantite_ore, 1000);
+inv_add(bank, runite_ore, 1000);
+
+inv_add(bank, bronze_bar, 1000);
+inv_add(bank, iron_bar, 1000);
+inv_add(bank, steel_bar, 1000);
+inv_add(bank, silver_bar, 1000);
+inv_add(bank, gold_bar, 1000);
+inv_add(bank, mithril_bar, 1000);
+inv_add(bank, adamantite_bar, 1000);
+inv_add(bank, runite_bar, 1000);
+
+// --- woodcutting / fletching / firemaking ---
+inv_add(bank, logs, 1000);
+inv_add(bank, oak_logs, 1000);
+inv_add(bank, willow_logs, 1000);
+inv_add(bank, maple_logs, 1000);
+inv_add(bank, yew_logs, 1000);
+inv_add(bank, magic_logs, 1000);
+inv_add(bank, achey_tree_logs, 1000);
+
+inv_add(bank, feather, 1000);
+inv_add(bank, arrow_shaft, 1000);
+inv_add(bank, headless_arrow, 1000);
+inv_add(bank, bow_string, 1000);
+
+inv_add(bank, bronze_arrowheads, 1000);
+inv_add(bank, iron_arrowheads, 1000);
+inv_add(bank, steel_arrowheads, 1000);
+inv_add(bank, mithril_arrowheads, 1000);
+inv_add(bank, adamant_arrowheads, 1000);
+inv_add(bank, rune_arrowheads, 1000);
+
+inv_add(bank, bronze_dart_tip, 1000);
+inv_add(bank, iron_dart_tip, 1000);
+inv_add(bank, steel_dart_tip, 1000);
+inv_add(bank, mithril_dart_tip, 1000);
+inv_add(bank, adamant_dart_tip, 1000);
+inv_add(bank, rune_dart_tip, 1000);
+
+inv_add(bank, bolt, 1000);
+inv_add(bank, opal, 1000);
+inv_add(bank, smalloysterpearls, 1000);
+inv_add(bank, bigoysterpearls, 1000);
+inv_add(bank, opal_bolttips, 1000);
+inv_add(bank, pearl_bolttips, 1000);
+inv_add(bank, barbed_bolttips, 1000);
+
+inv_add(bank, unstrung_shortbow, 100);
+inv_add(bank, unstrung_longbow, 100);
+inv_add(bank, unstrung_oak_shortbow, 100);
+inv_add(bank, unstrung_oak_longbow, 100);
+inv_add(bank, unstrung_willow_shortbow, 100);
+inv_add(bank, unstrung_willow_longbow, 100);
+inv_add(bank, unstrung_maple_shortbow, 100);
+inv_add(bank, unstrung_maple_longbow, 100);
+inv_add(bank, unstrung_yew_shortbow, 100);
+inv_add(bank, unstrung_yew_longbow, 100);
+inv_add(bank, unstrung_magic_shortbow, 100);
+inv_add(bank, unstrung_magic_longbow, 100);
+
+// --- crafting ---
+inv_add(bank, leather, 1000);
+inv_add(bank, hard_leather, 1000);
+inv_add(bank, dragon_leather, 1000);
+inv_add(bank, dragon_leather_blue, 1000);
+inv_add(bank, dragon_leather_red, 1000);
+inv_add(bank, dragon_leather_black, 1000);
+
+inv_add(bank, uncut_sapphire, 1000);
+inv_add(bank, uncut_emerald, 1000);
+inv_add(bank, uncut_ruby, 1000);
+inv_add(bank, uncut_diamond, 1000);
+inv_add(bank, uncut_opal, 1000);
+inv_add(bank, uncut_jade, 1000);
+inv_add(bank, uncut_red_topaz, 1000);
+inv_add(bank, uncut_dragonstone, 1000);
+
+inv_add(bank, ring_mould, 1);
+inv_add(bank, necklace_mould, 1);
+inv_add(bank, amulet_mould, 1);
+
+// --- cooking ---
+inv_add(bank, raw_shrimp, 200);
+inv_add(bank, raw_anchovies, 200);
+inv_add(bank, raw_sardine, 200);
+inv_add(bank, raw_herring, 200);
+inv_add(bank, raw_mackerel, 200);
+inv_add(bank, raw_trout, 200);
+inv_add(bank, raw_pike, 200);
+inv_add(bank, raw_salmon, 200);
+inv_add(bank, raw_giant_carp, 200);
+inv_add(bank, raw_cod, 200);
+inv_add(bank, raw_tuna, 200);
+inv_add(bank, raw_bass, 200);
+inv_add(bank, raw_lobster, 200);
+inv_add(bank, raw_swordfish, 200);
+inv_add(bank, raw_mantaray, 200);
+inv_add(bank, raw_shark, 200);
+inv_add(bank, raw_seaturtle, 200);
+inv_add(bank, raw_beef, 200);
+inv_add(bank, raw_chicken, 200);
+inv_add(bank, raw_rabbit, 200);
+inv_add(bank, raw_bear_meat, 200);
+inv_add(bank, raw_rat_meat, 200);
+
+// --- herblore ---
+inv_add(bank, vial_empty, 200);
+inv_add(bank, vial_water, 200);
+inv_add(bank, unidentified_guam, 200);
+inv_add(bank, unidentified_marentill, 200);
+inv_add(bank, unidentified_tarromin, 200);
+inv_add(bank, unidentified_harralander, 200);
+inv_add(bank, unidentified_ranarr, 200);
+inv_add(bank, unidentified_irit, 200);
+inv_add(bank, unidentified_avantoe, 200);
+inv_add(bank, unidentified_kwuarm, 200);
+inv_add(bank, unidentified_cadantine, 200);
+inv_add(bank, unidentified_dwarf_weed, 200);
+inv_add(bank, unidentified_torstol, 200);
+inv_add(bank, unidentified_snake_weed, 200);
+inv_add(bank, unidentified_ardrigal, 200);
+inv_add(bank, unidentified_sito_foil, 200);
+inv_add(bank, unidentified_volencia_moss, 200);
+inv_add(bank, unidentified_lantadyme, 200);
+inv_add(bank, eye_of_newt, 200);
+inv_add(bank, unicorn_horn, 200);
+inv_add(bank, red_spiders_eggs, 200);
+inv_add(bank, limpwurt_root, 200);
+inv_add(bank, snape_grass, 200);
+inv_add(bank, white_berries, 200);
+inv_add(bank, wine_of_zamorak, 200);
+inv_add(bank, jangerberries, 200);
+inv_add(bank, blue_dragon_scale, 200);
+
+// --- general ---
+inv_add(bank, coins, 1000000);
+
+mes("AP test kit: bank topped up with tools + supplies for mining, fishing, woodcutting, cooking, smithing, crafting, fletching and herblore.");
