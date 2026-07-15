@@ -4,16 +4,31 @@
 // [proc,send_quest_complete] in the overlaid general/scripts/quests.rs2, and
 // exercised directly by the ::apreward / ::apquestcheck test commands below.
 
-// info: custom - the check+reward hook. Pre-AP this rolls and grants a random
-// level-based reward; in the AP phase this also becomes the location-checked
-// emitter (see goals-and-checks.md). Always called from send_quest_complete,
-// which only ever runs from a [queue,...] trigger, so protected access
-// (bank fallback, varp writes) is already available here - no p_finduid dance
-// needed in this proc, unlike the KBD kill hook. Quest completion is just one
-// check surface now (see checks-and-unlocks.md's check catalog), so this is a
-// thin wrapper over the shared ~ap_grant_check_reward.
+// info: custom - NO-OP SHELL (docs/placement-mode.md "Retire the double
+// payout"). Quest completion is now ALSO a watched check: every quest's
+// progress varp (or varbit, for quest_horror) reaching its completion
+// threshold is a `quest_<dirname>` watch in ap-checks.json, so
+// ApChecks.onVarpSet already fires the SAME quest-complete moment as a check
+// through the normal ApChecks.fireCheck -> [queue,ap_check_fired] path
+// (unlock-or-filler, exactly like every other check) - by the time this proc
+// runs (called from send_quest_complete, itself called after the quest's
+// completion varp write already landed - verified against several quests'
+// [queue,*_complete] scripts, e.g. quest_doric.rs2 sets %doricquest before
+// calling send_quest_complete, same pattern in quest_cog/quest_horror), the
+// watcher has ALREADY fired (enqueued the announce+reward for) this exact
+// completion. This holds in BOTH modes: placements
+// active (the quest's real payoff IS its placed item, delivered by the
+// watcher) and placements absent (the watcher still fires and rolls filler -
+// rs2 has no way to see whether ap-placements.json exists, so gating had to
+// happen here, engine-side, structurally, not by an if-check). Rolling a
+// SECOND reward here on top of the watcher's would double-pay every quest
+// completion - kept as a callable no-op (rather than deleting the proc and
+// its call site in quests.rs2) so the call site there stays untouched and
+// this stays a one-line, obviously-safe revert if the watcher wiring is ever
+// pulled out.
 [proc,ap_quest_complete]
-~ap_grant_check_reward;
+// intentionally a no-op (return with no reward roll) - see comment above.
+return;
 
 // info: custom - the general-purpose check+reward hook, public interface for
 // every other check surface (e.g. the checks agent's [queue,ap_check_fired]

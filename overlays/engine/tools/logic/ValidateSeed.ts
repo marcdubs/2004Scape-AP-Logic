@@ -19,6 +19,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { allSkillCaps, loadSeedConfig } from '../sim/ConfigLoader.js';
+import { applyPlacementItem, buildLocationCatalog, capsFromCounts, loadPlacements, reachableFromState } from '../sim/PlacementEngine.js';
 import { Goal, QuestReq, StatName } from '../sim/types.js';
 
 import { WorldTile, parseRawCoord } from './Coords.js';
@@ -308,8 +309,19 @@ interface SphereEvent {
 function main(): void {
     const graph = loadRegionGraph(REGION_GRAPH_PATH);
     const seedConfig = loadSeedConfig(CONFIG_DIR);
-    const statCaps = allSkillCaps(seedConfig.unlocks) as Record<StatName, number>;
-    const statCapsLower = new Map<string, number>(Object.entries(statCaps).map(([k, v]) => [k.toLowerCase(), v]));
+
+    // Placement-mode extension (docs/placement-mode.md "Simulator & validator"). Absent
+    // ap-placements.json = every line touching these stays inert and statCaps/statCapsLower
+    // stay EXACTLY the static one-shot computation the pre-placement-mode code always did -
+    // the no-placements path is byte-compatible with prior behavior. (placementLocations/
+    // recomputeCapsFromPlacements are finished wiring up once `quests` loads below.)
+    const placementsFile = loadPlacements(CONFIG_DIR);
+    const placementCounts = new Map<string, number>(placementsFile.present && seedConfig.unlocks.present ? seedConfig.unlocks.unlocks : []);
+    const placementVisited = new Set<string>();
+    const placementFindsLog: { sphere: number; location: string; item: string; display: string }[] = [];
+
+    let statCaps: Record<StatName, number> = allSkillCaps(seedConfig.unlocks) as Record<StatName, number>;
+    let statCapsLower = new Map<string, number>(Object.entries(statCaps).map(([k, v]) => [k.toLowerCase(), v]));
 
     const { edges: entranceEdges, present: entrancesPresent } = loadEntranceEdges(CONFIG_DIR, graph);
     const gated = loadGatedAreas(CONFIG_DIR);
@@ -324,6 +336,15 @@ function main(): void {
     const quests: QuestReq[] = JSON.parse(fs.readFileSync(QUESTS_PATH, 'utf8')).quests;
     const goals: Goal[] = JSON.parse(fs.readFileSync(GOALS_PATH, 'utf8')).goals;
     const questsById = new Map(quests.map(q => [q.id, q]));
+
+    const placementLocations = placementsFile.present ? buildLocationCatalog(quests) : [];
+    function recomputeCapsFromPlacements(): void {
+        statCaps = capsFromCounts(placementCounts);
+        statCapsLower = new Map(Object.entries(statCaps).map(([k, v]) => [k.toLowerCase(), v]));
+    }
+    if (placementsFile.present) {
+        recomputeCapsFromPlacements(); // caps start from ap-unlocks.json's placement-mode starting state (usually all-zero -> 20 floor), not "uncapped".
+    }
 
     // spawn region
     const spawnFile = path.join(CONFIG_DIR, 'ap-spawn.json');
@@ -468,6 +489,35 @@ function main(): void {
             }
         }
 
+        // 5. placement-mode check locations (docs/placement-mode.md "Simulator &
+        // validator"): any check reachable under the CURRENT completed/qp/statCaps that
+        // holds a real (non-filler) item grants it immediately, which can grow statCaps
+        // for the NEXT pass - this is the "sphere loop = compute reachable checks -> collect
+        // their items -> recompute" the design brief asks for. Region/gate logic (steps
+        // 1-3) stays exactly as-is; placement locations are travel-agnostic here (same
+        // simplification tools/sim/Engine.ts documents), so this only ever adds reachable
+        // checks, never removes region-gated ones.
+        if (placementsFile.present) {
+            const reachableChecks = reachableFromState(placementLocations, quests, completed, qp, statCaps);
+            let grew = false;
+            for (const locId of reachableChecks) {
+                if (placementVisited.has(locId)) {
+                    continue;
+                }
+                placementVisited.add(locId);
+                changed = true;
+                const rec = placementsFile.placements.get(locId);
+                if (rec && rec.item !== 'filler') {
+                    applyPlacementItem(rec, placementCounts);
+                    grew = true;
+                    placementFindsLog.push({ sphere: sphere + 1, location: locId, item: rec.item, display: rec.display });
+                }
+            }
+            if (grew) {
+                recomputeCapsFromPlacements();
+            }
+        }
+
         if (!changed) {
             break;
         }
@@ -493,7 +543,8 @@ function main(): void {
     console.log(`Spawn: ${spawnRaw}${spawnRegion === 0 ? ' (WARNING: unresolved to any region!)' : ` -> region ${spawnRegion}`}`);
     console.log(`Entrances table: ${entrancesPresent ? `${entranceEdges.length} edge(s)` : 'ABSENT (vanilla entrances)'}`);
     console.log(`Gated areas table: ${gated.present ? `${gated.areas.length} area(s)` : 'ABSENT (no area gates)'}`);
-    console.log(`Skill caps: ${seedConfig.unlocks.present ? 'from ap-unlocks.json' : 'uncapped (vanilla - no ap-unlocks.json)'}`);
+    console.log(`Skill caps: ${placementsFile.present ? `from ap-placements.json (growing - ${placementFindsLog.length} progression item(s) collected this run)` : seedConfig.unlocks.present ? 'from ap-unlocks.json' : 'uncapped (vanilla - no ap-unlocks.json)'}`);
+    console.log(`Placements table: ${placementsFile.present ? `${placementsFile.placements.size} location(s), pool ${placementsFile.pool}` : 'ABSENT (vanilla check rewards, no unlock gating from checks)'}`);
     console.log(`Region graph: ${graph.meta.regionCount} regions total, mainland id=${graph.meta.mainlandRegionId}`);
     console.log('');
     console.log(`Reachable regions: ${reachableRegions.size} / ${graph.meta.regionCount}`);
@@ -506,6 +557,11 @@ function main(): void {
             if (s.questsCompleted.length) bits.push(`quests: ${s.questsCompleted.join(', ')}`);
             if (s.goalsReached.length) bits.push(`GOALS: ${s.goalsReached.join(', ')}`);
             console.log(`Sphere ${s.sphere}: regions=${s.regionsUnlocked}${bits.length ? ' | ' + bits.join(' | ') : ''}`);
+            if (placementsFile.present) {
+                for (const find of placementFindsLog.filter(f => f.sphere === s.sphere)) {
+                    console.log(`    found: ${find.location} -> ${find.display}`);
+                }
+            }
         }
         console.log('');
     }
@@ -629,7 +685,8 @@ function main(): void {
             spheres,
             goals: goals.map(g => ({ id: g.id, name: g.name, reachedAtSphere: goalSphere.get(g.id) ?? null, blockers: goalSphere.has(g.id) ? [] : diagnoseGoal(g) })),
             allGoalsReached,
-            lintWarnings
+            lintWarnings,
+            placements: placementsFile.present ? { pool: placementsFile.pool, locationCount: placementsFile.placements.size, finds: placementFindsLog } : null
         };
         fs.writeFileSync(JSON_OUT, JSON.stringify(out, null, 2));
         console.log(`Wrote ${JSON_OUT}`);

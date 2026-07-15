@@ -134,3 +134,21 @@ From `Server/engine`:
 5. The stair/ladder OPTION MENUS on multi-destination tiles (Lumbridge castle
    spiral stairs) — long-standing untested edge from the entrance randomizer;
    check climb-up/down/menu all agree.
+
+## 10. Placement mode (added later on 2026-07-15 — the "make it a game" round)
+
+Setup once: `npx tsx tools/ap/GenerateSeed.ts --seed 777 --pool per-skill` (from
+Server/engine — already run; regenerating clears fired-checks + tracker = new run).
+
+- [ ] `::apunlock` — gear/tool families read 0 (bronze-only), skill caps active at 20
+- [ ] Try to equip a STEEL weapon — blocked (bronze fine) with no SetUnlock needed
+- [ ] Train any skill toward 20 — XP truncates at the cap boundary
+- [ ] Kill your first cow — expect "AP check ...: received Progressive Pickaxe
+      (adamant)!" (per the seed-777 spoiler) and the unlock usable within ~2s
+- [ ] A filler-placed check (e.g. first rat kill... check the spoiler) — normal
+      random reward instead
+- [ ] Complete Sheep Shearer — the quest CHECK announcement fires exactly once
+      (watcher path; the old direct quest reward must NOT double-pay)
+- [ ] `npx tsx tools/sim/SimulateProgression.ts --verbosity 2` — narration now
+      references actual finds per sphere
+- [ ] Browser tracker "checks" category populates as you collect

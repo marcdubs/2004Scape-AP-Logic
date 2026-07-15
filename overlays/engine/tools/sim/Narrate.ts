@@ -6,6 +6,7 @@
 // user-facing artifact people will compare seed to seed.
 
 import { Blocker, SimResult } from './Engine.js';
+import { PlacementSimResult } from './PlacementEngine.js';
 import { QuestReq, StatName } from './types.js';
 
 type QuestIndex = Map<string, QuestReq>;
@@ -186,6 +187,108 @@ export function renderV2(result: SimResult, index: QuestIndex): string[] {
     }
 
     return lines;
+}
+
+// ---------------------------------------------------------------------------
+// Placement-mode renderers (docs/placement-mode.md "Simulator & validator"). Used ONLY
+// when SimulateProgression.ts finds an ap-placements.json - the vanilla-path
+// renderV0/V1/V2 above are completely untouched (byte-compatible no-placements path).
+// These walk the REAL progression a player will experience: sphere N opens up because
+// sphere N-1's finds raised a cap or completed a quest, narrated per-find rather than
+// per-quest-requirement since placement mode's "requirement" IS "go find the item".
+// ---------------------------------------------------------------------------
+
+export function renderPlacementV0(result: PlacementSimResult, seed: number, pool: string): string[] {
+    const lines: string[] = [];
+    lines.push('=== Progression Simulation - PLACEMENT MODE (spheres -> goals) ===');
+    lines.push(`Seed: ${seed}  Pool: ${pool}`);
+    lines.push('');
+
+    for (const s of result.spheres) {
+        if (s.finds.length === 0) {
+            continue;
+        }
+        lines.push(`Sphere ${s.sphere}: ${s.finds.map(f => `${f.display} (${f.location})`).join('; ')}`);
+    }
+
+    lines.push('');
+    lines.push(`Quests completed: ${result.completedQuests.size} (${result.qp} QP)  Locations visited: ${result.visitedLocations.size}`);
+    lines.push('');
+    lines.push('Goals:');
+    for (const gs of result.goalStatus) {
+        if (gs.reached) {
+            lines.push(`  [x] ${gs.goal.name} - reached at sphere ${gs.sphereReached}`);
+        } else {
+            lines.push(`  [ ] ${gs.goal.name} - BLOCKED (never reached this placement)`);
+        }
+    }
+    lines.push('');
+    lines.push(result.allGoalsReached ? 'RESULT: all goals reachable.' : 'RESULT: blocked - see above.');
+    if (result.unreachedLocations.length > 0) {
+        lines.push(`(${result.unreachedLocations.length} location(s) never became reachable this seed.)`);
+    }
+    return lines;
+}
+
+export function renderPlacementV1(result: PlacementSimResult, seed: number, pool: string): string[] {
+    const lines = renderPlacementV0(result, seed, pool);
+    lines.push('');
+    lines.push('=== Per-sphere finds (v1) ===');
+    for (const s of result.spheres) {
+        if (s.finds.length === 0) {
+            continue;
+        }
+        lines.push(`Sphere ${s.sphere}:`);
+        for (const f of s.finds) {
+            lines.push(`  - ${f.location}: ${f.display}`);
+        }
+    }
+    return lines;
+}
+
+export function renderPlacementV2(result: PlacementSimResult, seed: number, pool: string): string[] {
+    const lines = renderPlacementV1(result, seed, pool);
+    lines.push('');
+    lines.push('=== Walkthrough narration (v2) ===');
+    lines.push('');
+    lines.push(
+        `This is a PLACEMENT-MODE run (seed ${seed}, ${pool} item pool) - every check location holds a specific item (progressive gear/tool/skill-cap unlock, or filler). You start with every skill capped at 20 and bronze-tier gear/tools. Progress means hunting checks: quests, barcrawl bars, Dragon Slayer stages, first-XP/first-kill milestones, and level-up milestones (10-90) each hide something.`
+    );
+    lines.push('');
+
+    for (const s of result.spheres) {
+        if (s.finds.length === 0) {
+            continue;
+        }
+        lines.push(`-- Sphere ${s.sphere} --`);
+        for (const f of s.finds) {
+            lines.push(`${f.location} holds ${f.display} - collecting it now.`);
+        }
+        lines.push('');
+    }
+
+    if (!result.allGoalsReached) {
+        lines.push('-- Dead ends --');
+        for (const gs of result.goalStatus.filter(g => !g.reached)) {
+            lines.push(`${gs.goal.name} never opens up this run - see the blocker report in the plain (non-placement) simulator run for the underlying skill/quest chain, or check whether the progression items it needs ever got placed reachably.`);
+        }
+    }
+
+    return lines;
+}
+
+export function toJsonSafePlacement(result: PlacementSimResult, seed: number, pool: string): unknown {
+    return {
+        seed,
+        pool,
+        spheres: result.spheres,
+        completedQuests: [...result.completedQuests],
+        totalQp: result.qp,
+        finalCaps: result.finalCaps,
+        allGoalsReached: result.allGoalsReached,
+        goals: result.goalStatus.map(gs => ({ id: gs.goal.id, name: gs.goal.name, reached: gs.reached, sphereReached: gs.sphereReached })),
+        unreachedLocations: result.unreachedLocations
+    };
 }
 
 export function toJsonSafe(result: SimResult): unknown {

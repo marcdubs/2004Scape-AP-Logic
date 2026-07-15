@@ -1967,3 +1967,52 @@ exercised end-to-end. NOT in-game tested.
   messaged workstream C, which handled it (not fail-open). Pattern to reuse.
 - Backlog (user: "later"): entrance-barring by AP check rewards ("Key to X") - the
   gates schema accommodates a future { unlock: <name> } form reading ap-unlocks.json.
+
+## Session-end addendum: placement mode - solo AP (2026-07-15, same session)
+
+Fifth agent round (2 Sonnet agents: engine receipts + tools generator), triggered by
+the user finding the sim's -v2 "boring" - correctly diagnosed as "nothing is locked,
+checks pay confetti". Design: docs/placement-mode.md (user decisions: full AP
+assumed-fill placement; start caps 20 + bronze; pool granularity configurable
+--pool per-skill|groups). Integrated: typecheck clean (after fixing my own
+newCount reference in the group-expansion edit), pack build clean, decompile checks
+green, GenerateSeed --seed 777 --pool per-skill run for real + placement-aware sim
+verified. NOT in-game tested.
+
+- **The loop**: GenerateSeed.ts (assumed-fill over 274 locations x 111 progression
+  items per-skill / 71 groups) writes ap-placements.json + starting ap-unlocks.json
+  + clears fired/tracker state (NEW RULE: a placement seed IS a new run - supersedes
+  "fired checks never clear"). ApChecks.fireCheck consults placements: unlock ->
+  ApUnlockOverrides.grantUnlock (persist + forced mtime bookkeeping so ensureFresh
+  doesn't spuriously reload) -> announce via 3-arg [queue,ap_check_fired](check,
+  display, is_unlock); filler/missing/no-file -> old reward roll. No placements
+  file = byte-identical old behavior (verified).
+- **Quest completions are now watcher checks** (quest_<simid> x63 in ap-checks.json,
+  authoritative varp/value source = count_questpoints in quests.rs2). Three
+  edge cases: blackarmgang = TWO watches sharing one check id (gang OR-paths);
+  cog = bit mode on the step counter's bit 3; horror = a genuine VARBIT -> the
+  watch schema gained a "varbit" field (VarBitType-resolved) because raw-varp gte
+  would false-trip on sibling bits. ~ap_quest_complete is now a no-op shell -
+  the watcher is the single payout path in both modes (double-payout fix).
+- **Kill checks were silently outside the placement pipeline** (rs2 enqueued the
+  payoff directly, never through fireCheck) - found by the receipts agent, fixed by
+  making kills pure %ap_kills bit-writes + 15 bit watches; Player.setVar routes them
+  through the same engine path as everything else now.
+- **--pool groups uses 4 synthetic keys** (progressive_gathering/artisan/combat/
+  support) that grantUnlock expands into member-skill bumps (SKILL_GROUPS map in
+  ApUnlockOverrides.ts; MUST stay in sync with tools/sim/PlacementEngine.ts's
+  definitions - both sides carry mirror comments). per-skill mode uses only real
+  keys.
+- **Off-by-one caught by reading the gate code**: tier 0/bronze is unconditionally
+  free BEFORE the count comparison in ap_gear_locked + tool gates -> starting
+  gear/tool counts are 0, not the doc draft's 1 (doc corrected).
+- **Honest depth assessment (tell the user, don't oversell)**: seed-777 per-skill
+  validates at ~2 collection spheres and DS reachable sphere 0 - the caps gate only
+  the 21 skill-gated quests and milestones; gear tiers gate nothing in logic and
+  quest-access gates (unlock family D) are unbuilt. Placement works; DEPTH now
+  comes from: family D quest gates as placement items, gear tiers entering the KBD
+  combat floor, brutal-start option, entrance/area gates entering the fill's own
+  reachability (currently only ValidateSeed sees regions).
+- ValidateSeed needs ap-entrances.json present for region traversal (pre-existing;
+  GenerateSeed stages a copy) - run entrance rando at least once before placement
+  mode on a fresh checkout.

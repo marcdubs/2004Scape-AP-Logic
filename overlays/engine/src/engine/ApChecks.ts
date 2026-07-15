@@ -1,7 +1,10 @@
-// Archipelago check emitters (2004Scape-AP-Logic docs/checks-and-unlocks.md).
-// Seams called from Player.setVar / Player.addXp - populated by the checks-system
-// workstream (varp watch table for quest stages + barcrawl bits, first-XP checks,
-// level milestone checks).
+// Archipelago check emitters (2004Scape-AP-Logic docs/checks-and-unlocks.md,
+// docs/placement-mode.md). Seams called from Player.setVar / Player.addXp -
+// populated by the checks-system workstream (varp watch table for quest
+// completions + barcrawl bits, first-XP checks, level milestone checks) and,
+// as of placement mode, ALSO consults data/config/ap-placements.json so a
+// fired check can deliver its placed progression item instead of a random
+// reward.
 //
 // Both hooks run in extremely hot paths: onVarpSet fires for every varp write
 // including per-tick engine internals (the RUN toggle), onXpGain for every xp
@@ -10,7 +13,10 @@
 import fs from 'fs';
 import path from 'path';
 
+import VarBitType from '#/cache/config/VarBitType.js';
 import VarPlayerType from '#/cache/config/VarPlayerType.js';
+import * as ApUnlockOverrides from '#/engine/ApUnlockOverrides.js';
+import { recordDiscovery } from '#/engine/ApTracker.js';
 import type Player from '#/engine/entity/Player.js';
 import { PlayerQueueType } from '#/engine/entity/PlayerQueueRequest.js';
 import { PlayerStat, PlayerStatEnabled, PlayerStatNameMap } from '#/engine/entity/PlayerStat.js';
@@ -20,11 +26,26 @@ import { printInfo, printWarning } from '#/util/Logger.js';
 // ---------------------------------------------------------------------------
 // Varp watch table (data/config/ap-checks.json). Static per game version -
 // ships with the overlay, doesn't get regenerated per seed (unlike
-// ap-entrances.json / ap-drops.json).
+// ap-entrances.json / ap-drops.json / ap-placements.json).
+//
+// Two watch shapes: a plain varp entry ("varp": "<name>") compares the raw
+// value Player.setVar receives directly, same as day one. A varbit entry
+// ("varbit": "<name>") exists for quest_horror (Horror from the Deep), the
+// only quest whose OWN completion state is a varbit rather than a plain varp:
+// %horrorquest is declared [horrorquest] basevar=deephorror startbit=0
+// endbit=10 - packed into the SAME base varp as unrelated
+// horrordoor/horrorbridge/etc side-flag bits (11-24). Player.setVarBit
+// ultimately calls setVar(basevar, fullPackedInt) (verified in
+// CoreOps.ts/Player.ts), so onVarpSet only ever sees the base varp id and the
+// FULL packed integer - watching that raw value directly would false-trip the
+// moment ANY sibling bit (e.g. horrordoor) is set, regardless of horrorquest's
+// own progress. The startbit/endbit recorded on the Watch let onVarpSet
+// extract just the sub-field before testing it.
 // ---------------------------------------------------------------------------
 
 const WATCHES_PATH = 'data/config/ap-checks.json';
 const FIRED_PATH = 'data/config/ap-checks-fired.json';
+const PLACEMENTS_PATH = 'data/config/ap-placements.json';
 const PERSIST_DEBOUNCE_MS = 2000;
 
 type WatchMode = 'gte' | 'bit';
@@ -33,10 +54,15 @@ interface Watch {
     mode: WatchMode;
     value: number;
     check: string;
+    // present only for varbit-derived watches - extract bits [startbit,endbit]
+    // (inclusive) out of the raw varp value before applying mode/value.
+    startbit?: number;
+    endbit?: number;
 }
 
 interface RawWatch {
-    varp: string;
+    varp?: string;
+    varbit?: string;
     mode: WatchMode;
     value: number;
     check: string;
@@ -49,7 +75,13 @@ function isRawWatch(raw: unknown): raw is RawWatch {
         return false;
     }
     const w = raw as Record<string, unknown>;
-    return typeof w.varp === 'string' && (w.mode === 'gte' || w.mode === 'bit') && typeof w.value === 'number' && typeof w.check === 'string';
+    const hasVarp = typeof w.varp === 'string' && w.varp.length > 0;
+    const hasVarbit = typeof w.varbit === 'string' && w.varbit.length > 0;
+    // exactly one of varp/varbit, never both, never neither
+    if (hasVarp === hasVarbit) {
+        return false;
+    }
+    return (w.mode === 'gte' || w.mode === 'bit') && typeof w.value === 'number' && typeof w.check === 'string';
 }
 
 function loadWatches(): Map<number, Watch[]> {
@@ -63,6 +95,7 @@ function loadWatches(): Map<number, Watch[]> {
     try {
         const parsed = JSON.parse(fs.readFileSync(WATCHES_PATH, 'utf8')) as { watches?: unknown[] };
         let loaded = 0;
+        let unknown = 0;
 
         for (const raw of parsed.watches ?? []) {
             if (!isRawWatch(raw)) {
@@ -70,24 +103,132 @@ function loadWatches(): Map<number, Watch[]> {
                 continue;
             }
 
-            const varpId = VarPlayerType.getId(raw.varp);
-            if (varpId === -1) {
-                printWarning(`AP checks: skipping watch for unknown varp "${raw.varp}"`);
-                continue;
+            let varId = -1;
+            let startbit: number | undefined;
+            let endbit: number | undefined;
+
+            if (raw.varp) {
+                varId = VarPlayerType.getId(raw.varp);
+                if (varId === -1) {
+                    printWarning(`AP checks: skipping watch for unknown varp "${raw.varp}"`);
+                    unknown++;
+                    continue;
+                }
+            } else if (raw.varbit) {
+                const varbitId = VarBitType.getId(raw.varbit);
+                if (varbitId === -1) {
+                    printWarning(`AP checks: skipping watch for unknown varbit "${raw.varbit}"`);
+                    unknown++;
+                    continue;
+                }
+                const varbit = VarBitType.get(varbitId);
+                varId = varbit.basevar;
+                startbit = varbit.startbit;
+                endbit = varbit.endbit;
             }
 
-            const list = table.get(varpId) ?? [];
-            list.push({ mode: raw.mode, value: raw.value, check: raw.check });
-            table.set(varpId, list);
+            const list = table.get(varId) ?? [];
+            list.push({ mode: raw.mode, value: raw.value, check: raw.check, startbit, endbit });
+            table.set(varId, list);
             loaded++;
         }
 
-        printInfo(`AP checks: loaded ${loaded} varp watch(es)`);
+        printInfo(`AP checks: loaded ${loaded} varp watch(es)${unknown > 0 ? ` (${unknown} unresolved)` : ''}`);
     } catch (err) {
         printWarning(`AP checks: failed to parse ${WATCHES_PATH}, no varp-watch checks active (${err instanceof Error ? err.message : err})`);
     }
 
     return table;
+}
+
+// ---------------------------------------------------------------------------
+// Placement consult (data/config/ap-placements.json, docs/placement-mode.md).
+// Loaded lazily, once, and cached for the process lifetime - the generator
+// writes this file before a placement-mode server boot, it never changes
+// mid-session (unlike ap-unlocks.json, which DOES change as checks fire).
+// No file = every check is filler, i.e. exactly today's non-placement
+// behavior. Malformed entries fail open to filler for that check id only.
+// ---------------------------------------------------------------------------
+
+interface PlacementEntry {
+    item: string;
+    count?: number;
+    display?: string;
+}
+
+interface PlacementOutcome {
+    isUnlock: boolean;
+    display: string; // empty string for filler
+}
+
+let placements: Map<string, PlacementEntry> | null = null;
+
+function isRawPlacementEntry(raw: unknown): raw is PlacementEntry {
+    if (!raw || typeof raw !== 'object') {
+        return false;
+    }
+    const p = raw as Record<string, unknown>;
+    if (typeof p.item !== 'string' || p.item.length === 0) {
+        return false;
+    }
+    if (p.count !== undefined && (typeof p.count !== 'number' || !Number.isInteger(p.count) || p.count <= 0)) {
+        return false;
+    }
+    if (p.display !== undefined && typeof p.display !== 'string') {
+        return false;
+    }
+    return true;
+}
+
+function loadPlacements(): Map<string, PlacementEntry> {
+    const table = new Map<string, PlacementEntry>();
+
+    if (!fs.existsSync(PLACEMENTS_PATH)) {
+        printInfo(`AP checks: no ${path.basename(PLACEMENTS_PATH)}, placement mode inactive (checks roll filler)`);
+        return table;
+    }
+
+    try {
+        const parsed = JSON.parse(fs.readFileSync(PLACEMENTS_PATH, 'utf8')) as { placements?: Record<string, unknown> };
+        let loaded = 0;
+
+        for (const [checkId, raw] of Object.entries(parsed.placements ?? {})) {
+            if (!isRawPlacementEntry(raw)) {
+                printWarning(`AP checks: skipping malformed placement entry for "${checkId}": ${JSON.stringify(raw)}`);
+                continue;
+            }
+            table.set(checkId, raw);
+            loaded++;
+        }
+
+        printInfo(`AP checks: loaded ${loaded} placement(s) - placement mode active`);
+    } catch (err) {
+        printWarning(`AP checks: failed to parse ${PLACEMENTS_PATH}, placement mode inactive (${err instanceof Error ? err.message : err})`);
+    }
+
+    return table;
+}
+
+// Resolves what a fired check should deliver. Unlock placements apply the
+// unlock (via ApUnlockOverrides.grantUnlock) BEFORE returning, so by the time
+// the content script's announce runs the unlock is already live. Filler (an
+// explicit {item:"filler"}, a missing entry, or no placements file at all)
+// returns an empty display and leaves the existing random-reward roll to the
+// content script, unchanged.
+function resolvePlacement(checkId: string): PlacementOutcome {
+    if (placements === null) {
+        placements = loadPlacements();
+    }
+
+    const entry = placements.get(checkId);
+    if (!entry || entry.item === 'filler') {
+        return { isUnlock: false, display: '' };
+    }
+
+    const count = entry.count ?? 1;
+    ApUnlockOverrides.grantUnlock(entry.item, count);
+
+    return { isUnlock: true, display: entry.display ?? entry.item };
 }
 
 // ---------------------------------------------------------------------------
@@ -152,9 +293,11 @@ async function persistFired(): Promise<void> {
 }
 
 // Enqueues the content payoff script ([queue,ap_check_fired] in
-// ap_checks.rs2) on `player` with the check id as its single string arg, the
-// same way Player.addXp enqueues the ADVANCESTAT trigger. Once-ever per check
-// id (dedup Set), never throws.
+// ap_checks.rs2) on `player` with the check id, the placement display string
+// (empty for filler), and an is-unlock flag - the same way Player.addXp
+// enqueues the ADVANCESTAT trigger. Once-ever per check id (dedup Set), never
+// throws. Consults placements AFTER dedupe so a check that has already fired
+// this run/restart never re-grants its unlock or re-rolls filler.
 function fireCheck(player: Player, checkId: string): void {
     try {
         if (fired === null) {
@@ -168,6 +311,9 @@ function fireCheck(player: Player, checkId: string): void {
         fired.add(checkId);
         schedulePersist();
 
+        const outcome = resolvePlacement(checkId);
+        recordDiscovery('checks', checkId, outcome.isUnlock ? outcome.display : 'filler');
+
         const script = ScriptProvider.getByName('[queue,ap_check_fired]');
         if (!script) {
             // content not built/deployed yet - state is still recorded above so
@@ -175,7 +321,7 @@ function fireCheck(player: Player, checkId: string): void {
             return;
         }
 
-        player.enqueueScript(script, PlayerQueueType.ENGINE, 0, [checkId]);
+        player.enqueueScript(script, PlayerQueueType.ENGINE, 0, [checkId, outcome.display, outcome.isUnlock ? 1 : 0]);
     } catch (err) {
         printWarning(`AP checks: fireCheck(${checkId}) failed (${err instanceof Error ? err.message : err})`);
     }
@@ -198,7 +344,15 @@ export function onVarpSet(player: Player, id: number, value: number): void {
 
         for (let i = 0; i < watches.length; i++) {
             const watch = watches[i];
-            const tripped = watch.mode === 'gte' ? value >= watch.value : ((value >>> watch.value) & 1) === 1;
+
+            let effective = value;
+            if (watch.startbit !== undefined && watch.endbit !== undefined) {
+                const width = watch.endbit - watch.startbit + 1;
+                const mask = width >= 32 ? 0xffffffff : (1 << width) - 1;
+                effective = (value >>> watch.startbit) & mask;
+            }
+
+            const tripped = watch.mode === 'gte' ? effective >= watch.value : ((effective >>> watch.value) & 1) === 1;
             if (tripped) {
                 fireCheck(player, watch.check);
             }

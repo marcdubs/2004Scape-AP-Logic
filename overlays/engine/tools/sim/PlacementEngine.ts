@@ -1,0 +1,586 @@
+// Placement-mode core (docs/placement-mode.md): the location catalog, item pool builders,
+// and reachability engine shared by tools/ap/GenerateSeed.ts (the assumed-fill generator)
+// and the placement-aware extensions to SimulateProgression.ts / tools/logic/ValidateSeed.ts.
+// Deliberately lives under tools/sim/ (not tools/ap/) so both the generator AND the
+// simulator/validator import the SAME reachability rules - "reuse the sim engine's
+// reachability, do not reimplement" per the design brief.
+//
+// This module owns two concerns:
+//  1. The location catalog - the full list of check ids placement mode can put an item
+//     on, built from the quest database + the hardcoded stage/kill/skill id lists that
+//     mirror ApChecks.ts / ap_checks.rs2 / ap-checks.json EXACTLY (verified against those
+//     files this session - see the comments on each list below for the source).
+//  2. The item pool (gear/tools/skill-cap copies) and the reachability function used to
+//     decide which locations are accessible given a partial set of collected items.
+//
+// Reachability model (documented, not silently simplified):
+//  - Skill caps come from `progressive_<stat>` counts via the exact
+//    `20 + 10*count, min 99` formula ConfigLoader.ts/ApUnlockOverrides.ts use (reused via
+//    `allSkillCaps`, not reimplemented).
+//  - Quest completability is Engine.ts's `completableQuests` fixpoint (skills/quests/QP),
+//    the same rule the vanilla-path simulator uses.
+//  - `ds_*` (Dragon Slayer stage checks) collapse to the `dragon` quest's OWN requirement
+//    (QP >= 32, no skill gate) - ApChecks.ts's varp watches fire progressively as the
+//    player walks through the quest, but nothing in quests.json models sub-quest
+//    granularity, so "reachable once Dragon Slayer is startable" is the honest level of
+//    fidelity available without inventing new data. Documented simplification, not a bug.
+//  - `barcrawl_bar_*`, `first_xp_*`, `first_kill`/notable kills are always reachable
+//    (sphere-0-ish, bronze kit suffices) - matches the design brief exactly.
+//  - `level_<skill>_<N>` is reachable iff the skill's current cap >= N. Tool tiers
+//    (progressive_pickaxe/axe) are deliberately NOT a reachability gate here, for the same
+//    reason progression-sim.md documents for the vanilla-path engine: verified directly
+//    against mining.rs2/woodcut.rs2 that tier 0 (bronze) is unconditionally free on BOTH
+//    tools (bronze pickaxe: `ap_pickaxe_tier` returns 0, and `count < 0` is never true;
+//    bronze axe: last fallback branch has no unlock check at all) - so a player can always
+//    train any skill to its cap with the bronze tool. Tool progression items are real pool
+//    items (placed, collected, announced) but affect *efficiency/flavor* only, never
+//    reachability - matching the verified engine behavior rather than inventing a stricter
+//    model the game doesn't actually enforce.
+//  - Gear tiers (progressive_melee/armour/ranged/magic) are NOT a reachability gate on any
+//    location or goal either: verified against levelrequire.rs2's `ap_gear_locked` - tier 0
+//    (level < 5 equipment, i.e. bronze AND iron) is always free regardless of unlock count,
+//    and nothing in quests.json/goals.json references a gear-tier requirement (the KBD
+//    goal's 40/40/40/40 combat floor is a SKILL-cap judgment call, not a gear check - see
+//    progression-sim.md). Gear/tool copies are therefore placed as "free-floating"
+//    progression items in the assumed-fill sense: nothing depends on them, so they can
+//    land anywhere reachable at the time they're processed (typically early, since removing
+//    one from the pool never removes a location from reachability). This is intentional,
+//    not a gap - it mirrors how many AP games place cosmetic/QoL progression separately
+//    from hard-logic progression.
+
+import fs from 'fs';
+import path from 'path';
+
+import { completableQuests } from './Engine.js';
+import { GatherProcessConfig, UnlocksConfig, allSkillCaps } from './ConfigLoader.js';
+import { Goal, QuestReq, STAT_NAMES, StatName } from './types.js';
+
+// ---------------------------------------------------------------------------
+// Location catalog
+// ---------------------------------------------------------------------------
+
+export type LocationKind = 'quest' | 'ds' | 'barcrawl' | 'first_xp' | 'first_kill' | 'level';
+
+export interface LocationDef {
+    id: string;
+    kind: LocationKind;
+    /** For 'level' locations: the skill and the milestone N. */
+    skill?: StatName;
+    level?: number;
+    /** For 'quest' locations: the quests.json id (id === `quest_${questId}`, matches the quest dirname). */
+    questId?: string;
+}
+
+// Dragon Slayer stage watches - copied verbatim from data/config/ap-checks.json's
+// "dragonquest" entries (read this session; static/shipped, not seed-regenerated - see
+// docs/placement-mode.md "Locations"). If a future session adds/renames stages there,
+// update this list to match - it is the authoritative source, this is a mirror.
+export const DS_STAGE_IDS = ['ds_started', 'ds_oziach', 'ds_ship_ready', 'ds_map_complete', 'ds_sailed', 'ds_complete'] as const;
+
+export const BARCRAWL_BAR_IDS = Array.from({ length: 10 }, (_, i) => `barcrawl_bar_${i + 1}`);
+
+// The 14 notable-kill ids + first_kill, copied verbatim from ap_checks.rs2's
+// `ap_track_kill` OR-chain (read this session - see that file for the npc_type mapping).
+export const NOTABLE_KILL_IDS = [
+    'first_kill_goblin',
+    'first_kill_cow',
+    'first_kill_chicken',
+    'first_kill_rat',
+    'first_kill_guard',
+    'first_kill_dwarf',
+    'first_kill_skeleton',
+    'first_kill_zombie',
+    'first_kill_ghost',
+    'first_kill_moss_giant',
+    'first_kill_ice_giant',
+    'first_kill_lesser_demon',
+    'first_kill_black_knight',
+    'first_kill_green_dragon'
+];
+
+// The 18 cappable skills (STAT_NAMES minus hitpoints, which is never capped - see
+// ConfigLoader.ts/ApUnlockOverrides.ts). Matches ApChecks.ts's onXpGain exactly (it skips
+// PlayerStat.HITPOINTS for both first_xp and level_ checks).
+export const CAPPABLE_SKILLS: StatName[] = STAT_NAMES.filter(s => s !== 'hitpoints');
+
+export const LEVEL_MILESTONES = [10, 20, 30, 40, 50, 60, 70, 80, 90];
+
+export function buildLocationCatalog(quests: QuestReq[]): LocationDef[] {
+    const locs: LocationDef[] = [];
+
+    for (const q of quests) {
+        locs.push({ id: `quest_${q.id}`, kind: 'quest', questId: q.id });
+    }
+    for (const id of DS_STAGE_IDS) {
+        locs.push({ id, kind: 'ds' });
+    }
+    for (const id of BARCRAWL_BAR_IDS) {
+        locs.push({ id, kind: 'barcrawl' });
+    }
+    for (const skill of CAPPABLE_SKILLS) {
+        locs.push({ id: `first_xp_${skill}`, kind: 'first_xp', skill });
+    }
+    locs.push({ id: 'first_kill', kind: 'first_kill' });
+    for (const id of NOTABLE_KILL_IDS) {
+        locs.push({ id, kind: 'first_kill' });
+    }
+    for (const skill of CAPPABLE_SKILLS) {
+        for (const n of LEVEL_MILESTONES) {
+            locs.push({ id: `level_${skill}_${n}`, kind: 'level', skill, level: n });
+        }
+    }
+
+    return locs;
+}
+
+// ---------------------------------------------------------------------------
+// Item pool
+// ---------------------------------------------------------------------------
+
+export type PoolMode = 'per-skill' | 'groups';
+
+/** Group membership for `--pool groups` (documented in docs/placement-mode.md item pool section). */
+export const SKILL_GROUPS: Record<string, StatName[]> = {
+    gathering: ['mining', 'fishing', 'woodcutting'],
+    artisan: ['smithing', 'cooking', 'crafting', 'fletching', 'firemaking', 'herblore', 'runecraft'],
+    combat: ['attack', 'strength', 'defence', 'ranged', 'magic', 'prayer'],
+    support: ['agility', 'thieving']
+};
+
+const GEAR_FAMILIES: { key: string; label: string }[] = [
+    { key: 'progressive_melee', label: 'Melee' },
+    { key: 'progressive_armour', label: 'Armour' },
+    { key: 'progressive_ranged', label: 'Ranged' },
+    { key: 'progressive_magic', label: 'Magic' }
+];
+
+// tier -> the base-level threshold that unlocks it (ap_gear_locked in levelrequire.rs2).
+const GEAR_TIER_LEVELS = [5, 10, 20, 30, 40, 45, 60];
+
+// Exact material names, verified against mining.rs2 (ap_pickaxe_tier) and woodcut.rs2's
+// axe fallback cascade.
+const PICKAXE_TIERS = ['iron', 'steel', 'mithril', 'adamant', 'rune'];
+const AXE_TIERS = ['iron', 'steel', 'black', 'mithril', 'adamant', 'rune'];
+
+/**
+ * One "copy" of a progression item as it will be placed at a single location. `apply`
+ * mutates a running counts map to reflect collecting this copy - the single indirection
+ * point that lets group-mode items (which are NOT real ap-unlocks.json keys - see
+ * `groupKey` below) expand into per-member-skill bumps for reachability purposes while the
+ * placements file still records the item under its own (synthetic, for groups) key.
+ */
+export interface ProgressionCopy {
+    /** Unique within a single pool build - used for pool bookkeeping only, never written anywhere. */
+    uid: string;
+    /** The `item` value written into ap-placements.json. Real ap-unlocks.json key for gear/tools/per-skill caps; a synthetic `progressive_<group>` key for group-mode caps (see docs/placement-mode.md and GenerateSeed.ts's INTEGRATION note on why the engine's grantUnlock must special-case these). */
+    placementItem: string;
+    /** The `count` value written into ap-placements.json. */
+    placementCount: number;
+    /** Display/announcement string. */
+    display: string;
+    /** True for group-mode cap copies - flagged so GenerateSeed.ts can call out the engine integration requirement explicitly rather than silently. */
+    isGroupSynthetic: boolean;
+    /** Mutates `counts` (real ap-unlocks.json-shaped keys) to reflect collecting this copy. */
+    apply(counts: Map<string, number>): void;
+}
+
+function bump(counts: Map<string, number>, key: string, by: number): void {
+    counts.set(key, (counts.get(key) ?? 0) + by);
+}
+
+export function buildItemPool(mode: PoolMode): ProgressionCopy[] {
+    const pool: ProgressionCopy[] = [];
+
+    // --- gear: 7 copies per family (tiers 1..7), count += 1 each (engine gate is
+    // `ap_unlock_count(key) < tier`, so N copies collected == tier N unlocked). ---
+    for (const family of GEAR_FAMILIES) {
+        for (let tier = 1; tier <= 7; tier++) {
+            const levelThreshold = GEAR_TIER_LEVELS[tier - 1];
+            pool.push({
+                uid: `${family.key}#${tier}`,
+                placementItem: family.key,
+                placementCount: 1,
+                display: `Progressive ${family.label} (tier ${tier} - unlocks lv ${levelThreshold}+ ${family.label.toLowerCase()} equipment)`,
+                isGroupSynthetic: false,
+                apply: counts => bump(counts, family.key, 1)
+            });
+        }
+    }
+
+    // --- tools: pickaxe x5 (tiers 1..5), axe x6 (tiers 1..6), count += 1 each. ---
+    for (let tier = 1; tier <= PICKAXE_TIERS.length; tier++) {
+        pool.push({
+            uid: `progressive_pickaxe#${tier}`,
+            placementItem: 'progressive_pickaxe',
+            placementCount: 1,
+            display: `Progressive Pickaxe (${PICKAXE_TIERS[tier - 1]})`,
+            isGroupSynthetic: false,
+            apply: counts => bump(counts, 'progressive_pickaxe', 1)
+        });
+    }
+    for (let tier = 1; tier <= AXE_TIERS.length; tier++) {
+        pool.push({
+            uid: `progressive_axe#${tier}`,
+            placementItem: 'progressive_axe',
+            placementCount: 1,
+            display: `Progressive Axe (${AXE_TIERS[tier - 1]})`,
+            isGroupSynthetic: false,
+            apply: counts => bump(counts, 'progressive_axe', 1)
+        });
+    }
+
+    // --- skill caps ---
+    if (mode === 'per-skill') {
+        // 4 copies per skill, count += 2 each (cap = 20 + 10*count -> 20/40/60/80/99... at
+        // 0/1/2/3/4 copies the *cumulative* count is 0/2/4/6/8 -> caps 20/40/60/80/100(min99)).
+        for (const skill of CAPPABLE_SKILLS) {
+            const key = `progressive_${skill}`;
+            for (let copy = 1; copy <= 4; copy++) {
+                pool.push({
+                    uid: `${key}#cap${copy}`,
+                    placementItem: key,
+                    placementCount: 2,
+                    display: `+20 ${capitalize(skill)} cap (${copy}/4)`,
+                    isGroupSynthetic: false,
+                    apply: counts => bump(counts, key, 2)
+                });
+            }
+        }
+    } else {
+        // 8 copies per group; EACH copy bumps every member skill's real cap key by +1
+        // (== +10 level) simultaneously. Recorded in ap-placements.json under a synthetic
+        // `progressive_<group>` item key that is NOT a real ap-unlocks.json entry - see
+        // ProgressionCopy.isGroupSynthetic and GenerateSeed.ts's printed integration note.
+        for (const [groupName, members] of Object.entries(SKILL_GROUPS)) {
+            const groupKey = `progressive_${groupName}`;
+            for (let copy = 1; copy <= 8; copy++) {
+                pool.push({
+                    uid: `${groupKey}#cap${copy}`,
+                    placementItem: groupKey,
+                    placementCount: 1,
+                    display: `+10 cap to all of ${members.map(capitalize).join('/')} (${groupName} group, ${copy}/8)`,
+                    isGroupSynthetic: true,
+                    apply: counts => {
+                        for (const m of members) {
+                            bump(counts, `progressive_${m}`, 1);
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    return pool;
+}
+
+function capitalize(s: string): string {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// The real ap-unlocks.json keys placement mode's starting state controls (gear families,
+// tool families, and one progressive_<skill> per cappable skill). Used both to write the
+// zeroed starting table and to know which keys `capsFromCounts`/reachability should read.
+export function realUnlockKeys(): string[] {
+    const keys = GEAR_FAMILIES.map(f => f.key).concat(['progressive_pickaxe', 'progressive_axe']);
+    for (const skill of CAPPABLE_SKILLS) {
+        keys.push(`progressive_${skill}`);
+    }
+    return keys;
+}
+
+// ---------------------------------------------------------------------------
+// Reachability
+// ---------------------------------------------------------------------------
+
+export function capsFromCounts(counts: Map<string, number>): Record<StatName, number> {
+    const synthetic: UnlocksConfig = { present: true, unlocks: counts };
+    return allSkillCaps(synthetic);
+}
+
+export interface ReachabilityResult {
+    caps: Record<StatName, number>;
+    completedQuests: Set<string>;
+    qp: number;
+    reachable: Set<string>;
+}
+
+/**
+ * Pure location-reachability rule, factored out so callers that already have their OWN
+ * (possibly richer - e.g. region-aware) notion of `completed`/`qp` can reuse the exact
+ * same location rules without going through `completableQuests` a second time. This is
+ * what tools/logic/ValidateSeed.ts's placement extension calls directly, feeding its own
+ * region-gated `completed`/`qp` in place of PlacementEngine's travel-agnostic ones - see
+ * docs/entrance-logic.md/placement-mode.md on why region logic stays ValidateSeed's job,
+ * not duplicated here.
+ */
+export function reachableFromState(locations: LocationDef[], quests: QuestReq[], completed: Set<string>, qp: number, caps: Record<StatName, number>): Set<string> {
+    const dragonReachable = completed.has('dragon') || (quests.find(q => q.id === 'dragon')?.requiredQp ?? 0) <= qp;
+
+    const reachable = new Set<string>();
+    for (const loc of locations) {
+        switch (loc.kind) {
+            case 'quest':
+                if (loc.questId && completed.has(loc.questId)) {
+                    reachable.add(loc.id);
+                }
+                break;
+            case 'ds':
+                // See file header: Dragon Slayer stage checks collapse to the quest's own
+                // startability requirement (QP >= 32), not per-stage granularity.
+                if (dragonReachable) {
+                    reachable.add(loc.id);
+                }
+                break;
+            case 'barcrawl':
+            case 'first_kill':
+                reachable.add(loc.id); // sphere-0-ish, bronze kit suffices.
+                break;
+            case 'first_xp':
+                reachable.add(loc.id); // every skill starts trainable (cap >= 20 >= 1).
+                break;
+            case 'level':
+                if (loc.skill && loc.level !== undefined && caps[loc.skill] >= loc.level) {
+                    reachable.add(loc.id);
+                }
+                break;
+        }
+    }
+    return reachable;
+}
+
+/** Full reachability computation for a given (already-flattened) item counts map - the travel-agnostic (no region graph) path used by GenerateSeed and the vanilla-path placement-aware simulator. */
+export function computeReachability(locations: LocationDef[], quests: QuestReq[], counts: Map<string, number>): ReachabilityResult {
+    const caps = capsFromCounts(counts);
+    const { completed, qp } = completableQuests(quests, caps);
+    const reachable = reachableFromState(locations, quests, completed, qp, caps);
+    return { caps, completedQuests: completed, qp, reachable };
+}
+
+/** Goal reachability given caps/completed/qp, reusing the exact ReqLike shape Engine.ts's goal-status logic uses. */
+export function goalReachable(goal: Goal, caps: Record<StatName, number>, completed: Set<string>, qp: number): boolean {
+    if (goal.skills) {
+        for (const [stat, level] of Object.entries(goal.skills) as [StatName, number][]) {
+            if (caps[stat] < level) {
+                return false;
+            }
+        }
+    }
+    if (goal.quests) {
+        for (const id of goal.quests) {
+            if (!completed.has(id)) {
+                return false;
+            }
+        }
+    }
+    if (goal.requiredQp !== undefined && qp < goal.requiredQp) {
+        return false;
+    }
+    return true;
+}
+
+// re-exported for callers that only have a GatherProcessConfig-shaped seed config lying
+// around (kept generic/unused today - see Engine.ts's findGatherOrProcessSource for the
+// matching "ready extension point, not dead code" precedent).
+export type { GatherProcessConfig };
+
+// ---------------------------------------------------------------------------
+// ap-placements.json loading + item application (shared by GenerateSeed's own spoiler
+// re-simulation, SimulateProgression's placement-aware sphere loop, and ValidateSeed's
+// placement extension - one loader/applier, three consumers).
+// ---------------------------------------------------------------------------
+
+export interface PlacementRecord {
+    item: string;
+    count: number;
+    display: string;
+}
+
+export interface PlacementsFile {
+    present: boolean;
+    seed?: number;
+    pool?: PoolMode;
+    placements: Map<string, PlacementRecord>;
+}
+
+export function loadPlacements(configDir: string): PlacementsFile {
+    const file = path.join(configDir, 'ap-placements.json');
+    if (!fs.existsSync(file)) {
+        return { present: false, placements: new Map() };
+    }
+    try {
+        const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as {
+            seed?: number;
+            pool?: string;
+            placements?: Record<string, { item?: string; count?: number; display?: string }>;
+        };
+        const placements = new Map<string, PlacementRecord>();
+        for (const [locId, rec] of Object.entries(parsed.placements ?? {})) {
+            if (!rec || typeof rec.item !== 'string') {
+                continue;
+            }
+            placements.set(locId, {
+                item: rec.item,
+                count: typeof rec.count === 'number' ? rec.count : 0,
+                display: typeof rec.display === 'string' ? rec.display : rec.item
+            });
+        }
+        return {
+            present: true,
+            seed: parsed.seed,
+            pool: parsed.pool === 'groups' ? 'groups' : 'per-skill',
+            placements
+        };
+    } catch (err) {
+        console.warn(`ap-placements.json: failed to parse, treating as absent (${err instanceof Error ? err.message : err})`);
+        return { present: false, placements: new Map() };
+    }
+}
+
+const GROUP_KEY_RE = /^progressive_(gathering|artisan|combat|support)$/;
+
+/**
+ * Applies ONE placement record's effect to a running real-key counts map. Handles the
+ * group-mode synthetic keys (`progressive_gathering` etc - see ProgressionCopy above)
+ * transparently: expands into a +count bump on every member skill's REAL
+ * `progressive_<skill>` key, exactly matching what buildItemPool('groups')'s copies do at
+ * generation time. This is the function a placement-aware consumer (SimulateProgression,
+ * ValidateSeed) calls when a location holding this item becomes reachable - it never needs
+ * to know whether the item came from a per-skill or groups pool.
+ */
+export function applyPlacementItem(rec: PlacementRecord, counts: Map<string, number>): void {
+    if (rec.item === 'filler') {
+        return;
+    }
+    const groupMatch = GROUP_KEY_RE.exec(rec.item);
+    if (groupMatch) {
+        for (const member of SKILL_GROUPS[groupMatch[1]]) {
+            bump(counts, `progressive_${member}`, rec.count);
+        }
+        return;
+    }
+    bump(counts, rec.item, rec.count);
+}
+
+// ---------------------------------------------------------------------------
+// Forward sphere simulation over a FINAL placements map (ground truth - what a real
+// player collecting every reachable check each sphere would actually experience).
+// Shared by tools/ap/GenerateSeed.ts (spoiler generation + its own beatability
+// self-check) and SimulateProgression.ts's placement-aware -v0/-v1/-v2 path, so both
+// tools narrate identically for the same placements file.
+// ---------------------------------------------------------------------------
+
+export interface SphereFind {
+    location: string;
+    item: string;
+    display: string;
+}
+
+export interface PlacementSphereEvent {
+    sphere: number;
+    finds: SphereFind[];
+}
+
+export interface PlacementGoalStatus {
+    goal: Goal;
+    reached: boolean;
+    sphereReached: number | null;
+}
+
+export interface PlacementSimResult {
+    spheres: PlacementSphereEvent[];
+    finalCounts: Map<string, number>;
+    finalCaps: Record<StatName, number>;
+    completedQuests: Set<string>;
+    qp: number;
+    goalStatus: PlacementGoalStatus[];
+    allGoalsReached: boolean;
+    visitedLocations: Set<string>;
+    unreachedLocations: string[];
+}
+
+/**
+ * Runs the placement-mode sphere loop the design brief describes: compute reachable
+ * checks -> collect their items -> recompute, until fixpoint. `startingCounts` lets a
+ * caller seed a non-empty ap-unlocks.json baseline (placement mode always writes an
+ * all-zero one, but this stays general rather than assuming that).
+ */
+export function simulatePlacementSpheres(
+    locations: LocationDef[],
+    quests: QuestReq[],
+    goals: Goal[],
+    placements: Map<string, PlacementRecord>,
+    startingCounts?: Map<string, number>
+): PlacementSimResult {
+    const counts = new Map<string, number>(startingCounts ?? []);
+    const visited = new Set<string>();
+    const spheres: PlacementSphereEvent[] = [];
+    const goalReachedAt = new Map<string, number>();
+
+    let sphere = 0;
+    let caps = capsFromCounts(counts);
+    let completed = new Set<string>();
+    let qp = 0;
+
+    const checkGoals = () => {
+        for (const g of goals) {
+            if (!goalReachedAt.has(g.id) && goalReachable(g, caps, completed, qp)) {
+                goalReachedAt.set(g.id, sphere);
+            }
+        }
+    };
+
+    for (;;) {
+        const state = completableQuests(quests, caps);
+        completed = state.completed;
+        qp = state.qp;
+        const reachable = reachableFromState(locations, quests, completed, qp, caps);
+
+        if (sphere === 0) {
+            checkGoals(); // a goal that needs literally nothing (e.g. Barcrawl).
+        }
+
+        const newlyReachable = [...reachable].filter(id => !visited.has(id));
+        if (newlyReachable.length === 0) {
+            break; // fixpoint
+        }
+
+        const finds: SphereFind[] = [];
+        for (const id of newlyReachable) {
+            visited.add(id);
+            const rec = placements.get(id);
+            if (rec && rec.item !== 'filler') {
+                applyPlacementItem(rec, counts);
+                finds.push({ location: id, item: rec.item, display: rec.display });
+            }
+        }
+
+        sphere += 1;
+        caps = capsFromCounts(counts);
+        const after = completableQuests(quests, caps);
+        completed = after.completed;
+        qp = after.qp;
+        checkGoals();
+
+        spheres.push({ sphere, finds });
+    }
+
+    const goalStatus: PlacementGoalStatus[] = goals.map(g => ({
+        goal: g,
+        reached: goalReachedAt.has(g.id),
+        sphereReached: goalReachedAt.get(g.id) ?? null
+    }));
+
+    const unreachedLocations = locations.map(l => l.id).filter(id => !visited.has(id));
+
+    return {
+        spheres,
+        finalCounts: counts,
+        finalCaps: caps,
+        completedQuests: completed,
+        qp,
+        goalStatus,
+        allGoalsReached: goalStatus.every(g => g.reached),
+        visitedLocations: visited,
+        unreachedLocations
+    };
+}

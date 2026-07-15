@@ -15,7 +15,8 @@ import { fileURLToPath } from 'url';
 
 import { loadSeedConfig } from './ConfigLoader.js';
 import { runSimulation } from './Engine.js';
-import { buildQuestIndex, renderV0, renderV1, renderV2, toJsonSafe } from './Narrate.js';
+import { buildQuestIndex, renderPlacementV0, renderPlacementV1, renderPlacementV2, renderV0, renderV1, renderV2, toJsonSafe, toJsonSafePlacement } from './Narrate.js';
+import { buildLocationCatalog, loadPlacements, simulatePlacementSpheres } from './PlacementEngine.js';
 import { Goal, QuestReq } from './types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -67,6 +68,32 @@ function main(): void {
     const quests = loadQuestDatabase();
     const goals = loadGoalDatabase();
     const seedConfig = loadSeedConfig(configDir);
+
+    // Placement mode (docs/placement-mode.md "Simulator & validator"): an ap-placements.json
+    // present in configDir switches this tool to the placement-aware sphere loop (compute
+    // reachable checks -> collect their items -> recompute) and narration. Absent file =
+    // the exact vanilla-path code below, untouched - byte-compatible with prior behavior.
+    const placementsFile = loadPlacements(configDir);
+    if (placementsFile.present) {
+        const locations = buildLocationCatalog(quests);
+        const startingCounts = seedConfig.unlocks.present ? seedConfig.unlocks.unlocks : undefined;
+        const result = simulatePlacementSpheres(locations, quests, goals, placementsFile.placements, startingCounts);
+
+        const lines =
+            verbosity === 0
+                ? renderPlacementV0(result, placementsFile.seed ?? -1, placementsFile.pool ?? 'per-skill')
+                : verbosity === 1
+                  ? renderPlacementV1(result, placementsFile.seed ?? -1, placementsFile.pool ?? 'per-skill')
+                  : renderPlacementV2(result, placementsFile.seed ?? -1, placementsFile.pool ?? 'per-skill');
+        console.log(lines.join('\n'));
+
+        if (jsonOut) {
+            fs.writeFileSync(jsonOut, JSON.stringify(toJsonSafePlacement(result, placementsFile.seed ?? -1, placementsFile.pool ?? 'per-skill'), null, 2));
+            console.log(`\n(machine-readable result written to ${jsonOut})`);
+        }
+
+        process.exit(result.allGoalsReached ? 0 : 1);
+    }
 
     const result = runSimulation(quests, goals, seedConfig);
     const index = buildQuestIndex(quests);

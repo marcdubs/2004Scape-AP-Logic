@@ -96,6 +96,80 @@ export function getUnlockCount(name: string): number {
     return table.get(name) ?? 0;
 }
 
+// Placement mode (docs/placement-mode.md "Receipt wiring"): called from
+// ApChecks.fireCheck when a fired check's placed item is a real unlock (not
+// filler). Bumps `name`'s count by `count` and persists the FULL table back to
+// OVERRIDES_PATH synchronously (write-temp-then-rename, same crash-safety
+// pattern as ApTracker's flush, but sync rather than debounced-async: the
+// caller needs the write to be observably complete - and lastMtimeMs updated
+// to match - before it returns, so the very next ensureFresh() throttle tick
+// doesn't see "the file changed underneath us" and reparse redundantly).
+//
+// Requires a table already on disk: placements mode's contract is that the
+// generator always writes a starting ap-unlocks.json before a placement seed
+// ships (docs/placement-mode.md "Starting state"), so `table === null` here
+// means placements mode is misconfigured (no starting unlocks file), NOT
+// "create one from scratch" - that would silently paper over a generator bug.
+// --pool groups synthetic-key membership (see docs/placement-mode.md). Mirror of
+// tools/sim/PlacementEngine.ts - keep both in sync.
+const SKILL_GROUPS: Record<string, readonly string[]> = {
+    progressive_gathering: ['mining', 'fishing', 'woodcutting'],
+    progressive_artisan: ['smithing', 'cooking', 'crafting', 'fletching', 'firemaking', 'herblore', 'runecraft'],
+    progressive_combat: ['attack', 'strength', 'defence', 'ranged', 'magic', 'prayer'],
+    progressive_support: ['agility', 'thieving']
+};
+
+export function grantUnlock(name: string, count: number): void {
+    try {
+        ensureFresh();
+
+        if (table === null) {
+            printWarning(`AP unlock overrides: grantUnlock(${name}, ${count}) called with no ${OVERRIDES_PATH} on disk - placement mode requires a starting unlocks table, ignoring`);
+            return;
+        }
+
+        if (typeof name !== 'string' || name.length === 0 || !Number.isInteger(count) || count <= 0) {
+            printWarning(`AP unlock overrides: grantUnlock called with invalid args (${JSON.stringify(name)}, ${count})`);
+            return;
+        }
+
+        // --pool groups placements use 4 synthetic keys that are NOT real unlock
+        // keys: expand each into a +count bump on every member skill's real
+        // progressive_<skill> key, mirroring PlacementEngine.applyPlacementItem
+        // (tools side) exactly. Membership must stay in sync with
+        // tools/sim/PlacementEngine.ts's group definitions.
+        const group = SKILL_GROUPS[name];
+        if (group) {
+            for (const skill of group) {
+                const key = `progressive_${skill}`;
+                table.set(key, (table.get(key) ?? 0) + count);
+            }
+        } else {
+            table.set(name, (table.get(name) ?? 0) + count);
+        }
+
+        const dir = path.dirname(OVERRIDES_PATH);
+        fs.mkdirSync(dir, { recursive: true });
+
+        const payload = JSON.stringify({ unlocks: Object.fromEntries(table) }, null, 2);
+        const tmpPath = `${OVERRIDES_PATH}.tmp`;
+        fs.writeFileSync(tmpPath, payload, 'utf8');
+        fs.renameSync(tmpPath, OVERRIDES_PATH);
+
+        // Force the cached mtime bookkeeping to the state we just wrote so the
+        // next ensureFresh() (throttled, but this write may land inside the
+        // same throttle window) treats our own write as already-current rather
+        // than reloading it redundantly - table is already authoritative in
+        // memory.
+        lastMtimeMs = fs.statSync(OVERRIDES_PATH).mtimeMs;
+        lastStatCheckMs = Date.now();
+
+        printInfo(`AP unlock overrides: granted ${count}x ${name}${SKILL_GROUPS[name] ? ` (expanded to ${SKILL_GROUPS[name].length} member skills)` : ` (now ${table.get(name)})`}`);
+    } catch (err) {
+        printWarning(`AP unlock overrides: grantUnlock(${name}, ${count}) failed (${err instanceof Error ? err.message : err})`);
+    }
+}
+
 // PlayerStat enum order (engine/src/engine/entity/PlayerStat.ts), lowercased, used to
 // build the "progressive_<name>" unlock key each stat's cap reads. Verified against
 // PlayerStat.ts on 2026-07-15 - keep in sync if that enum ever changes order.

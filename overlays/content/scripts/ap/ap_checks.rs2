@@ -1,19 +1,33 @@
 // Archipelago check-firing payoff + first/notable-kill tracking. See
-// docs/checks-and-unlocks.md, check surfaces #2-#6. The varp watcher (barcrawl
-// bars, Dragon Slayer stages) and the first-XP/level-milestone checks live in
-// the engine (ApChecks.ts, hooked from Player.setVar/Player.addXp) and reach
-// here purely by enqueueing [queue,ap_check_fired] - this file never needs to
-// know why a check fired, only how to announce + reward it. Kill checks are
-// content-side (hooked from the shared [proc,npc_death], see below) but funnel
-// through the exact same queue script, so there is only ever ONE announce+
-// reward seam in the whole checks system.
+// docs/checks-and-unlocks.md (check surfaces #2-#6) and docs/placement-mode.md
+// (the placement receipt contract). The varp watcher (barcrawl bars, quest
+// completions, Dragon Slayer stages), the first-XP/level-milestone checks, and
+// (as of placement mode) kill checks too all live in the engine (ApChecks.ts,
+// hooked from Player.setVar/Player.addXp) and reach here purely by enqueueing
+// [queue,ap_check_fired] with the check id plus the already-resolved
+// placement outcome - this file never needs to know WHY a check fired or
+// whether it's a placement seed, only how to announce it. There is exactly
+// ONE announce+reward seam in the whole checks system.
 
 // Queue scripts always run with protected access (Feature-1/2 lesson), so no
 // if_close/p_finduid dance is needed here even though checks fire from
 // engine-hot-path hooks and unprotected NPC-death contexts.
-[queue,ap_check_fired](string $check_id)
-mes("Archipelago check: <~ap_prettify_check_id($check_id)>!");
-~ap_grant_check_reward;
+//
+// $display is the placed item's announcement string (e.g. "Progressive
+// Pickaxe (steel)") when $is_unlock = 1, and empty otherwise. Engine-side
+// (ApChecks.ts fireCheck/resolvePlacement) already applied the unlock via
+// ApUnlockOverrides.grantUnlock BEFORE this script was enqueued - this is
+// announce-only for the unlock branch. The filler branch (no placements file,
+// or this check id maps to explicit filler) is unchanged from pre-placement
+// behavior: announce + roll a random reward.
+[queue,ap_check_fired](string $check_id, string $display, int $is_unlock)
+if ($is_unlock = 1) {
+    ~music_jingle("quest complete 1");
+    mes("AP check <~ap_prettify_check_id($check_id)>: received <$display>!");
+} else {
+    mes("Archipelago check: <~ap_prettify_check_id($check_id)>!");
+    ~ap_grant_check_reward;
+}
 
 // Cosmetic only: "first_kill_moss_giant" -> "first kill moss giant". No
 // string-replace command exists in this rs2 dialect, so this walks the string
@@ -54,6 +68,21 @@ return($out);
 // content set (content/pack/npc.pack has no hillgiant/hill_giant entry at
 // all, same "not implemented yet" situation as giant spiders' missing drop
 // table) - dropped from the list.
+//
+// Placement-mode wiring: ap_kill_mark ONLY sets the %ap_kills bit now - it no
+// longer enqueues [queue,ap_check_fired] itself. %ap_kills = setbit(...) is a
+// plain POP_VARP write, so it already flows through Player.setVar -> the
+// SAME ApChecks.onVarpSet chokepoint every other watched varp uses. Adding
+// {"varp":"ap_kills","mode":"bit",...} watches to ap-checks.json (mirroring
+// the exact bit<->check_id pairs below) makes the engine detect the flip and
+// call fireCheck() itself - which is what actually consults placements,
+// grants the unlock, dedupes, and enqueues the announce. Before this change
+// kill checks fired through a rs2-only path that never touched placements at
+// all, so a placed unlock behind e.g. "first_kill_goblin" would silently
+// never be granted - keep the $check_id strings here in sync with
+// ap-checks.json's ap_kills watch table (kept as a passed-through argument
+// for that documentation value, even though it's no longer used to enqueue
+// anything directly).
 // ------------------------------------------------------------------
 
 [proc,ap_track_kill]
@@ -88,13 +117,15 @@ if (npc_type = goblin | npc_type = goblin_armed | npc_type = goblin_helmet | npc
     ~ap_kill_mark(14, "first_kill_green_dragon");
 }
 
-// Sets bit $bit on %ap_kills and fires $check_id, once ever. The early
-// testbit return (before if_close) means a player's 10,000th chicken kill
-// costs one cheap varp read, not a forced modal-close - if_close/p_finduid
-// only run the FIRST time a given bit is still unset. Needs protected access
-// to write the varp - copies the king_black_dragon.rs2 if_close/p_finduid/
-// queue-retry shape exactly (npc-death context is unprotected by default,
-// same as every other ai_queue3 kill hook in this repo).
+// Sets bit $bit on %ap_kills, once ever. The early testbit return (before
+// if_close) means a player's 10,000th chicken kill costs one cheap varp read,
+// not a forced modal-close - if_close/p_finduid only run the FIRST time a
+// given bit is still unset. Needs protected access to write the varp - copies
+// the king_black_dragon.rs2 if_close/p_finduid/queue-retry shape exactly
+// (npc-death context is unprotected by default, same as every other
+// ai_queue3 kill hook in this repo). Does NOT enqueue ap_check_fired itself -
+// see the placement-mode wiring note above; the engine's ApChecks.onVarpSet
+// watches %ap_kills directly and fires the check from there.
 [proc,ap_kill_mark](int $bit, string $check_id)
 if (testbit(%ap_kills, $bit) = ^true) {
     return;
@@ -103,7 +134,6 @@ if_close;
 if (p_finduid(uid) = true) {
     if (testbit(%ap_kills, $bit) = ^false) {
         %ap_kills = setbit(%ap_kills, $bit);
-        queue*(ap_check_fired, 0)($check_id);
     }
 } else {
     queue*(ap_kill_mark_retry, 0)($bit, $check_id);
@@ -112,7 +142,6 @@ if (p_finduid(uid) = true) {
 [queue,ap_kill_mark_retry](int $bit, string $check_id)
 if (testbit(%ap_kills, $bit) = ^false) {
     %ap_kills = setbit(%ap_kills, $bit);
-    queue*(ap_check_fired, 0)($check_id);
 }
 
 // ------------------------------------------------------------------
@@ -121,18 +150,22 @@ if (testbit(%ap_kills, $bit) = ^false) {
 
 // ::apcheckfire <check_id> - directly fires the check payoff (mes + reward)
 // via the same queue script real checks use, bypassing the engine's watch
-// table/dedupe entirely - exercises the reward path without needing to trip
-// a watch or land a kill.
+// table/dedupe/placement-consult entirely - exercises the FILLER reward path
+// without needing to trip a watch or land a kill. Sensible test defaults:
+// empty display + is_unlock 0, i.e. always the filler branch (this is the
+// only branch this shortcut can meaningfully exercise, since it never
+// consults ap-placements.json - the real placement path only runs through
+// ApChecks.fireCheck).
 [debugproc,ap_checkfire](string $check_id)
 if_close;
 if (p_finduid(uid) = false) {
     queue*(ap_checkfire_retry, 0)($check_id);
     return;
 }
-queue*(ap_check_fired, 0)($check_id);
+queue*(ap_check_fired, 0)($check_id, "", 0);
 
 [queue,ap_checkfire_retry](string $check_id)
-queue*(ap_check_fired, 0)($check_id);
+queue*(ap_check_fired, 0)($check_id, "", 0);
 
 // ::apchecks - status readout of what rs2 can see for the checks system:
 // %ap_kills bits set, barcrawl bar count, %dragonquest value.

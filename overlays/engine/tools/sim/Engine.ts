@@ -41,14 +41,14 @@ export interface SimResult {
     unreachedQuests: { quest: QuestReq; blockers: Blocker[] }[];
 }
 
-type ReqLike = {
+export type ReqLike = {
     requiredQp?: number;
     skills?: Partial<Record<StatName, number>>;
     quests?: string[];
     questsAny?: string[][];
 };
 
-function skillsSatisfied(req: ReqLike, caps: Record<StatName, number>): boolean {
+export function skillsSatisfied(req: ReqLike, caps: Record<StatName, number>): boolean {
     if (!req.skills) {
         return true;
     }
@@ -60,7 +60,7 @@ function skillsSatisfied(req: ReqLike, caps: Record<StatName, number>): boolean 
     return true;
 }
 
-function questsSatisfied(req: ReqLike, completed: Set<string>): boolean {
+export function questsSatisfied(req: ReqLike, completed: Set<string>): boolean {
     if (req.quests) {
         for (const id of req.quests) {
             if (!completed.has(id)) {
@@ -78,12 +78,45 @@ function questsSatisfied(req: ReqLike, completed: Set<string>): boolean {
     return true;
 }
 
-function qpSatisfied(req: ReqLike, qp: number): boolean {
+export function qpSatisfied(req: ReqLike, qp: number): boolean {
     return req.requiredQp === undefined || qp >= req.requiredQp;
 }
 
-function isSatisfied(req: ReqLike, caps: Record<StatName, number>, completed: Set<string>, qp: number): boolean {
+export function isSatisfied(req: ReqLike, caps: Record<StatName, number>, completed: Set<string>, qp: number): boolean {
     return skillsSatisfied(req, caps) && questsSatisfied(req, completed) && qpSatisfied(req, qp);
+}
+
+/**
+ * Placement-mode helper (docs/placement-mode.md): given a FIXED set of skill caps (from
+ * currently-collected AP item counts, not a static ap-unlocks.json snapshot), runs the
+ * same quest-chain fixpoint `runSimulation` uses internally but without the sphere
+ * bookkeeping - callers that need per-sphere narration (the placement-aware simulator/
+ * validator/generator) drive their OWN outer sphere loop and call this once per pass with
+ * progressively larger caps as placed items get collected. Exported (not reimplemented)
+ * so tools/ap/GenerateSeed.ts and tools/logic/ValidateSeed.ts's placement extension share
+ * the exact same quest-completability rule the vanilla-path simulator uses - "reuse the
+ * sim engine's reachability", not a parallel implementation that could drift.
+ */
+export function completableQuests(quests: QuestReq[], caps: Record<StatName, number>): { completed: Set<string>; qp: number } {
+    const completed = new Set<string>();
+    let qp = 0;
+    for (;;) {
+        let changed = false;
+        for (const q of quests) {
+            if (completed.has(q.id)) {
+                continue;
+            }
+            if (isSatisfied(q, caps, completed, qp)) {
+                completed.add(q.id);
+                qp += q.qp;
+                changed = true;
+            }
+        }
+        if (!changed) {
+            break;
+        }
+    }
+    return { completed, qp };
 }
 
 /**
