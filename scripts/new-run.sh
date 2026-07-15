@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# new-run.sh - roll a complete fresh Archipelago run, end to end.
+#
+#   bash scripts/new-run.sh              (from the 2004Scape-AP-Logic repo)
+#
+# Edit the variables below and re-run. Every stage is independently toggleable and
+# every tool's FULL parameter list is documented next to its knob. Stage order
+# matters and is already correct: content mutation (with the one pack rebuild)
+# first, runtime-JSON randomizers next, placement LAST (it validates against the
+# final entrance table and resets the run state - fired checks + tracker).
+#
+# After it finishes: RESTART THE WINDOWS SERVER. Also make sure world.json has
+# "apSkipTutorial": true (next to xpRate/infiniteRun) if you want new accounts to
+# skip Tutorial Island - that's a world flag, not a seed artifact.
+
+set -euo pipefail
+ENGINE_DIR="$(cd "$(dirname "$0")/../../Server/engine" && pwd)"
+cd "$ENGINE_DIR"
+
+# ============================== master knobs =================================
+
+SEED=777                  # one seed drives every stage below (change per run!)
+
+# --- stage toggles: 1 = run, 0 = skip (skipped stages keep their current state) ---
+RUN_CONTENT=1             # drip + shops + drops via RegenerateAll (INCLUDES the ~1:30 pack rebuild)
+RUN_GATHER=1              # gathering swap table (runtime JSON, restart only)
+RUN_PROCESS=1             # processing/recipe swap table (runtime JSON, restart only)
+RUN_ENTRANCES=1           # entrance shuffle + automatic logic validation/reroll
+RUN_SPAWN=1               # random home/respawn point
+RUN_PLACEMENT=1           # AP placement: checks contain the unlocks (RESETS run progress!)
+REFRESH_REGION_GRAPH=0    # only after map/content changes (validator input; slow-ish)
+REFRESH_WORLDMAP_PNG=0    # tracker map images; only after map changes
+
+# ============================ per-stage knobs ================================
+
+# RegenerateAll.ts - restores pristine content, reruns drip+shops+drops, rebuilds pack.
+#   all params: [--seed <n>] [--drip-seed <n>] [--shops-seed <n>] [--drops-seed <n>]
+#               [--mode tiered|chaos|mimic] [--skip-drip] [--skip-shops] [--skip-drops]
+#               [--no-rebuild]
+#   (finer control lives in the individual tools if you ever need it:
+#    RandomizeDrip.ts  [--seed n] [--dry-run] [--mixed-gender] [--no-weapons] [--exclude a,b]
+#    RandomizeShops.ts [--seed n] [--dry-run] [--mismatched-titles] [--exclude a,b]
+#    RandomizeDrops.ts [--seed n] [--dry-run] [--mode tiered|chaos|mimic] [--no-death-drop] [--exclude a,b])
+DROPS_MODE=mimic          # tiered | chaos | mimic ("chicken runs the green dragon table")
+REGENERATE_EXTRA=""       # e.g. "--skip-drip" or "--drip-seed 555"
+
+# RandomizeGathering.ts - what mining/fishing/woodcutting actually yield.
+#   all params: [--seed <n>] [--mode shuffle|chaos]
+#               [--skills mining,fishing,woodcutting] [--exclude <item,item>]
+#               [--pin-quest-items] [--no-quest-pins] [--dry-run]
+GATHER_MODE=shuffle       # shuffle (bijective, everything obtainable) | chaos
+GATHER_EXTRA=""
+
+# RandomizeProcessing.ts - what cooking/smithing/crafting/fletching produce.
+#   all params: [--seed <n>] [--mode shuffle|chaos]
+#               [--skills cooking,smithing,crafting,fletching] [--exclude <item,item>]
+#               [--pin-quest-items] [--no-quest-pins] [--dry-run]
+PROCESS_MODE=shuffle
+PROCESS_EXTRA=""
+
+# RandomizeEntrances.ts - ladder/stair/trapdoor shuffle + gated entrances.
+#   all params: [--seed <n>] [--mixed] [--dry-run] [--no-validate]
+#   (validation rerolls seed+1 automatically, budget 20; --rewrite is legacy, avoid)
+ENTRANCE_EXTRA=""         # e.g. "--mixed" to pool cross-map + floor-shift together
+
+# RandomizeSpawn.ts - the home/respawn point.
+#   all params: [--seed <n>] [--mode city|chunk] [--dry-run] [--include-far-west]
+SPAWN_MODE=city           # city (7 spellbook landmarks) | chunk (random mainland square)
+SPAWN_EXTRA=""            # chunk mode: "--include-far-west" opens mapX<40 back up
+
+# GenerateSeed.ts - AP placement (checks contain the unlocks). Writes
+# ap-placements.json + a locked starting ap-unlocks.json, CLEARS fired checks +
+# tracker (a placement seed IS a new run), and refuses to ship an unbeatable seed.
+#   all params: [--seed N] [--pool per-skill|groups] [--dry-run]
+#               [--max-progression-level N] [--retry-budget N] [--config-dir <dir>]
+POOL=per-skill            # per-skill (72 "+20 <Skill> cap" items) | groups (32 chunky items)
+PLACEMENT_EXTRA=""        # e.g. "--max-progression-level 50"
+
+# ================================ stages =====================================
+
+run() { echo; echo "==> npx tsx $*"; npx tsx "$@"; }
+
+[ "$RUN_CONTENT" = 1 ]   && run tools/RegenerateAll.ts --seed "$SEED" --mode "$DROPS_MODE" $REGENERATE_EXTRA
+[ "$RUN_GATHER" = 1 ]    && run tools/gather/RandomizeGathering.ts --seed "$SEED" --mode "$GATHER_MODE" $GATHER_EXTRA
+[ "$RUN_PROCESS" = 1 ]   && run tools/process/RandomizeProcessing.ts --seed "$SEED" --mode "$PROCESS_MODE" $PROCESS_EXTRA
+[ "$RUN_ENTRANCES" = 1 ] && run tools/map/RandomizeEntrances.ts --seed "$SEED" $ENTRANCE_EXTRA
+[ "$RUN_SPAWN" = 1 ]     && run tools/spawn/RandomizeSpawn.ts --seed "$SEED" --mode "$SPAWN_MODE" $SPAWN_EXTRA
+[ "$REFRESH_REGION_GRAPH" = 1 ] && run tools/logic/BuildRegionGraph.ts
+[ "$REFRESH_WORLDMAP_PNG" = 1 ] && run tools/map/RenderWorldmapPng.ts
+[ "$RUN_PLACEMENT" = 1 ] && run tools/ap/GenerateSeed.ts --seed "$SEED" --pool "$POOL" $PLACEMENT_EXTRA
+
+echo
+echo "================================================================"
+echo "New run rolled (seed $SEED). Now:"
+echo "  1. RESTART the Windows server."
+echo "  2. Walkthrough: npx tsx tools/sim/SimulateProgression.ts --verbosity 2"
+echo "  3. Sanity:      npx tsx tools/logic/ValidateSeed.ts"
+echo "  4. Tracker:     http://localhost:8080/ap/   (?spoiler=1 to see everything)"
+echo "  5. Testing aids: tools/ap/SetUnlock.ts <name> <count> | --clear"
+echo "================================================================"
