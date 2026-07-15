@@ -10,6 +10,9 @@ the level-based reward system, and the next randomizers - build from it.
 catalog (first-time/kill/level/stage checks), reward expansion (XP drops,
 supply categories), and AP unlock items (gear tiers, tools, skill caps, quest
 gates) - decisions pending at the bottom of that doc.
+`docs/tracker-map.md` is the researched proposal for the browser discovery
+tracker (world map revealing entrances/swaps/mimics only after first use) -
+also decisions-pending.
 
 ## The one-paragraph mental model
 

@@ -1722,3 +1722,31 @@ nothing installed. Hook-point facts verified this session, worth not re-deriving
 - Proposed opcode allocations to keep collision-free: **1903 =
   ap_stat_advance_raw, 1904 = ap_unlock_count** (unlock table needs a RELOAD path,
   unlike entrances - AP items arrive mid-session).
+
+## Session addendum: tracker-map feasibility research (2026-07-15, same session)
+
+Second docs-only deliverable: [tracker-map.md](tracker-map.md) (browser discovery
+tracker). Web-layer facts verified this session, worth not re-deriving:
+
+- **`engine/src/web.ts` is a plain `http.createServer` if-chain router**
+  (`handleWebRequest`), NOT express/fastify. It already serves static files from
+  `engine/public/` as a fallthrough (`web.ts:174-177`) - a static tracker page under
+  `public/ap/` needs zero engine changes; only JSON data routes need a web.ts
+  overlay. A second management-port server exists too (`web.ts:393`).
+- **`/worldmap.jag` is already a route** (`web.ts:144`), built by
+  `engine/tools/pack/map/Worldmap.ts` from packed map data (underlay/overlay/loc/
+  labels dats), and **`webclient/src/mapview/MapView.ts` (1962 lines) is a full
+  browser port of the 2004 world-map applet** - already a bundle entry
+  (`webclient/bundle.ts:156`), fetches /worldmap.jag, renders a pannable canvas
+  map. Any future "render the world in a browser" work should start from these
+  two files.
+- **Every runtime randomizer lookup is a one-function discovery hook**:
+  `getEntranceOverride`, `getGatherSwap` (ApGatherOverrides.ts:53),
+  `getProcessSwap` (ApProcessOverrides.ts:54), `getDropGroupOverride`
+  (ApDropOverrides.ts:48). The lookup moment IS the "player did it once" moment,
+  so reveal-after-first-use costs nothing extra. Config-mutation randomizers
+  (teleports, shops) have no runtime lookup - proposed generic `ap_track` command
+  (opcode 1905) for content-side discovery calls.
+- Opcode ledger now: 1900 entrance, 1901 drop group, 1902 gather swap, 1903
+  (proposed) ap_stat_advance_raw, 1904 (proposed) ap_unlock_count, 1905 (proposed)
+  ap_track.

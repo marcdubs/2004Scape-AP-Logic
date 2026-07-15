@@ -109,11 +109,13 @@ call to a new `~ap_quest_complete` proc at the end. That proc:
 
 **Reward roll design:**
 - Pick a category uniformly at random: `runes`, `ranged_gear`, `arrows`,
-  `weapons`, `armour`, `cash`, `potions`, `food`.
+  `weapons`, `armour`, `cash`, `potions`, `food`, `tools`.
 - Pick the item within the category by the governing stat, checked with
   `stat(...)` at roll time: armour→defence, weapons→attack, ranged gear &
   arrows→ranged, runes→magic, potions & food→hitpoints (or combat level),
-  cash→scale with quest points (`%qp`).
+  tools→min(woodcutting, mining) (so a lopsided gatherer can't roll a top-tier
+  tool for the skill they haven't trained), cash→scale with quest points
+  (`%qp`).
 - Tier tables: give each pool entry a `min_level`; roll among entries the player
   qualifies for, weighted toward the top of their range so a 40-Defence player
   actually sees rune, not an even chance of bronze. Example the user gave:
