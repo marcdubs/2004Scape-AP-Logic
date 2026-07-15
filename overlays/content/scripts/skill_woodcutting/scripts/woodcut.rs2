@@ -168,22 +168,29 @@ def_obj $obj1 = inv_getobj(worn, ^wearpos_rhand);
 // if (($obj1 = bronze_axe | inv_total(inv, bronze_axe) > 0) & $level > 0) {
 //     return (bronze_axe);
 // }
-if (($obj1 = rune_axe | inv_total(inv, rune_axe) > 0)) {
+// AP: Archipelago progressive-tool gate (2004Scape-AP-Logic docs/checks-and-unlocks.md,
+// unlock family B). ap_unlock_count() returns 99 when data/config/ap-unlocks.json does
+// not exist, so the "& ap_unlock_count(...) >= N" clauses below are a no-op outside an
+// AP run. Unlike mining's pickaxe_checker (out of this overlay's ownership), this whole
+// cascade lives in this file, so a locked tier naturally FALLS THROUGH to the next-best
+// owned tier the player is carrying (real "fall back to best unlocked tool" semantics)
+// instead of being treated as "no axe" - bronze (tier 0) always stays unconditional.
+if (($obj1 = rune_axe | inv_total(inv, rune_axe) > 0) & ap_unlock_count("progressive_axe") >= 6) {
     return (rune_axe);
 }
-if (($obj1 = adamant_axe | inv_total(inv, adamant_axe) > 0)) {
+if (($obj1 = adamant_axe | inv_total(inv, adamant_axe) > 0) & ap_unlock_count("progressive_axe") >= 5) {
     return (adamant_axe);
 }
-if (($obj1 = mithril_axe | inv_total(inv, mithril_axe) > 0)) {
+if (($obj1 = mithril_axe | inv_total(inv, mithril_axe) > 0) & ap_unlock_count("progressive_axe") >= 4) {
     return (mithril_axe);
 }
-if (($obj1 = black_axe | inv_total(inv, black_axe) > 0)) {
+if (($obj1 = black_axe | inv_total(inv, black_axe) > 0) & ap_unlock_count("progressive_axe") >= 3) {
     return (black_axe);
 }
-if (($obj1 = steel_axe | inv_total(inv, steel_axe) > 0)) {
+if (($obj1 = steel_axe | inv_total(inv, steel_axe) > 0) & ap_unlock_count("progressive_axe") >= 2) {
     return (steel_axe);
 }
-if (($obj1 = iron_axe | inv_total(inv, iron_axe) > 0)) {
+if (($obj1 = iron_axe | inv_total(inv, iron_axe) > 0) & ap_unlock_count("progressive_axe") >= 1) {
     return (iron_axe);
 }
 if (($obj1 = bronze_axe | inv_total(inv, bronze_axe) > 0)) {

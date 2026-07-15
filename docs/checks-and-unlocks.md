@@ -162,7 +162,7 @@ Three additions:
 - **The multiplier trap**: `stat_advance` (`PlayerOps.ts:801`) calls
   `addXp(stat, xp)` with `allowMulti` defaulted true → the user's `xpRate: 30`
   world would turn a "10k XP" drop into 300k. Add a new engine command
-  `ap_stat_advance_raw(stat, xp)` → `addXp(stat, xp, false)` — **opcode 1903**
+  `ap_stat_advance_raw(stat, xp)` → `addXp(stat, xp, false)` — **opcode 1904**
   (1900 entrance, 1901 drop group, 1902 gather swap are taken; standard
   4-touch-point recipe). XP drops should feel identical on a 1x and a 30x world.
 - Weighting within the roll: flat random across all 19 skills including HP —
@@ -364,7 +364,7 @@ readable and ideally runtime-*re*-readable:
   entrances it needs a **reload path** (file-watch or a reload on each AP item
   receipt) since the AP client will rewrite it while the server runs. Pre-AP
   testing: `::apunlock <name> <count>` writes the file and reloads.
-- Script command `ap_unlock_count(string)(int)` — **opcode 1904**. Content-side
+- Script command `ap_unlock_count(string)(int)` — **opcode 1905**. Content-side
   gates (A/B/D/E) call it; engine-side consumers (C/F) read the module
   directly.
 - Missing file = everything unlocked (vanilla behavior preserved, same
@@ -397,11 +397,11 @@ readable and ideally runtime-*re*-readable:
    Dragon Slayer stage table proves it end-to-end.
 2. **First-XP + first-kill checks** (addXp hook, npc_death overlay,
    `::apfirstxp` status printout).
-3. **Reward expansion**: XP drops (opcode 1903) + 3 supply categories
+3. **Reward expansion**: XP drops (opcode 1904) + 3 supply categories
    (`::apreward xp`, `::apreward herb_supplies 40` etc. already fit the
    existing test command's arg shape).
 4. **Level milestone checks** (levelup.rs2 overlay + milestone dbtable).
-5. **Unlock plumbing** (JSON + module + opcode 1904 + `::apunlock`), then in
+5. **Unlock plumbing** (JSON + module + opcode 1905 + `::apunlock`), then in
    value order: **A gear tiers → B tools → C skill caps → D quest gates →
    E teleports → F xp tomes**.
 6. AP protocol integration (the apworld package + a bridge client) — after the

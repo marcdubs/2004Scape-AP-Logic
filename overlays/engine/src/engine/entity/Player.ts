@@ -23,6 +23,8 @@ import HeroPoints from '#/engine/entity/HeroPoints.js';
 import Loc from '#/engine/entity/Loc.js';
 import { ModalState } from '#/engine/entity/ModalState.js';
 import { MoveSpeed } from '#/engine/entity/MoveSpeed.js';
+import * as ApChecks from '#/engine/ApChecks.js';
+import { clampStatXp } from '#/engine/ApUnlockOverrides.js';
 import { MoveStrategy } from '#/engine/entity/MoveStrategy.js';
 import { isClientConnected } from '#/engine/entity/NetworkPlayer.js';
 import Npc from '#/engine/entity/Npc.js';
@@ -1778,6 +1780,11 @@ export default class Player extends PathingEntity {
             if (varp.transmit) {
                 this.writeVarp(id, value);
             }
+
+            // AP: varp-watch check emitter (quest stages, barcrawl bits). Fires for
+            // every numeric varp write incl. per-tick engine internals - the module
+            // is responsible for staying O(1) on unwatched varps.
+            ApChecks.onVarpSet(this, id, value);
         }
     }
 
@@ -1830,7 +1837,14 @@ export default class Player extends PathingEntity {
         }
 
         const multi = allowMulti ? Environment.node.xpRate : 1;
-        this.stats[stat] += xp * multi;
+        // AP: progressive skill caps may truncate the gain (pure passthrough until an
+        // unlock table caps this stat); first-XP state feeds the AP check emitter below.
+        const gained = clampStatXp(stat, this.stats[stat], xp * multi);
+        if (gained <= 0) {
+            return;
+        }
+        const firstXp = this.stats[stat] === 0;
+        this.stats[stat] += gained;
 
         // cap to 200m, this is represented as "2 billion" because we use 32-bit signed integers and divide by 10 to give us a decimal point
         if (this.stats[stat] > 2_000_000_000) {
@@ -1892,6 +1906,9 @@ export default class Player extends PathingEntity {
             this.combatLevel = this.getCombatLevel();
             this.buildAppearance(this.appearanceInv);
         }
+
+        // AP: check emitter (first XP in a skill, level milestones).
+        ApChecks.onXpGain(this, stat, before, this.baseLevels[stat], firstXp);
     }
 
     changeStat(stat: number) {

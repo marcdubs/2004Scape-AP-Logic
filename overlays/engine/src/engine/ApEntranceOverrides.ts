@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { CoordGrid } from '#/engine/CoordGrid.js';
+import { recordDiscovery } from '#/engine/ApTracker.js';
 import { printInfo, printWarning } from '#/util/Logger.js';
 
 // Backing store for the ap_entrance_override script command (Archipelago entrance
@@ -23,6 +24,13 @@ const COORD_RE = /^\d+_\d+_\d+_\d+_\d+$/;
 function packFromString(raw: string): number {
     const [level, mapX, mapZ, localX, localZ] = raw.split('_').map(Number);
     return CoordGrid.packCoord(level, (mapX << 6) + localX, (mapZ << 6) + localZ);
+}
+
+// inverse of packFromString - reproduces the same "level_mapX_mapZ_localX_localZ"
+// human-readable form the JSON table (and thus the browser tracker map) uses.
+function stringFromPacked(packed: number): string {
+    const { level, x, z } = CoordGrid.unpackCoord(packed);
+    return `${level}_${x >> 6}_${z >> 6}_${x & 63}_${z & 63}`;
 }
 
 let overrides: Map<string, number> | null = null;
@@ -58,5 +66,20 @@ export function getEntranceOverride(packedCoord: number, op: number): number {
     if (overrides === null) {
         overrides = load();
     }
-    return overrides.get(`${packedCoord}:${op}`) ?? -1;
+
+    const dest = overrides.get(`${packedCoord}:${op}`) ?? -1;
+    if (dest !== -1) {
+        // the lookup moment IS "the player actually used this shuffled entrance" -
+        // record it for the browser discovery tracker (docs/tracker-map.md).
+        recordDiscovery('entrances', `${stringFromPacked(packedCoord)}:${op}`, stringFromPacked(dest));
+    }
+    return dest;
+}
+
+// table size for the tracker's "N of M discovered" counters - not a spoiler, just a count.
+export function getEntranceOverrideCount(): number {
+    if (overrides === null) {
+        overrides = load();
+    }
+    return overrides.size;
 }

@@ -1,2 +1,5 @@
 [ap_kbd_killed]
 scope=perm
+
+[ap_kills]
+scope=perm

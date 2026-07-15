@@ -9,13 +9,40 @@
 // emitter (see goals-and-checks.md). Always called from send_quest_complete,
 // which only ever runs from a [queue,...] trigger, so protected access
 // (bank fallback, varp writes) is already available here - no p_finduid dance
-// needed in this proc, unlike the KBD kill hook.
+// needed in this proc, unlike the KBD kill hook. Quest completion is just one
+// check surface now (see checks-and-unlocks.md's check catalog), so this is a
+// thin wrapper over the shared ~ap_grant_check_reward.
 [proc,ap_quest_complete]
+~ap_grant_check_reward;
+
+// info: custom - the general-purpose check+reward hook, public interface for
+// every other check surface (e.g. the checks agent's [queue,ap_check_fired]
+// calls this directly). Rolls a fully random category at the player's level
+// in that category and delivers it. Callers must only invoke this from a
+// queue-triggered (or otherwise already-protected) context, same guarantee
+// ap_quest_complete relies on above.
+[proc,ap_grant_check_reward]
 def_string $category = ~ap_random_category;
+if (compare($category, "xp") = 0) {
+    ~ap_grant_xp_reward;
+    return;
+}
 ~ap_deliver_reward(~ap_roll_reward($category, ~ap_level_for_category($category)));
 
+// info: custom - XP-drop reward category (10k-50k real XP in a uniformly
+// random skill, all 19 including hitpoints - flat random across all of them
+// is the fun, see checks-and-unlocks.md "XP drops"). No dbrows: amount and
+// skill are rolled here directly. ap_stat_advance_raw bypasses the world's
+// xpRate multiplier so a "10k XP" drop is 10k XP on a 1x world and a 30x
+// world alike (engine XP units are tenths of a point).
+[proc,ap_grant_xp_reward]
+def_stat $stat = enum(int, stat, stats, calc(random(19) + 1));
+def_int $exp = calc(random(400001) + 100000);
+ap_stat_advance_raw($stat, $exp);
+mes("You are struck by inspiration! +<tostring(calc($exp / 10))> <~stat_name($stat)> XP.");
+
 [proc,ap_random_category]()(string)
-def_int $r = random(8);
+def_int $r = random(14);
 if ($r = 0) {
     return("armour");
 } else if ($r = 1) {
@@ -30,10 +57,24 @@ if ($r = 0) {
     return("potions");
 } else if ($r = 6) {
     return("food");
+} else if ($r = 7) {
+    return("tools");
+} else if ($r = 8) {
+    return("cash");
+} else if ($r = 9) {
+    return("xp");
+} else if ($r = 10) {
+    return("herb_supplies");
+} else if ($r = 11) {
+    return("runecraft_supplies");
+} else if ($r = 12) {
+    return("crafting_supplies");
 }
-return("cash");
+return("keepsakes");
 
 // Maps a reward category to the stat (or %qp, for cash) that gates its tiers.
+// "xp" never reaches this (special-cased before the dbtable roll in both
+// ap_grant_check_reward and ap_reward_do below).
 [proc,ap_level_for_category](string $category)(int)
 if (compare($category, "armour") = 0) {
     return(stat_base(defence));
@@ -45,8 +86,25 @@ if (compare($category, "armour") = 0) {
     return(stat_base(magic));
 } else if (compare($category, "potions") = 0 | compare($category, "food") = 0) {
     return(stat_base(hitpoints));
+} else if (compare($category, "tools") = 0) {
+    // gate on the lower of the two gathering stats so a woodcutting-only
+    // character can't roll a rune pickaxe (and vice versa)
+    return(min(stat_base(woodcutting), stat_base(mining)));
 } else if (compare($category, "cash") = 0) {
     return(%qp);
+} else if (compare($category, "herb_supplies") = 0) {
+    return(stat_base(herblore));
+} else if (compare($category, "runecraft_supplies") = 0) {
+    return(stat_base(runecraft));
+} else if (compare($category, "crafting_supplies") = 0) {
+    return(stat_base(crafting));
+} else if (compare($category, "keepsakes") = 0) {
+    // flat pool - every keepsakes row is min_level 1, so the weighted
+    // reservoir roll (weight = min_level + 1) is naturally uniform across
+    // the whole category regardless of what we return here, as long as it's
+    // >= 1. No level gating is appropriate for one-per-account quest
+    // keepsakes, so this is a deliberate neutral mapping, not an oversight.
+    return(1);
 }
 return(1);
 
@@ -98,7 +156,12 @@ if (inv_freespace(inv) > 0 | inv_total(inv, $item) > 0) {
 // ::apreward [category] [level] - bare = fully random category + the
 // player's own level in that category (same roll send_quest_complete would
 // make); with args, forces category/tier so every level bracket can be
-// eyeballed without playing to it.
+// eyeballed without playing to it. Valid category names: armour, weapons,
+// ranged_gear, arrows, runes, potions, food, tools, cash, xp, herb_supplies,
+// runecraft_supplies, crafting_supplies, keepsakes - an unrecognized name
+// rolls no eligible rows and prints ap_deliver_reward's "no reward available"
+// message. xp ignores $level entirely (it's not tiered - see
+// ap_grant_xp_reward); keepsakes ignores $level too (flat pool).
 [debugproc,ap_reward](string $category, int $level)
 if_close;
 if (p_finduid(uid) = false) {
@@ -112,7 +175,11 @@ if (p_finduid(uid) = false) {
 
 [proc,ap_reward_do](string $category, int $level)
 if (compare($category, "") = 0) {
-    ~ap_quest_complete;
+    ~ap_grant_check_reward;
+    return;
+}
+if (compare($category, "xp") = 0) {
+    ~ap_grant_xp_reward;
     return;
 }
 if ($level <= 0) {

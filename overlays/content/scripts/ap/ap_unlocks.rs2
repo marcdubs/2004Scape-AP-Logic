@@ -1,0 +1,30 @@
+// Test command for the Archipelago unlock table (2004Scape-AP-Logic
+// docs/checks-and-unlocks.md, "Unlock plumbing"). ap_unlock_count is declared as a
+// [command,...] in ap.rs2 (owned by another workstream) - this file only adds the
+// ::apunlock debugproc, following the same "any file can add [debugproc,ap_<name>]"
+// dispatch convention documented there.
+
+// ::apunlock <name> - print the received count for a named unlock, e.g.
+// ::apunlock progressive_melee. Bare ::apunlock prints usage plus the families this
+// workstream implements (A: gear tiers, B: tools).
+[debugproc,ap_unlock](string $name)
+if (p_finduid(uid) = false) {
+    return;
+}
+if (compare($name, "") = 0) {
+    mes("Usage: ::apunlock <name> (e.g. ::apunlock progressive_melee)");
+    def_int $melee = ap_unlock_count("progressive_melee");
+    def_int $armour = ap_unlock_count("progressive_armour");
+    def_int $ranged = ap_unlock_count("progressive_ranged");
+    def_int $magic = ap_unlock_count("progressive_magic");
+    def_int $axe = ap_unlock_count("progressive_axe");
+    def_int $pickaxe = ap_unlock_count("progressive_pickaxe");
+    mes("progressive_melee: <tostring($melee)>");
+    mes("progressive_armour: <tostring($armour)>");
+    mes("progressive_ranged: <tostring($ranged)>");
+    mes("progressive_magic: <tostring($magic)>");
+    mes("progressive_axe: <tostring($axe)>");
+    mes("progressive_pickaxe: <tostring($pickaxe)>");
+    return;
+}
+mes("AP unlock count: <$name> = <tostring(ap_unlock_count($name))>");

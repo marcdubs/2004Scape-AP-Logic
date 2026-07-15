@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
+import { recordDiscovery } from '#/engine/ApTracker.js';
 import { printInfo, printWarning } from '#/util/Logger.js';
 
 // Backing store for the ap_gather_swap script command (Archipelago gathering-skill
@@ -54,5 +55,20 @@ export function getGatherSwap(product: number): number {
     if (overrides === null) {
         overrides = load();
     }
-    return overrides.get(product) ?? product;
+
+    const swapped = overrides.get(product) ?? product;
+    if (swapped !== product) {
+        // the lookup moment IS "the player actually gathered this" - record it for
+        // the browser discovery tracker (docs/tracker-map.md).
+        recordDiscovery('gather', String(product), String(swapped));
+    }
+    return swapped;
+}
+
+// table size for the tracker's "N of M discovered" counters - not a spoiler, just a count.
+export function getGatherOverrideCount(): number {
+    if (overrides === null) {
+        overrides = load();
+    }
+    return overrides.size;
 }

@@ -1,4 +1,5 @@
 import { execFileSync } from 'child_process';
+import fs from 'fs';
 
 import { printInfo } from '#/util/Logger.js';
 
@@ -83,6 +84,14 @@ function main() {
     const npcRestored = restoreNpcBackup();
     const dropRestored = restoreDropScriptBackup();
     printInfo(`restored ${npcRestored} .npc file(s) (${SCRIPTS_ROOT}) and ${dropRestored} drop-table script(s) (${DROP_SCRIPTS_DIR}) to pristine vanilla`);
+
+    // discoveries from a previous seed are lies once the world reshuffles - the
+    // browser tracker (ApTracker.ts / docs/tracker-map.md) must start fogged again.
+    // The fired-checks ledger stays: checks are once-ever progression, not seed data.
+    if (fs.existsSync('data/config/ap-tracker.json')) {
+        fs.rmSync('data/config/ap-tracker.json');
+        printInfo('cleared data/config/ap-tracker.json (tracker discoveries reset for the new seed)');
+    }
 
     // the mimic dispatch file/JSON live OUTSIDE the backed-up subtrees (deliberately -
     // see MimicTransform.ts), so the restore above doesn't touch them. If this pipeline

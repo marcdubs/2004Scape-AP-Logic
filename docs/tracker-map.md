@@ -40,7 +40,7 @@ single owned functions:
 | Gather swaps | `ApGatherOverrides.getGatherSwap()` (`:53`) | swapped product actually delivered (mine/chop/fish) |
 | Manufacture/recipe swaps | `ApProcessOverrides.getProcessSwap()` (`:54`) | swapped output actually crafted/cooked/smithed |
 | Drop-table mimics | `ApDropOverrides.getDropGroupOverride()` (`:48`) | monster with a mimicked table actually killed |
-| Anything content-side | new script command `ap_track(category, key, value)` — **opcode 1905** | script says so |
+| Anything content-side | new script command `ap_track(category, key, value)` — **opcode 1906** | script says so |
 
 The first four are engine-only edits inside files this repo already overlays —
 the lookup *is* the "player did the thing" moment, so "revealed only after doing
@@ -128,14 +128,14 @@ few-thousand-pixel image, one file is fine.
 
 | Piece | Size |
 |---|---|
-| `ApTracker.ts` + 4 lookup hooks + opcode 1905 | small — an evening |
+| `ApTracker.ts` + 4 lookup hooks + opcode 1906 | small — an evening |
 | `web.ts` overlay route | small |
 | PNG renderer tool | medium — the flo-color render is the one genuinely new bit, but `Worldmap.ts` is the crib sheet |
 | Tracker SPA (map + tabs, polling) | medium — plain web dev, spoiler mode makes it fast to iterate |
 | Content-side `ap_track` calls (teleports/shops/home) | small |
 
 No new infrastructure categories: runtime-JSON pattern (existing), engine
-command recipe (existing, 1905 next), whole-file overlays (existing), static
+command recipe (existing, 1906 was next), whole-file overlays (existing), static
 web serving (already in vanilla).
 
 ## Decisions needed from the user

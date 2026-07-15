@@ -1,0 +1,145 @@
+// Archipelago check-firing payoff + first/notable-kill tracking. See
+// docs/checks-and-unlocks.md, check surfaces #2-#6. The varp watcher (barcrawl
+// bars, Dragon Slayer stages) and the first-XP/level-milestone checks live in
+// the engine (ApChecks.ts, hooked from Player.setVar/Player.addXp) and reach
+// here purely by enqueueing [queue,ap_check_fired] - this file never needs to
+// know why a check fired, only how to announce + reward it. Kill checks are
+// content-side (hooked from the shared [proc,npc_death], see below) but funnel
+// through the exact same queue script, so there is only ever ONE announce+
+// reward seam in the whole checks system.
+
+// Queue scripts always run with protected access (Feature-1/2 lesson), so no
+// if_close/p_finduid dance is needed here even though checks fire from
+// engine-hot-path hooks and unprotected NPC-death contexts.
+[queue,ap_check_fired](string $check_id)
+mes("Archipelago check: <~ap_prettify_check_id($check_id)>!");
+~ap_grant_check_reward;
+
+// Cosmetic only: "first_kill_moss_giant" -> "first kill moss giant". No
+// string-replace command exists in this rs2 dialect, so this walks the string
+// one char at a time swapping '_' for ' '.
+[proc,ap_prettify_check_id](string $id)(string)
+def_string $out = "";
+def_int $i = 0;
+def_int $len = string_length($id);
+while ($i < $len) {
+    def_string $ch = substring($id, $i, calc($i + 1));
+    if (compare($ch, "_") = 0) {
+        $out = append($out, " ");
+    } else {
+        $out = append($out, $ch);
+    }
+    $i = calc($i + 1);
+}
+return($out);
+
+// ------------------------------------------------------------------
+// First/notable kill tracking (check surface #5). Hooked from the shared
+// [proc,npc_death] via a whole-file overlay of
+// skill_combat/scripts/npc/npc_death.rs2 - one added line, `~ap_track_kill;`,
+// inside its existing "if (finduid(%npc_aggressive_player) = true)" block, so
+// npc_type is still valid there (npc_del hasn't run yet) and the killer is
+// already resolved.
+//
+// %ap_kills is a new perm varp (configs/ap.varp): bit 0 = first kill ever,
+// bits 1-14 = a curated notable-monster list, matched by npc_type (OR-chains
+// covering each monster's palette-swap variants). npc_category was the
+// originally suggested match mechanism, but was verified NOT to apply here:
+// none of goblin/cow/chicken/rat/guard/dwarf/skeleton/zombie/ghost/moss
+// giant/ice giant/lesser demon/black knight/green dragon carry a category=
+// value anywhere in this content set's .npc configs (category is reserved
+// for quest/grouped NPCs like dagannoth_mother, bank_teller, etc in this
+// rev) - confirmed by grepping every .npc config, not assumed. "Hill giant"
+// was in the suggested curated list but does not exist anywhere in this
+// content set (content/pack/npc.pack has no hillgiant/hill_giant entry at
+// all, same "not implemented yet" situation as giant spiders' missing drop
+// table) - dropped from the list.
+// ------------------------------------------------------------------
+
+[proc,ap_track_kill]
+~ap_kill_mark(0, "first_kill");
+if (npc_type = goblin | npc_type = goblin_armed | npc_type = goblin_helmet | npc_type = goblin_greenarmour | npc_type = goblin_redarmour) {
+    ~ap_kill_mark(1, "first_kill_goblin");
+} else if (npc_type = cow) {
+    ~ap_kill_mark(2, "first_kill_cow");
+} else if (npc_type = chicken) {
+    ~ap_kill_mark(3, "first_kill_chicken");
+} else if (npc_type = rat) {
+    ~ap_kill_mark(4, "first_kill_rat");
+} else if (npc_type = guard1 | npc_type = guard2) {
+    ~ap_kill_mark(5, "first_kill_guard");
+} else if (npc_type = dwarf_normal | npc_type = dwarf_chaos | npc_type = dwarf_mountain | npc_type = dwarf_tunnel) {
+    ~ap_kill_mark(6, "first_kill_dwarf");
+} else if (npc_type = skeleton_unarmed | npc_type = skeleton_armed | npc_type = skeleton_unagressive) {
+    ~ap_kill_mark(7, "first_kill_skeleton");
+} else if (npc_type = zombie_unarmed | npc_type = zombie_armed | npc_type = zombie2) {
+    ~ap_kill_mark(8, "first_kill_zombie");
+} else if (npc_type = ghost) {
+    ~ap_kill_mark(9, "first_kill_ghost");
+} else if (npc_type = mossgiant) {
+    ~ap_kill_mark(10, "first_kill_moss_giant");
+} else if (npc_type = icegiant) {
+    ~ap_kill_mark(11, "first_kill_ice_giant");
+} else if (npc_type = lesser_demon) {
+    ~ap_kill_mark(12, "first_kill_lesser_demon");
+} else if (npc_type = black_knight | npc_type = aggressive_black_knight) {
+    ~ap_kill_mark(13, "first_kill_black_knight");
+} else if (npc_type = green_dragon) {
+    ~ap_kill_mark(14, "first_kill_green_dragon");
+}
+
+// Sets bit $bit on %ap_kills and fires $check_id, once ever. The early
+// testbit return (before if_close) means a player's 10,000th chicken kill
+// costs one cheap varp read, not a forced modal-close - if_close/p_finduid
+// only run the FIRST time a given bit is still unset. Needs protected access
+// to write the varp - copies the king_black_dragon.rs2 if_close/p_finduid/
+// queue-retry shape exactly (npc-death context is unprotected by default,
+// same as every other ai_queue3 kill hook in this repo).
+[proc,ap_kill_mark](int $bit, string $check_id)
+if (testbit(%ap_kills, $bit) = ^true) {
+    return;
+}
+if_close;
+if (p_finduid(uid) = true) {
+    if (testbit(%ap_kills, $bit) = ^false) {
+        %ap_kills = setbit(%ap_kills, $bit);
+        queue*(ap_check_fired, 0)($check_id);
+    }
+} else {
+    queue*(ap_kill_mark_retry, 0)($bit, $check_id);
+}
+
+[queue,ap_kill_mark_retry](int $bit, string $check_id)
+if (testbit(%ap_kills, $bit) = ^false) {
+    %ap_kills = setbit(%ap_kills, $bit);
+    queue*(ap_check_fired, 0)($check_id);
+}
+
+// ------------------------------------------------------------------
+// Test commands (see docs/goals-and-checks.md "Test command infrastructure").
+// ------------------------------------------------------------------
+
+// ::apcheckfire <check_id> - directly fires the check payoff (mes + reward)
+// via the same queue script real checks use, bypassing the engine's watch
+// table/dedupe entirely - exercises the reward path without needing to trip
+// a watch or land a kill.
+[debugproc,ap_checkfire](string $check_id)
+if_close;
+if (p_finduid(uid) = false) {
+    queue*(ap_checkfire_retry, 0)($check_id);
+    return;
+}
+queue*(ap_check_fired, 0)($check_id);
+
+[queue,ap_checkfire_retry](string $check_id)
+queue*(ap_check_fired, 0)($check_id);
+
+// ::apchecks - status readout of what rs2 can see for the checks system:
+// %ap_kills bits set, barcrawl bar count, %dragonquest value.
+[debugproc,ap_checks]
+if (p_finduid(uid) = false) {
+    return;
+}
+mes("AP checks - kill flags set: <tostring(bitcount(%ap_kills))> (first kill: <tostring(testbit(%ap_kills, 0))>)");
+mes("Barcrawl bars signed: <tostring(bitcount(getbit_range(%barcrawl, 3, 12)))>/10");
+mes("Dragon Slayer stage (%dragonquest): <tostring(%dragonquest)>");

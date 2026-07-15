@@ -1766,3 +1766,83 @@ the quest-critical scan (additive-only risk: sequence-skips Merlin's Crystal fet
 steps, can't brick). `dramen_staff` stays out of every pool (it is Lost City's
 completion mechanic). When building the dbrow, run candidates through
 `loadQuestCriticalItems()` and sign off on each flagged item explicitly.
+
+## Session-end addendum: parallel-agent build of checks/rewards/unlocks/tracker (2026-07-15)
+
+The user asked to fan out subagents to build everything in checks-and-unlocks.md +
+tracker-map.md. Orchestration shape that worked: the orchestrator built the SHARED
+plumbing first (files touched by multiple workstreams), froze those files, then ran
+4 parallel agents with strictly disjoint file ownership and no build/install rights
+(one integration build at the end). Facts a future session needs:
+
+- **Opcode ledger CORRECTION vs the design docs' first drafts**: 1903 was already
+  AP_PROCESS_SWAP (processing randomizer). Actual: **1904 = AP_STAT_ADVANCE_RAW**
+  (addXp with allowMulti=false - xpRate-proof reward XP), **1905 = AP_UNLOCK_COUNT**,
+  **1906 = AP_TRACK**. Next free: 1907.
+- **Player.ts now carries three AP seams** (frozen - agents never touch Player.ts):
+  setVar calls ApChecks.onVarpSet after every numeric write; addXp routes the
+  post-multiplier gain through ApUnlockOverrides.clampStatXp (<=0 = skip) and fires
+  ApChecks.onXpGain(stat, beforeBase, afterBase, firstXp) at the end. All three
+  modules default to vanilla no-ops when their JSON tables are absent.
+- **The varp.pack staleness race (addendum: quest-completion rewards session) hit
+  again**, this time on the new `ap_kills` varp: build failed with "'%ap_kills'
+  cannot be resolved". Same workaround: `rm content/pack/varp.pack`, rebuild. Expect
+  this for ANY new config NAME on this WSL/DrvFs setup.
+- **What got built** (all offline-verified; NOTHING in-game tested yet):
+  - Checks: ApChecks.ts (varp watcher from data/config/ap-checks.json - 10 barcrawl
+    bars + 6 dragonquest stages; first-XP per skill exc. hitpoints; level milestones
+    every 10), fired-set persisted to ap-checks-fired.json (once-ever, survives
+    restart, NOT cleared on reseed - deliberate), npc_death.rs2 overlay (1 line ->
+    ~ap_track_kill; %ap_kills bitfield, 14 notable kills matched by npc_type OR-chains
+    - hill giant doesn't exist in this content set), payoff = [queue,ap_check_fired]
+    (engine enqueues via player.enqueueScript(script, PlayerQueueType.ENGINE, 0,
+    [checkId])) -> mes + ~ap_grant_check_reward. Tests: ::apcheckfire <id>, ::apchecks.
+  - Rewards: 94 -> 172 dbrows; categories now 14 (was actually 9 incl. tools, not 8
+    as the doc first said): +xp (10k-50k via 1904, random skill via stats enum),
+    +herb_supplies (unidentified herbs - it's 2004), +runecraft_supplies (blankrune
+    NOT rune_essence; talismans at real altar levels; blood/soul excluded - no altar
+    in 274), +crafting_supplies (leather - soft_leather doesn't exist), +keepsakes
+    (excalibur..cape_of_legends, flat weight); dragon weapons/dhide/viking helms into
+    weapons/armour (vanilla levelrequire enforces their quests at wear time).
+    [proc,ap_grant_check_reward] is the stable checks->rewards interface.
+  - Unlocks: ApUnlockOverrides.ts reads data/config/ap-unlocks.json with mtime-
+    throttled (2s) MID-SESSION reload; no file = all unlocked (count 99/cap 99/
+    passthrough), file present + key missing = 0. levelrequire.rs2 overlay gates 13
+    base labels via ~ap_gear_locked (tiers 1/5/10/20/30/40/45-50/60-70 -> idx 0-7;
+    families melee/armour/ranged/magic); mining/woodcut overlays gate pickaxe/axe
+    tiers (pickaxe: locked = treated as absent; axe: falls back to best unlocked -
+    asymmetry documented in the agent report, driven by pickaxe_checker.rs2 being
+    outside ownership). Skill caps = 20 + 10/item, hitpoints never capped, exp table
+    duplicated locally in the module (circular-import avoidance vs Player.ts).
+    KNOWN DESIGN POINT: progressive_magic/progressive_ranged are SHARED keys between
+    gear tier and skill cap (one item raises both); melee splits into
+    attack/strength/defence caps. Tools: tools/ap/SetUnlock.ts CLI; ::apunlock.
+  - Tracker: ApTracker.ts (dedupe + 2s debounced temp-file+rename flush to
+    data/config/ap-tracker.json), discovery hooks in all 4 Ap*Overrides (record on
+    hit only), web.ts overlay adds GET /ap/tracker.json (names enriched server-side:
+    ObjType for gather/process, ap-drops.json spoiler arrays for drops; totals per
+    category; ?spoiler=1 merges full tables), SPA at public/ap/ (tabs Map/Gathering/
+    Recipes/Bestiary/Teleports, 5s poll, pan/zoom + SVG markers), RenderWorldmapPng.ts
+    (source = maps-server.zip via Worldmap.ts's decode; FloType.rgb palette with
+    hand-picked fallbacks for rgb==0 texture flos; hand-rolled PNG encoder, no deps;
+    surface 3584x7424@2px/tile + underground 2432x2304 + meta json - COMMITTED as
+    generated artifacts? No: they live only in Server/engine/public/ap, regenerate
+    with the tool after map rebuilds). teleport.rs2 overlay tracks casts
+    ("teleports" category, key = spell name literal). RegenerateAll.ts now deletes
+    ap-tracker.json on reseed (fired-checks ledger intentionally NOT deleted).
+    ::aptracker <cat> <key> <val>.
+- **Integration state**: install.js run, engine typecheck clean, pack build clean
+  (1:43 after the varp.pack workaround), decompile check green for all 11 new/changed
+  scripts ([queue,ap_check_fired], ap_grant_check_reward, ap_gear_locked,
+  ap_track_kill, all debugprocs), %ap_kills registered, public/ap assets present.
+  **In-game verification checklist for the user (nothing tested live)**: ::apchecks,
+  ::apcheckfire test_check (expect announce + reward), kill a chicken (first_kill +
+  first_kill_chicken), ::apreward xp / ::apreward keepsakes 1, ::apunlock, then
+  tools/ap/SetUnlock.ts progressive_melee 0 + try equipping steel (should block,
+  bronze fine, delete file to restore), sign a barcrawl bar, open
+  http://localhost:8080/ap/ (or :80) and watch discoveries appear, ?spoiler=1 for the
+  full map.
+- A stray identical-to-live overlays/content/scripts/interface_bank/configs/
+  bank.constant snapshot (1024 slots, matches the user's live file) was found
+  untracked and committed as-is - it's a no-op overlay; ask the user if it was
+  deliberate before ever changing it.

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
+import { recordDiscovery } from '#/engine/ApTracker.js';
 import { printInfo, printWarning } from '#/util/Logger.js';
 
 // Backing store for the ap_drop_group script command (Archipelago drop randomizer,
@@ -49,5 +50,20 @@ export function getDropGroupOverride(slot: number): number {
     if (overrides === null) {
         overrides = load();
     }
-    return overrides.get(slot) ?? -1;
+
+    const unit = overrides.get(slot) ?? -1;
+    if (unit !== -1) {
+        // the lookup moment IS "the player actually killed this mimicking monster" -
+        // record it for the browser discovery tracker (docs/tracker-map.md).
+        recordDiscovery('drops', String(slot), String(unit));
+    }
+    return unit;
+}
+
+// table size for the tracker's "N of M discovered" counters - not a spoiler, just a count.
+export function getDropOverrideCount(): number {
+    if (overrides === null) {
+        overrides = load();
+    }
+    return overrides.size;
 }

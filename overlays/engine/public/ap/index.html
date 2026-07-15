@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archipelago Discovery Tracker</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+    <h1>Archipelago Discovery Tracker</h1>
+    <nav class="tabs" id="tabs">
+        <button class="tab-btn active" data-tab="map">Map</button>
+        <button class="tab-btn" data-tab="gathering">Gathering</button>
+        <button class="tab-btn" data-tab="recipes">Recipes</button>
+        <button class="tab-btn" data-tab="bestiary">Bestiary</button>
+        <button class="tab-btn" data-tab="teleports">Teleports</button>
+    </nav>
+    <div class="topbar-right">
+        <span id="status" class="status">connecting&hellip;</span>
+        <a id="spoiler-toggle" class="spoiler-link" href="?spoiler=1">spoiler mode</a>
+    </div>
+</header>
+
+<main id="app">
+    <section id="tab-map" class="tab-panel active">
+        <div class="map-toolbar">
+            <div class="layer-switch">
+                <button class="layer-btn active" data-layer="surface">Surface</button>
+                <button class="layer-btn" data-layer="underground">Underground</button>
+            </div>
+            <div class="map-counters" id="map-counters"></div>
+            <div class="map-hint">drag to pan &middot; scroll to zoom</div>
+        </div>
+        <div class="map-viewport" id="map-viewport">
+            <div class="map-world" id="map-world">
+                <img id="map-image" class="map-image" alt="world map" draggable="false">
+                <svg id="map-overlay" class="map-overlay" xmlns="http://www.w3.org/2000/svg"></svg>
+            </div>
+            <div id="map-empty" class="empty-state" hidden>Nothing discovered yet on this layer. Go find some shuffled entrances!</div>
+            <div id="map-loading" class="empty-state">Loading map&hellip;</div>
+        </div>
+    </section>
+
+    <section id="tab-gathering" class="tab-panel">
+        <h2>Gathering <span class="counter" id="gathering-counter"></span></h2>
+        <p class="tab-desc">Mining/fishing/woodcutting products that turned out different than vanilla, revealed the first time you actually gathered them.</p>
+        <table class="discovery-table" id="gathering-table">
+            <thead><tr><th>Vanilla product</th><th></th><th>Now yields</th></tr></thead>
+            <tbody></tbody>
+        </table>
+        <div class="empty-state" id="gathering-empty" hidden>Nothing discovered yet. Go chop/mine/fish something!</div>
+    </section>
+
+    <section id="tab-recipes" class="tab-panel">
+        <h2>Recipes <span class="counter" id="recipes-counter"></span></h2>
+        <p class="tab-desc">Cooking/smithing/crafting/fletching outputs that turned out different than vanilla, revealed the first time you actually made them.</p>
+        <table class="discovery-table" id="recipes-table">
+            <thead><tr><th>Vanilla product</th><th></th><th>Now yields</th></tr></thead>
+            <tbody></tbody>
+        </table>
+        <div class="empty-state" id="recipes-empty" hidden>Nothing discovered yet. Go cook/smith/craft/fletch something!</div>
+    </section>
+
+    <section id="tab-bestiary" class="tab-panel">
+        <h2>Bestiary <span class="counter" id="bestiary-counter"></span></h2>
+        <p class="tab-desc">Monsters whose loot table was swapped for another monster's, revealed the first time you killed one.</p>
+        <table class="discovery-table" id="bestiary-table">
+            <thead><tr><th>Monster</th><th></th><th>Smells like</th></tr></thead>
+            <tbody></tbody>
+        </table>
+        <div class="empty-state" id="bestiary-empty" hidden>Nothing discovered yet. Go kill something!</div>
+    </section>
+
+    <section id="tab-teleports" class="tab-panel">
+        <h2>Teleports <span class="counter" id="teleports-counter"></span></h2>
+        <p class="tab-desc">Spellbook teleports, revealed spell-by-spell as you cast them.</p>
+        <table class="discovery-table" id="teleports-table">
+            <thead><tr><th>Spell</th><th></th><th>Lands at</th></tr></thead>
+            <tbody></tbody>
+        </table>
+        <div class="empty-state" id="teleports-empty" hidden>Nothing discovered yet. Go cast a teleport spell!</div>
+    </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

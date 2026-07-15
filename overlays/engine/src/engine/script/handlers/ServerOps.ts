@@ -8,7 +8,8 @@ import LocType from '#/cache/config/LocType.js';
 import { ScriptOpcode } from '#/engine/script/ScriptOpcode.js';
 import { CommandHandlers } from '#/engine/script/ScriptRunner.js';
 import ScriptState from '#/engine/script/ScriptState.js';
-import { check, CoordValid, LocTypeValid, NumberPositive, SeqTypeValid, SpotAnimTypeValid, FindSquareValid } from '#/engine/script/ScriptValidators.js';
+import { check, CoordValid, LocTypeValid, NumberNotNull, NumberPositive, SeqTypeValid, SpotAnimTypeValid, FindSquareValid } from '#/engine/script/ScriptValidators.js';
+import { ActivePlayer, checkedHandler } from '#/engine/script/ScriptPointer.js';
 import World from '#/engine/World.js';
 import Environment from '#/util/Environment.js';
 import { printDebug } from '#/util/Logger.js';
@@ -17,6 +18,8 @@ import { getDropGroupOverride } from '#/engine/ApDropOverrides.js';
 import { getGatherSwap } from '#/engine/ApGatherOverrides.js';
 import { getProcessSwap } from '#/engine/ApProcessOverrides.js';
 import { getEntranceOverride } from '#/engine/ApEntranceOverrides.js';
+import { getUnlockCount } from '#/engine/ApUnlockOverrides.js';
+import { recordDiscovery } from '#/engine/ApTracker.js';
 
 // Archipelago entrance override support: the redirected destination is often the far
 // ladder/staircase's own (blocked) tile, so find that loc to check real reachability
@@ -518,6 +521,37 @@ const ServerOps: CommandHandlers = {
         const product = state.popInt();
 
         state.pushInt(getProcessSwap(product));
+    },
+
+    // custom: Archipelago reward XP drops - identical to STAT_ADVANCE except the
+    // world xpRate multiplier is bypassed (allowMulti=false), so reward amounts are
+    // absolute regardless of the world's rate. XP is in engine tenths of a point.
+    [ScriptOpcode.AP_STAT_ADVANCE_RAW]: checkedHandler(ActivePlayer, state => {
+        const [stat, xp] = state.popInts(2);
+
+        check(stat, NumberNotNull);
+        check(xp, NumberNotNull);
+
+        state.activePlayer.addXp(stat, xp, false);
+    }),
+
+    // custom: Archipelago unlock-item lookup - how many of a named progressive
+    // unlock the player has received. Missing table = effectively unlimited (99),
+    // so vanilla behavior is preserved until an AP run writes ap-unlocks.json.
+    [ScriptOpcode.AP_UNLOCK_COUNT]: state => {
+        const name = state.popString();
+
+        state.pushInt(getUnlockCount(name));
+    },
+
+    // custom: Archipelago discovery tracker - record a "player did/saw this" event
+    // for the browser tracker map. Fire-and-forget; must never throw into scripts.
+    [ScriptOpcode.AP_TRACK]: state => {
+        const value = state.popString();
+        const key = state.popString();
+        const category = state.popString();
+
+        recordDiscovery(category, key, value);
     },
 
     [ScriptOpcode.MIDI_LENGTH]: state => {

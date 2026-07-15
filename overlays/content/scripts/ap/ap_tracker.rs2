@@ -1,0 +1,15 @@
+// ::aptracker <category> <key> <value> - force-record a synthetic discovery event for
+// the browser tracker map (docs/tracker-map.md), e.g. ::aptracker gather 1511 383.
+// Exercises the exact same ap_track command the engine's entrance/gather/process/drop
+// override hooks and teleport.rs2 call automatically - lets the /ap/tracker.json route
+// and the SPA be tested without actually playing.
+[debugproc,ap_tracker](string $category, string $key, string $value)
+if (p_finduid(uid) = false) {
+    return;
+}
+if (string_length($category) = 0 | string_length($key) = 0 | string_length($value) = 0) {
+    mes("Usage: ::aptracker <category> <key> <value> (e.g. ::aptracker gather 1511 383)");
+    return;
+}
+ap_track($category, $key, $value);
+mes("AP tracker: recorded <$category>.<$key> = <$value>.");

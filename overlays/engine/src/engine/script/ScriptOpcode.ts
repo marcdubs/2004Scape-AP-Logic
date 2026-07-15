@@ -82,6 +82,21 @@ export const enum ScriptOpcode {
     // AP_ENTRANCE_OVERRIDE above.
     AP_PROCESS_SWAP = 1903,
 
+    // custom: Archipelago reward XP drops - grant XP ignoring the world xpRate
+    // multiplier, so a "10k XP" reward is the same absolute amount on a 1x and a
+    // 30x world - same explicit-numbering reasoning as AP_ENTRANCE_OVERRIDE above.
+    AP_STAT_ADVANCE_RAW = 1904,
+
+    // custom: Archipelago unlock-item lookup - how many of a named progressive
+    // unlock the player has received (gear tiers, tools, skill caps) - same
+    // explicit-numbering reasoning as AP_ENTRANCE_OVERRIDE above.
+    AP_UNLOCK_COUNT = 1905,
+
+    // custom: Archipelago discovery tracker - record a "player did/saw this" event
+    // for the browser tracker map - same explicit-numbering reasoning as
+    // AP_ENTRANCE_OVERRIDE above.
+    AP_TRACK = 1906,
+
     // Player ops (2000-2499)
     AFK_EVENT = 2000,
     ALLOWDESIGN,
@@ -534,6 +549,9 @@ export const ScriptOpcodeMap: Map<string, number> = new Map([
     ['AP_DROP_GROUP', ScriptOpcode.AP_DROP_GROUP],
     ['AP_GATHER_SWAP', ScriptOpcode.AP_GATHER_SWAP],
     ['AP_PROCESS_SWAP', ScriptOpcode.AP_PROCESS_SWAP],
+    ['AP_STAT_ADVANCE_RAW', ScriptOpcode.AP_STAT_ADVANCE_RAW],
+    ['AP_UNLOCK_COUNT', ScriptOpcode.AP_UNLOCK_COUNT],
+    ['AP_TRACK', ScriptOpcode.AP_TRACK],
 
     ['AFK_EVENT', ScriptOpcode.AFK_EVENT],
     ['ALLOWDESIGN', ScriptOpcode.ALLOWDESIGN],

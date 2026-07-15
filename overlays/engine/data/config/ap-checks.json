@@ -1,0 +1,21 @@
+{
+    "watches": [
+        { "varp": "barcrawl", "mode": "bit", "value": 3, "check": "barcrawl_bar_1" },
+        { "varp": "barcrawl", "mode": "bit", "value": 4, "check": "barcrawl_bar_2" },
+        { "varp": "barcrawl", "mode": "bit", "value": 5, "check": "barcrawl_bar_3" },
+        { "varp": "barcrawl", "mode": "bit", "value": 6, "check": "barcrawl_bar_4" },
+        { "varp": "barcrawl", "mode": "bit", "value": 7, "check": "barcrawl_bar_5" },
+        { "varp": "barcrawl", "mode": "bit", "value": 8, "check": "barcrawl_bar_6" },
+        { "varp": "barcrawl", "mode": "bit", "value": 9, "check": "barcrawl_bar_7" },
+        { "varp": "barcrawl", "mode": "bit", "value": 10, "check": "barcrawl_bar_8" },
+        { "varp": "barcrawl", "mode": "bit", "value": 11, "check": "barcrawl_bar_9" },
+        { "varp": "barcrawl", "mode": "bit", "value": 12, "check": "barcrawl_bar_10" },
+
+        { "varp": "dragonquest", "mode": "gte", "value": 1, "check": "ds_started" },
+        { "varp": "dragonquest", "mode": "gte", "value": 2, "check": "ds_oziach" },
+        { "varp": "dragonquest", "mode": "gte", "value": 7, "check": "ds_ship_ready" },
+        { "varp": "dragonquest", "mode": "gte", "value": 8, "check": "ds_map_complete" },
+        { "varp": "dragonquest", "mode": "gte", "value": 9, "check": "ds_sailed" },
+        { "varp": "dragonquest", "mode": "gte", "value": 10, "check": "ds_complete" }
+    ]
+}
