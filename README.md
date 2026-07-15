@@ -515,6 +515,85 @@ vanilla by design: the mining gem bonus roll, Shilo gem rocks, big-net junk catc
 Crest perfect-gold branch, and the Tourist Trap punishment rock (`thpunishrock`,
 hard-excluded).
 
+## Processing randomization (cooking / smithing / crafting / fletching)
+
+Shuffles which item each processing recipe actually hands the player - smith some ore
+and get a cooked fish, cook some meat and get leather chaps. Same runtime-override
+design as gathering: reseeding rewrites a JSON table and needs a server restart only,
+no pack rebuild. Deleting `engine/data/config/ap-process.json` restores vanilla
+processing.
+
+### Pieces
+
+- `overlays/engine/src/engine/ApProcessOverrides.ts` - runtime loader for
+  `engine/data/config/ap-process.json` (obj id -> obj id). Same vanilla-passthrough-
+  on-miss semantics as `ApGatherOverrides.ts`.
+- `ScriptOpcode.ts` / `ServerOps.ts` - `AP_PROCESS_SWAP = 1903`, declared in
+  `ap/ap.rs2` as `[command,ap_process_swap](obj $product)(namedobj)`.
+- Whole-file overlays of the vanilla recipe scripts, each final delivery point
+  wrapped as `inv_add(inv, ap_process_swap($product), n)`:
+  - `skill_cooking/scripts/cooking.rs2` - the success-path delivery in `cook_item`
+    (1; the burn-path delivery stays vanilla)
+  - `skill_smithing/scripts/smithing/smithing.rs2` - `smithing_anvil`'s bar->item
+    delivery (1)
+  - `skill_crafting/scripts/leather/leather.rs2` - the `hardleather_body` special
+    case plus the general `craft_leather_queue` (2)
+  - `skill_crafting/scripts/gem/uncut_gem.rs2` - the gem-cutting success delivery (1;
+    the mis-hit's `crushed_gemstone` stays vanilla)
+  - `skill_fletching/scripts/arrows.rs2`, `darts.rs2`, `cut_logs.rs2` - final tipped
+    arrow, final dart, log->unstrung-bow delivery (1 each)
+  - `skill_fletching/scripts/bolts.rs2` - bolt-tip cutting and bolt tipping (2)
+  - `skill_fletching/scripts/bows.rs2` - bow stringing (1). The three fletching sites
+    that originally spliced `db_getfield(...)`'s two return values straight into
+    `inv_add`'s item+qty params were rewritten to destructure into local vars first -
+    `ap_process_swap` only takes one `obj` argument.
+- `overlays/engine/tools/process/RandomizeProcessing.ts` - builds the product pool
+  from the game's own dbtable data (`cooking_generic.dbrow`, `smithing.dbrow`,
+  `leather.dbrow`, `gem.dbrow`, `fletching`'s `arrows`/`bolts`/`darts`/`bows.dbrow` +
+  `cut_logs.dbrow`), writes the JSON table and a spoiler at
+  `engine/tools/process/process-seed.json`.
+- `::approcess <item_debugname>` test command (e.g. `::approcess cooked_meat`) -
+  prints what a product is randomized into.
+
+### Usage
+
+```
+cd ../Server/engine
+npx tsx tools/process/RandomizeProcessing.ts [--seed <n>] [--mode shuffle|chaos]
+    [--skills cooking,smithing,crafting,fletching] [--exclude <item,...>]
+    [--pin-quest-items] [--no-quest-pins] [--dry-run]
+```
+
+- `shuffle` (default): one derangement across the combined ~253-product pool - a
+  bijection, so every product is still obtainable from exactly one processing action
+  and nothing maps to itself. Seed 777: 253 swapped, 160 land cross-skill.
+- `chaos`: every product independently resamples from the pool - duplicates allowed,
+  so some products can become unobtainable from processing entirely.
+- `--skills` restricts which skills join the pool; unselected skills stay vanilla.
+
+**Quest-critical pinning is mode-aware**, same reasoning as gathering: shuffle
+doesn't pin by default (it's a bijection - everything stays obtainable, a quest just
+needs its item made by a different recipe), chaos pins by default (independent
+resampling can genuinely orphan a product). Override with `--pin-quest-items` /
+`--no-quest-pins`.
+
+### Scope
+
+Only DBTABLE-driven recipes are wrapped - `cooking_generic` (the bulk of Cooking),
+`smithing.dbtable`, crafting's `leather.dbtable` + `gem.dbtable`, and fletching's
+`fletching_table` (arrows/bolts/darts/bow-stringing) + `fletch_bow_table`
+(log->unstrung bow). **Deliberately NOT wrapped** - composite/multi-step recipes
+where the "product" is built across several intermediate items, so swapping an
+intermediate would corrupt the recipe rather than just reveal a surprise: cooking's
+pies/pizza/cakes/dough/stew/kebab/wine/oomlie/gnome specialties; crafting's
+jewellery/glass/pottery/spinning/snelm/studded/battlestaves/dye_cape; fletching's
+`ogre_arrows.rs2` (hardcoded shaft/headless/tip chain, no dbtable) and the
+`headless_arrow` intermediate in `arrows.rs2`. A future pass could hand-wrap just the
+true final `inv_add` in each of those files. Only the item identity is wrapped -
+quantities are untouched, so a recipe slot that hands out 5 of its product (the
+metal-tier knives, `nails`) still hands out 5 of whatever it got swapped to; same
+"structure stays put, content moves" philosophy as tiered drop randomization.
+
 ## Infinite run energy
 
 A permanent world-config toggle, not a per-seed randomizer - same class of change as the

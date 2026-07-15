@@ -77,6 +77,11 @@ export const enum ScriptOpcode {
     // explicit-numbering reasoning as AP_ENTRANCE_OVERRIDE above.
     AP_GATHER_SWAP = 1902,
 
+    // custom: Archipelago processing-skill randomizer (cooking/smithing/crafting)
+    // product swap lookup - same explicit-numbering reasoning as
+    // AP_ENTRANCE_OVERRIDE above.
+    AP_PROCESS_SWAP = 1903,
+
     // Player ops (2000-2499)
     AFK_EVENT = 2000,
     ALLOWDESIGN,
@@ -528,6 +533,7 @@ export const ScriptOpcodeMap: Map<string, number> = new Map([
     ['AP_ENTRANCE_OVERRIDE', ScriptOpcode.AP_ENTRANCE_OVERRIDE],
     ['AP_DROP_GROUP', ScriptOpcode.AP_DROP_GROUP],
     ['AP_GATHER_SWAP', ScriptOpcode.AP_GATHER_SWAP],
+    ['AP_PROCESS_SWAP', ScriptOpcode.AP_PROCESS_SWAP],
 
     ['AFK_EVENT', ScriptOpcode.AFK_EVENT],
     ['ALLOWDESIGN', ScriptOpcode.ALLOWDESIGN],

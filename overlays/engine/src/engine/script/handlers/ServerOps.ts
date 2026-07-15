@@ -15,6 +15,7 @@ import { printDebug } from '#/util/Logger.js';
 import Midi from '#/cache/midi/Midi.js';
 import { getDropGroupOverride } from '#/engine/ApDropOverrides.js';
 import { getGatherSwap } from '#/engine/ApGatherOverrides.js';
+import { getProcessSwap } from '#/engine/ApProcessOverrides.js';
 import { getEntranceOverride } from '#/engine/ApEntranceOverrides.js';
 
 // Archipelago entrance override support: the redirected destination is often the far
@@ -511,6 +512,12 @@ const ServerOps: CommandHandlers = {
         const product = state.popInt();
 
         state.pushInt(getGatherSwap(product));
+    },
+
+    [ScriptOpcode.AP_PROCESS_SWAP]: state => {
+        const product = state.popInt();
+
+        state.pushInt(getProcessSwap(product));
     },
 
     [ScriptOpcode.MIDI_LENGTH]: state => {
