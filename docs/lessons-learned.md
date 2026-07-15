@@ -1750,3 +1750,19 @@ tracker). Web-layer facts verified this session, worth not re-deriving:
 - Opcode ledger now: 1900 entrance, 1901 drop group, 1902 gather swap, 1903
   (proposed) ap_stat_advance_raw, 1904 (proposed) ap_unlock_count, 1905 (proposed)
   ap_track.
+
+### Same-session follow-up: quest-reward items for the reward pool (2026-07-15)
+
+Researched for checks-and-unlocks.md's new "Quest keepsakes" section. Facts worth
+keeping: **quest-completion wield gates live in the same levelrequire file as the
+level gates** (dragon dagger/long = Lost City, dragon mace/b-axe = Heroes, halberd =
+Regicide, dragon sq = Legends, iban staff = its own label, rune platebody +
+dragonhide_body = Dragon Slayer, viking helmets = Fremennik Trials) - so quest-gated
+gear can go straight into the reward pool with zero new gating code. Family Crest
+gauntlets (cooking/goldsmithing/chaos) are a one-choice-per-account vanilla reward -
+all three exist as separate objs, so the randomizer can hand out the unchosen ones.
+`arthur_journal.rs2:55` checks `inv_total(inv, excalibur)` - excalibur WILL flag in
+the quest-critical scan (additive-only risk: sequence-skips Merlin's Crystal fetch
+steps, can't brick). `dramen_staff` stays out of every pool (it is Lost City's
+completion mechanic). When building the dbrow, run candidates through
+`loadQuestCriticalItems()` and sign off on each flagged item explicitly.

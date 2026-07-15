@@ -188,10 +188,66 @@ by the governing stat like the existing 8:
 lists). Quantity column matters more here than for gear (essence wants to come
 in 15–30s, herbs in 3–5s).
 
-Category selection stays uniform-random across what becomes 12 categories
-(8 + xp + 3 supplies) — dilution of any one category is fine, variety is the
-point. If the user wants XP drops more/less often than 1-in-12, add a weight
-column to the category pick then.
+### Quest keepsakes & quest-gated gear (researched 2026-07-15)
+
+Two distinct classes, both verified against `obj.pack` and the quest scripts:
+
+**Quest-gated-wield gear — add to the existing weapons/armour pools, it's
+free synergy.** This content set enforces quest completion at *wear* time
+through the same `levelrequire` file the gear-tier unlocks will overlay:
+
+| Item(s) | Wield gate (verified in `levelrequire/scripts/tier*.rs2`) |
+|---|---|
+| `dragon_dagger(_p)`, `dragon_longsword` | 60 atk + **Lost City** (`levelrequire_zanaris_quest_attack`) |
+| `dragon_mace`, `dragon_battleaxe` | 60 atk + **Heroes** (`levelrequire_heroes_quest_attack`) |
+| `dragon_halberd` | 60 atk/30 str + **Regicide** |
+| `dragon_sq_shield` | 60 def + **Legends** |
+| `ibanstaff` | its own `levelrequire_iban_staff` label (**Underground Pass**) |
+| `rune_platebody` (+trim/gold/god), `dragonhide_body` | 40 def + **Dragon Slayer** |
+| `viking_helmet_crush/slash/magic/range` | 45 def + **Fremennik Trials** |
+
+Rolling a dragon longsword you *can't wield yet* is a proper AP tease: the
+quest-completion check that unlocks it is itself a location. Add these as
+top-tier rows (min_level 60/40/45 per the table) — the quest gate needs zero
+extra work because vanilla already enforces it on wear. (The current 94-row
+table's rune platebody rows already behave this way today.)
+
+**Post-quest keepsakes — new low-frequency `keepsakes` category.** Iconic
+quest rewards that are normally one-per-account, safe to duplicate:
+
+- `excalibur` (20 atk wield, no quest gate) — the user's own example. Caveat:
+  `arthur_journal.rs2:55` checks `inv_total(inv, excalibur)`, so granting it
+  early can sequence-skip Merlin's Crystal's fetch steps — additive-only
+  (can't brick, the quest still completes), but it IS flagged by the
+  quest-critical scan; ship behind the same judgment as the rest of this list.
+- `silverlight` (Demon Slayer's sword — the quest gates on
+  `silverlight_key_*`, not the sword itself, so it's clean).
+- `gauntlets_of_cooking` / `gauntlets_of_goldsmithing` / `gauntlets_of_chaos`
+  / `steel_gauntlets` (Family Crest — vanilla forces ONE choice per account;
+  handing out the others is a randomizer-only treat you can't get any other
+  way).
+- `ice_gloves` (Heroes step item; extra copies only help).
+- `klanks_gauntlets` (Underground Pass keepsake).
+- `amulet_of_ghostspeak` (Restless Ghost; also useful toward Priest in Peril).
+- `amulet_of_accuracy` (Imp Catcher), `gnome_amulet` (Tree Gnome Village).
+- `cape_of_legends` (the flex item of the era).
+- `ice_arrow` stacks (Temple of Ikov's bespoke ammo — fun ranged filler).
+- `antidragonbreathshield` + the `*dose1antidragon` potions — survival filler
+  that's thematically perfect for a Dragon Slayer/KBD-goal game (shield also
+  belongs in the armour pool proper).
+
+**Excluded on purpose**: `dramen_staff` (it IS Lost City's completion
+mechanic — handing it out deletes the quest), `silverlight_key_*` /
+`ibandoll`-family / any mid-quest plumbing items. Mechanically: when writing
+the dbrow file, run the candidates through the drops tool's
+`loadQuestCriticalItems()` scan (`DropTableParser.ts`) and consciously
+sign off on every flagged item (excalibur will flag; dramen will flag and
+stay out) rather than trusting either the scan or this list alone.
+
+Category selection stays uniform-random across what becomes ~13 categories
+(8 + xp + 3 supplies + keepsakes) — dilution of any one category is fine,
+variety is the point. If the user wants XP drops or keepsakes more/less often
+than 1-in-13, add a weight column to the category pick then.
 
 ---
 
