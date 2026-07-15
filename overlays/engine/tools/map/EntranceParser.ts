@@ -49,6 +49,11 @@ export type CoordExpr = CoordLiteral | CoordRelative | CoordUnknown;
 
 export type SourceSpec = { type: 'literal'; coord: CoordLiteral } | { type: 'angle'; angle: number } | { type: 'any' };
 
+// shared require schema with data/config/ap-gated-areas.json (see
+// docs/entrance-logic.md) - a quest-varp progress threshold, a held/worn item, or a
+// combination of either.
+export type Requirement = { varp: string; gte: number } | { item: string } | { allOf: Requirement[] };
+
 export type Entrance = {
     file: string;
     line: number;
@@ -62,6 +67,11 @@ export type Entrance = {
     gosubTarget?: string;
     resolvedFrom?: string;
     gated?: boolean;
+    // set alongside `gated` when the guarding expression is one of the shapes
+    // extractRequirement() understands - a gated entrance included in the shuffle pool
+    // (see RandomizeEntrances.ts) always has this set; a gated entrance that stays
+    // vanilla/excluded may not (unrecognized guard shape).
+    requires?: Requirement;
     kind: 'floor-shift' | 'cross-map' | 'unresolved' | 'no-transition';
     // set by ApproachResolver.ts when a player-relative movecoord destination was
     // converted to a validated literal / when the attempt failed (and why).
@@ -210,6 +220,136 @@ export function readSource(filePath: string): string {
     return fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n');
 }
 
+// `^constant_name = value` lines from every *.constant config under the content tree,
+// lazily indexed on first use (there's no central registry file to read instead).
+const CONSTANT_CACHE = new Map<string, number>();
+let constantsLoaded = false;
+
+function loadConstants(): void {
+    if (constantsLoaded) {
+        return;
+    }
+    constantsLoaded = true;
+    const stack: string[] = [SCRIPTS_ROOT];
+    while (stack.length) {
+        const dir = stack.pop()!;
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                stack.push(full);
+                continue;
+            }
+            if (!entry.name.endsWith('.constant')) {
+                continue;
+            }
+            for (const line of fs.readFileSync(full, 'utf8').split(/\r?\n/)) {
+                const m = line.match(/^\^([a-zA-Z0-9_]+)\s*=\s*(-?\d+)/);
+                if (m) {
+                    CONSTANT_CACHE.set(m[1], parseInt(m[2], 10));
+                }
+            }
+        }
+    }
+}
+
+export function resolveConstant(name: string): number | null {
+    loadConstants();
+    return CONSTANT_CACHE.has(name) ? CONSTANT_CACHE.get(name)! : null;
+}
+
+// best-effort extraction of the requirement guarding a gated transition - not a general
+// expression parser, only the two shapes seen in the entrances actually included in the
+// shuffle pool (see docs/entrance-logic.md Workstream B): a quest-varp progress check
+// (`%name < ^const`, meaning the transition needs %name >= that stage's constant) and a
+// held/worn item check (`inv_total(worn, item) > 0`). Returns null when the guard text
+// doesn't match either shape (or the constant can't be resolved) - callers treat that as
+// "don't include this one, stays excluded/vanilla".
+export function extractRequirement(guardText: string): Requirement | null {
+    const varpMatch = guardText.match(/%([a-zA-Z0-9_]+)\s*<\s*\^([a-zA-Z0-9_]+)/);
+    if (varpMatch) {
+        const value = resolveConstant(varpMatch[2]);
+        if (value !== null) {
+            return { varp: varpMatch[1], gte: value };
+        }
+    }
+    const itemMatch = guardText.match(/inv_total\(\s*worn\s*,\s*([a-zA-Z0-9_]+)\s*\)\s*>\s*0/);
+    if (itemMatch) {
+        return { item: itemMatch[1] };
+    }
+    return null;
+}
+
+// resolves a relative movecoord destination whose base is the OPERATING TILE itself
+// (`coord`/`coord()`) under the assumption the player is standing on the trigger's own
+// tile when the script runs - true for ladders (climbing straight up/down the tile
+// you're on; no forceapproach parking elsewhere the way wall-mounted stairs get, see
+// ApproachResolver.ts for that case). Only safe for that shape; returns null otherwise.
+export function resolveSameTileRelative(trigger: CoordLiteral, destination: CoordRelative): CoordLiteral | null {
+    const base = destination.base.trim();
+    if (base !== 'coord' && base !== 'coord()') {
+        return null;
+    }
+    const dx = parseInt(destination.dx, 10);
+    const dy = parseInt(destination.dy, 10);
+    const dz = parseInt(destination.dz, 10);
+    if (!Number.isInteger(dx) || !Number.isInteger(dy) || !Number.isInteger(dz)) {
+        return null;
+    }
+    const worldX = trigger.worldX + dx;
+    const worldZ = trigger.worldZ + dz;
+    const mapX = Math.floor(worldX / 64);
+    const mapZ = Math.floor(worldZ / 64);
+    return decodeCoord(`${trigger.plane + dy}_${mapX}_${mapZ}_${worldX - mapX * 64}_${worldZ - mapZ * 64}`);
+}
+
+// The Zanaris shed door (`[oploc1,zanarisdoor]` in quest_zanaris.rs2) is the one gated
+// entrance whose handler shape the generic switch/if machinery below doesn't cover: it's
+// a `check_axis` door (entering vs leaving the shed), not a switch_coord/if-coord chain,
+// and its transition proc is `~player_teleport_normal` rather than
+// p_telejump/p_teleport/~climb_ladder. Only one placement exists in the whole game (the
+// caller confirms this via LocPlacementScanner and passes the placement's own coord as
+// the trigger), so there's no enumeration ambiguity - the destination and item
+// requirement are read straight out of the live script text so this stays in sync with
+// whatever's actually there (including this file's own patched preamble, which leaves
+// both regexed substrings untouched).
+export function parseZanarisDoorText(triggerCoord: CoordLiteral): Entrance | null {
+    const filePath = path.join(SCRIPTS_ROOT, 'quests/quest_zanaris/scripts/quest_zanaris.rs2');
+    if (!fs.existsSync(filePath)) {
+        return null;
+    }
+    const text = readSource(filePath);
+    const headerIdx = text.indexOf('[oploc1,zanarisdoor]');
+    if (headerIdx === -1) {
+        return null;
+    }
+    const rest = text.slice(headerIdx);
+    const nextHeader = rest.slice(1).search(/\n\[/);
+    const block = nextHeader === -1 ? rest : rest.slice(0, nextHeader + 1);
+
+    const destMatch = block.match(/~player_teleport_normal\((\d+_\d+_\d+_\d+_\d+)\)/);
+    const itemMatch = block.match(/inv_total\(\s*worn\s*,\s*([a-zA-Z0-9_]+)\s*\)\s*>\s*0/);
+    if (!destMatch || !itemMatch) {
+        return null;
+    }
+
+    const source: SourceSpec = { type: 'literal', coord: triggerCoord };
+    const destination = decodeCoord(destMatch[1]);
+    return {
+        file: path.relative(CONTENT_ROOT, filePath),
+        line: text.slice(0, headerIdx).split('\n').length,
+        category: 'zanarisdoor',
+        op: 'oploc1',
+        source,
+        method: 'p_teleport',
+        destination,
+        up: null,
+        description: 'Zanaris shed (dramen staff)',
+        gated: true,
+        requires: { item: itemMatch[1] },
+        kind: classify(source, destination)
+    };
+}
+
 // best-effort resolution of a gosub target that isn't one of the local flow-control
 // labels (stair_options/ladder_options/unhandled_*) - searches the whole content tree
 // for `[label,name]` and pulls the first transition call out of its body.
@@ -283,9 +423,11 @@ function buildEntrance(base: Omit<Entrance, 'kind' | 'destination' | 'method' | 
     if (gosub) {
         const resolved = resolveExternalLabel(gosub);
         if (resolved) {
-            const gated = /\bif\s*\(/.test(resolved.body.split(/~climb_ladder|p_telejump|p_teleport/)[0] ?? '');
+            const guardText = resolved.body.split(/~climb_ladder|p_telejump|p_teleport/)[0] ?? '';
+            const gated = /\bif\s*\(/.test(guardText);
+            const requires = gated ? (extractRequirement(guardText) ?? undefined) : undefined;
             const nested = buildEntrance({ ...base, description }, resolved.body);
-            return nested.map(e => ({ ...e, gosubTarget: gosub, resolvedFrom: resolved.file, gated }));
+            return nested.map(e => ({ ...e, gosubTarget: gosub, resolvedFrom: resolved.file, gated, requires }));
         }
         return [{ ...base, description, method: 'gosub', destination: null, up: null, gosubTarget: gosub, kind: 'unresolved' }];
     }

@@ -1,10 +1,11 @@
+import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
 import { printInfo, printWarning } from '#/util/Logger.js';
 
 import { resolveApproachDestinations } from './ApproachResolver.js';
-import { CONTENT_ROOT, ENTRANCE_DIR, type CoordLiteral, type Entrance, parseFile } from './EntranceParser.js';
+import { CONTENT_ROOT, ENTRANCE_DIR, type CoordLiteral, type Entrance, parseFile, parseZanarisDoorText, type Requirement, resolveSameTileRelative } from './EntranceParser.js';
 import { scanPlacements } from './LocPlacementScanner.js';
 import { derangement, mulberry32 } from '../shared/Prng.js';
 
@@ -321,7 +322,31 @@ function parseArgs() {
     const args = process.argv.slice(2);
     const seedIdx = args.indexOf('--seed');
     const seed = seedIdx !== -1 ? parseInt(args[seedIdx + 1], 10) : Math.floor(Math.random() * 0xffffffff);
-    return { seed, dryRun: args.includes('--dry-run'), rewrite: args.includes('--rewrite'), mixed: args.includes('--mixed') };
+    return { seed, dryRun: args.includes('--dry-run'), rewrite: args.includes('--rewrite'), mixed: args.includes('--mixed'), noValidate: args.includes('--no-validate') };
+}
+
+// Runs tools/logic/ValidateSeed.ts against the just-written table (exit 0 = every
+// goal reachable under region/gate logic - see docs/entrance-logic.md). Returns true
+// when the seed is playable. Requires tools/logic/region-graph.json to exist (built
+// once by BuildRegionGraph.ts); when it doesn't, validation is skipped with a loud
+// warning rather than failing the roll - a seed without validation is exactly what
+// every seed was before this existed.
+function validateSeed(): boolean | null {
+    if (!fs.existsSync('tools/logic/region-graph.json')) {
+        printWarning('seed validation SKIPPED: tools/logic/region-graph.json missing - run BuildRegionGraph.ts once to enable reroll-until-valid');
+        return null;
+    }
+    try {
+        execFileSync('npx', ['tsx', 'tools/logic/ValidateSeed.ts'], { stdio: 'pipe' });
+        return true;
+    } catch (err) {
+        const e = err as { status?: number; stdout?: Buffer };
+        if (e.status === 1) {
+            return false;
+        }
+        printWarning(`seed validation errored (not a logic failure): ${err instanceof Error ? err.message : err}`);
+        return null;
+    }
 }
 
 function main() {
@@ -330,7 +355,7 @@ function main() {
         process.exit(1);
     }
 
-    const { seed, dryRun, rewrite, mixed } = parseArgs();
+    const { seed, dryRun, rewrite, mixed, noValidate } = parseArgs();
 
     // always (re)derive from the untouched vanilla backup, creating it on first run,
     // so re-randomizing never compounds onto a previous shuffle's output.
@@ -356,6 +381,42 @@ function main() {
     // validated literals so they can join the floor-shift pool - see ApproachResolver.
     const approach = resolveApproachDestinations(allEntrances);
     printInfo(`resolved ${approach.resolved} player-relative destination(s) via forceapproach geometry (${approach.failed} left vanilla)`);
+
+    // Workstream B (docs/entrance-logic.md): gated entrances join the shuffle pool with
+    // their requirement kept - the patched handlers (see ladders.rs2, mcannon_ladders.rs2,
+    // quest_zanaris.rs2) run the requirement check BEFORE consulting the override table,
+    // so the gate guards wherever the entrance now leads. Two candidates:
+    //   - the dwarf guard tower ladder (%mcannon quest progress) - already parsed above
+    //     (gosub-resolved, `gated`+`requires` set by EntranceParser) but its destination
+    //     is still a same-tile relative movecoord; resolve it to a literal here (safe -
+    //     the player stands on the ladder's own tile when climbing, same assumption the
+    //     generic scanned ladder gates make).
+    //   - the Zanaris shed door (dramen staff) - a `check_axis` door handler shape the
+    //     generic switch/if parser doesn't cover at all, so it's not in allEntrances yet;
+    //     inject it directly (single placement in the game, confirmed via LocPlacementScanner).
+    let gatedResolved = 0;
+    for (const e of allEntrances) {
+        if (e.gated && e.requires && e.source.type === 'literal' && e.destination?.type === 'relative') {
+            const literal = resolveSameTileRelative(e.source.coord, e.destination);
+            if (literal) {
+                e.destination = literal;
+                gatedResolved++;
+            }
+        }
+    }
+    const zanarisPlacements = scanPlacements(['zanarisdoor']);
+    if (zanarisPlacements.length === 1) {
+        const zanarisDoor = parseZanarisDoorText(zanarisPlacements[0].coord);
+        if (zanarisDoor) {
+            allEntrances.push({ ...zanarisDoor, _index: nextIndex++ });
+            gatedResolved++;
+        } else {
+            printWarning('Zanaris shed door: could not parse destination/requirement out of quest_zanaris.rs2 - left vanilla');
+        }
+    } else {
+        printWarning(`Zanaris shed door: expected exactly 1 "zanarisdoor" placement, found ${zanarisPlacements.length} - left vanilla`);
+    }
+    printInfo(`included ${gatedResolved} gated entrance(s) in the shuffle pool with their requirement kept`);
 
     // the override table is keyed by trigger coord alone, so a coord that triggers
     // multiple distinct transitions (e.g. spiralstairsmiddle: one coord with climb-up,
@@ -544,6 +605,20 @@ function main() {
         printWarning(`only ${oneWays.length} one-way entrance(s) found - left vanilla`);
     }
 
+    // Workstream B gate table (docs/entrance-logic.md shared schema): every trigger
+    // whose PHYSICAL entrance is gated, regardless of where the shuffle sent it or
+    // whether it was pairable at all - the gate stays with the location, not the
+    // destination (you walk up to the dwarf ladder, the dwarf still stops you without
+    // the quest; the ladder now leads somewhere shuffled). Consumed by the patched
+    // handlers indirectly (the requirement check is baked into the .rs2 text, not read
+    // from this file at runtime) and directly by Workstream C's seed validator.
+    const gates: Record<string, { require: Requirement; name: string }> = {};
+    for (const e of allEntrances) {
+        if (e.requires && e.source.type === 'literal') {
+            gates[overrideKey(e.source.coord, opNum(e))] = { require: e.requires, name: e.description ?? e.category };
+        }
+    }
+
     // default mode: emit the runtime override table consumed by the engine's
     // ap_entrance_override command (see ApEntranceOverrides.ts). No content changes,
     // no pack rebuild - swap the file and restart the server.
@@ -566,14 +641,45 @@ function main() {
                     trigger: (e.source as { coord: CoordLiteral }).coord.raw,
                     landing: (e.destination as CoordLiteral).raw
                 })),
+            // gated entrances included in the shuffle pool with their requirement kept -
+            // same info as the top-level `gates` object, folded into the spoiler for
+            // convenience.
+            gatedEntrances: gates,
             excluded
         },
-        overrides
+        overrides,
+        gates
     };
     if (!dryRun) {
         fs.writeFileSync(OVERRIDES_OUTPUT, JSON.stringify(output, null, 2));
     }
-    printInfo(`${dryRun ? '[dry run] ' : ''}wrote ${Object.keys(overrides).length} override(s) to ${OVERRIDES_OUTPUT}`);
+    printInfo(`${dryRun ? '[dry run] ' : ''}wrote ${Object.keys(overrides).length} override(s) and ${Object.keys(gates).length} gate requirement(s) to ${OVERRIDES_OUTPUT}`);
+
+    // reroll-until-valid (docs/entrance-logic.md): every written seed must pass the
+    // region/gate logic validator, like any other Archipelago game. On failure,
+    // re-run this tool with seed+1 (deterministic, so a given starting seed always
+    // converges to the same final layout), budgeted to 20 attempts.
+    if (!dryRun && !noValidate) {
+        const valid = validateSeed();
+        if (valid === false) {
+            const attempt = parseInt(process.env.AP_REROLL_ATTEMPT ?? '0', 10);
+            if (attempt >= 19) {
+                printWarning(`seed ${seed} FAILED logic validation and the reroll budget (20) is exhausted - do NOT play this table; investigate with: npx tsx tools/logic/ValidateSeed.ts`);
+                process.exit(1);
+            }
+            const nextSeed = (seed + 1) >>> 0;
+            printWarning(`seed ${seed} failed logic validation - rerolling with seed ${nextSeed} (attempt ${attempt + 2}/20)`);
+            execFileSync('npx', ['tsx', 'tools/map/RandomizeEntrances.ts', '--seed', String(nextSeed), ...(mixed ? ['--mixed'] : [])], {
+                stdio: 'inherit',
+                env: { ...process.env, AP_REROLL_ATTEMPT: String(attempt + 1) }
+            });
+            return;
+        }
+        if (valid === true) {
+            printInfo(`seed ${seed} passed logic validation - all goals reachable`);
+        }
+    }
+
     if (!dryRun) {
         printInfo('restart the server to load the new entrance layout (no content rebuild needed)');
     }

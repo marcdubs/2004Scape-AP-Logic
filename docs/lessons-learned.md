@@ -1910,3 +1910,60 @@ simplifications and roadmap. Facts for future sessions:
   (entrances are flavor because gate pairing is bidirectional).
 - Roadmap (in progression-sim.md): AP item-receipt-order simulation, entrance
   flavor mining for -v2, CI gate wiring, --json feed into the browser tracker.
+
+## Session-end addendum: entrance logic - gated areas, gated entrances, seed validation (2026-07-15, same session)
+
+Fourth parallel-agent round (3 Sonnet agents: A enforcement, B inclusion, C region
+logic), triggered by a real user bug report: shuffled stairs dropped them inside the
+Champions' Guild without 32 QP. Root cause: the guild is gated by its DOOR script
+(championdoor, %qp < 32), doors aren't entrances, and the guild's interior staircase
+was a legit floor-shift candidate - AREA gates were never modeled, only
+entrance-SCRIPT gates (which were excluded). User-directed design pivot, decided via
+AskUserQuestion (all recommended options): include gated things + enforce
+requirements + validate seeds like a real AP game. Full design:
+docs/entrance-logic.md. Integrated: typecheck clean, pack build clean (~1:31),
+zanarisdoor bytecode carries opcode 1900, live validator run green, reroll loop
+exercised end-to-end. NOT in-game tested.
+
+- **Area gates** (ApAreaGates.ts + data/config/ap-gated-areas.json, 7 curated areas):
+  enforcement lives in the AP_ENTRANCE_OVERRIDE handler - on a blocked arrival the
+  module messages the player (throttled 600ms - menu-label lookups hit the same path)
+  and the op returns the player's OWN tile (telejump no-op; zero content changes to
+  block). Same-area transit rule: a player already inside an area's boxes may use its
+  interior stairs. Schema v1.1 gained { stat, gte } (BASE level, stricter than
+  vanilla's boostable stat() on purpose) - all four require forms
+  (varp/stat/item/allOf) must be handled by every consumer. Crafting Guild requires
+  level AND worn brown_apron (vanilla parity). Mining/Prayer Guild boxes staged but
+  currently unreachable via shuffle (their ladders aren't in the pool) - inert.
+- **Gated entrances now shuffle** (workstream B): mcannon dwarf-tower ladder
+  ({varp: mcannon, gte: 2}) + Zanaris shed door ({item: dramen_staff}) - handlers
+  restructured so the requirement check runs BEFORE the override consult (the
+  documented preamble-bypass is now fixed for these), gate guards wherever the
+  entrance leads. Zanaris's one-way exit ladder auto-paired with the door into a
+  proper connector gate (one-ways 5 -> 4). ap-entrances.json gained a top-level
+  `gates` object (trigger "coord:op" -> { require, name }). Black knights ladder
+  stays excluded (side-effect, not a gate); bespoke gated transports (spirit trees,
+  kalphite burrow, magic-guild portals...) were never in the 353-record baseline -
+  documented backlog, not silently included. Parser regression 352/353 byte-identical
+  + 1 record gains `requires` only.
+- **Region graph + seed validation** (workstream C, tools/logic/): BuildRegionGraph
+  flood-fills real collision (maps-server.zip via the engine's own routefinder -
+  gotcha: pre-allocate collision zones or canTravel reads NULL=blocked everywhere;
+  first symptom was 5.8M singleton regions). 16,455 regions; mainland = id 37
+  (Lumbridge/Varrock/Falador/Ardougne/Camelot all in it); doors treated walkable
+  UNLESS within 2 tiles of a gated-area box (gated doors split regions, vanilla
+  doors don't - their loc configs are indistinguishable, the curated boxes are the
+  only signal). ValidateSeed.ts: sphere expansion over regions+gates+quests
+  (consumes ap-entrances gates, ap-gated-areas incl. stat form vs skill caps,
+  sim's quests.json), exit 0/1, ~2s. Live seed: 464/16455 regions reachable, 63/63
+  quests, all 3 goals (KBD's route this seed goes through a shuffled staircase
+  straight into the lever room - detected from the real graph, not assumed).
+- **RandomizeEntrances now rerolls until valid** (orchestrator wiring): after
+  writing, runs ValidateSeed (skips loudly if region-graph.json missing); on exit 1
+  re-invokes itself with seed+1 (deterministic convergence), budget 20, opt out
+  --no-validate. Exercised: seed 777 wrote 736 overrides + 2 gates and passed.
+- **Cross-agent schema evolution worked via SendMessage**: workstream A added the
+  stat require form mid-build; the orchestrator updated entrance-logic.md and
+  messaged workstream C, which handled it (not fail-open). Pattern to reuse.
+- Backlog (user: "later"): entrance-barring by AP check rewards ("Key to X") - the
+  gates schema accommodates a future { unlock: <name> } form reading ap-unlocks.json.

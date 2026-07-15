@@ -22,6 +22,7 @@ import { getUnlockCount } from '#/engine/ApUnlockOverrides.js';
 import { recordDiscovery } from '#/engine/ApTracker.js';
 import { getHomeCoord } from '#/engine/ApSpawnOverrides.js';
 import { randomizeAppearance } from '#/engine/ApNewPlayer.js';
+import { applyAreaGate } from '#/engine/ApAreaGates.js';
 
 // Archipelago entrance override support: the redirected destination is often the far
 // ladder/staircase's own (blocked) tile, so find that loc to check real reachability
@@ -431,6 +432,21 @@ const ServerOps: CommandHandlers = {
         if (override === -1) {
             state.pushInt(-1);
             return;
+        }
+
+        // AP: gated-area enforcement - if the arrival lies inside a gated area the
+        // player doesn't qualify for, refuse the redirect: the module messages the
+        // player and we return their OWN tile, so the preamble's telejump becomes a
+        // harmless no-op move (no content/preamble change needed for blocking).
+        try {
+            const player = state.activePlayer;
+            if (!applyAreaGate(player, override)) {
+                state.pushInt(CoordGrid.packCoord(player.level, player.x, player.z));
+                return;
+            }
+        } catch (_) {
+            // no active player in this script context (shouldn't happen for oploc
+            // handlers) - fail open rather than break the entrance.
         }
 
         // map-scanned destinations may be the far ladder's own (blocked) tile -

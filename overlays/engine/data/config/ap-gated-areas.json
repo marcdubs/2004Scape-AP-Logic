@@ -1,0 +1,76 @@
+{
+    "areas": [
+        {
+            "name": "Champions' Guild",
+            "derivation": "Door 'championdoor' (id 1805) at 0_49_52_55_35 (abs 3191,3363). Building perimeter = 'brickwall' (id 1902) placements spanning local x51-58,z22-35 on BOTH level 0 and level 1 (m49_52.jm2), +2 tile pad.",
+            "boxes": [
+                { "level": 0, "x1": 3185, "z1": 3348, "x2": 3196, "z2": 3365 },
+                { "level": 1, "x1": 3185, "z1": 3348, "x2": 3196, "z2": 3365 }
+            ],
+            "require": { "varp": "qp", "gte": 32 },
+            "message": "A strange force bars your way. (Champions' Guild: requires 32 Quest Points)"
+        },
+        {
+            "name": "Heroes' Guild",
+            "derivation": "Doors 'herodoor_l'/'herodoor_r' at 0_45_54_22_54 / 22_55 (abs 2902,3510-3511). Walled compound = 'castlewall' (id 1911) placements spanning local x8-22,z47-62 on levels 0/1/2 (m45_54.jm2), +2 tile pad.",
+            "boxes": [
+                { "level": 0, "x1": 2886, "z1": 3501, "x2": 2904, "z2": 3520 },
+                { "level": 1, "x1": 2886, "z1": 3501, "x2": 2904, "z2": 3520 },
+                { "level": 2, "x1": 2886, "z1": 3501, "x2": 2904, "z2": 3520 }
+            ],
+            "require": { "varp": "heroquest", "gte": 15 },
+            "message": "A strange force bars your way. (Heroes' Guild: requires completion of the Heroes' Quest)"
+        },
+        {
+            "name": "Legends' Guild",
+            "derivation": "Gate 'legendsguildgatel'/'legendsguildgater' at 0_42_52_40_21 / 41_21 (abs 2728-2729,3349), constants ^legends_guild_gate_west_coord etc. Level 0 = outer fence+building ('timberwall'/'bluepaintedbrickwall_2'/'wallshield3_white') local x29-52,z20-47; level 1 = building only local x34-46,z35-47; level 2 = small upper room ('brickwall') local x35-46,z44-48 (m42_52.jm2), +2 tile pad each.",
+            "boxes": [
+                { "level": 0, "x1": 2715, "z1": 3346, "x2": 2742, "z2": 3377 },
+                { "level": 1, "x1": 2720, "z1": 3361, "x2": 2736, "z2": 3377 },
+                { "level": 2, "x1": 2721, "z1": 3370, "x2": 2736, "z2": 3378 }
+            ],
+            "require": { "varp": "legendsquest", "gte": 75 },
+            "message": "A strange force bars your way. (Legends' Guild: requires completion of the Legends' Quest)"
+        },
+        {
+            "name": "Crafting Guild",
+            "derivation": "Door 'crafting_guild_door' at 0_45_51_53_25 (abs 2933,3289); vanilla check is level 40 Crafting AND worn brown apron (allOf). Level 0 = 'paintedbrickwall_1' local x47-59,z13-29; level 1 = 'paintedbrickwall_2' local x50-56,z17-24 (m45_51.jm2), +2 tile pad each.",
+            "boxes": [
+                { "level": 0, "x1": 2925, "z1": 3275, "x2": 2941, "z2": 3295 },
+                { "level": 1, "x1": 2928, "z1": 3279, "x2": 2938, "z2": 3290 }
+            ],
+            "require": { "allOf": [ { "stat": "crafting", "gte": 40 }, { "item": "brown_apron" } ] },
+            "message": "A strange force bars your way. (Crafting Guild: requires level 40 Crafting and a worn brown apron)"
+        },
+        {
+            "name": "Wizards' Guild",
+            "derivation": "Doors 'magicguild_door_l'/'magicguild_door_r' (two pairs, outer+inner) around local x24-37,z15-16 (m40_48.jm2, abs 2584-2597,3087-3088). Level 0 = tower shell 'bluepaintedbrickwall_1' local x24-37,z9-22; levels 1/2 = 'witcheswallchart' local x25-35,z12-19, +2 tile pad each.",
+            "boxes": [
+                { "level": 0, "x1": 2582, "z1": 3079, "x2": 2599, "z2": 3096 },
+                { "level": 1, "x1": 2583, "z1": 3082, "x2": 2597, "z2": 3093 },
+                { "level": 2, "x1": 2583, "z1": 3082, "x2": 2597, "z2": 3093 }
+            ],
+            "require": { "stat": "magic", "gte": 66 },
+            "message": "A strange force bars your way. (Wizards' Guild: requires level 66 Magic)"
+        },
+        {
+            "name": "Mining Guild",
+            "derivation": "Surface ladder 'miningguildladder' at 0_47_52_10-12_10-12 (Falador mining site, movecoord +6400 z to the underground layer); interior door 'miningguilddoor' at 0_47_152_38_28 (abs 3046,9756). The whole dungeon is self-contained within mapsquare (47,152) - 'cavewall_top'/'cavewall_face1' fill essentially the entire square on levels 0-1, so the box is the full mapsquare (no pad needed/possible - padding would spill into an unrelated adjacent square). NOTE: mining_guild.rs2 is a standalone script, not in the ladders+stairs shuffle pool today - included for forward coverage if workstream B ever adds it.",
+            "boxes": [
+                { "level": 0, "x1": 3008, "z1": 9728, "x2": 3071, "z2": 9791 },
+                { "level": 1, "x1": 3008, "z1": 9728, "x2": 3071, "z2": 9791 }
+            ],
+            "require": { "stat": "mining", "gte": 60 },
+            "message": "A strange force bars your way. (Mining Guild: requires level 60 Mining)"
+        },
+        {
+            "name": "Prayer Guild",
+            "derivation": "Ladder 'monasteryladder' at 0_47_54_38_27 / 49_27 (abs 3046/3057,3483), gated by varp %prayer_guild (set permanently to 1 via Abbot Langley dialogue, itself requiring stat_base(prayer)>=31 at join time - the persistent flag is what the ladder rechecks, so that's what this area gate mirrors). ONLY the upper floor is members-only (ground floor chapel is public) - box covers level 1 only: monastery building 'paintedbrickwall_2' local x35-52,z25-44 (m47_54.jm2), +2 tile pad.",
+            "boxes": [
+                { "level": 1, "x1": 3041, "z1": 3479, "x2": 3062, "z2": 3502 }
+            ],
+            "require": { "varp": "prayer_guild", "gte": 1 },
+            "message": "A strange force bars your way. (Prayer Guild: you must join the Order of Ardougne monks first)"
+        }
+    ]
+}

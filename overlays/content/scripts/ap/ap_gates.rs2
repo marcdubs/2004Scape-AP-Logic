@@ -1,0 +1,16 @@
+// ::apgates - Archipelago gated-area test command. Gate checks (data/config/
+// ap-gated-areas.json) run engine-side inside ApAreaGates.applyAreaGate, which rs2
+// scripts have no read access to - this command can only report the player's OWN
+// current coordinate, it cannot tell you which gate (if any) covers it or whether
+// you'd pass. Real verification means walking a shuffled staircase/ladder into a
+// gated guild's footprint and watching the block + denial message (or successful
+// entry once you qualify). See docs/entrance-logic.md.
+//
+// (ApAreaGates also exports describeGateAt(coord): string | null, an engine-only
+// helper for agent C's region-graph tooling and unit tests - not reachable from rs2.)
+[debugproc,ap_gates]
+if (p_finduid(uid) = false) {
+    return;
+}
+mes("AP gates: your coord is <tostring(coordy(coord))>_<tostring(calc(coordx(coord) / 64))>_<tostring(calc(coordz(coord) / 64))>_<tostring(calc(coordx(coord) % 64))>_<tostring(calc(coordz(coord) % 64))>");
+mes("Gate checks run engine-side on shuffled-entrance arrival (and stair/ladder menu previews) - walk a shuffled staircase into a gated guild to test for real.");

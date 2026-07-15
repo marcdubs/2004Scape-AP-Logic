@@ -71,9 +71,16 @@ switch_coord (loc_coord) {
 }
 
 [oploc1,ladder]
-def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
-if ($ap_dest ! null) {
-    @ap_entrance_go($ap_dest);
+// AP: the dwarf guard tower ladder (0_40_53_10_49) is quest-gated inside
+// ladder_to_dwarf_remains (quest_mcannon/scripts/locs/mcannon_ladders.rs2) - the
+// override consult for that one coord happens THERE, after the %mcannon check, not
+// here, so a shuffled destination can never bypass the gate. Every other placement of
+// this category keeps the normal top-of-handler consult.
+if (loc_coord ! 0_40_53_10_49) {
+    def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
+    if ($ap_dest ! null) {
+        @ap_entrance_go($ap_dest);
+    }
 }
 p_arrivedelay;
 switch_coord (loc_coord) {

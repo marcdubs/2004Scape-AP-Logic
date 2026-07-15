@@ -1,0 +1,16 @@
+[label,ladder_to_dwarf_remains]
+if (%mcannon < ^mcannon_tasked_with_checking_guard_tower) {
+    mes("You climb up the ladder...");
+    p_delay(0);
+    mes("but the trap door will not open.");
+} else {
+    // AP: the requirement above already gated this fallthrough - loc_coord is still
+    // valid here (this label is @jumped into, same script run, from ladders.rs2's
+    // [oploc1,ladder] handler, which deliberately skips its own override consult for
+    // this one coord so the check above always runs first).
+    def_coord $ap_dest = ap_entrance_override(loc_coord, 1);
+    if ($ap_dest ! null) {
+        @ap_entrance_go($ap_dest);
+    }
+    ~climb_ladder(movecoord(coord(), 0, 1, 0), true);
+}
