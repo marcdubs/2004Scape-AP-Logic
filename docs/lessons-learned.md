@@ -171,27 +171,34 @@ reasoning:
 - Same seed number does NOT reproduce the same layout across algorithm changes (the
   dedupe fix changed the candidate list, which changed what seed 1803231336
   produces). Treat seeds as valid only within one tool version.
-- **Relative-destination stairs (`movecoord(coord, dx, dy, dz)`) used to be silently
-  dropped, no diagnostic** - found via the user reporting Falador's bar/smith
-  staircases stayed vanilla. Some handlers are reused verbatim across several
-  physically distinct staircases (e.g. `case 0_46_52_27_42 :
-  p_telejump(movecoord(coord, 0, 1, 4)); // Falador smith`), so their destination is
-  computed relative to the trigger's own coord instead of being a literal. The old
-  `isLiteral()` filter in `RandomizeEntrances.ts` required a literal destination, so
-  these never became candidates - and since `classify()` correctly calls them
-  `floor-shift`, not `cross-map`, they didn't even land in the printed `excluded`
-  list (which only logs non-literal `cross-map` kind). Fix: `EntranceParser.ts` now
-  has `resolveRelativeDestination()` - when the base is the bare `coord`/`loc_coord`
-  variable (not a `coord()` call, which is the unrelated any-source/map-scanned
-  pattern) and the source is already a literal, it resolves the offset into a real
-  literal at parse time, so these entrances flow through the normal pairing path
-  unmodified. Went from 309 to 317 floor-shift gates at seed 1 (~41 movecoord call
-  sites across both files, most any-source and handled by the map scanner instead;
-  ~8 pairs were literal-sourced and previously dropped). Any future "this specific
-  staircase stayed vanilla" report should first check whether its handler uses
-  `movecoord` with a non-`coord`/`loc_coord` base (e.g. `$randomX`/`$randomZ`, or an
-  explicit coord literal as base) - those are genuinely unresolvable and correctly
-  stay out of the pool.
+- **Relative-destination stairs (`movecoord(coord, dx, dy, dz)`) are correctly left
+  vanilla - do NOT try to resolve them to a literal using the trigger's own
+  coordinate.** Tried this once (found via the user reporting Falador's bar/smith
+  staircases stayed vanilla - some handlers are reused verbatim across several
+  physically distinct staircases, e.g. `case 0_46_52_27_42 :
+  p_telejump(movecoord(coord, 0, 1, 4)); // Falador smith`). The bare `coord` token
+  in that expression is **not** the loc's own switch-case coordinate - it's
+  `ScriptOpcode.COORD` (`PlayerOps.ts`), which reads `state.activePlayer`: the
+  *operating player's own live tile* at the moment they click the object. A player
+  can't stand on the staircase loc's own tile (it's the thing blocking movement
+  there), so they're actually standing on whichever adjacent tile the loc's
+  shape/angle lets you approach from - which the trigger's switch-case coordinate
+  does not tell you. Approximating `coord` with the trigger tile added a
+  `resolveRelativeDestination()` step to `EntranceParser.ts` that got these ~8 pairs
+  (309 -> 317 floor-shift gates at seed 1) into the shuffle pool, and it looked fine
+  in the dry-run pairing math - but live-testing immediately caught it: climbing
+  Falador smith's stairs down landed the player two tiles outside the building,
+  because the computed "vanilla" landing tile was never where a real player
+  triggering that script actually stands. Reverted. Resolving this correctly would
+  need the loc's placed shape/angle at the trigger coordinate to compute the true
+  approach tile (same class of lookup `LocPlacementScanner` already does for
+  map-scanned gates) - not attempted. These entries are still silently invisible to
+  `isLiteral()`, but `RandomizeEntrances.ts`'s `excluded` diagnostic now reports
+  every non-candidate `floor-shift`/`cross-map` entrance (not just `cross-map` as
+  before), with `'relative destination (movecoord depends on player position, not
+  resolvable from the loc coord alone)'` as the reason - so a future "why is this
+  staircase vanilla" question is answerable from `ap-entrances.json`'s
+  `spoiler.excluded` without re-deriving this.
 
 ## Testing & verification process that worked
 

@@ -397,13 +397,32 @@ function main() {
     printInfo(`seed ${seed}: ${connectorGates.length} connector gate(s) (${scanned.gates.length} map-scanned), ${floorGates.length} floor-shift gate(s) (${scannedLadders.gates.length} map-scanned), ${oneWays.length} one-way(s)`);
     printInfo(`left vanilla: ${floor.unpaired.length} unpaired floor-shift(s), ${scanned.skipped + scannedLadders.skipped} unpaired scanned placement(s), ${multiDest.size} multi-destination coord(s)`);
 
+    // reported regardless of kind (not just cross-map) - a floor-shift entrance with a
+    // relative movecoord destination is just as invisible to isLiteral() and was
+    // previously silently dropped with no trace anywhere in these diagnostics (found via
+    // live testing: the Falador smith/pub stairs). Tried resolving movecoord(coord, ...)
+    // to a literal at parse time once (see git history) and reverted it - the bare
+    // `coord` token in that expression is the OPERATING PLAYER's live tile
+    // (ScriptOpcode.COORD in PlayerOps.ts reads state.activePlayer), not the loc's own
+    // switch-case coordinate, so approximating it with the trigger tile silently landed
+    // players outside the building by however far the real approach tile differs from
+    // the loc's own tile. Resolving it correctly would need the loc's placed
+    // shape/angle to compute the real approach tile (same class of lookup
+    // LocPlacementScanner does for map-scanned gates) - not attempted yet.
     const excluded = allEntrances
-        .filter(e => e.kind === 'cross-map' && !isLiteral(e))
+        .filter(e => !isLiteral(e) && (e.kind === 'cross-map' || e.kind === 'floor-shift'))
         .map(e => ({
             category: e.category,
             op: e.op,
             description: e.description,
-            reason: isProtected(e) ? 'protected region (tutorial)' : e.source.type !== 'literal' ? 'non-literal source' : 'non-literal destination'
+            kind: e.kind,
+            reason: isProtected(e)
+                ? 'protected region (tutorial)'
+                : e.source.type !== 'literal'
+                  ? 'non-literal source'
+                  : e.destination?.type === 'relative'
+                    ? 'relative destination (movecoord depends on player position, not resolvable from the loc coord alone)'
+                    : 'non-literal destination'
         }));
 
     if (rewrite) {
