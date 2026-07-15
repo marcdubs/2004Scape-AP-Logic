@@ -35,7 +35,12 @@ import InvType from '#/cache/config/InvType.js';
 import ObjType from '#/cache/config/ObjType.js';
 import VarPlayerType from '#/cache/config/VarPlayerType.js';
 import { CoordGrid } from '#/engine/CoordGrid.js';
-import Player from '#/engine/entity/Player.js';
+// TYPE-ONLY on purpose: a runtime `import Player` here creates a circular module
+// graph (login worker: PlayerLoading -> ApNewPlayer -> Player -> NetworkPlayer ->
+// Player[TDZ]) that crashed the Windows server with "Cannot access 'Player' before
+// initialization" at NetworkPlayer's `extends Player`. The one static we need
+// (DESIGN_BODY_COLORS) is read off the passed instance's constructor instead.
+import type Player from '#/engine/entity/Player.js';
 import { getHomeCoord } from '#/engine/ApSpawnOverrides.js';
 import { printWarning } from '#/util/Logger.js';
 
@@ -190,9 +195,12 @@ export function randomizeAppearance(player: Player): void {
         }
         player.body = body;
 
-        const colors: number[] = new Array(Player.DESIGN_BODY_COLORS.length).fill(0);
-        for (let i = 0; i < Player.DESIGN_BODY_COLORS.length; i++) {
-            colors[i] = randomInt(Player.DESIGN_BODY_COLORS[i].length);
+        // Player.DESIGN_BODY_COLORS via the instance's own constructor - see the
+        // type-only import note at the top for why this can't be a static import.
+        const DESIGN_BODY_COLORS = (player.constructor as unknown as { DESIGN_BODY_COLORS: number[][] }).DESIGN_BODY_COLORS;
+        const colors: number[] = new Array(DESIGN_BODY_COLORS.length).fill(0);
+        for (let i = 0; i < DESIGN_BODY_COLORS.length; i++) {
+            colors[i] = randomInt(DESIGN_BODY_COLORS[i].length);
         }
         player.colors = colors;
 

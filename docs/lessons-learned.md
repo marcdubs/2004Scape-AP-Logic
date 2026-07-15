@@ -2016,3 +2016,32 @@ verified. NOT in-game tested.
 - ValidateSeed needs ap-entrances.json present for region traversal (pre-existing;
   GenerateSeed stages a copy) - run entrance rando at least once before placement
   mode on a fresh checkout.
+
+## Hotfix addendum: first live boot crash - circular import TDZ (2026-07-15, late)
+
+The user's first real Windows boot after the placement round crashed the login
+worker: `ReferenceError: Cannot access 'Player' before initialization` at
+`NetworkPlayer.ts:38` (`export class NetworkPlayer extends Player`). Root cause:
+`ApNewPlayer.ts` had a RUNTIME `import Player` (for the `Player.DESIGN_BODY_COLORS`
+static), and the login worker's graph reaches Player via PlayerLoading -> ApNewPlayer
+BEFORE NetworkPlayer loads - Player was mid-execution (TDZ) when NetworkPlayer's
+`extends Player` evaluated. The main thread happened to load in a safe order (boot
+reached "World ready"), which is why every offline check missed it - only a worker
+entrypoint exposes the alternate order.
+
+**RULE for all Ap* engine modules: `import type Player` ONLY - never a runtime
+import of Player (or NetworkPlayer).** Player statics must be read off a passed
+instance's constructor (`player.constructor as unknown as { STATIC: T }` - statics
+inherit through NetworkPlayer fine). ApUnlockOverrides already duplicated the exp
+table for exactly this reason; ApChecks/ApAreaGates were already type-only;
+ApNewPlayer was the one violation. Audited all Ap* modules after the fix - clean.
+
+Verified by reproducing the worker's import order directly (no boot needed):
+`npx tsx -e "await import('./src/engine/entity/PlayerLoading.ts'); await
+import('./src/engine/entity/NetworkPlayer.ts')"` - crashed before the fix's
+semantics, loads clean after. Add this graph-order repro to the toolbox: module
+init order differs PER ENTRYPOINT, so "the server boots" only proves the main
+thread's order.
+
+Also: the esbuild ping-pong hit again right when diagnosing (user had booted from
+Windows); the documented npm-install pair restored both platforms.
