@@ -1846,3 +1846,41 @@ plumbing first (files touched by multiple workstreams), froze those files, then 
   bank.constant snapshot (1024 slots, matches the user's live file) was found
   untracked and committed as-is - it's a no-op overlay; ask the user if it was
   deliberate before ever changing it.
+
+## Session-end addendum: skip-tutorial + random spawn (2026-07-15, same session)
+
+Second parallel-agent round (2 Sonnet agents), same orchestration shape (orchestrator
+pre-built shared plumbing: ApSpawnOverrides/ApNewPlayer stubs, opcodes 1907
+AP_HOME_COORD + 1908 AP_REROLL_LOOK; next free: 1909). Integrated: typecheck clean,
+pack build clean (no new config names -> no staleness race this time), decompile
+checks green incl. [queue,player_death] carrying opcode 1907. NOT in-game tested.
+
+- **Skip tutorial** (`node.apSkipTutorial` in world.json, default false; env
+  NODE_APSKIPTUTORIAL): hook in new PlayerLoading.ts overlay (both exit points of
+  load(); idempotent module-side via %tutorial >= 1000 check). %tutorial varp
+  (^tutorial_complete = 1000, quest.constant); pre-setting it before [login,_] runs
+  suppresses both tutorial re-entry AND the design screen (allowdesign(true) exists
+  only inside tutorial.rs2's start_tutorial). Starter kit copied from
+  tutorial_complete label (18 items + 25 bank coins); random look via IdkType
+  index (type 0-6 male/7-13 female parts; female jaw legitimately empty -> -1;
+  colors sized off Player.DESIGN_BODY_COLORS). Accounts mid-tutorial get skipped
+  out on next login while the flag is on - deliberate. Tests: ::apnewlook, ::apkit.
+  Open risk (agent-flagged): PlayerLoading mutates x/z/level/vars pre-login same as
+  vanilla save-load does, but a live fresh-account login is the real test.
+- **Random spawn** (`tools/spawn/RandomizeSpawn.ts [--seed N] [--mode city|chunk]`):
+  writes data/config/ap-spawn.json (reseed = rewrite + restart). City = 1 of the 7
+  vanilla spellbook landmarks (tool cross-checks live magic_spells.dbrow and warns
+  loudly if the teleport shuffle deranged it - home uses vanilla coords regardless).
+  Chunk = random mainland square from 127 candidates (surface, mapX>=40, mapZ<=62
+  core band, no Tutorial Island/wilderness/Karamja; wilderness boundary VERIFIED:
+  x in [2944,3392) & z in [3520,6400), 3520 = mapsquare edge 55, confirmed by both
+  Player.isInWilderness() and move.rs2's [mapzone,0_46_55]; >=8 LOCs or >=1 NPC to
+  skip ocean; --include-far-west opens mapX<40 back up). death.rs2 overlay = 2-line
+  diff using ap_home_coord() (zero-arg command WITH parens compiles fine); ::home
+  engine block now reads getHomeCoord(). Test: ::apspawn. KNOWN chunk-mode risk:
+  offline reachability is heuristic; if home lands somewhere enclosed, ::home loops
+  to the same place - the spoiler prints the square prominently, reroll if bad.
+- User answered the progression-simulator design questions (AskUserQuestion):
+  logic engine + narrator, hand-authored script-verified requirements JSON, fully
+  seed-aware, spheres/steps/story verbosity levels - agent dispatched with that
+  spec; see docs/progression-sim.md once it lands.

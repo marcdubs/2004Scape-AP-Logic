@@ -97,6 +97,16 @@ export const enum ScriptOpcode {
     // AP_ENTRANCE_OVERRIDE above.
     AP_TRACK = 1906,
 
+    // custom: Archipelago random spawn/home point - the seeded home coordinate
+    // (death respawn / ::home / skip-tutorial spawn) - same explicit-numbering
+    // reasoning as AP_ENTRANCE_OVERRIDE above.
+    AP_HOME_COORD = 1907,
+
+    // custom: Archipelago skip-tutorial support - re-roll the active player's
+    // random appearance (test path for the new-player look randomizer) - same
+    // explicit-numbering reasoning as AP_ENTRANCE_OVERRIDE above.
+    AP_REROLL_LOOK = 1908,
+
     // Player ops (2000-2499)
     AFK_EVENT = 2000,
     ALLOWDESIGN,
@@ -552,6 +562,8 @@ export const ScriptOpcodeMap: Map<string, number> = new Map([
     ['AP_STAT_ADVANCE_RAW', ScriptOpcode.AP_STAT_ADVANCE_RAW],
     ['AP_UNLOCK_COUNT', ScriptOpcode.AP_UNLOCK_COUNT],
     ['AP_TRACK', ScriptOpcode.AP_TRACK],
+    ['AP_HOME_COORD', ScriptOpcode.AP_HOME_COORD],
+    ['AP_REROLL_LOOK', ScriptOpcode.AP_REROLL_LOOK],
 
     ['AFK_EVENT', ScriptOpcode.AFK_EVENT],
     ['ALLOWDESIGN', ScriptOpcode.ALLOWDESIGN],

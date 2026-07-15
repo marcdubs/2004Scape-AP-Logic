@@ -1,0 +1,11 @@
+// ::apspawn - print the seeded home/respawn coord, then teleport there. Exercises the
+// exact same ap_home_coord -> map_findsquare lookup death.rs2 uses on death, without
+// having to die. See docs/goals-and-checks.md "Test command infrastructure" and
+// Feature 3 (random spawn/home point, city/chunk modes).
+[debugproc,ap_spawn]
+if (p_finduid(uid) = false) {
+    return;
+}
+def_coord $ap_home = ap_home_coord();
+mes("AP home: <tostring(coordy($ap_home))>_<tostring(calc(coordx($ap_home) / 64))>_<tostring(calc(coordz($ap_home) / 64))>_<tostring(calc(coordx($ap_home) % 64))>_<tostring(calc(coordz($ap_home) % 64))>");
+p_telejump(map_findsquare($ap_home, 0, 2, ^map_findsquare_lineofwalk));

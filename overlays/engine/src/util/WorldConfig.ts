@@ -23,6 +23,7 @@ export interface WorldConfig {
         autoSubscribeMembers: boolean;
         xpRate: number;
         infiniteRun: boolean;
+        apSkipTutorial: boolean;
         production: boolean;
         minimumWealthValueEvent: number;
         debug: boolean;
@@ -98,6 +99,7 @@ export function createDefaultWorldConfig(): WorldConfig {
             autoSubscribeMembers: true,
             xpRate: 1,
             infiniteRun: false,
+            apSkipTutorial: false,
             production: false,
             minimumWealthValueEvent: 10,
             debug: true,
@@ -238,6 +240,7 @@ function migrateFromLegacyEnv(defaults: WorldConfig, env: Record<string, string>
     config.node.autoSubscribeMembers = tryParseBoolean(env.NODE_AUTO_SUBSCRIBE_MEMBERS, config.node.autoSubscribeMembers);
     config.node.xpRate = tryParseInt(env.NODE_XPRATE, config.node.xpRate);
     config.node.infiniteRun = tryParseBoolean(env.NODE_INFINITERUN, config.node.infiniteRun);
+    config.node.apSkipTutorial = tryParseBoolean(env.NODE_APSKIPTUTORIAL, config.node.apSkipTutorial);
     config.node.production = tryParseBoolean(env.NODE_PRODUCTION, config.node.production);
     config.node.minimumWealthValueEvent = tryParseInt(env.NODE_MINIMUM_WEALTH_VALUE_EVENT, config.node.minimumWealthValueEvent);
     config.node.debug = tryParseBoolean(env.NODE_DEBUG, config.node.debug);

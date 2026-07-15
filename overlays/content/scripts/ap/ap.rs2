@@ -116,3 +116,10 @@ if (%ap_kbd_killed = 1) {
 // info: custom - record a discovery event for the browser tracker map (category,
 // key, value). Fire-and-forget; safe from any script context.
 [command,ap_track](string $category, string $key, string $value)
+
+// info: custom - the seeded home/respawn coordinate (Archipelago random spawn).
+// Never null: vanilla Lumbridge when no ap-spawn.json exists.
+[command,ap_home_coord]()(coord)
+
+// info: custom - re-roll the caller's randomized appearance (skip-tutorial test path).
+[command,ap_reroll_look]

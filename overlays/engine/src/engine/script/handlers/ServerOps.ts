@@ -20,6 +20,8 @@ import { getProcessSwap } from '#/engine/ApProcessOverrides.js';
 import { getEntranceOverride } from '#/engine/ApEntranceOverrides.js';
 import { getUnlockCount } from '#/engine/ApUnlockOverrides.js';
 import { recordDiscovery } from '#/engine/ApTracker.js';
+import { getHomeCoord } from '#/engine/ApSpawnOverrides.js';
+import { randomizeAppearance } from '#/engine/ApNewPlayer.js';
 
 // Archipelago entrance override support: the redirected destination is often the far
 // ladder/staircase's own (blocked) tile, so find that loc to check real reachability
@@ -553,6 +555,18 @@ const ServerOps: CommandHandlers = {
 
         recordDiscovery(category, key, value);
     },
+
+    // custom: Archipelago random spawn/home point - the seeded home coordinate.
+    // Never null: falls back to vanilla Lumbridge when no ap-spawn.json exists.
+    [ScriptOpcode.AP_HOME_COORD]: state => {
+        state.pushInt(getHomeCoord());
+    },
+
+    // custom: Archipelago skip-tutorial support - re-roll the active player's
+    // random appearance (no-op until the new-player module is populated).
+    [ScriptOpcode.AP_REROLL_LOOK]: checkedHandler(ActivePlayer, state => {
+        randomizeAppearance(state.activePlayer);
+    }),
 
     [ScriptOpcode.MIDI_LENGTH]: state => {
         const track = state.popInt();

@@ -1,0 +1,45 @@
+// Archipelago skip-tutorial test commands (2004Scape-AP-Logic docs, tutorial-skip
+// workstream). Both dispatch via the ungated ::ap<name> test-command infrastructure
+// (see docs/goals-and-checks.md), so they work even with node.production: true set.
+//
+// ::apnewlook - re-roll the caller's appearance via the engine-side randomizer
+// (ApNewPlayer.ts randomizeAppearance, opcode AP_REROLL_LOOK / ap_reroll_look). Lets
+// the id-picking logic be exercised repeatedly without a fresh account.
+[debugproc,ap_newlook]
+if (p_finduid(uid) = false) {
+    return;
+}
+ap_reroll_look;
+mes("AP test: appearance re-rolled.");
+
+// ::apkit - grant the same starter kit a skip-tutorial account gets from
+// ApNewPlayer.ts's applyNewPlayerSetup, content-side, without touching the
+// %tutorial varp or teleporting. Additive (no inv_clear) so it's safe to run on an
+// existing character - just tops up/duplicates the kit items. Kept in sync by hand
+// with the engine-side STARTER_KIT list in ApNewPlayer.ts (that list is the
+// authoritative one actually used on real skip-tutorial setup; this is a
+// convenience duplicate for testing kit contents in isolation).
+[debugproc,ap_kit]
+if (p_finduid(uid) = false) {
+    return;
+}
+inv_add(inv, bronze_axe, 1);
+inv_add(inv, tinderbox, 1);
+inv_add(inv, net, 1);
+inv_add(inv, shrimp, 1);
+inv_add(inv, bucket_empty, 1);
+inv_add(inv, pot_empty, 1);
+inv_add(inv, bread, 1);
+inv_add(inv, bronze_pickaxe, 1);
+inv_add(inv, bronze_dagger, 1);
+inv_add(inv, bronze_sword, 1);
+inv_add(inv, wooden_shield, 1);
+inv_add(inv, shortbow, 1);
+inv_add(inv, bronze_arrow, 25);
+inv_add(inv, airrune, 25);
+inv_add(inv, mindrune, 15);
+inv_add(inv, waterrune, 6);
+inv_add(inv, earthrune, 4);
+inv_add(inv, bodyrune, 2);
+
+mes("AP test kit: granted the tutorial-exit starter kit (tools, food, bronze gear, shortbow + arrows, rune-strike runes).");

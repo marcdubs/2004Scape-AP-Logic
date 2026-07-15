@@ -15,6 +15,8 @@ import SpotanimType from '#/cache/config/SpotanimType.js';
 import VarBitType from '#/cache/config/VarBitType.js';
 import VarPlayerType from '#/cache/config/VarPlayerType.js';
 
+import { getHomeCoord } from '#/engine/ApSpawnOverrides.js';
+import { recordDiscovery } from '#/engine/ApTracker.js';
 import { CoordGrid } from '#/engine/CoordGrid.js';
 import World from '#/engine/World.js';
 import { EntityLifeCycle } from '#/engine/entity/EntityLifeCycle.js';
@@ -710,9 +712,13 @@ export default class ClientCheatHandler extends ClientGameMessageHandler<ClientC
         }
 
         if (cmd === 'home') {
-            // custom - unconditional home teleport (Lumbridge), available to every
-            // player with no rank check and no cooldown, so nobody can get permanently
-            // stuck (e.g. behind a randomized entrance with no way back).
+            // custom - unconditional "go home" teleport, available to every player
+            // with no rank check and no cooldown, so nobody can get permanently stuck
+            // (e.g. behind a randomized entrance with no way back). Home used to be
+            // hardcoded Lumbridge; it is now the Archipelago-seeded home coordinate
+            // (see ApSpawnOverrides.ts / docs/goals-and-checks.md Feature 3) - vanilla
+            // Lumbridge when no seed has been rolled, so behavior is unchanged outside
+            // an AP run.
             player.closeModal();
 
             if (!player.canAccess()) {
@@ -723,8 +729,13 @@ export default class ClientCheatHandler extends ClientGameMessageHandler<ClientC
             player.clearInteraction();
             player.unsetMapFlag();
 
-            // ::tele 0,50,50,22,22
-            player.teleJump((50 << 6) + 22, (50 << 6) + 22, 0);
+            const home = CoordGrid.unpackCoord(getHomeCoord());
+            player.teleJump(home.x, home.z, home.level);
+
+            // the lookup moment IS "the player actually used their seeded home" -
+            // record it for the browser discovery tracker (docs/tracker-map.md). Not
+            // recorded at module load, only on first real use.
+            recordDiscovery('spawn', 'home', CoordGrid.formatString(home.level, home.x, home.z));
         } else if (cmd.startsWith('ap')) {
             // custom - Archipelago test-command dispatcher, unconditional (no
             // production/staffmod gate, unlike the vanilla `~`-prefixed debugproc
