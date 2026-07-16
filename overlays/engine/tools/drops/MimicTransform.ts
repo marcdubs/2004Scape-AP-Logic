@@ -61,6 +61,26 @@ import { DROP_BACKUP_DIR, DROP_SCRIPTS_DIR, findDropScriptFiles } from './DropTa
 // Inline handlers with pre-prologue logic (guard/guard_dog clue-trail checks,
 // troll_commander's prison keys) keep that logic in place - the preamble is inserted
 // AFTER it, immediately before the prologue - so they stay mappable.
+//
+// STRUCTURAL_DROP_HOISTS (2026-07-16, Witch's Potion follow-up): the note above says
+// quest-gated guaranteed drops "travel fine" - true for obtainability, but wrong for a
+// vanilla mechanic a quest expects to always work regardless of the seed: killing a
+// rat should always be able to yield a rats_tail once Hetty's quest is underway, not
+// only when whichever monster's slot happens to land on rat's unit. Unit-level pinning
+// (like grip/mountain_troll above) isn't right here either - that would delete rat's
+// unit from unitByKey entirely, reindexing every unit after it (a whole-corpus rebuild
+// for one NPC's guaranteed drop). Instead these are hoisted at the STATEMENT level:
+// pulled out of the movable unit.loot (so a monster mimicking rat's unit doesn't also
+// inherit the drop) and re-emitted unconditionally inside the OWNING slot's own
+// preamble (before the @ap_drops_go dispatch), so the real npc keeps delivering them
+// no matter which unit its slot ends up mimicking - while the rest of that slot (and
+// everything else in the corpus) stays fully mimicable. Exact-match asserted against
+// the pristine backup text (parseMimic throws if it drifts) rather than regex-guessed,
+// same discipline as the rest of this file - a content change here should fail loudly,
+// not silently stop hoisting. Currently only rat.rs2's rats_tail (Witch's Potion); the
+// lessons-learned doc's rats_tail/jail_key/unholy mould/hot_feather list has 3 more
+// items in the same latent-bug category that weren't reported broken and so aren't
+// touched here - revisit if a future quest check needs them too.
 
 export const AP_DROPS_JSON = path.join('data', 'config', 'ap-drops.json');
 export const MIMIC_GENERATED_FILE = path.join(SCRIPTS_ROOT, 'drop tables', 'ap_mimic.rs2');
@@ -71,6 +91,20 @@ export const MIMIC_MARKER = 'ap_drop_group(';
 const HEADER_RE = /^\[([a-zA-Z_0-9]+),([a-zA-Z0-9_]+)\](.*)$/;
 const PROLOGUE_RE = /gosub\(npc_death\);\s*\n\s*if ?\(npc_findhero = \^false\) ?\{\s*\n\s*return;\s*\n\s*\}/;
 const JUMP_ONLY_RE = /^@([a-zA-Z0-9_]+);$/;
+
+// keyed by `${rel file}:${handler}` (same shape as MimicSlot.unitKey for inline
+// handlers) -> the exact post-prologue substring (LF, as returned by readNpcSource)
+// to hoist out of that unit's movable loot and re-emit unconditionally in the owning
+// slot's own preamble. See the file header's STRUCTURAL_DROP_HOISTS note.
+const STRUCTURAL_DROP_HOISTS: Record<string, string> = {
+    'rat.rs2:rat':
+        '// Drop Rats Tail only as long as quest is active.\n' +
+        'if (%hetty = ^hetty_started | %hetty = ^hetty_objects_given) {\n' +
+        '    if (inv_total(inv, rats_tail) < 1 & inv_total(bank, rats_tail) < 1) { // Only drop if no rats tail found in inv or bank.\n' +
+        '        obj_add(npc_coord, rats_tail, 1, ^lootdrop_duration);\n' +
+        '    }\n' +
+        '}'
+};
 
 export type MimicUnit = {
     index: number;
@@ -232,7 +266,9 @@ export function parseMimic(): MimicParse {
     const slots: MimicSlot[] = [];
     const unitByKey = new Map<string, MimicUnit>();
 
-    type PendingEdit = { kind: 'insert-before'; lineIdx: number; slot: MimicSlot } | { kind: 'expand-header'; lineIdx: number; slot: MimicSlot };
+    type PendingEdit =
+        | { kind: 'insert-before'; lineIdx: number; slot: MimicSlot; hoist: string | null }
+        | { kind: 'expand-header'; lineIdx: number; slot: MimicSlot };
     const editsByFile = new Map<string, { lines: string[]; edits: PendingEdit[] }>();
 
     for (const file of findDropScriptFiles(DROP_BACKUP_DIR)) {
@@ -309,8 +345,21 @@ export function parseMimic(): MimicParse {
                 continue;
             }
             slot.unitKey = `${rel}:${b.name}`;
-            unitByKey.set(slot.unitKey, { index: -1, name: b.name, file: rel, loot: body.slice(pm.index! + pm[0].length).replace(/^\n+/, ''), deathDrop: null, displayName: '', handlers: [b.name] });
-            edits.push({ kind: 'insert-before', lineIdx: gosubIdx, slot });
+            let loot = body.slice(pm.index! + pm[0].length).replace(/^\n+/, '');
+            let hoist: string | null = null;
+            const hoistMarker = STRUCTURAL_DROP_HOISTS[slot.unitKey];
+            if (hoistMarker !== undefined) {
+                if (!loot.includes(hoistMarker)) {
+                    throw new Error(`mimic: STRUCTURAL_DROP_HOISTS text for ${slot.unitKey} not found verbatim in its loot - content drifted from the pristine backup, update the hoist text`);
+                }
+                loot = loot
+                    .replace(hoistMarker, '')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+                hoist = hoistMarker;
+            }
+            unitByKey.set(slot.unitKey, { index: -1, name: b.name, file: rel, loot, deathDrop: null, displayName: '', handlers: [b.name] });
+            edits.push({ kind: 'insert-before', lineIdx: gosubIdx, slot, hoist });
         }
 
         editsByFile.set(rel, { lines, edits });
@@ -375,7 +424,7 @@ export function parseMimic(): MimicParse {
         for (const edit of [...edits].sort((a, b) => b.lineIdx - a.lineIdx)) {
             if (edit.kind === 'insert-before') {
                 const indent = out[edit.lineIdx].match(/^\s*/)?.[0] ?? '';
-                out.splice(edit.lineIdx, 0, ...preambleLines(edit.slot.index, indent));
+                out.splice(edit.lineIdx, 0, ...preambleLines(edit.slot.index, indent, edit.hoist));
             } else {
                 const m = out[edit.lineIdx].match(HEADER_RE)!;
                 out.splice(edit.lineIdx, 1, `[${m[1]},${m[2]}]`, ...preambleLines(edit.slot.index, ''), m[3].trim());
@@ -387,7 +436,13 @@ export function parseMimic(): MimicParse {
     return { slots, units, unitByKey, transformed, generatedText: generateMimicFile(units) };
 }
 
-function preambleLines(slotIndex: number, indent: string): string[] {
+function preambleLines(slotIndex: number, indent: string, hoist: string | null = null): string[] {
+    // hoisted structural drops (see STRUCTURAL_DROP_HOISTS) run unconditionally inside
+    // the mimic branch, right before the dispatch jump - so the owning npc keeps
+    // delivering them no matter which unit its slot ends up mimicking. One indent
+    // level deeper than gosub/return, same as the rest of this block; the hoisted
+    // text's own internal indentation (nested ifs) is preserved relative to that.
+    const hoistLines = hoist === null ? [] : hoist.split('\n').map(l => (l.length ? `${indent}    ${l}` : l));
     return [
         `${indent}def_int $ap_group = ap_drop_group(${slotIndex});`,
         `${indent}if ($ap_group >= 0) {`,
@@ -395,6 +450,7 @@ function preambleLines(slotIndex: number, indent: string): string[] {
         `${indent}    if (npc_findhero = ^false) {`,
         `${indent}        return;`,
         `${indent}    }`,
+        ...hoistLines,
         `${indent}    @ap_drops_go($ap_group);`,
         `${indent}}`
     ];

@@ -11,6 +11,7 @@
     <h1>Archipelago Discovery Tracker</h1>
     <nav class="tabs" id="tabs">
         <button class="tab-btn active" data-tab="map">Map</button>
+        <button class="tab-btn" data-tab="entrances">Entrances</button>
         <button class="tab-btn" data-tab="gathering">Gathering</button>
         <button class="tab-btn" data-tab="recipes">Recipes</button>
         <button class="tab-btn" data-tab="bestiary">Bestiary</button>
@@ -40,6 +41,16 @@
             <div id="map-empty" class="empty-state" hidden>Nothing discovered yet on this layer. Go find some shuffled entrances!</div>
             <div id="map-loading" class="empty-state">Loading map&hellip;</div>
         </div>
+    </section>
+
+    <section id="tab-entrances" class="tab-panel">
+        <h2>Entrances <span class="counter" id="entrances-counter"></span></h2>
+        <p class="tab-desc">Every shuffled ladder/staircase/door connection you've actually used, as a readable list &mdash; the map draws the same data as pins and dashed lines, which gets hard to read once a few dozen are discovered. Click a row to jump to it on the map.</p>
+        <div class="entrance-toolbar">
+            <input type="search" id="entrances-search" class="entrance-search" placeholder="Filter by place name&hellip;">
+        </div>
+        <div id="entrances-groups"></div>
+        <div class="empty-state" id="entrances-empty" hidden>Nothing discovered yet. Go find a shuffled entrance!</div>
     </section>
 
     <section id="tab-gathering" class="tab-panel">

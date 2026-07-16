@@ -18,7 +18,7 @@ import { getDropGroupOverride } from '#/engine/ApDropOverrides.js';
 import { getGatherSwap } from '#/engine/ApGatherOverrides.js';
 import { getProcessSwap } from '#/engine/ApProcessOverrides.js';
 import { getEntranceOverride } from '#/engine/ApEntranceOverrides.js';
-import { getUnlockCount } from '#/engine/ApUnlockOverrides.js';
+import { applyAllBankedXp, getUnlockCount } from '#/engine/ApUnlockOverrides.js';
 import { recordDiscovery } from '#/engine/ApTracker.js';
 import { getHomeCoord } from '#/engine/ApSpawnOverrides.js';
 import { randomizeAppearance } from '#/engine/ApNewPlayer.js';
@@ -582,6 +582,15 @@ const ServerOps: CommandHandlers = {
     // random appearance (no-op until the new-player module is populated).
     [ScriptOpcode.AP_REROLL_LOOK]: checkedHandler(ActivePlayer, state => {
         randomizeAppearance(state.activePlayer);
+    }),
+
+    // custom: Archipelago banked-XP safety net - drains every cappable stat's
+    // ap_xpbank_<skill> varp through the real addXp path now that a cap increase
+    // might cover it (also called immediately off a placement grant - see
+    // ApChecks.resolvePlacement - this opcode is the login-time backstop for
+    // that same drain).
+    [ScriptOpcode.AP_APPLY_BANKED_XP]: checkedHandler(ActivePlayer, state => {
+        applyAllBankedXp(state.activePlayer);
     }),
 
     [ScriptOpcode.MIDI_LENGTH]: state => {

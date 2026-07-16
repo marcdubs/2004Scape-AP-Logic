@@ -3,3 +3,66 @@ scope=perm
 
 [ap_kills]
 scope=perm
+
+// AP: per-skill banked XP (2026-07-16, "struck with inspiration hits your level
+// cap" fix - docs/lessons-learned.md progressive-cap section). When
+// ApUnlockOverrides.clampStatXp truncates an xp gain at the current progressive
+// skill cap, the excess (post-multiplier, engine tenths-of-a-point units) is
+// stashed here instead of silently discarded, then re-applied automatically the
+// moment that skill's cap rises (grantUnlock) and as a login safety net
+// (ApUnlockOverrides.applyAllBankedXp). One perm varp per cappable skill -
+// hitpoints is excluded (never capped, see getSkillCap), stat18/stat19 are
+// excluded (disabled placeholder stats, PlayerStatEnabled=false).
+[ap_xpbank_attack]
+scope=perm
+
+[ap_xpbank_defence]
+scope=perm
+
+[ap_xpbank_strength]
+scope=perm
+
+[ap_xpbank_ranged]
+scope=perm
+
+[ap_xpbank_prayer]
+scope=perm
+
+[ap_xpbank_magic]
+scope=perm
+
+[ap_xpbank_cooking]
+scope=perm
+
+[ap_xpbank_woodcutting]
+scope=perm
+
+[ap_xpbank_fletching]
+scope=perm
+
+[ap_xpbank_fishing]
+scope=perm
+
+[ap_xpbank_firemaking]
+scope=perm
+
+[ap_xpbank_crafting]
+scope=perm
+
+[ap_xpbank_smithing]
+scope=perm
+
+[ap_xpbank_mining]
+scope=perm
+
+[ap_xpbank_herblore]
+scope=perm
+
+[ap_xpbank_agility]
+scope=perm
+
+[ap_xpbank_thieving]
+scope=perm
+
+[ap_xpbank_runecraft]
+scope=perm

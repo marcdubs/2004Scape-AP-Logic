@@ -123,3 +123,8 @@ if (%ap_kbd_killed = 1) {
 
 // info: custom - re-roll the caller's randomized appearance (skip-tutorial test path).
 [command,ap_reroll_look]
+
+// info: custom - apply any banked overflow XP (from skills that were at their
+// progressive cap when the XP arrived) that now fits under the current caps.
+// Login safety net; caps rising via a check grant applies it engine-side already.
+[command,ap_apply_banked_xp]

@@ -42,7 +42,18 @@ import { derangement, mulberry32 } from '../shared/Prng.js';
 // - cooking's burnt-item delivery (the burn roll, message, and burnt item are all
 //   still vanilla - only what you get when you DON'T burn it is randomized, matching
 //   gathering's "junk/failure outcomes stay vanilla" precedent (big-net junk catches,
-//   the gem-cutting mis-hit's crushed_gemstone)
+//   the gem-cutting mis-hit's crushed_gemstone). This is enforced by only ever reading
+//   the `burnt` field (never wrapped) - EXCEPT `cooking_burn_meat`, a standalone row
+//   that models the deliberate "burn your own cooked meat" action (uncooked=
+//   cooked_meat, its OWN `cooked` field is burnt_meat - the burn outcome delivered
+//   through the normal product chokepoint because it's the row's only successful
+//   path). Structurally excluded below (STRUCTURAL_POOL_EXCLUSIONS) so burnt_meat
+//   never enters the pool as a key OR a replacement value, in every mode - it's also
+//   a Witch's Potion ingredient (hetty_journal.rs2's inv_total gate) and correctly
+//   flagged quest-critical, but quest-critical pins are mode-aware (see below) and
+//   shuffle mode doesn't pin by default; this row needs to ALWAYS stay vanilla
+//   because "burn cooked meat -> burnt meat" is the action itself, not just one of
+//   several ways to obtain the item.
 // - cooking's $additional_item (tins etc.), gnome half-baked reassignment (those
 //   items aren't cooking_generic rows, so they're never in the pool - vanilla for
 //   free, no special-casing needed)
@@ -90,14 +101,25 @@ function readLines(file: string): string[] {
     return fs.readFileSync(file, 'utf8').split(/\r?\n/);
 }
 
-function extractDataField(file: string, field: string): string[] {
+function extractDataField(file: string, field: string, excludeBlocks: ReadonlySet<string> = new Set()): string[] {
     const out: string[] = [];
     // trailing (?:,.*)? handles multi-value dbtable columns (e.g. fletching_table's
     // product is namedobj,int and fletch_bow_table's shortbow/longbow are
     // namedobj,int,int) - only the leading namedobj token is the product identity.
     const re = new RegExp(`^data=${field},([a-zA-Z0-9_]+)(?:,.*)?$`);
+    const blockRe = /^\[([a-zA-Z0-9_]+)\]$/;
+    let currentBlock: string | null = null;
     for (const line of readLines(file)) {
-        const m = line.trim().match(re);
+        const trimmed = line.trim();
+        const headerMatch = trimmed.match(blockRe);
+        if (headerMatch) {
+            currentBlock = headerMatch[1];
+            continue;
+        }
+        if (currentBlock !== null && excludeBlocks.has(currentBlock)) {
+            continue;
+        }
+        const m = trimmed.match(re);
         // "null" is a real sentinel value in this content (e.g.
         // cooking_generic_raw_oomlie's cooked=null - a "you can't cook this directly"
         // row that always hits the cantcookmessage branch before any inv_add), not a
@@ -109,8 +131,14 @@ function extractDataField(file: string, field: string): string[] {
     return out;
 }
 
+// cooking_burn_meat is the deliberate "burn your own cooked meat" action, not a
+// normal raw->cooked recipe - see the header comment. Excluding its BLOCK (rather
+// than the item name burnt_meat) is deliberately narrow: it doesn't accidentally
+// exclude some other future row that happens to also produce burnt_meat.
+const COOKING_BLOCK_EXCLUSIONS = new Set(['cooking_burn_meat']);
+
 function loadCookingProducts(): string[] {
-    return extractDataField(path.join(SCRIPTS_ROOT, 'skill_cooking', 'configs', 'cooking_source', 'cooking_generic.dbrow'), 'cooked');
+    return extractDataField(path.join(SCRIPTS_ROOT, 'skill_cooking', 'configs', 'cooking_source', 'cooking_generic.dbrow'), 'cooked', COOKING_BLOCK_EXCLUSIONS);
 }
 
 function loadSmithingProducts(): string[] {

@@ -107,6 +107,13 @@ export const enum ScriptOpcode {
     // explicit-numbering reasoning as AP_ENTRANCE_OVERRIDE above.
     AP_REROLL_LOOK = 1908,
 
+    // custom: Archipelago banked-XP safety net - apply any XP a "struck with
+    // inspiration"-style reward stashed against a progressive skill cap, for
+    // every cappable stat, now that the caller (login.rs2) has a live player in
+    // world. A no-op per stat with nothing banked or still at the same cap -
+    // same explicit-numbering reasoning as AP_ENTRANCE_OVERRIDE above.
+    AP_APPLY_BANKED_XP = 1909,
+
     // Player ops (2000-2499)
     AFK_EVENT = 2000,
     ALLOWDESIGN,
@@ -564,6 +571,7 @@ export const ScriptOpcodeMap: Map<string, number> = new Map([
     ['AP_TRACK', ScriptOpcode.AP_TRACK],
     ['AP_HOME_COORD', ScriptOpcode.AP_HOME_COORD],
     ['AP_REROLL_LOOK', ScriptOpcode.AP_REROLL_LOOK],
+    ['AP_APPLY_BANKED_XP', ScriptOpcode.AP_APPLY_BANKED_XP],
 
     ['AFK_EVENT', ScriptOpcode.AFK_EVENT],
     ['ALLOWDESIGN', ScriptOpcode.ALLOWDESIGN],

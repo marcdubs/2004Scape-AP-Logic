@@ -155,12 +155,24 @@ return($chosen_item, $chosen_qty);
 // quest_legends.rs2). Requires protected access when the bank branch is hit -
 // callers that don't already have it (debugproc test commands) must acquire
 // it first via the usual if_close/p_finduid dance.
+//
+// Bug fix (2026-07-16, user report: "AP rewards are dropping to the ground when
+// inventory is full"): the old condition `inv_freespace(inv) > 0 |
+// inv_total(inv, $item) > 0` treated "already carrying one of these" as proof a
+// new copy will fit, which is only true for STACKABLE items (a second stack entry
+// needs no new slot). For a non-stackable reward (nearly everything in the
+// weapons/armour/ranged_gear/tools categories) that already occupies a slot, a
+// genuinely full inventory has nowhere to put a second one - inv_add(inv, ...)
+// then has nothing to do but drop it on the ground, which is exactly the
+// ground-drop the user saw. Gate the stack-fits-without-a-slot case behind
+// oc_stackable so non-stackables only take the inventory branch when a slot is
+// actually free.
 [proc,ap_deliver_reward](namedobj $item, int $qty)
 if ($item = null) {
     mes("AP: no reward available for that roll.");
     return;
 }
-if (inv_freespace(inv) > 0 | inv_total(inv, $item) > 0) {
+if (inv_freespace(inv) > 0 | (oc_stackable($item) = true & inv_total(inv, $item) > 0)) {
     inv_add(inv, $item, $qty);
     mes("Archipelago reward: <tostring($qty)> x <oc_name($item)>!");
 } else {

@@ -1,6 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 
+import VarPlayerType from '#/cache/config/VarPlayerType.js';
+import type Player from '#/engine/entity/Player.js';
+import { PlayerStatEnabled } from '#/engine/entity/PlayerStat.js';
 import { printInfo, printWarning } from '#/util/Logger.js';
 
 // Archipelago unlock-item table (2004Scape-AP-Logic docs/checks-and-unlocks.md,
@@ -119,18 +122,25 @@ const SKILL_GROUPS: Record<string, readonly string[]> = {
     progressive_support: ['agility', 'thieving']
 };
 
-export function grantUnlock(name: string, count: number): void {
+// Returns the resulting count that best represents "what this grant just did" so
+// the caller (ApChecks.resolvePlacement) can build an announcement from the ACTUAL
+// post-grant state instead of trusting a pre-baked string (see describeUnlock below
+// for why that distinction matters). Sentinel 0 means "grant did not happen" -
+// callers should fail open to whatever fallback text they already have rather than
+// trusting a fabricated "now 0" message (a real successful grant always ends at
+// count >= 1, since count > 0 is required to reach the increment).
+export function grantUnlock(name: string, count: number): number {
     try {
         ensureFresh();
 
         if (table === null) {
             printWarning(`AP unlock overrides: grantUnlock(${name}, ${count}) called with no ${OVERRIDES_PATH} on disk - placement mode requires a starting unlocks table, ignoring`);
-            return;
+            return 0;
         }
 
         if (typeof name !== 'string' || name.length === 0 || !Number.isInteger(count) || count <= 0) {
             printWarning(`AP unlock overrides: grantUnlock called with invalid args (${JSON.stringify(name)}, ${count})`);
-            return;
+            return 0;
         }
 
         // --pool groups placements use 4 synthetic keys that are NOT real unlock
@@ -139,13 +149,24 @@ export function grantUnlock(name: string, count: number): void {
         // (tools side) exactly. Membership must stay in sync with
         // tools/sim/PlacementEngine.ts's group definitions.
         const group = SKILL_GROUPS[name];
+        let resultCount: number;
         if (group) {
+            let first = 0;
             for (const skill of group) {
                 const key = `progressive_${skill}`;
-                table.set(key, (table.get(key) ?? 0) + count);
+                const updated = (table.get(key) ?? 0) + count;
+                table.set(key, updated);
+                if (first === 0) {
+                    first = updated;
+                }
             }
+            // Every member is always bumped by the same amount in lockstep (groups
+            // never receive a member-specific grant), so any one member's new
+            // count is representative for announcement purposes.
+            resultCount = first;
         } else {
-            table.set(name, (table.get(name) ?? 0) + count);
+            resultCount = (table.get(name) ?? 0) + count;
+            table.set(name, resultCount);
         }
 
         const dir = path.dirname(OVERRIDES_PATH);
@@ -164,10 +185,91 @@ export function grantUnlock(name: string, count: number): void {
         lastMtimeMs = fs.statSync(OVERRIDES_PATH).mtimeMs;
         lastStatCheckMs = Date.now();
 
-        printInfo(`AP unlock overrides: granted ${count}x ${name}${SKILL_GROUPS[name] ? ` (expanded to ${SKILL_GROUPS[name].length} member skills)` : ` (now ${table.get(name)})`}`);
+        printInfo(`AP unlock overrides: granted ${count}x ${name}${group ? ` (expanded to ${group.length} member skills, now ${resultCount})` : ` (now ${resultCount})`}`);
+        return resultCount;
     } catch (err) {
         printWarning(`AP unlock overrides: grantUnlock(${name}, ${count}) failed (${err instanceof Error ? err.message : err})`);
+        return 0;
     }
+}
+
+// ---------------------------------------------------------------------------
+// Bug fix (2026-07-16, user report: "first bone buried got progressive melee
+// Tier 5?? Level 10 firemaking got a rune axe??"): GenerateSeed/PlacementEngine
+// bake an assumed-tier display string into ap-placements.json PER COPY, based on
+// that copy's position when the item pool was built (e.g. the 5th of 7
+// progressive_melee copies is labelled "tier 5"). That label is only accurate if
+// copies are collected in the exact 1..N order the generator built them in - real
+// play has no such guarantee (a player can hit their first-ever melee-family
+// placement from ANY check, in ANY order). The functional grant was always
+// correct (a flat +1/+2 bump, i.e. genuinely one tier/step at a time) - only the
+// ANNOUNCEMENT TEXT lied about which tier the bump actually reached. Fix: never
+// trust the generator's baked string for the live announcement; rebuild it from
+// the real post-grant count every time. Mirrors PlacementEngine.ts's
+// GEAR_TIER_LEVELS/PICKAXE_TIERS/AXE_TIERS tables (kept in sync manually, same
+// duplication precedent as STAT_NAMES/levelExperience above - avoids a
+// tools/ <-> engine import across the build boundary).
+// ---------------------------------------------------------------------------
+
+const GEAR_FAMILY_LABELS: Record<string, string> = {
+    progressive_melee: 'Melee',
+    progressive_armour: 'Armour',
+    progressive_ranged: 'Ranged',
+    progressive_magic: 'Magic'
+};
+
+// tier (1-indexed) -> base-level threshold it unlocks. Mirrors
+// PlacementEngine.ts's GEAR_TIER_LEVELS and levelrequire.rs2's ap_gear_locked.
+const GEAR_TIER_LEVELS = [5, 10, 20, 30, 40, 45, 60];
+
+// Mirrors PlacementEngine.ts's PICKAXE_TIERS/AXE_TIERS (verified against
+// mining.rs2's ap_pickaxe_tier and woodcut.rs2's axe fallback cascade).
+const PICKAXE_TIERS = ['iron', 'steel', 'mithril', 'adamant', 'rune'];
+const AXE_TIERS = ['iron', 'steel', 'black', 'mithril', 'adamant', 'rune'];
+
+function capitalize(s: string): string {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Builds the honest "what did this grant actually just do" announcement from the
+// REAL post-grant count for `name` (the value grantUnlock returned). Handles the
+// three placement item shapes: gear/tool families (tier/material name), plain
+// per-skill cap keys, and the two keys that are BOTH (progressive_ranged/magic -
+// see the "KNOWN DESIGN POINT" comment on STAT_NAMES above) by reporting every
+// applicable facet.
+export function describeUnlock(name: string, newCount: number): string {
+    const parts: string[] = [];
+
+    const gearLabel = GEAR_FAMILY_LABELS[name];
+    if (gearLabel) {
+        const tier = Math.min(Math.max(newCount, 1), GEAR_TIER_LEVELS.length);
+        const lvl = GEAR_TIER_LEVELS[tier - 1];
+        parts.push(`tier ${tier} (unlocks lv ${lvl}+ ${gearLabel.toLowerCase()} equipment)`);
+    }
+
+    if (name === 'progressive_pickaxe' || name === 'progressive_axe') {
+        const tiers = name === 'progressive_pickaxe' ? PICKAXE_TIERS : AXE_TIERS;
+        const idx = Math.min(Math.max(newCount, 1), tiers.length) - 1;
+        parts.push(`now ${tiers[idx]}`);
+    }
+
+    const groupMembers = SKILL_GROUPS[name];
+    if (groupMembers) {
+        const cap = Math.min(99, 20 + 10 * newCount);
+        return `+level cap to ${groupMembers.map(capitalize).join('/')} (now ${cap})`;
+    }
+
+    const bareSkill = name.startsWith('progressive_') ? name.slice('progressive_'.length) : '';
+    if (bareSkill.length > 0 && STAT_NAMES.includes(bareSkill) && bareSkill !== 'hitpoints') {
+        const cap = Math.min(99, 20 + 10 * newCount);
+        parts.push(`${capitalize(bareSkill)} cap now ${cap}`);
+    }
+
+    const label = gearLabel ?? capitalize(name.replace(/^progressive_/, ''));
+    if (parts.length === 0) {
+        return `Progressive ${label} received (now ${newCount})`;
+    }
+    return `Progressive ${label}: ${parts.join(', ')}`;
 }
 
 // PlayerStat enum order (engine/src/engine/entity/PlayerStat.ts), lowercased, used to
@@ -238,7 +340,13 @@ function getExpByLevel(level: number): number {
 // player may actually gain in `stat` given their current xp and the stat's cap.
 // Called from Player.addXp on EVERY xp gain - must stay O(1) (it is: one throttled
 // mtime check + a couple of Map/array lookups + arithmetic, no loops).
-export function clampStatXp(stat: number, currentXp: number, xp: number): number {
+//
+// Bug fix (2026-07-16, user report: "struck with inspiration hits your level cap,
+// save the remaining XP so when the level is uncapped it applies"): the truncated
+// portion used to be silently discarded - a "10k-50k random skill" reward rolled
+// while that skill was capped just vanished. Now the discarded remainder is banked
+// per-skill (see bankOverflowXp/applyBankedXp below) instead of lost.
+export function clampStatXp(player: Player, stat: number, currentXp: number, xp: number): number {
     const cap = getSkillCap(stat);
     if (cap >= 99) {
         return xp;
@@ -249,5 +357,149 @@ export function clampStatXp(stat: number, currentXp: number, xp: number): number
     // getLevelByExp(ceilXp + 1) === cap + 1 (verified via tsx one-liner against this
     // exact table - see session notes).
     const ceilXp = getExpByLevel(cap + 1) - 1;
-    return Math.max(0, Math.min(xp, ceilXp - currentXp));
+    const allowed = Math.max(0, Math.min(xp, ceilXp - currentXp));
+
+    const overflow = xp - allowed;
+    if (overflow > 0) {
+        bankOverflowXp(player, stat, overflow);
+    }
+
+    return allowed;
+}
+
+// ---------------------------------------------------------------------------
+// Banked XP (2026-07-16 fix, docs/lessons-learned.md progressive-cap section).
+// Backing store: one perm varp per cappable real skill, `ap_xpbank_<skill>`
+// (configs/ap.varp) - per-PLAYER persistence, the same mechanism %ap_kills/
+// %ap_kbd_killed already use elsewhere in this codebase (a global JSON file like
+// ap-unlocks.json would be wrong here: banked xp is per-account state, not
+// seed-wide state). Varp ids are resolved lazily against VarPlayerType (not known
+// until config load) and cached per stat id - the mapping never changes at
+// runtime so this cache never goes stale.
+// ---------------------------------------------------------------------------
+
+const xpBankVarpCache = new Map<number, number>(); // stat id -> varp id (-1 = no varp declared for this stat)
+
+function getXpBankVarpId(stat: number): number {
+    const cached = xpBankVarpCache.get(stat);
+    if (cached !== undefined) {
+        return cached;
+    }
+
+    let varId = -1;
+    if (stat !== HITPOINTS_STAT && PlayerStatEnabled[stat]) {
+        const name = STAT_NAMES[stat];
+        if (name !== undefined) {
+            varId = VarPlayerType.getId(`ap_xpbank_${name}`);
+            if (varId === -1) {
+                printWarning(`AP unlock overrides: no ap_xpbank_${name} varp declared (configs/ap.varp) - banked xp for this stat is disabled`);
+            }
+        }
+    }
+
+    xpBankVarpCache.set(stat, varId);
+    return varId;
+}
+
+// Adds `amount` (engine tenths of a point, already post-multiplier - same units
+// clampStatXp truncates) to `stat`'s banked-xp varp. Never throws (mirrors every
+// other Ap* hook's fail-safe contract) - a failure here loses the overflow amount
+// same as pre-fix behavior, it just doesn't crash the xp gain that triggered it.
+function bankOverflowXp(player: Player, stat: number, amount: number): void {
+    try {
+        if (!(amount > 0)) {
+            return;
+        }
+        const varId = getXpBankVarpId(stat);
+        if (varId === -1) {
+            return;
+        }
+        const current = player.getVar(varId);
+        const banked = (typeof current === 'number' ? current : 0) + amount;
+        player.setVar(varId, banked);
+    } catch (err) {
+        printWarning(`AP unlock overrides: bankOverflowXp(stat=${stat}, ${amount}) failed (${err instanceof Error ? err.message : err})`);
+    }
+}
+
+// Applies `stat`'s ENTIRE banked xp back through the real addXp path. Relies on
+// clampStatXp (above) to do the right thing on its own: withdrawing the full
+// bank and handing it to addXp re-truncates (and re-banks the leftover,
+// unchanged) if the new cap still can't fit all of it, and applies it in full if
+// the stat is uncapped or the bank now fits - either way this function doesn't
+// need its own cap arithmetic. Safe to call speculatively (a zero/absent bank,
+// or a stat with no ap_xpbank_* varp, is a same-tick no-op) - the two call sites
+// are "a grant just raised a cap that might cover this stat" (immediate) and "a
+// player just logged in" (safety net, see login.rs2's `ap_apply_banked_xp;`).
+export function applyBankedXp(player: Player, stat: number): void {
+    try {
+        const varId = getXpBankVarpId(stat);
+        if (varId === -1) {
+            return;
+        }
+        const banked = player.getVar(varId);
+        if (typeof banked !== 'number' || banked <= 0) {
+            return;
+        }
+
+        player.setVar(varId, 0);
+        player.addXp(stat, banked, false); // allowMulti=false: already multiplied when it was banked
+    } catch (err) {
+        printWarning(`AP unlock overrides: applyBankedXp(stat=${stat}) failed (${err instanceof Error ? err.message : err})`);
+    }
+}
+
+// Login safety net entry point (AP_APPLY_BANKED_XP opcode, wired from
+// login.rs2): sweeps every cappable real stat. Cheap even on a bare-vanilla
+// server (no ap-unlocks.json, no ap_xpbank_* varps set) - each stat is one
+// getVar + an early return.
+export function applyAllBankedXp(player: Player): void {
+    for (let stat = 0; stat < STAT_NAMES.length; stat++) {
+        if (stat === HITPOINTS_STAT) {
+            continue;
+        }
+        applyBankedXp(player, stat);
+    }
+}
+
+// Resolves the real stat id(s) a just-granted unlock KEY affects the cap of, so
+// the caller (ApChecks.resolvePlacement) can immediately drain that stat's bank
+// the moment a placement raises its cap - not just wait for the next xp gain or
+// the login safety net. Three shapes: a --pool groups synthetic key (expands to
+// every member's stat id), a real progressive_<skill> key naming an actual stat
+// (covers both plain per-skill caps AND the shared progressive_ranged/magic
+// gear-tier keys - see the STAT_NAMES comment above on that collision), or a
+// gear/tool-only key (progressive_melee/armour/pickaxe/axe) that affects no
+// skill cap at all, correctly returning [].
+export function statsAffectedByUnlockKey(name: string): number[] {
+    const group = SKILL_GROUPS[name];
+    if (group) {
+        const stats: number[] = [];
+        for (const skill of group) {
+            const stat = STAT_NAMES.indexOf(skill);
+            if (stat !== -1) {
+                stats.push(stat);
+            }
+        }
+        return stats;
+    }
+
+    if (name.startsWith('progressive_')) {
+        const stat = STAT_NAMES.indexOf(name.slice('progressive_'.length));
+        if (stat !== -1 && stat !== HITPOINTS_STAT) {
+            return [stat];
+        }
+    }
+
+    return [];
+}
+
+// Convenience wrapper for ApChecks.resolvePlacement: applies banked xp for every
+// stat `unlockName`'s just-granted copy affects (usually 0 or 1 stat, up to 7 for
+// a --pool groups synthetic key). Called AFTER grantUnlock so getSkillCap already
+// reflects the new count.
+export function applyBankedXpForUnlock(player: Player, unlockName: string): void {
+    for (const stat of statsAffectedByUnlockKey(unlockName)) {
+        applyBankedXp(player, stat);
+    }
 }

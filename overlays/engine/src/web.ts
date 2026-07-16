@@ -141,6 +141,69 @@ function loadDropNames(): { slots: Map<number, string>; units: Map<number, strin
     return dropNameCache;
 }
 
+type ApEntranceDescribed = { raw?: string; description?: string | null };
+type ApEntranceSpoilerFile = {
+    spoiler?: {
+        gates?: Array<{ locA?: ApEntranceDescribed; locB?: ApEntranceDescribed; nowLeadsTo?: ApEntranceDescribed }>;
+        oneWay?: Array<{ from?: ApEntranceDescribed; nowLeadsTo?: ApEntranceDescribed }>;
+        approachResolved?: Array<{ description?: string | null; trigger?: string; landing?: string }>;
+        gatedEntrances?: Record<string, { name?: string }>;
+    };
+};
+
+let entranceNameCache: Map<string, string> | null = null;
+
+// raw coord ("level_mapX_mapZ_localX_localZ", same format ApEntranceOverrides.ts's
+// stringFromPacked emits) -> human description, mined from ap-entrances.json's
+// spoiler block (RandomizeEntrances.ts's describe() helper writes these). Static for
+// the process lifetime like loadDropNames() below. This is only ever looked up for
+// coords the caller already has from a discovery (see collectEntranceCoords) - a
+// naming convenience for the tracker list view, not a new spoiler surface: the
+// coordinate itself was already revealed by the discovery.
+function loadEntranceNames(): Map<string, string> {
+    if (entranceNameCache === null) {
+        entranceNameCache = new Map<string, string>();
+        const parsed = readJsonFile<ApEntranceSpoilerFile>('data/config/ap-entrances.json');
+
+        const add = (raw: string | undefined, description: string | null | undefined) => {
+            if (raw && description && !entranceNameCache!.has(raw)) {
+                entranceNameCache!.set(raw, description);
+            }
+        };
+
+        for (const gate of parsed?.spoiler?.gates ?? []) {
+            add(gate.locA?.raw, gate.locA?.description);
+            add(gate.locB?.raw, gate.locB?.description);
+            add(gate.nowLeadsTo?.raw, gate.nowLeadsTo?.description);
+        }
+        for (const entry of parsed?.spoiler?.oneWay ?? []) {
+            add(entry.from?.raw, entry.from?.description);
+            add(entry.nowLeadsTo?.raw, entry.nowLeadsTo?.description);
+        }
+        for (const entry of parsed?.spoiler?.approachResolved ?? []) {
+            add(entry.trigger, entry.description);
+            add(entry.landing, entry.description);
+        }
+        for (const [key, gate] of Object.entries(parsed?.spoiler?.gatedEntrances ?? {})) {
+            add(key.split(':')[0], gate?.name ?? null);
+        }
+    }
+    return entranceNameCache;
+}
+
+// raw coords referenced by an entrances discovery/spoiler map, with the ":op" suffix
+// stripped from keys - the set of coords the response is allowed to attach a name to.
+function collectEntranceCoords(map: Record<string, string> | undefined, coords: Set<string>): void {
+    if (!map) {
+        return;
+    }
+    for (const [key, value] of Object.entries(map)) {
+        const sep = key.lastIndexOf(':');
+        coords.add(sep === -1 ? key : key.slice(0, sep));
+        coords.add(value);
+    }
+}
+
 type ApSpoilerTables = { entrances: Record<string, string>; gather: Record<string, string>; process: Record<string, string>; drops: Record<string, string> };
 
 let spoilerTablesCache: ApSpoilerTables | null = null;
@@ -249,9 +312,27 @@ function buildApTrackerResponse(spoilerMode: boolean): unknown {
         dropUnits[String(id)] = dropNames.units.get(id) ?? `unit_${id}`;
     }
 
+    // entrance/teleport coord -> place name, scoped to coords already referenced by
+    // discoveries (or the full spoiler table in spoiler mode) - see loadEntranceNames.
+    const entranceCoords = new Set<string>();
+    collectEntranceCoords(discoveries.entrances, entranceCoords);
+    collectEntranceCoords(discoveries.teleports, entranceCoords);
+    if (spoiler) {
+        collectEntranceCoords(spoiler.entrances, entranceCoords);
+    }
+
+    const entranceNames = loadEntranceNames();
+    const places: Record<string, string> = {};
+    for (const raw of entranceCoords) {
+        const name = entranceNames.get(raw);
+        if (name) {
+            places[raw] = name;
+        }
+    }
+
     return {
         discoveries,
-        names: { items, dropSlots, dropUnits },
+        names: { items, dropSlots, dropUnits, places },
         totals: {
             entrances: getEntranceOverrideCount(),
             gather: getGatherOverrideCount(),
@@ -353,9 +434,12 @@ async function handleWebRequest(req: Request): Promise<Response> {
             }
         }
 
-        const publicPath = `public${url.pathname}`;
+        let publicPath = `public${url.pathname}`;
+        if (publicPath.endsWith('/')) {
+            publicPath += 'index.html';
+        }
         if (fileExists(publicPath)) {
-            return streamFile(publicPath, MIME_TYPES.get(path.extname(url.pathname ?? '')) ?? 'text/plain');
+            return streamFile(publicPath, MIME_TYPES.get(path.extname(publicPath)) ?? 'text/plain');
         }
     } else if (req.method === 'PUT') {
         if (Environment.node.debug) {

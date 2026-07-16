@@ -2045,3 +2045,71 @@ thread's order.
 
 Also: the esbuild ping-pong hit again right when diagnosing (user had booted from
 Windows); the documented npm-install pair restored both platforms.
+
+## Session addendum: problems.txt batch fixes (2026-07-16)
+
+Eight user-reported problems from the first real placement-mode run, fixed by four
+parallel subagents (grouped by file footprint so none shared files), then one pack
+build + typecheck at the end. Per-problem root causes and rules:
+
+- **Progressive items announcing the wrong tier (bone -> "melee tier 5", fm10 ->
+  "rune axe")**: NOT a granting bug - `grantUnlock` always incremented correctly.
+  `GenerateSeed`/`PlacementEngine` bake a `display` string into `ap-placements.json`
+  from each copy's position in the *simulated fill order*, but players receive copies
+  in arbitrary order. RULE: placement `display` strings are spoiler text only; live
+  announcements must be rebuilt from the real post-grant count
+  (`ApUnlockOverrides.describeUnlock(name, newCount)`, used by
+  `ApChecks.resolvePlacement`). `ap-tracker.json` still holds the wrong historical
+  strings for the 28 checks fired before the fix - unfixable without an event log.
+- **Rewards dropping on full inventory**: `ap_deliver_reward`'s bank fallback treated
+  "already carrying one" as "it will fit" - only true for stackables. Gate that
+  branch on `oc_stackable($item)` (`ap_rewards.rs2`).
+- **Capped XP now banks instead of vanishing**: `Player.clampStatXp` overflow goes to
+  perm varps `ap_xpbank_<skill>` (`configs/ap.varp`), re-applied through `addXp`
+  (which re-clamps/re-banks) when a cap-raising unlock lands, and on login via new
+  opcode `AP_APPLY_BANKED_XP` (1909) called from a one-line `login.rs2` overlay.
+  Tradeoff (deliberate): banks overflow from ANY xp source, not just AP rewards -
+  no source signal exists inside `addXp`.
+- **Subagent gotcha**: the login-XP agent implemented opcode + handler but missed
+  recipe step 3 (the `[command,ap_apply_banked_xp]` declaration in content) - pack
+  build failed with `'ap_apply_banked_xp' could not be resolved to a symbol`. That
+  error message = missing `[command,...]` declaration, fixed in `ap.rs2`.
+- **Skill caps display**: `UPDATE_STAT` has no spare field and repurposing `level`
+  breaks boost/drain coloring; webclient rebuild out of scope. Shipped `::apcaps`
+  (`[debugproc,ap_caps]` via the ungated `::ap<name>` dispatcher) printing every
+  cap from the same `20 + 10*count` formula the engine enforces.
+- **Lowe's invisible legs**: `man_legs_stitches` - real `.ob2` geometry (passes
+  `hasModelData()`) but vanilla only ever uses it as a HIGH-numbered layered
+  accessory next to a real legs value (all 5 uses in viking.npc), same class as
+  `torso_backpack`. Blacklisted `(man|woman)_legs_stitches` in `isNeverSwappable()`;
+  live seed had FOUR victims (lowe, reldo, king_roald, father_lawrence in
+  varrock.npc), all restored to vanilla values by hand. RULE: when a named (non
+  `_model_<id>`) model renders invisible, check the "only ever layered above a real
+  value" pattern before assuming missing geometry.
+- **Burnt meat randomized away (Witch's Potion)**: `cooking_generic.dbrow`'s
+  `[cooking_burn_meat]` row models the deliberate cooked->burnt action but reuses
+  the `cooked` field for it, so `loadCookingProducts()` swept `burnt_meat` into the
+  pool. Excluded that block unconditionally in `RandomizeProcessing.ts` (all modes)
+  and removed the single live `ap-process.json` entry. RULE: dbrow field scans must
+  be block-aware; "action" rows can reuse the primary product field.
+- **Rat tail never dropped in mimic mode - by construction**: the derangement
+  forbids self-mapping, so the real rat can never roll the table containing its own
+  quest-gated tail (it leaked to whoever mimicked rat instead).
+  `STRUCTURAL_DROP_HOISTS` in `MimicTransform.ts` hoists the tail block (assert-
+  matched against the backup) into rat.rs2's preamble, unconditional, and strips it
+  from the mimicable unit. Template for `jail_key`/`hot_feather` if ever reported.
+  Process rule: snapshot `engine/data/config/ap-*.json` before any non-dry-run tool
+  run against a live seed - the dir is gitignored, there is no recovery path.
+- **Tracker "Entrances" list tab**: driven by the same discovery-gated
+  `discoveries.entrances` the map gets; names mined from `ap-entrances.json`
+  spoiler blocks (`loadEntranceNames()` in web.ts, ~84% coord coverage, tile-coord
+  fallback); rows merge A->B with discovered B->A into one "A <-> B", click pans the
+  map. Also fixed `/ap/` directory-index serving in web.ts.
+
+End state: install + pack build (2:26) + engine typecheck clean; worker
+import-order repro (`PlayerLoading` then `NetworkPlayer`) still loads clean (the
+Ap* type-only-Player rule held). Live-seed hand-patches applied to ../Server:
+`ap-process.json` (one entry removed), `varrock.npc` (4 legs lines), rat.rs2 +
+ap_mimic.rs2 (regenerated via same-seed tool re-run). NOT committed here: the
+parallel session's in-flight new-run.sh/GenerateSeed/RegenerateAll/spawn/entrance
+tool edits.

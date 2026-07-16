@@ -28,3 +28,54 @@ if (compare($name, "") = 0) {
     return;
 }
 mes("AP unlock count: <$name> = <tostring(ap_unlock_count($name))>");
+
+// Reuses the exact formula ApUnlockOverrides.getSkillCap enforces (cap = min(99,
+// 20 + 10*count)) so this readout can never drift out of sync with what the
+// engine actually applies - if that formula ever changes, update this too.
+[proc,ap_cap_for](string $unlock)(int)
+def_int $cap = calc(20 + (10 * ap_unlock_count($unlock)));
+if ($cap > 99) {
+    $cap = 99;
+}
+return($cap);
+
+// ::apcaps - problem 7 ("hard to know what your caps are"): print every
+// cappable skill's current progressive level cap in one go. Ungated (same
+// ::ap<name> dispatcher as every other AP test command - see
+// ClientCheatHandler.ts), so this is available any time, not just to staff.
+// Hitpoints is never capped (see getSkillCap) so it's called out rather than
+// printing a misleading "cap: 99" that never actually applies to it. This is
+// the server-side alternative to showing the cap as a second number in the
+// client's skills tab: the UPDATE_STAT packet (stat/exp/level, see
+// UpdateStat.ts) has no spare field for a cap, and the webclient that would
+// need a new one isn't overlaid in this repo (out of scope) - repurposing the
+// existing `level` field to show the cap would actively lie about the
+// player's real current level (breaks boost/drain coloring too), which is
+// worse than not showing it at all.
+[debugproc,ap_caps]
+if (p_finduid(uid) = false) {
+    return;
+}
+def_int $attack = ~ap_cap_for("progressive_attack");
+def_int $strength = ~ap_cap_for("progressive_strength");
+def_int $defence = ~ap_cap_for("progressive_defence");
+def_int $ranged = ~ap_cap_for("progressive_ranged");
+def_int $magic = ~ap_cap_for("progressive_magic");
+def_int $prayer = ~ap_cap_for("progressive_prayer");
+def_int $cooking = ~ap_cap_for("progressive_cooking");
+def_int $woodcutting = ~ap_cap_for("progressive_woodcutting");
+def_int $fletching = ~ap_cap_for("progressive_fletching");
+def_int $fishing = ~ap_cap_for("progressive_fishing");
+def_int $firemaking = ~ap_cap_for("progressive_firemaking");
+def_int $crafting = ~ap_cap_for("progressive_crafting");
+def_int $smithing = ~ap_cap_for("progressive_smithing");
+def_int $mining = ~ap_cap_for("progressive_mining");
+def_int $herblore = ~ap_cap_for("progressive_herblore");
+def_int $agility = ~ap_cap_for("progressive_agility");
+def_int $thieving = ~ap_cap_for("progressive_thieving");
+def_int $runecraft = ~ap_cap_for("progressive_runecraft");
+
+mes("Archipelago skill caps (current base-level ceiling; Hitpoints is never capped):");
+mes("Attack <tostring($attack)>  Strength <tostring($strength)>  Defence <tostring($defence)>  Ranged <tostring($ranged)>  Magic <tostring($magic)>  Prayer <tostring($prayer)>");
+mes("Cooking <tostring($cooking)>  Woodcutting <tostring($woodcutting)>  Fletching <tostring($fletching)>  Fishing <tostring($fishing)>  Firemaking <tostring($firemaking)>  Crafting <tostring($crafting)>");
+mes("Smithing <tostring($smithing)>  Mining <tostring($mining)>  Herblore <tostring($herblore)>  Agility <tostring($agility)>  Thieving <tostring($thieving)>  Runecraft <tostring($runecraft)>");

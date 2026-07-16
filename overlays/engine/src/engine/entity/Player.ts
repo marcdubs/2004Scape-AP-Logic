@@ -1839,7 +1839,9 @@ export default class Player extends PathingEntity {
         const multi = allowMulti ? Environment.node.xpRate : 1;
         // AP: progressive skill caps may truncate the gain (pure passthrough until an
         // unlock table caps this stat); first-XP state feeds the AP check emitter below.
-        const gained = clampStatXp(stat, this.stats[stat], xp * multi);
+        // Truncated overflow is banked per-skill (ap_xpbank_<skill> varp) rather than
+        // discarded - see ApUnlockOverrides.clampStatXp/applyBankedXp.
+        const gained = clampStatXp(this, stat, this.stats[stat], xp * multi);
         if (gained <= 0) {
             return;
         }

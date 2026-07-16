@@ -89,12 +89,24 @@ const SWAPPABLE_RE = /^(man|woman)_([a-z]+)_.+$/;
 //   (human_weapons_model_526 is one half of vanilla's two-piece excalibur, see
 //   loadWeaponUniverse) - hasPlaceholderName() is checked there separately since
 //   isNeverSwappable() only sees (man|woman)_* values.
+// - `man_legs_stitches`: same torso_backpack shape again - vanilla's only occurrences
+//   (quest_viking.npc, viking_olaf and 4 other blocks) all use it as a high-numbered
+//   accessory slot layered ALONGSIDE a real legs value (model6=man_legs_viking +
+//   model9=man_legs_stitches, same pattern as model8=man_torsoextra_shirt2 /
+//   model11=man_torsoextra_cloak_plain in that same block) - it's a decorative patch,
+//   not full leg coverage. Landing it in an NPC's primary (and only) legs slot leaves
+//   them with no leg mesh - reported as "Lowe has invisible legs" (Varrock archery shop
+//   owner, drip-seed.json shows model6 man_legs_elfbootsbasic -> man_legs_stitches).
+//   Only one model.pack entry has this name (no siblings to check across categories).
 export function hasPlaceholderName(value: string): boolean {
     return /_model_\d+$/.test(value);
 }
 
 function isNeverSwappable(value: string): boolean {
     if (value === 'man_torso_backpack' || value === 'woman_torso_backpack') {
+        return true;
+    }
+    if (value === 'man_legs_stitches' || value === 'woman_legs_stitches') {
         return true;
     }
     if (hasPlaceholderName(value)) {

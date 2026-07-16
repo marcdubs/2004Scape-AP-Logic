@@ -215,7 +215,19 @@ function loadPlacements(): Map<string, PlacementEntry> {
 // explicit {item:"filler"}, a missing entry, or no placements file at all)
 // returns an empty display and leaves the existing random-reward roll to the
 // content script, unchanged.
-function resolvePlacement(checkId: string): PlacementOutcome {
+//
+// Bug fix (2026-07-16): the announcement text used to come straight from
+// entry.display, a string GenerateSeed/PlacementEngine baked in at seed-generation
+// time based on this copy's ASSUMED position in the fill order (e.g. "Progressive
+// Melee (tier 5)"). That assumption only holds if copies are collected in the
+// generator's own 1..N order - a real player can hit any copy of a progressive
+// item first, so the baked label routinely overstated (or understated) the tier
+// actually reached, even though the underlying grant was always a correct +1/+2
+// step. Now the display is rebuilt from grantUnlock's real post-grant count via
+// ApUnlockOverrides.describeUnlock, so the message always matches what
+// ap_gear_locked/getSkillCap will actually enforce. entry.display survives only as
+// a fallback if the grant itself failed (sentinel 0 - see grantUnlock).
+function resolvePlacement(player: Player, checkId: string): PlacementOutcome {
     if (placements === null) {
         placements = loadPlacements();
     }
@@ -226,9 +238,18 @@ function resolvePlacement(checkId: string): PlacementOutcome {
     }
 
     const count = entry.count ?? 1;
-    ApUnlockOverrides.grantUnlock(entry.item, count);
+    const newCount = ApUnlockOverrides.grantUnlock(entry.item, count);
+    const display = newCount > 0 ? ApUnlockOverrides.describeUnlock(entry.item, newCount) : (entry.display ?? entry.item);
 
-    return { isUnlock: true, display: entry.display ?? entry.item };
+    // Struck-with-inspiration cap fix: this grant may have just raised the cap on
+    // a stat that's been quietly banking overflow xp (ApUnlockOverrides.
+    // clampStatXp) - drain it immediately rather than waiting for the player's
+    // next xp gain or next login.
+    if (newCount > 0) {
+        ApUnlockOverrides.applyBankedXpForUnlock(player, entry.item);
+    }
+
+    return { isUnlock: true, display };
 }
 
 // ---------------------------------------------------------------------------
@@ -311,7 +332,7 @@ function fireCheck(player: Player, checkId: string): void {
         fired.add(checkId);
         schedulePersist();
 
-        const outcome = resolvePlacement(checkId);
+        const outcome = resolvePlacement(player, checkId);
         recordDiscovery('checks', checkId, outcome.isUnlock ? outcome.display : 'filler');
 
         const script = ScriptProvider.getByName('[queue,ap_check_fired]');

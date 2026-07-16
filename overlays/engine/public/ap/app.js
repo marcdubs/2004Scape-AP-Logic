@@ -257,6 +257,174 @@
         });
     }
 
+    // ---- render: entrances list (docs/tracker-map.md "the map can be hard to read")
+    // ----
+    // Same discovered-entrances data the map draws as pins/lines, as a readable,
+    // sortable, filterable list. Discovery gating comes for free: this only ever
+    // reads data.discoveries.entrances, which the server already scopes to what's
+    // actually been used (see buildApTrackerResponse in web.ts).
+
+    function labelForRaw(raw) {
+        var data = state.data;
+        var places = (data && data.names && data.names.places) || {};
+        if (places[raw]) {
+            return places[raw];
+        }
+        var coord = parseCoord(raw);
+        if (coord) {
+            return (coord.layer === 'underground' ? 'underground, ' : '') + 'tile (' + coord.absX + ', ' + coord.absZ + ') level ' + coord.level;
+        }
+        return raw;
+    }
+
+    // Collapses a discovered "A leads to B" record and its discovered reverse (if
+    // any) into one row - one-way connections keep a single "->" arrow, entrances
+    // that have been used from both ends render once as a "<->" pair instead of two
+    // near-duplicate rows.
+    function buildConnectionRows(discovered) {
+        var bySrcDst = {};
+        var parsed = [];
+
+        Object.keys(discovered).forEach(function (key) {
+            var idx = key.lastIndexOf(':');
+            var src = idx === -1 ? key : key.slice(0, idx);
+            var dst = discovered[key];
+            bySrcDst[src + '|' + dst] = true;
+            parsed.push({ src: src, dst: dst });
+        });
+
+        var seenPairs = {};
+        var rows = [];
+
+        parsed.forEach(function (entry) {
+            var pairKey = [entry.src, entry.dst].sort().join('|');
+            if (seenPairs[pairKey]) {
+                return;
+            }
+            seenPairs[pairKey] = true;
+
+            var twoWay = !!bySrcDst[entry.dst + '|' + entry.src];
+            var srcCoord = parseCoord(entry.src);
+            var dstCoord = parseCoord(entry.dst);
+            var group = 'Cross-layer';
+            if (srcCoord && dstCoord && srcCoord.layer === dstCoord.layer) {
+                group = srcCoord.layer === 'underground' ? 'Underground' : 'Surface';
+            }
+
+            rows.push({
+                srcRaw: entry.src,
+                dstRaw: entry.dst,
+                srcLabel: labelForRaw(entry.src),
+                dstLabel: labelForRaw(entry.dst),
+                twoWay: twoWay,
+                group: group
+            });
+        });
+
+        return rows;
+    }
+
+    var ENTRANCE_GROUP_ORDER = ['Surface', 'Underground', 'Cross-layer'];
+
+    function renderEntrancesTab() {
+        var data = state.data;
+        var container = document.getElementById('entrances-groups');
+        var emptyEl = document.getElementById('entrances-empty');
+        var counterEl = document.getElementById('entrances-counter');
+        if (!data) {
+            return;
+        }
+
+        var discovered = (data.discoveries && data.discoveries.entrances) || {};
+        var total = (data.totals && data.totals.entrances) || 0;
+        counterEl.textContent = '(' + Object.keys(discovered).length + ' / ' + total + ' discovered)';
+
+        var rows = buildConnectionRows(discovered);
+        container.innerHTML = '';
+
+        if (rows.length === 0) {
+            emptyEl.hidden = false;
+            return;
+        }
+        emptyEl.hidden = true;
+
+        var searchInput = document.getElementById('entrances-search');
+        var filterTerm = ((searchInput && searchInput.value) || '').trim().toLowerCase();
+
+        var byGroup = {};
+        rows.forEach(function (row) {
+            if (!byGroup[row.group]) {
+                byGroup[row.group] = [];
+            }
+            byGroup[row.group].push(row);
+        });
+
+        var anyRendered = false;
+
+        ENTRANCE_GROUP_ORDER.forEach(function (groupName) {
+            var groupRows = byGroup[groupName];
+            if (!groupRows || groupRows.length === 0) {
+                return;
+            }
+
+            groupRows.sort(function (a, b) {
+                return a.srcLabel.localeCompare(b.srcLabel) || a.dstLabel.localeCompare(b.dstLabel);
+            });
+
+            if (filterTerm) {
+                groupRows = groupRows.filter(function (row) {
+                    return row.srcLabel.toLowerCase().indexOf(filterTerm) !== -1 || row.dstLabel.toLowerCase().indexOf(filterTerm) !== -1;
+                });
+            }
+
+            if (groupRows.length === 0) {
+                return;
+            }
+
+            anyRendered = true;
+
+            var section = document.createElement('div');
+            section.className = 'connection-group';
+
+            var heading = document.createElement('h3');
+            heading.textContent = groupName + ' (' + groupRows.length + ')';
+            section.appendChild(heading);
+
+            var table = document.createElement('table');
+            table.className = 'discovery-table';
+            var thead = document.createElement('thead');
+            thead.innerHTML = '<tr><th>Location</th><th></th><th>Leads to</th></tr>';
+            table.appendChild(thead);
+
+            var tbody = document.createElement('tbody');
+            groupRows.forEach(function (row) {
+                var tr = makeRow(row.srcLabel, row.twoWay ? '⇄' : '→', row.dstLabel);
+                tr.classList.add('clickable');
+                tr.title = 'Click to view on the map';
+                tr.addEventListener('click', function () {
+                    panToRaw(row.srcRaw);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+
+            section.appendChild(table);
+            container.appendChild(section);
+        });
+
+        if (!anyRendered && filterTerm) {
+            var noMatch = document.createElement('p');
+            noMatch.className = 'tab-desc';
+            noMatch.textContent = 'No connections match "' + filterTerm + '".';
+            container.appendChild(noMatch);
+        }
+    }
+
+    function initEntranceSearch() {
+        var input = document.getElementById('entrances-search');
+        input.addEventListener('input', renderEntrancesTab);
+    }
+
     // ---- render: map ----
 
     var mapDrag = { active: false, startX: 0, startY: 0, tx: 0, ty: 0, scale: 1 };
@@ -439,6 +607,62 @@
             '<span>Teleports: <b>' + Object.keys(teleports).length + ' / ' + teleportTotal + '</b></span>';
     }
 
+    // ---- map: pan-to-connection (entrances list -> map click-through) ----
+
+    function showPanPulse(viewport) {
+        var existing = viewport.querySelector('.pan-pulse');
+        if (existing) {
+            existing.remove();
+        }
+        var pulse = document.createElement('div');
+        pulse.className = 'pan-pulse';
+        viewport.appendChild(pulse);
+        setTimeout(function () {
+            pulse.remove();
+        }, 1500);
+    }
+
+    // Switches to the map tab (and the coord's layer if needed), centers the
+    // viewport on it, and drops a brief pulse there - the entrances list's "jump to
+    // it on the map" affordance. Since panning always centers the target in the
+    // viewport, the pulse itself needs no coordinate math: it's just a fixed dot at
+    // the viewport's center.
+    function panToRaw(raw) {
+        var coord = parseCoord(raw);
+        var meta = state.meta;
+        if (!coord || !meta || !meta[coord.layer]) {
+            return;
+        }
+
+        if (state.layer !== coord.layer) {
+            state.layer = coord.layer;
+            document.querySelectorAll('.layer-btn').forEach(function (b) {
+                b.classList.toggle('active', b.dataset.layer === coord.layer);
+            });
+        }
+
+        document.querySelectorAll('.tab-btn').forEach(function (b) {
+            b.classList.toggle('active', b.dataset.tab === 'map');
+        });
+        document.querySelectorAll('.tab-panel').forEach(function (p) {
+            p.classList.toggle('active', p.id === 'tab-map');
+        });
+
+        var viewport = document.getElementById('map-viewport');
+        var world = document.getElementById('map-world');
+        var bounds = meta[coord.layer];
+        var pxPerTile = meta.pxPerTile || 2;
+        var p = coordToPixel(coord, bounds, pxPerTile);
+
+        mapDrag.scale = Math.max(mapDrag.scale, 2);
+        mapDrag.tx = viewport.clientWidth / 2 - p.x * mapDrag.scale;
+        mapDrag.ty = viewport.clientHeight / 2 - p.y * mapDrag.scale;
+        world.style.transform = 'translate(' + mapDrag.tx + 'px,' + mapDrag.ty + 'px) scale(' + mapDrag.scale + ')';
+
+        renderMap();
+        showPanPulse(viewport);
+    }
+
     // ---- render all ----
 
     function renderAll() {
@@ -446,6 +670,7 @@
         renderItemSwapTab('process', 'recipes-table', 'recipes-empty', 'recipes-counter');
         renderBestiaryTab();
         renderTeleportsTab();
+        renderEntrancesTab();
         renderMap();
     }
 
@@ -455,6 +680,7 @@
         initTabs();
         initSpoilerToggle();
         initMapControls();
+        initEntranceSearch();
         fetchMeta();
         fetchTracker();
         setInterval(fetchTracker, POLL_MS);
