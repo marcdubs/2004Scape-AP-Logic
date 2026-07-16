@@ -17,12 +17,12 @@
 // (seed+1, seed+2, ...) up to --retry-budget, same convergence pattern
 // RandomizeEntrances.ts uses for its own reroll-until-valid loop.
 
-import { execFileSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import { execNpxTsx } from '../shared/Npx.js';
 import { mulberry32, shuffle } from '../shared/Prng.js';
 import {
     LocationDef,
@@ -269,7 +269,7 @@ function stageAndValidate(realConfigDir: string, seed: number, pool: PoolMode, p
     let output = '';
     let ok = false;
     try {
-        output = execFileSync('npx', ['tsx', path.join('tools', 'logic', 'ValidateSeed.ts'), '--config-dir', scratchDir, '--verbose'], { encoding: 'utf8' });
+        output = execNpxTsx([path.join('tools', 'logic', 'ValidateSeed.ts'), '--config-dir', scratchDir, '--verbose'], { encoding: 'utf8' }) as string;
         ok = true;
     } catch (err: any) {
         output = (err.stdout ?? '') + (err.stderr ?? '');

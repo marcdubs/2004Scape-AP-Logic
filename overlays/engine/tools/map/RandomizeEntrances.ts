@@ -1,4 +1,3 @@
-import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -7,6 +6,7 @@ import { printInfo, printWarning } from '#/util/Logger.js';
 import { resolveApproachDestinations } from './ApproachResolver.js';
 import { CONTENT_ROOT, ENTRANCE_DIR, type CoordLiteral, type Entrance, parseFile, parseZanarisDoorText, type Requirement, resolveSameTileRelative } from './EntranceParser.js';
 import { scanPlacements } from './LocPlacementScanner.js';
+import { execNpxTsx } from '../shared/Npx.js';
 import { derangement, mulberry32 } from '../shared/Prng.js';
 
 // Shuffles game entrances and writes a runtime override table
@@ -337,7 +337,7 @@ function validateSeed(): boolean | null {
         return null;
     }
     try {
-        execFileSync('npx', ['tsx', 'tools/logic/ValidateSeed.ts'], { stdio: 'pipe' });
+        execNpxTsx(['tools/logic/ValidateSeed.ts'], { stdio: 'pipe' });
         return true;
     } catch (err) {
         const e = err as { status?: number; stdout?: Buffer };
@@ -349,14 +349,12 @@ function validateSeed(): boolean | null {
     }
 }
 
-function main() {
-    if (!fs.existsSync(ENTRANCE_DIR)) {
-        printWarning(`entrance script directory not found: ${ENTRANCE_DIR}`);
-        process.exit(1);
-    }
-
-    const { seed, dryRun, rewrite, mixed, noValidate } = parseArgs();
-
+// Builds and writes the entrance table for exactly one seed, then (for non-rewrite,
+// non-dry-run, validated runs) checks it against the region-graph validator. Returns
+// true if the caller should reroll with the next seed (validation failed), false once
+// there's nothing left to do (success, dry-run, --no-validate, or --rewrite mode, which
+// never validates/rerolls at all).
+function runAttempt(seed: number, dryRun: boolean, rewrite: boolean, mixed: boolean, noValidate: boolean): boolean {
     // always (re)derive from the untouched vanilla backup, creating it on first run,
     // so re-randomizing never compounds onto a previous shuffle's output.
     ensureBackup();
@@ -549,7 +547,7 @@ function main() {
         if (!dryRun) {
             printInfo('rebuild the pack before testing: npx tsx tools/pack/Build.ts');
         }
-        return;
+        return false;
     }
 
     const overrides: Record<string, string> = {};
@@ -655,33 +653,59 @@ function main() {
     }
     printInfo(`${dryRun ? '[dry run] ' : ''}wrote ${Object.keys(overrides).length} override(s) and ${Object.keys(gates).length} gate requirement(s) to ${OVERRIDES_OUTPUT}`);
 
-    // reroll-until-valid (docs/entrance-logic.md): every written seed must pass the
-    // region/gate logic validator, like any other Archipelago game. On failure,
-    // re-run this tool with seed+1 (deterministic, so a given starting seed always
-    // converges to the same final layout), budgeted to 20 attempts.
-    if (!dryRun && !noValidate) {
-        const valid = validateSeed();
-        if (valid === false) {
-            const attempt = parseInt(process.env.AP_REROLL_ATTEMPT ?? '0', 10);
-            if (attempt >= 19) {
-                printWarning(`seed ${seed} FAILED logic validation and the reroll budget (20) is exhausted - do NOT play this table; investigate with: npx tsx tools/logic/ValidateSeed.ts`);
-                process.exit(1);
-            }
-            const nextSeed = (seed + 1) >>> 0;
-            printWarning(`seed ${seed} failed logic validation - rerolling with seed ${nextSeed} (attempt ${attempt + 2}/20)`);
-            execFileSync('npx', ['tsx', 'tools/map/RandomizeEntrances.ts', '--seed', String(nextSeed), ...(mixed ? ['--mixed'] : [])], {
-                stdio: 'inherit',
-                env: { ...process.env, AP_REROLL_ATTEMPT: String(attempt + 1) }
-            });
-            return;
-        }
-        if (valid === true) {
-            printInfo(`seed ${seed} passed logic validation - all goals reachable`);
-        }
+    if (dryRun || noValidate) {
+        return false;
     }
 
-    if (!dryRun) {
-        printInfo('restart the server to load the new entrance layout (no content rebuild needed)');
+    // reroll-until-valid (docs/entrance-logic.md): every written seed must pass the
+    // region/gate logic validator, like any other Archipelago game - the caller (main())
+    // retries with seed+1 (deterministic, so a given starting seed always converges to
+    // the same final layout), budgeted to MAX_REROLL_ATTEMPTS. Used to reroll by
+    // spawning a brand-new child process per attempt, nested up to 20 deep (attempt N
+    // waited synchronously on a fresh OS process running attempt N+1). Reworked to this
+    // in-process loop (2026-07-16) after that nesting hit a real, DETERMINISTIC failure
+    // at one particular seed/depth on a user's Windows machine (`'tsx' is not
+    // recognized...` via the shell:true + npx.cmd path in ../shared/Npx.ts) that
+    // reproduced identically on an immediate retry of the exact same spawn - so it
+    // wasn't a one-off flake to retry past, it was nesting-depth-dependent resource
+    // contention (dozens of live nested cmd.exe/node processes on a deep reroll chain).
+    // An in-process loop has no nested processes at all, and is much faster besides (no
+    // repeated node/tsx cold start per attempt).
+    const valid = validateSeed();
+    if (valid === false) {
+        return true;
+    }
+    if (valid === true) {
+        printInfo(`seed ${seed} passed logic validation - all goals reachable`);
+    }
+    printInfo('restart the server to load the new entrance layout (no content rebuild needed)');
+    return false;
+}
+
+const MAX_REROLL_ATTEMPTS = 20;
+
+function main() {
+    if (!fs.existsSync(ENTRANCE_DIR)) {
+        printWarning(`entrance script directory not found: ${ENTRANCE_DIR}`);
+        process.exit(1);
+    }
+
+    const { seed: startSeed, dryRun, rewrite, mixed, noValidate } = parseArgs();
+
+    for (let attempt = 0; attempt < MAX_REROLL_ATTEMPTS; attempt++) {
+        const seed = (startSeed + attempt) >>> 0;
+        const shouldReroll = runAttempt(seed, dryRun, rewrite, mixed, noValidate);
+        if (!shouldReroll) {
+            return;
+        }
+
+        if (attempt === MAX_REROLL_ATTEMPTS - 1) {
+            printWarning(`seed ${seed} FAILED logic validation and the reroll budget (${MAX_REROLL_ATTEMPTS}) is exhausted - do NOT play this table; investigate with: npx tsx tools/logic/ValidateSeed.ts`);
+            process.exit(1);
+        }
+
+        const nextSeed = (seed + 1) >>> 0;
+        printWarning(`seed ${seed} failed logic validation - rerolling with seed ${nextSeed} (attempt ${attempt + 2}/${MAX_REROLL_ATTEMPTS})`);
     }
 }
 

@@ -1,4 +1,3 @@
-import { execFileSync } from 'child_process';
 import fs from 'fs';
 
 import { printInfo } from '#/util/Logger.js';
@@ -6,6 +5,7 @@ import { printInfo } from '#/util/Logger.js';
 import { BACKUP_ROOT, SCRIPTS_ROOT, ensureNpcBackup, restoreNpcBackup } from './npc/NpcDripParser.js';
 import { DROP_BACKUP_DIR, DROP_SCRIPTS_DIR, ensureDropScriptBackup, restoreDropScriptBackup } from './drops/DropTableParser.js';
 import { removeMimicArtifacts } from './drops/MimicTransform.js';
+import { execNpxTsx } from './shared/Npx.js';
 
 // Single entry point for "start completely fresh and regenerate every content
 // randomizer together" - restores the .npc/drop-table tree to pristine vanilla ONCE,
@@ -63,7 +63,7 @@ function parseArgs() {
 
 function run(scriptPath: string, args: string[]): void {
     printInfo(`running: npx tsx ${scriptPath} ${args.join(' ')}`);
-    execFileSync('npx', ['tsx', scriptPath, ...args], { stdio: 'inherit' });
+    execNpxTsx([scriptPath, ...args], { stdio: 'inherit' });
 }
 
 function main() {

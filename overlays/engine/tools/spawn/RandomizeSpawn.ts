@@ -42,6 +42,40 @@ const CITY_LANDMARKS: { label: string; coord: string }[] = [
     { label: 'Trollheim', coord: '0_45_57_10_31' }
 ];
 
+// Trollheim and Watchtower are EXCLUDED from the random city-mode pick below, though
+// both stay in CITY_LANDMARKS above so verifyCityCoordsAgainstDbrow() still cross-checks
+// their coords. Region-graph-verified (2026-07-16, live investigation after 20/20
+// RandomizeEntrances reroll attempts failed logic validation identically with EACH of
+// these two spawns in turn): of the 7 landmarks, Varrock/Lumbridge/Falador/Camelot/
+// Ardougne all resolve directly to region 37 (mainland) - no entrance hop needed, always
+// reachable regardless of seed. Trollheim (region 14018) and Watchtower (region 30) both
+// land on a small, separate, enclosed platform, and NEITHER has a single edge touching it
+// anywhere in a live 736-entry ap-entrances.json (checked directly against the region
+// graph) - i.e. whatever staircase/connector is supposed to get you off that platform
+// isn't in the entrance catalog at all, so picking either one makes 'mainland' (and
+// therefore nearly every check/goal) permanently unreachable regardless of reroll. Two
+// different underlying gaps, same symptom:
+//   - Trollheim's only real connector, quest_troll.rs2's troll_pass_entrance/exit oploc
+//     pair, lives under quests/quest_troll/ - outside content/scripts/ladders+stairs/
+//     scripts, EntranceParser's only scan root - so it's invisible to the catalog
+//     entirely. Troll Pass itself (region 4520) is ALSO separate from mainland with no
+//     confirmed connector on to it either - a "found part of the chain, not all of it"
+//     situation like the kbd_lever_room gap in quest-regions.json, so no alwaysConnected
+//     edge was added rather than fabricate an unverified one.
+//   - Watchtower's internal staircase is (per quest_troll.loc-style naming elsewhere)
+//     almost certainly a 'spiralstairs_wooden'/'spiralstairstop_wooden' pair - these DO
+//     get found by EntranceParser (they're in ladders+stairs/scripts) but are excluded as
+//     "non-literal source" (generic handler, no literal per-instance coord), and unlike
+//     the base 'spiralstairs'/'spiralstairstop' or the plain 'ladder'/'laddertop' family,
+//     the wooden variant isn't in RandomizeEntrances.ts's SCAN_LADDER_UP/SCAN_LADDER_DOWN
+//     fallback lists either, so nothing re-discovers it from map placements.
+// Fixing Watchtower properly means adding spiralstairs_wooden/spiralstairstop_wooden to
+// the SCAN_LADDER_* tables (untested here - couldn't run tsx from WSL this session, see
+// git history); fixing Trollheim means closing the quest-regions.json gap above. Until
+// then, re-enabling either requires actually closing its gap, not just re-adding the name
+// here.
+const CITY_SPAWN_POOL = CITY_LANDMARKS.filter(l => l.label !== 'Trollheim' && l.label !== 'Watchtower');
+
 const MAGIC_SPELLS_DBROW = path.join(CONTENT_ROOT, 'scripts/skill_magic/configs/magic_spells.dbrow');
 
 // dbrow section name -> the label above, so a live cross-check can be keyed by name
@@ -276,7 +310,7 @@ function main() {
 
     if (mode === 'city') {
         verifyCityCoordsAgainstDbrow();
-        const pick = CITY_LANDMARKS[Math.floor(rand() * CITY_LANDMARKS.length)];
+        const pick = CITY_SPAWN_POOL[Math.floor(rand() * CITY_SPAWN_POOL.length)];
         home = pick.coord;
         label = pick.label;
         printInfo(`seed ${seed}: city mode picked ${label} (${home})`);
