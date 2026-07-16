@@ -5,40 +5,40 @@
       "name": "Dragon Slayer",
       "qp": 2,
       "requiredQp": 32,
-      "skills": {},
+      "skills": {"attack": 40, "strength": 40, "defence": 40, "hitpoints": 40},
       "quests": [],
       "items": ["3 map pieces (Melzar's Maze chest, Wormbrain the goblin, Dwarven Mines chest)", "a ship (bought in Port Sarim) + Captain Ned, OR the Karamja-Crandor secret passage once found", "antidragonbreathshield strongly recommended (sold by Oziach) - mitigates Elvarg's dragonfire but is not script-enforced as a hard block"],
       "kills": ["Elvarg (level 83 dragon, Crandor)"],
       "regions": ["crandor"],
-      "notes": "Script-verified gate: dragon_journal.rs2:7 `if (%qp < 32)` blocks starting at the Champions' Guild - no quest or skill prerequisites, purely a QP threshold. This is THE central computation for the whole quest web: 62 other quests sum to 133 QP (quest.constant), so 32 is trivially reachable well before the endgame quests. Elvarg fight has no scripted level gate either - survivability is a judgment call for the player, not the engine.",
+      "notes": "Script-verified gate: dragon_journal.rs2:7 `if (%qp < 32)` blocks starting at the Champions' Guild - no quest or skill prerequisites, purely a QP threshold. This is THE central computation for the whole quest web: 62 other quests sum to 133 QP (quest.constant), so 32 is trivially reachable well before the endgame quests. Elvarg fight has no scripted level gate either - survivability is a judgment call for the player, not the engine. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of Elvarg (level 83; ai_queue3 in quest_dragon/scripts/elvarg.rs2 queues dragon_complete; Melzar's Maze lesser demon is 82). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
       "id": "arena",
       "name": "Fight Arena",
       "qp": 2,
-      "skills": {},
+      "skills": {"attack": 50, "strength": 50, "defence": 50, "hitpoints": 50},
       "quests": [],
-      "notes": "No skill/quest prerequisites found (full script grep clean).",
+      "notes": "No skill/quest prerequisites found (full script grep clean). AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 50 atk/str/def/hp for the mandatory kill of Bouncer (level 137; ai_queue3 in quest_arena/scripts/bouncer.rs2 advances %fightarena; General Khazard (112) is escapable, Bouncer is not). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
       "id": "arthur",
       "name": "Merlin's Crystal",
       "qp": 6,
-      "skills": {},
+      "skills": {"attack": 25, "strength": 25, "defence": 25, "hitpoints": 25},
       "quests": [],
       "items": ["Excalibur pieces fetched during the quest (do NOT hand out excalibur as a filler reward before this quest - arthur_journal.rs2:55 checks inv_total(inv, excalibur) and would let this sequence-skip)"],
-      "notes": "No skill/quest prerequisites found. Feeds Heroes' Quest.",
+      "notes": "No skill/quest prerequisites found. Feeds Heroes' Quest. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 25 atk/str/def/hp for the mandatory kill of Sir Mordred (level 39; ai_queue3 in quest_arthur/scripts/sir_mordred.rs2). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
       "id": "ball",
       "name": "Witch's House",
       "qp": 4,
-      "skills": {},
+      "skills": {"attack": 30, "strength": 30, "defence": 30, "hitpoints": 30},
       "quests": [],
-      "notes": "No skill/quest prerequisites (the stat(hitpoints) hits in-script are damage-percent calculations, not level gates).",
+      "notes": "No skill/quest prerequisites (the stat(hitpoints) hits in-script are damage-percent calculations, not level gates). AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 30 atk/str/def/hp for the mandatory kill of the witch's experiment (wolf form) (level 53; shapeshifter forms 19/30/42/53 in quest_ball/scripts/witches_experiement.rs2). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
@@ -72,7 +72,7 @@
       "id": "chompybird",
       "name": "Big Chompy Bird Hunting",
       "qp": 2,
-      "skills": { "fletching": 5, "cooking": 30, "ranged": 30 },
+      "skills": {"fletching": 5, "cooking": 30, "ranged": 30},
       "quests": [],
       "items": ["ogre_bow (quest reward)"],
       "notes": "chompybird_journal.rs2 gates completion on fletching>=5 (ogre bow ammo), cooking>=30 (chompy meat), ranged>=30 (hunting with the bow).",
@@ -100,10 +100,10 @@
       "id": "crest",
       "name": "Family Crest",
       "qp": 1,
-      "skills": {},
+      "skills": {"attack": 50, "strength": 50, "defence": 50, "hitpoints": 50},
       "quests": [],
       "items": ["one of the Family Crest gauntlets (cooking/goldsmithing/chaos) - vanilla forces a single choice per account"],
-      "notes": "No hard skill prerequisites found - mining/smithing/crafting are used to CHOOSE which gauntlet to make, not to gate completion. Feeds Legends' Quest.",
+      "notes": "No hard skill prerequisites found - mining/smithing/crafting are used to CHOOSE which gauntlet to make, not to gate completion. Feeds Legends' Quest. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 50 atk/str/def/hp for the mandatory kill of Chronozon (level 170; ai_queue3 in quest_crest/scripts/crest_chronozon.rs2 sets varp + drops crest piece). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
@@ -119,20 +119,20 @@
       "id": "demon",
       "name": "Demon Slayer",
       "qp": 3,
-      "skills": {},
+      "skills": {"attack": 25, "strength": 25, "defence": 25, "hitpoints": 25},
       "quests": [],
       "items": ["silverlight (quest reward)"],
       "kills": ["Delrith (via the Incantation)"],
-      "notes": "No skill/quest prerequisites found.",
+      "notes": "No skill/quest prerequisites found. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 25 atk/str/def/hp for the mandatory kill of Delrith (level 27; ai_queue3 in quest_demon/scripts/delrith.rs2 (Silverlight weakens him but the fight is mandatory)). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
       "id": "desertrescue",
       "name": "Tourist Trap",
       "qp": 2,
-      "skills": { "smithing": 20, "fletching": 10 },
+      "skills": {"smithing": 20, "fletching": 10, "attack": 30, "strength": 30, "defence": 30, "hitpoints": 30},
       "quests": [],
-      "notes": "desertrescue_journal.rs2 + quest_desertrescue.rs2 gate the punish-rock/dart-making steps on smithing>=20 and fletching>=10.",
+      "notes": "desertrescue_journal.rs2 + quest_desertrescue.rs2 gate the punish-rock/dart-making steps on smithing>=20 and fletching>=10. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 30 atk/str/def/hp for the mandatory kill of the Mercenary Captain (level 47; ai_queue3 in quest_desertrescue/scripts/mercenary_captain.rs2 drops the key item). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
@@ -157,9 +157,9 @@
       "id": "druidspirit",
       "name": "Nature Spirit",
       "qp": 2,
-      "skills": { "crafting": 18 },
+      "skills": {"crafting": 18, "attack": 25, "strength": 25, "defence": 25, "hitpoints": 25},
       "quests": ["priest", "priestperil"],
-      "notes": "crafting>=18 is script-verified (druidspirit_journal.rs2:37, for repairing the urn). The Priest/Priest in Peril prerequisite is NOT a coded varp gate in this script set (era knowledge only, matching OSRS canon) - marking the quest chain as knowledge-tagged inside an otherwise script-verified entry.",
+      "notes": "crafting>=18 is script-verified (druidspirit_journal.rs2:37, for repairing the urn). The Priest/Priest in Peril prerequisite is NOT a coded varp gate in this script set (era knowledge only, matching OSRS canon) - marking the quest chain as knowledge-tagged inside an otherwise script-verified entry. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 25 atk/str/def/hp for the mandatory kill of ghasts (level 30; ai_queue3 in quest_druidspirit/scripts/ghast.rs2 advances the quest). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "knowledge"
     },
     {
@@ -184,9 +184,9 @@
       "id": "elemental_workshop",
       "name": "Elemental Workshop",
       "qp": 1,
-      "skills": { "mining": 20, "smithing": 20, "crafting": 20 },
+      "skills": {"mining": 20, "smithing": 20, "crafting": 20, "attack": 25, "strength": 25, "defence": 25, "hitpoints": 25},
       "quests": [],
-      "notes": "elemental_workshop_journal.rs2 + quest_elemental_workshop.rs2 gate on mining>=20, smithing>=20, crafting>=20.",
+      "notes": "elemental_workshop_journal.rs2 + quest_elemental_workshop.rs2 gate on mining>=20, smithing>=20, crafting>=20. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 25 atk/str/def/hp for the mandatory kill of an elemental (level 35; ai_queue3 handlers in quest_elemental_workshop drop the elemental metal). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
@@ -202,7 +202,7 @@
       "id": "fishingcompo",
       "name": "Fishing Contest",
       "qp": 1,
-      "skills": { "fishing": 10 },
+      "skills": {"fishing": 10},
       "quests": [],
       "notes": "fishingcompo_journal.rs2 + hemenster_fishing.rs2 gate on fishing>=10.",
       "verified": "script"
@@ -230,18 +230,18 @@
       "id": "grail",
       "name": "Holy Grail",
       "qp": 2,
-      "skills": {},
+      "skills": {"attack": 50, "strength": 50, "defence": 50, "hitpoints": 50},
       "quests": [],
-      "notes": "No skill/quest prerequisites found (in particular, no %arthur reference - differs from later OSRS canon where Holy Grail requires Merlin's Crystal).",
+      "notes": "No skill/quest prerequisites found (in particular, no %arthur reference - differs from later OSRS canon where Holy Grail requires Merlin's Crystal). AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 50 atk/str/def/hp for the mandatory kill of the Black Knight Titan (level 120; ai_queue3 in quest_grail/scripts/black_knight_titan.rs2). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
       "id": "grandtree",
       "name": "The Grand Tree",
       "qp": 5,
-      "skills": { "agility": 25 },
+      "skills": {"agility": 25, "attack": 50, "strength": 50, "defence": 50, "hitpoints": 50},
       "quests": [],
-      "notes": "grandtree_journal.rs2 + quest_grandtree.rs2 gate on agility>=25 (the tree-climbing obstacle course).",
+      "notes": "grandtree_journal.rs2 + quest_grandtree.rs2 gate on agility>=25 (the tree-climbing obstacle course). AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 50 atk/str/def/hp for the mandatory kill of a black demon (level 172; ai_queue3 in quest_grandtree/scripts/grandtree_black_demon.rs2 sets varp). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
@@ -267,10 +267,10 @@
       "name": "Heroes' Quest",
       "qp": 1,
       "requiredQp": 55,
-      "skills": {},
+      "skills": {"attack": 40, "strength": 40, "defence": 40, "hitpoints": 40},
       "quests": ["zanaris", "dragon", "arthur"],
       "questsAny": [["blackarmgang"]],
-      "notes": "Script-verified at quest_hero.rs2:1-6 (has_hero_quest_requirements proc): %qp>=55 AND Lost City complete AND Dragon Slayer complete AND Merlin's Crystal complete AND (Shield of Arrav complete via either faction). The questsAny entry is a formality here since blackarmgang already folds both factions into one id (see that entry's notes) - kept in the schema/engine as a real OR-group mechanism for future entries. Feeds Legends' Quest.",
+      "notes": "Script-verified at quest_hero.rs2:1-6 (has_hero_quest_requirements proc): %qp>=55 AND Lost City complete AND Dragon Slayer complete AND Merlin's Crystal complete AND (Shield of Arrav complete via either faction). The questsAny entry is a formality here since blackarmgang already folds both factions into one id (see that entry's notes) - kept in the schema/engine as a real OR-group mechanism for future entries. Feeds Legends' Quest. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of the Ice Queen (level 111; ice gloves (Ice Queen drop) are required for the Entrana firebird feather). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
@@ -286,9 +286,9 @@
       "id": "horror",
       "name": "Horror from the Deep",
       "qp": 2,
-      "skills": {},
+      "skills": {"attack": 40, "strength": 40, "defence": 40, "hitpoints": 40},
       "quests": [],
-      "notes": "The prayer>=50 checks in horror_godbook.rs2 gate blessing an unholy symbol (a bonus/reward-track feature), NOT the main quest completion path (send_quest_complete at horror.rs2:497 has no stat check upstream) - deliberately left out of the hard skills gate and noted instead.",
+      "notes": "The prayer>=50 checks in horror_godbook.rs2 gate blessing an unholy symbol (a bonus/reward-track feature), NOT the main quest completion path (send_quest_complete at horror.rs2:497 has no stat check upstream) - deliberately left out of the hard skills gate and noted instead. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of the Dagannoth Mother (level 100; ai_queue3 varp writes in quest_horror/scripts/horror_dagannoth.rs2 (jr form vislevel 100; mother's config debugname not level-resolved, era level ~100)). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
@@ -305,9 +305,9 @@
       "id": "ikov",
       "name": "Temple of Ikov",
       "qp": 1,
-      "skills": {},
+      "skills": {"attack": 40, "strength": 40, "defence": 40, "hitpoints": 40},
       "quests": [],
-      "notes": "thieving>=42 in ikov_dungeon.rs2 is an OPTIONAL trap-disarm shortcut (ikov_traplever), not a hard block - the Fire Warrior can be fought instead. Deliberately left out of the hard skills gate.",
+      "notes": "thieving>=42 in ikov_dungeon.rs2 is an OPTIONAL trap-disarm shortcut (ikov_traplever), not a hard block - the Fire Warrior can be fought instead. Deliberately left out of the hard skills gate. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of the Fire Warrior of Lesarkus (level 84; ai_queue3 in quest_ikov/scripts/fire_warrior_of_leskarus.rs2 (level from era knowledge; config debugname not level-resolved)). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
@@ -324,7 +324,7 @@
       "id": "itexam",
       "name": "The Digsite",
       "qp": 2,
-      "skills": { "agility": 10, "herblore": 10, "thieving": 25 },
+      "skills": {"agility": 10, "herblore": 10, "thieving": 25},
       "quests": [],
       "notes": "itexam_journal.rs2 gates on agility>=10, herblore>=10, thieving>=25 (matches area_digsite.rs2/digsite_workman.rs2/itexam_chemistry.rs2 in-scene checks).",
       "verified": "script"
@@ -342,9 +342,9 @@
       "id": "itwatchtower",
       "name": "Watchtower",
       "qp": 4,
-      "skills": { "magic": 14, "mining": 40, "herblore": 14, "thieving": 15, "agility": 25 },
+      "skills": {"magic": 14, "mining": 40, "herblore": 14, "thieving": 15, "agility": 25, "attack": 30, "strength": 30, "defence": 30, "hitpoints": 30},
       "quests": [],
-      "notes": "itwatchtower_journal.rs2 + ogre_potion.rs2/ogre_shaman.rs2/quest_itwatchtower.rs2 gate on magic>=14, mining>=40, herblore>=14, thieving>=15, agility>=25. Highest single-quest mining requirement outside the endgame chain.",
+      "notes": "itwatchtower_journal.rs2 + ogre_potion.rs2/ogre_shaman.rs2/quest_itwatchtower.rs2 gate on magic>=14, mining>=40, herblore>=14, thieving>=15, agility>=25. Highest single-quest mining requirement outside the endgame chain. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 30 atk/str/def/hp for the mandatory kill of Gorad (level 68; ai_queue3 in quest_itwatchtower/scripts/gorad.rs2 drops his tooth). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
@@ -362,10 +362,10 @@
       "name": "Legends' Quest",
       "qp": 4,
       "requiredQp": 107,
-      "skills": { "magic": 56, "mining": 52, "agility": 50, "crafting": 50, "smithing": 50, "strength": 50, "thieving": 50, "woodcutting": 50, "herblore": 45, "prayer": 42 },
+      "skills": {"magic": 56, "mining": 52, "agility": 50, "crafting": 50, "smithing": 50, "strength": 50, "thieving": 50, "woodcutting": 50, "herblore": 45, "prayer": 42, "attack": 50, "defence": 50, "hitpoints": 50},
       "quests": ["crest", "hero", "zombiequeen", "upass", "waterfall"],
       "regions": ["karamja"],
-      "notes": "Script-verified at legends_guard.rs2:50-53 (quest chain: crest+hero+zombiequeen+upass+waterfall all complete, AND %qp>=107) and legends_journal.rs2/quest_legends.rs2 (the ten skill gates, all hard `if (stat(x) < N) return/block` checks scattered through the Kharazi Jungle dungeon). The single most skill-demanding quest in the set - deliberately the capstone this simulator uses to prove skill-cap unlocks matter.",
+      "notes": "Script-verified at legends_guard.rs2:50-53 (quest chain: crest+hero+zombiequeen+upass+waterfall all complete, AND %qp>=107) and legends_journal.rs2/quest_legends.rs2 (the ten skill gates, all hard `if (stat(x) < N) return/block` checks scattered through the Kharazi Jungle dungeon). The single most skill-demanding quest in the set - deliberately the capstone this simulator uses to prove skill-cap unlocks matter. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 50 atk/str/def/hp for the mandatory kill of Nezikchened (level 187; ai_queue3 in quest_legends/scripts/nezikchened.rs2; the three Viyeldi warriors are 92-106). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
@@ -381,7 +381,7 @@
       "id": "mortton",
       "name": "Shades of Mort'ton",
       "qp": 3,
-      "skills": { "crafting": 12 },
+      "skills": {"crafting": 12},
       "quests": [],
       "notes": "quest_mortton.rs2:76 gates on crafting>=12 (shade key/urn work).",
       "verified": "script"
@@ -409,9 +409,9 @@
       "id": "priestperil",
       "name": "Priest in Peril",
       "qp": 1,
-      "skills": {},
+      "skills": {"attack": 25, "strength": 25, "defence": 25, "hitpoints": 25},
       "quests": [],
-      "notes": "No skill/quest prerequisites found (evil_monks.rs2's stat_base<=stat checks are anti-boost combat guards, not level gates). Opens Morytania/Canifis access.",
+      "notes": "No skill/quest prerequisites found (evil_monks.rs2's stat_base<=stat checks are anti-boost combat guards, not level gates). Opens Morytania/Canifis access. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 25 atk/str/def/hp for the mandatory kill of the temple monks (level 30; ai_queue3 in quest_priestperil/scripts/evil_monks.rs2 drops the golden key). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
@@ -427,9 +427,9 @@
       "id": "regicide",
       "name": "Regicide",
       "qp": 3,
-      "skills": { "agility": 56, "crafting": 10 },
+      "skills": {"agility": 56, "crafting": 10, "attack": 40, "strength": 40, "defence": 40, "hitpoints": 40},
       "quests": ["upass"],
-      "notes": "Script-verified: regicide_kings_messenger.rs2:2 `if(%upass = ^upass_complete ...)` gates the quest start on Underground Pass complete. quest_regicide.rs2 has two agility checks (45 for an early obstacle, 56 for a later one - the higher value is the binding requirement) and crafting>=10 (poison-antidote work).",
+      "notes": "Script-verified: regicide_kings_messenger.rs2:2 `if(%upass = ^upass_complete ...)` gates the quest start on Underground Pass complete. quest_regicide.rs2 has two agility checks (45 for an early obstacle, 56 for a later one - the higher value is the binding requirement) and crafting>=10 (poison-antidote work). AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of a Tyras guard (level 110; ai_queue3 in quest_regicide/scripts/tyras_guard.rs2 sets varp + drop). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
@@ -454,7 +454,7 @@
       "id": "scorpcatcher",
       "name": "Scorpion Catcher",
       "qp": 1,
-      "skills": { "prayer": 31 },
+      "skills": {"prayer": 31},
       "quests": [],
       "notes": "scorpcatcher_journal.rs2:9 gates on prayer>=31.",
       "verified": "script"
@@ -463,7 +463,7 @@
       "id": "seaslug",
       "name": "Sea Slug",
       "qp": 1,
-      "skills": { "firemaking": 30 },
+      "skills": {"firemaking": 30},
       "quests": [],
       "notes": "quest_seaslug.rs2:40 gates on firemaking>=30 (signal fire).",
       "verified": "script"
@@ -490,7 +490,7 @@
       "id": "squire",
       "name": "Knight's Sword",
       "qp": 1,
-      "skills": { "mining": 10 },
+      "skills": {"mining": 10},
       "quests": [],
       "notes": "squire_journal.rs2:7 gates on mining>=10 (Blurite ore).",
       "verified": "script"
@@ -499,7 +499,7 @@
       "id": "tbwt",
       "name": "Tai Bwo Wannai Trio",
       "qp": 2,
-      "skills": { "firemaking": 30, "cooking": 30 },
+      "skills": {"firemaking": 30, "cooking": 30},
       "quests": [],
       "regions": ["karamja"],
       "notes": "tbwt_jogre_bones.rs2 gates on firemaking>=30 and cooking>=30 (karambwan prep). Set on Karamja.",
@@ -509,7 +509,7 @@
       "id": "totem",
       "name": "Tribal Totem",
       "qp": 1,
-      "skills": { "thieving": 21 },
+      "skills": {"thieving": 21},
       "quests": [],
       "regions": ["karamja"],
       "notes": "totem_journal.rs2 + quest_totem.rs2 gate on thieving>=21. Set on Karamja.",
@@ -519,49 +519,49 @@
       "id": "tree",
       "name": "Tree Gnome Village",
       "qp": 2,
-      "skills": {},
+      "skills": {"attack": 40, "strength": 40, "defence": 40, "hitpoints": 40},
       "quests": [],
       "items": ["gnome_amulet (quest reward)"],
-      "notes": "No skill/quest prerequisites found.",
+      "notes": "No skill/quest prerequisites found. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of the Khazard Warlord (level 112; ai_queue3 in quest_tree/scripts/khazard_warlord.rs2). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
       "id": "troll",
       "name": "Troll Stronghold",
       "qp": 1,
-      "skills": { "agility": 15 },
+      "skills": {"agility": 15, "attack": 40, "strength": 40, "defence": 40, "hitpoints": 40},
       "quests": [],
-      "notes": "quest_troll.rs2 gates several obstacles on agility>=15.",
+      "notes": "quest_troll.rs2 gates several obstacles on agility>=15. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of the troll champion Dad (level 101; ai_queue3 in quest_troll/scripts/troll_champion.rs2 sets varp). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
       "id": "upass",
       "name": "Underground Pass",
       "qp": 5,
-      "skills": { "thieving": 50 },
+      "skills": {"thieving": 50, "attack": 40, "strength": 40, "defence": 40, "hitpoints": 40},
       "quests": ["biohazard"],
-      "notes": "Script-verified: quest_upass.rs2:81 `if(%biohazard < ^biohazard_complete)` gates the quest start on Biohazard complete. thieving>=50 gates a pickpocket obstacle (quest_upass.rs2:248). Feeds Regicide and Legends' Quest.",
+      "notes": "Script-verified: quest_upass.rs2:81 `if(%biohazard < ^biohazard_complete)` gates the quest start on Biohazard complete. thieving>=50 gates a pickpocket obstacle (quest_upass.rs2:248). Feeds Regicide and Legends' Quest. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of the demons Doomion/Holthion/Othainian (level 91; ai_queue3 handlers drop the amulets; Kalrag (89) and three paladins (62) also mandatory). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
       "id": "vampire",
       "name": "Vampire Slayer",
       "qp": 3,
-      "skills": {},
+      "skills": {"attack": 25, "strength": 25, "defence": 25, "hitpoints": 25},
       "quests": [],
       "items": ["stake (quest reward)"],
       "kills": ["Count Draynor"],
-      "notes": "No skill/quest prerequisites found.",
+      "notes": "No skill/quest prerequisites found. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 25 atk/str/def/hp for the mandatory kill of Count Draynor (level 34; ai_queue4 death hook in quest_vampire/scripts/count_draynor.rs2). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
       "id": "viking",
       "name": "Trials of the Fremmenik",
       "qp": 3,
-      "skills": { "woodcutting": 40, "crafting": 40, "fletching": 25 },
+      "skills": {"woodcutting": 40, "crafting": 40, "fletching": 25, "attack": 30, "strength": 30, "defence": 30, "hitpoints": 30},
       "quests": [],
       "items": ["viking_helmet (quest reward, also a wield-gate item)"],
-      "notes": "viking_olaf.rs2 gates the boat-repair minigame on woodcutting>=40, crafting>=40, fletching>=25.",
+      "notes": "viking_olaf.rs2 gates the boat-repair minigame on woodcutting>=40, crafting>=40, fletching>=25. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 30 atk/str/def/hp for the mandatory kill of the Draugen / Koschei the Deathless (level 69; ai_queue3 in quest_viking scripts (viking_draugen vislevel 69)). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
@@ -577,28 +577,21 @@
       "id": "zanaris",
       "name": "Lost City",
       "qp": 3,
-      "skills": { "woodcutting": 36, "crafting": 31 },
+      "skills": {"woodcutting": 36, "crafting": 31, "attack": 40, "strength": 40, "defence": 40, "hitpoints": 40},
       "quests": [],
       "regions": ["zanaris"],
       "items": ["dramen_staff (the quest's own completion mechanic - NEVER hand this out as a filler reward, it would delete the quest's fetch step)"],
-      "notes": "quest_zanaris.rs2:37,78 + zanaris_journal.rs2 gate on woodcutting>=36 (dramen branch) and crafting>=31 (lever mechanism). Opens Zanaris (fairy realm, reached via the dramen tree once the staff is crafted) and the Fairy Ring network in later revisions - not relevant to rev 274. Feeds Heroes' Quest.",
+      "notes": "quest_zanaris.rs2:37,78 + zanaris_journal.rs2 gate on woodcutting>=36 (dramen branch) and crafting>=31 (lever mechanism). Opens Zanaris (fairy realm, reached via the dramen tree once the staff is crafted) and the Fairy Ring network in later revisions - not relevant to rev 274. Feeds Heroes' Quest. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of the Tree Spirit (level 101; ai_queue3 in quest_zanaris/scripts/tree_spirit.rs2 sets %zanaris). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     },
     {
       "id": "zombiequeen",
       "name": "Shilo Village",
       "qp": 2,
-      "skills": { "agility": 32, "crafting": 9 },
+      "skills": {"agility": 32, "crafting": 9, "attack": 40, "strength": 40, "defence": 40, "hitpoints": 40},
       "quests": [],
-      "notes": "quest_zombiequeen.rs2:390 gates on agility>=32 (rope swing). The crafting gate (line 789-793) is tool-dependent: chisel needs only crafting>=9, spade needs 29, default 19 - modeled at the lowest reachable value (9) since any of the three tools completes the same step. Feeds Legends' Quest.",
+      "notes": "quest_zombiequeen.rs2:390 gates on agility>=32 (rope swing). The crafting gate (line 789-793) is tool-dependent: chisel needs only crafting>=9, spade needs 29, default 19 - modeled at the lowest reachable value (9) since any of the three tools completes the same step. Feeds Legends' Quest. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of Nazastarool (level 93; ai_queue3 in quest_zombiequeen/scripts/nazastarool.rs2 (three forms; level from era knowledge)). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
       "verified": "script"
     }
-  ],
-  "meta": {
-    "totalQuests": 63,
-    "totalQpAvailable": 135,
-    "scriptVerifiedCount": 62,
-    "knowledgeVerifiedCount": 1,
-    "generatedNotes": "QP values are script-verified against Server/content/scripts/general/configs/quest.constant (the single source of truth for every ^*_questpoints constant - 63 entries, sum 135). Skill/quest-chain requirements were established by grepping every quest's .rs2 scripts for stat_base/stat()/level checks (29 quests have skill gates) and for cross-quest _complete varp comparisons in each quest's main script AND its journal/guard files (found: hero, legends, upass, regicide, blackarmgang's two-faction fold). Absence of a hit is itself a verified claim (a full-directory grep found nothing), not an assumption - so 62/63 entries are 'script' verified; only druidspirit's quest-chain portion (Priest/Priest in Peril) falls back to era knowledge since no coded varp gate exists for it in this script set."
-  }
+  ]
 }

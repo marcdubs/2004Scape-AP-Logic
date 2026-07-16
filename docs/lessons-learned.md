@@ -2113,3 +2113,39 @@ Ap* type-only-Player rule held). Live-seed hand-patches applied to ../Server:
 ap_mimic.rs2 (regenerated via same-seed tool re-run). NOT committed here: the
 parallel session's in-flight new-run.sh/GenerateSeed/RegenerateAll/spawn/entrance
 tool edits.
+
+## Session addendum: quest combat floors (2026-07-16)
+
+The user flagged Dragon Slayer at sphere 0 in the sim. NOT a requiredQp bug - the
+engine enforces it - but 40 of 63 quests had zero requirements, so 32 QP was free
+within one sphere and DS unlocked instantly. Fix (user decision via AskUserQuestion:
+combat floors now + family D quest-gate items as a second wave; DS itself stays
+QP + floor, no unlock item):
+
+- **Combat floors are data-only** (`tools/sim/data/quests.json`), same convention as
+  the KBD goal's existing 40 atk/str/def/hp floor: 25 quests with script-enforced
+  mandatory kills got atk/str/def/hp floors sized to the hardest kill.
+  Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50.
+  Each entry's notes name the boss, level, and the ai_queue3/queue evidence.
+  KBD goal raised 40 -> 50 to sit on the same curve (never shallower than Legends).
+- **Kill survey method**: grep quest dirs for `[ai_queue3,...]` death handlers, but
+  the big bosses advance quests via `queue(player,...)`/`@label` idioms that a
+  varp-write regex misses (elvarg, delrith, tree_spirit...) - spot-read those.
+  vislevel comes from .npc configs. A few levels (ikov fire warrior, nazastarool,
+  dagannoth mother) are era knowledge, debugnames didn't resolve - noted per entry.
+- **Verified**: live seed still beatable under stricter logic (ValidateSeed 63/63
+  quests, 3/3 goals; DS goal sphere 0 -> 2), fresh GenerateSeed --dry-run converges,
+  placement fill spreads quest checks across spheres 2-3 now instead of everything
+  in sphere 1. Floors are logic-only - the game does not enforce them.
+- **Cap-item semantics reminder**: "+20 <Skill> cap" pool items grant +2 progressive
+  counts each (engine cap formula is 20 + 10*count) - looks like a mismatch, isn't.
+- **JSON data files are hand-formatted** (leaf arrays/objects inline) - a plain
+  json.dump(indent=2) reformats ~400 lines of noise; use a style-matching dumper
+  (see this session's approach) or edit lines surgically.
+- **Family D scoping done**: no shared quest-START proc exists (only
+  send_quest_complete on completion) - quest starts are scattered per-NPC varp
+  writes. The viable enforcement seam is engine-side interception of the 0->started
+  varp transition in Player.setVar (same routing the kill checks use), with a
+  quest-varp -> unlock-key table; blocking mid-dialogue is safe because quest
+  dialogue re-reads the varp on every interaction (one-time cosmetic desync only).
+  NOT BUILT YET.
