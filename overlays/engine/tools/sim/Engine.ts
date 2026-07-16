@@ -46,6 +46,8 @@ export type ReqLike = {
     skills?: Partial<Record<StatName, number>>;
     quests?: string[];
     questsAny?: string[][];
+    /** Family-D placement gate key (`quest_<id>`) - see types.ts QuestReq.gateKey. */
+    gateKey?: string;
 };
 
 export function skillsSatisfied(req: ReqLike, caps: Record<StatName, number>): boolean {
@@ -82,8 +84,18 @@ export function qpSatisfied(req: ReqLike, qp: number): boolean {
     return req.requiredQp === undefined || qp >= req.requiredQp;
 }
 
-export function isSatisfied(req: ReqLike, caps: Record<StatName, number>, completed: Set<string>, qp: number): boolean {
-    return skillsSatisfied(req, caps) && questsSatisfied(req, completed) && qpSatisfied(req, qp);
+/**
+ * Family-D quest gate: satisfied when the req has no gateKey, when the caller has no
+ * placement context at all (`unlocks === undefined` - the vanilla sim path, mirroring
+ * the engine's missing-ap-unlocks.json = everything-open convention), or when the
+ * gate's `quest_<id>` item has been collected.
+ */
+export function gateSatisfied(req: ReqLike, unlocks?: Map<string, number>): boolean {
+    return req.gateKey === undefined || unlocks === undefined || (unlocks.get(req.gateKey) ?? 0) >= 1;
+}
+
+export function isSatisfied(req: ReqLike, caps: Record<StatName, number>, completed: Set<string>, qp: number, unlocks?: Map<string, number>): boolean {
+    return skillsSatisfied(req, caps) && questsSatisfied(req, completed) && qpSatisfied(req, qp) && gateSatisfied(req, unlocks);
 }
 
 /**
@@ -97,7 +109,7 @@ export function isSatisfied(req: ReqLike, caps: Record<StatName, number>, comple
  * the exact same quest-completability rule the vanilla-path simulator uses - "reuse the
  * sim engine's reachability", not a parallel implementation that could drift.
  */
-export function completableQuests(quests: QuestReq[], caps: Record<StatName, number>): { completed: Set<string>; qp: number } {
+export function completableQuests(quests: QuestReq[], caps: Record<StatName, number>, unlocks?: Map<string, number>): { completed: Set<string>; qp: number } {
     const completed = new Set<string>();
     let qp = 0;
     for (;;) {
@@ -106,7 +118,7 @@ export function completableQuests(quests: QuestReq[], caps: Record<StatName, num
             if (completed.has(q.id)) {
                 continue;
             }
-            if (isSatisfied(q, caps, completed, qp)) {
+            if (isSatisfied(q, caps, completed, qp, unlocks)) {
                 completed.add(q.id);
                 qp += q.qp;
                 changed = true;
@@ -132,7 +144,8 @@ function diagnose(
     completed: Set<string>,
     qp: number,
     questsById: Map<string, QuestReq>,
-    visiting: Set<string> = new Set()
+    visiting: Set<string> = new Set(),
+    unlocks?: Map<string, number>
 ): Blocker[] {
     const blockers: Blocker[] = [];
 
@@ -158,6 +171,15 @@ function diagnose(
         });
     }
 
+    if (!gateSatisfied(req, unlocks)) {
+        blockers.push({
+            subject: `unlock:${req.gateKey}`,
+            subjectName: req.gateKey!,
+            reason: `quest is gated behind the "${req.gateKey}" placement item, which was never collected`,
+            children: []
+        });
+    }
+
     const diagnoseQuestId = (id: string): Blocker => {
         const quest = questsById.get(id);
         const name = quest?.name ?? id;
@@ -172,7 +194,7 @@ function diagnose(
             return { subject: `quest:${id}`, subjectName: id, reason: 'unknown quest id referenced in requirements database', children: [] };
         }
         visiting.add(id);
-        const childBlockers = diagnose(quest, caps, completed, qp, questsById, visiting);
+        const childBlockers = diagnose(quest, caps, completed, qp, questsById, visiting, unlocks);
         visiting.delete(id);
         return {
             subject: `quest:${id}`,

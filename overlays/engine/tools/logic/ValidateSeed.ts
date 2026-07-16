@@ -19,7 +19,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { allSkillCaps, loadSeedConfig } from '../sim/ConfigLoader.js';
-import { applyPlacementItem, buildLocationCatalog, capsFromCounts, loadPlacements, reachableFromState } from '../sim/PlacementEngine.js';
+import { applyPlacementItem, applyQuestGates, buildLocationCatalog, capsFromCounts, loadPlacements, reachableFromState } from '../sim/PlacementEngine.js';
 import { Goal, QuestReq, StatName } from '../sim/types.js';
 
 import { WorldTile, parseRawCoord } from './Coords.js';
@@ -333,7 +333,10 @@ function main(): void {
         anchorRegions.set(name, graph.resolveRegion({ level: def.level, x: def.x, z: def.z }));
     }
 
-    const quests: QuestReq[] = JSON.parse(fs.readFileSync(QUESTS_PATH, 'utf8')).quests;
+    const rawQuests: QuestReq[] = JSON.parse(fs.readFileSync(QUESTS_PATH, 'utf8')).quests;
+    // Family D: the active seed's questGates lock those quests behind `quest_<id>`
+    // placement items (tracked in placementCounts like every other unlock key).
+    const quests: QuestReq[] = placementsFile.present ? applyQuestGates(rawQuests, placementsFile.questGates) : rawQuests;
     const goals: Goal[] = JSON.parse(fs.readFileSync(GOALS_PATH, 'utf8')).goals;
     const questsById = new Map(quests.map(q => [q.id, q]));
 
@@ -476,6 +479,7 @@ function main(): void {
                 skillsSatisfied(q.skills, statCaps) &&
                 qp >= (q.requiredQp ?? 0) &&
                 questsChainSatisfied(q.quests, q.questsAny, completed) &&
+                (q.gateKey === undefined || (placementCounts.get(q.gateKey) ?? 0) >= 1) &&
                 regionsSatisfied(qr.quests[q.id]?.requiredAnchors, anchorRegions, reachableRegions)
             ) {
                 newlyCompleted.push(q);

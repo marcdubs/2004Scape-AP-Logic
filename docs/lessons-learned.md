@@ -2149,3 +2149,44 @@ QP + floor, no unlock item):
   quest-varp -> unlock-key table; blocking mid-dialogue is safe because quest
   dialogue re-reads the varp on every interaction (one-time cosmetic desync only).
   NOT BUILT YET.
+
+## Session addendum: family-D quest gates (2026-07-16, same session)
+
+Built per the user's "Do #2" decision: central engine-side quest-start gating, not
+per-quest dialogue overlays. 17 curated quests ("Quest unlock: <name>" single-copy
+pool items); DS excluded per the earlier decision. Design facts:
+
+- **The enforcement seam is Player.setVar** - there is no shared quest-START proc in
+  this content (only ~send_quest_complete on completion), quest givers write their
+  progress varps directly. ApQuestGates.interceptVarpWrite vetoes a gated quest's
+  0 -> nonzero varp write when `quest_<id>` isn't received, with a player message.
+  One-time cosmetic dialogue desync only: quest dialogue re-reads its varp per
+  interaction. PlayerLoading writes player.vars[] directly (never setVar), so save
+  restores can NEVER be blocked - verified before building.
+- **Gates are seed-declared**: GenerateSeed writes `questGates: [...]` into
+  ap-placements.json; the engine loads gates only from that list (old seeds/absent
+  file/parse failure = zero gates = vanilla). quest id -> varp resolves through
+  ap-checks.json's own quest_<id> watches - no second varp table to drift. That's
+  also why curation excludes cog (bit counter), horror (varbit), blackarmgang
+  (two-watch OR): the gate rule assumes a plain varp that goes 0 -> nonzero.
+- **Logic plumbing**: QuestReq/ReqLike gained optional `gateKey` (attached at load
+  by PlacementEngine.applyQuestGates, NEVER present in quests.json);
+  Engine.gateSatisfied treats "no unlocks map" as open (vanilla sim path);
+  completableQuests/isSatisfied/diagnose take an optional unlocks map - the counts
+  map doubles as unlock state since quest_ keys flow through
+  applyPlacementItem/grantUnlock generically (both were verified name-agnostic, no
+  changes needed). statsAffectedByUnlockKey returns [] for quest_ keys, so the
+  banked-XP drain no-ops on them.
+- **Cycle avoidance**: QUEST_GATE_LABELS + questGateLabel live in ApUnlockOverrides
+  (describeUnlock needs them), and ApQuestGates imports FROM ApUnlockOverrides -
+  putting labels in ApQuestGates would have made
+  ApUnlockOverrides <-> ApQuestGates circular.
+- **Depth payoff measured**: seed 424242 per-skill dry-run went 3 spheres -> 7
+  spheres with real chains (Family Crest's unlock inside Doric's Quest's check,
+  whose unlock sits in Scorpion Catcher's check). All 128 items placed, all goals
+  reachable. Live pre-family-D seed re-validated identical (gates inert on it).
+- Test command: ::apquests (mirror of QUEST_GATE_IDS in rs2 - keep in sync; caveat
+  in its header about pre-family-D seeds reading LOCKED while inert).
+- Verified: typecheck, pack build clean, worker import-order repro still clean
+  (Player gained the ApQuestGates import - type-only Player rule respected).
+  NOT in-game tested - needs a fresh seed roll (new-run) to actually place gates.

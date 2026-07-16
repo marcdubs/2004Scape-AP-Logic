@@ -53,6 +53,14 @@ export interface QuestReq {
      * "blackarmgang" quest id - kept generic in case a future entry needs the same shape.
      */
     questsAny?: string[][];
+    /**
+     * Family-D placement gate (docs/checks-and-unlocks.md unlock family D): the
+     * ap-unlocks.json key (`quest_<id>`) that must be >= 1 before this quest can be
+     * started/completed. NEVER present in quests.json itself - attached at load time by
+     * placement-aware consumers via PlacementEngine.applyQuestGates() when the active
+     * ap-placements.json declares questGates. Absent = quest ungated.
+     */
+    gateKey?: string;
     /** Narrative-only notable items (fetched via NPCs/drops/fixed locations, not gathersanity/processsanity - see progression-sim.md "Item requirements" for why). */
     items?: string[];
     /** Narrative-only notable kills. */

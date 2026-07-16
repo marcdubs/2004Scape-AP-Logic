@@ -79,6 +79,49 @@ export const DS_STAGE_IDS = ['ds_started', 'ds_oziach', 'ds_ship_ready', 'ds_map
 
 export const BARCRAWL_BAR_IDS = Array.from({ length: 10 }, (_, i) => `barcrawl_bar_${i + 1}`);
 
+// Family D (docs/checks-and-unlocks.md unlock family D): curated quests that placement
+// mode locks behind a `quest_<id>` pool item. Until the item is collected the quest can
+// neither be STARTED in-game (engine/src/engine/ApQuestGates.ts vetoes the 0 -> started
+// varp write - keep its QUEST_GATE_LABELS mirror in sync with this list) nor completed
+// in logic (Engine.gateSatisfied). Curation rules: plain-varp gte quests only (cog's
+// bit-mode counter, horror's varbit, and blackarmgang's two-watch OR-shape are excluded
+// because the runtime gate keys off "varp goes 0 -> nonzero"), never the Dragon Slayer
+// goal quest (user decision 2026-07-16: DS stays 32 QP + combat floor, no gate item),
+// spread across easy/mid/hard so gates land in every band of the sphere structure.
+export const QUEST_GATE_IDS: readonly string[] = ['cook', 'sheep', 'doric', 'imp', 'gobdip', 'hetty', 'vampire', 'demon', 'prince', 'squire', 'druid', 'fishingcompo', 'arthur', 'junglepotion', 'crest', 'grail', 'zanaris'];
+
+/** The ap-unlocks.json key a family-D gate reads for quest `questId`. */
+export function questGateKey(questId: string): string {
+    return `quest_${questId}`;
+}
+
+/** One single-copy pool item per QUEST_GATE_IDS entry (display names from quests.json). */
+export function buildQuestGateCopies(quests: QuestReq[]): ProgressionCopy[] {
+    const byId = new Map(quests.map(q => [q.id, q]));
+    return QUEST_GATE_IDS.map(id => {
+        const key = questGateKey(id);
+        return {
+            uid: key,
+            placementItem: key,
+            placementCount: 1,
+            display: `Quest unlock: ${byId.get(id)?.name ?? id}`,
+            isGroupSynthetic: false,
+            apply(counts: Map<string, number>): void {
+                bump(counts, key, 1);
+            }
+        };
+    });
+}
+
+/**
+ * Returns a copy of `quests` with `gateKey` attached to every id in `gateIds` (source
+ * objects untouched - the parsed quests.json data may be shared with ungated callers).
+ */
+export function applyQuestGates(quests: QuestReq[], gateIds: readonly string[]): QuestReq[] {
+    const gated = new Set(gateIds);
+    return quests.map(q => (gated.has(q.id) ? { ...q, gateKey: questGateKey(q.id) } : q));
+}
+
 // The 14 notable-kill ids + first_kill, copied verbatim from ap_checks.rs2's
 // `ap_track_kill` OR-chain (read this session - see that file for the npc_type mapping).
 export const NOTABLE_KILL_IDS = [
@@ -351,7 +394,9 @@ export function reachableFromState(locations: LocationDef[], quests: QuestReq[],
 /** Full reachability computation for a given (already-flattened) item counts map - the travel-agnostic (no region graph) path used by GenerateSeed and the vanilla-path placement-aware simulator. */
 export function computeReachability(locations: LocationDef[], quests: QuestReq[], counts: Map<string, number>): ReachabilityResult {
     const caps = capsFromCounts(counts);
-    const { completed, qp } = completableQuests(quests, caps);
+    // counts doubles as the family-D unlock state: `quest_<id>` keys land in it via
+    // applyPlacementItem/ProgressionCopy.apply just like every real unlock key.
+    const { completed, qp } = completableQuests(quests, caps, counts);
     const reachable = reachableFromState(locations, quests, completed, qp, caps);
     return { caps, completedQuests: completed, qp, reachable };
 }
@@ -399,18 +444,21 @@ export interface PlacementsFile {
     present: boolean;
     seed?: number;
     pool?: PoolMode;
+    /** Family-D gated quest ids declared by this seed (empty = no quest gates, incl. every pre-family-D seed). */
+    questGates: string[];
     placements: Map<string, PlacementRecord>;
 }
 
 export function loadPlacements(configDir: string): PlacementsFile {
     const file = path.join(configDir, 'ap-placements.json');
     if (!fs.existsSync(file)) {
-        return { present: false, placements: new Map() };
+        return { present: false, questGates: [], placements: new Map() };
     }
     try {
         const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as {
             seed?: number;
             pool?: string;
+            questGates?: unknown[];
             placements?: Record<string, { item?: string; count?: number; display?: string }>;
         };
         const placements = new Map<string, PlacementRecord>();
@@ -428,11 +476,12 @@ export function loadPlacements(configDir: string): PlacementsFile {
             present: true,
             seed: parsed.seed,
             pool: parsed.pool === 'groups' ? 'groups' : 'per-skill',
+            questGates: (parsed.questGates ?? []).filter((id): id is string => typeof id === 'string'),
             placements
         };
     } catch (err) {
         console.warn(`ap-placements.json: failed to parse, treating as absent (${err instanceof Error ? err.message : err})`);
-        return { present: false, placements: new Map() };
+        return { present: false, questGates: [], placements: new Map() };
     }
 }
 
@@ -530,7 +579,7 @@ export function simulatePlacementSpheres(
     };
 
     for (;;) {
-        const state = completableQuests(quests, caps);
+        const state = completableQuests(quests, caps, counts);
         completed = state.completed;
         qp = state.qp;
         const reachable = reachableFromState(locations, quests, completed, qp, caps);
@@ -556,7 +605,7 @@ export function simulatePlacementSpheres(
 
         sphere += 1;
         caps = capsFromCounts(counts);
-        const after = completableQuests(quests, caps);
+        const after = completableQuests(quests, caps, counts);
         completed = after.completed;
         qp = after.qp;
         checkGoals();

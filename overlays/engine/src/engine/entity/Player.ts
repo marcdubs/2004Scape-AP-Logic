@@ -24,6 +24,7 @@ import Loc from '#/engine/entity/Loc.js';
 import { ModalState } from '#/engine/entity/ModalState.js';
 import { MoveSpeed } from '#/engine/entity/MoveSpeed.js';
 import * as ApChecks from '#/engine/ApChecks.js';
+import * as ApQuestGates from '#/engine/ApQuestGates.js';
 import { clampStatXp } from '#/engine/ApUnlockOverrides.js';
 import { MoveStrategy } from '#/engine/entity/MoveStrategy.js';
 import { isClientConnected } from '#/engine/entity/NetworkPlayer.js';
@@ -1775,6 +1776,14 @@ export default class Player extends PathingEntity {
         if (varp.type === ScriptVarType.STRING && typeof value === 'string') {
             this.varsString[varp.id] = value;
         } else if (typeof value === 'number') {
+            // AP: family-D quest-start gate - may veto the entire write (gated quest,
+            // never started, unlock item not yet received). Save restores bypass
+            // setVar (PlayerLoading writes this.vars directly), so this can never
+            // block loading an existing save.
+            if (ApQuestGates.interceptVarpWrite(this, varp.id, this.vars[varp.id] ?? 0, value)) {
+                return;
+            }
+
             this.vars[varp.id] = value;
 
             if (varp.transmit) {

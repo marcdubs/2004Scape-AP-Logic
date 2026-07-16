@@ -231,6 +231,35 @@ function capitalize(s: string): string {
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// Family-D quest-gate display names, keyed by unlock key (`quest_<id>`). Mirror of
+// tools/sim/PlacementEngine.ts's QUEST_GATE_IDS x quests.json names - keep in sync
+// (same tools <-> engine duplication precedent as GEAR_TIER_LEVELS above). Used by
+// describeUnlock announcements and ApQuestGates' blocked-start messages.
+const QUEST_GATE_LABELS: Record<string, string> = {
+    quest_cook: "Cook's Assistant",
+    quest_sheep: 'Sheep Shearer',
+    quest_doric: "Doric's Quest",
+    quest_imp: 'Imp Catcher',
+    quest_gobdip: 'Goblin Diplomacy',
+    quest_hetty: "Witch's Potion",
+    quest_vampire: 'Vampire Slayer',
+    quest_demon: 'Demon Slayer',
+    quest_prince: 'Prince Ali Rescue',
+    quest_squire: "Knight's Sword",
+    quest_druid: 'Druidic Ritual',
+    quest_fishingcompo: 'Fishing Contest',
+    quest_arthur: "Merlin's Crystal",
+    quest_junglepotion: 'Jungle Potion',
+    quest_crest: 'Family Crest',
+    quest_grail: 'Holy Grail',
+    quest_zanaris: 'Lost City'
+};
+
+/** Human name for a `quest_<id>` unlock key (falls back to the capitalized id). */
+export function questGateLabel(key: string): string {
+    return QUEST_GATE_LABELS[key] ?? capitalize(key.replace(/^quest_/, ''));
+}
+
 // Builds the honest "what did this grant actually just do" announcement from the
 // REAL post-grant count for `name` (the value grantUnlock returned). Handles the
 // three placement item shapes: gear/tool families (tier/material name), plain
@@ -238,6 +267,12 @@ function capitalize(s: string): string {
 // see the "KNOWN DESIGN POINT" comment on STAT_NAMES above) by reporting every
 // applicable facet.
 export function describeUnlock(name: string, newCount: number): string {
+    // Family-D quest gates are single-copy items - the count carries no tier semantics,
+    // so the fill-order display bug this function exists to fix can't apply to them.
+    if (name.startsWith('quest_')) {
+        return `Quest unlocked: ${questGateLabel(name)}!`;
+    }
+
     const parts: string[] = [];
 
     const gearLabel = GEAR_FAMILY_LABELS[name];

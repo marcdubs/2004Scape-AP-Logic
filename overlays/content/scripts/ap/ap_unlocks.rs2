@@ -79,3 +79,42 @@ mes("Archipelago skill caps (current base-level ceiling; Hitpoints is never capp
 mes("Attack <tostring($attack)>  Strength <tostring($strength)>  Defence <tostring($defence)>  Ranged <tostring($ranged)>  Magic <tostring($magic)>  Prayer <tostring($prayer)>");
 mes("Cooking <tostring($cooking)>  Woodcutting <tostring($woodcutting)>  Fletching <tostring($fletching)>  Fishing <tostring($fishing)>  Firemaking <tostring($firemaking)>  Crafting <tostring($crafting)>");
 mes("Smithing <tostring($smithing)>  Mining <tostring($mining)>  Herblore <tostring($herblore)>  Agility <tostring($agility)>  Thieving <tostring($thieving)>  Runecraft <tostring($runecraft)>");
+
+// info: family-D quest gates (::apquests) - lists every gated quest and whether its
+// "Quest unlock" placement item has been received. Quest list is a mirror of
+// tools/sim/PlacementEngine.ts's QUEST_GATE_IDS - keep in sync. Outside an AP run
+// (no ap-unlocks.json) every count reads 99, so everything reports open. CAVEAT: on a
+// placement seed generated before family D existed (no questGates in ap-placements.json)
+// the gates are inert but counts still read 0 - this listing cannot tell those apart.
+[proc,ap_quest_gate_status](string $key)(string)
+if (ap_unlock_count($key) >= 1) {
+    return("open");
+}
+return("LOCKED");
+
+[debugproc,ap_quests]
+if (p_finduid(uid) = false) {
+    return;
+}
+def_string $cook = ~ap_quest_gate_status("quest_cook");
+def_string $sheep = ~ap_quest_gate_status("quest_sheep");
+def_string $doric = ~ap_quest_gate_status("quest_doric");
+def_string $imp = ~ap_quest_gate_status("quest_imp");
+def_string $gobdip = ~ap_quest_gate_status("quest_gobdip");
+def_string $hetty = ~ap_quest_gate_status("quest_hetty");
+def_string $vampire = ~ap_quest_gate_status("quest_vampire");
+def_string $demon = ~ap_quest_gate_status("quest_demon");
+def_string $prince = ~ap_quest_gate_status("quest_prince");
+def_string $squire = ~ap_quest_gate_status("quest_squire");
+def_string $druid = ~ap_quest_gate_status("quest_druid");
+def_string $fishingcompo = ~ap_quest_gate_status("quest_fishingcompo");
+def_string $arthur = ~ap_quest_gate_status("quest_arthur");
+def_string $junglepotion = ~ap_quest_gate_status("quest_junglepotion");
+def_string $crest = ~ap_quest_gate_status("quest_crest");
+def_string $grail = ~ap_quest_gate_status("quest_grail");
+def_string $zanaris = ~ap_quest_gate_status("quest_zanaris");
+mes("Archipelago quest gates (family D; gates only bind on seeds that placed quest unlocks):");
+mes("Cook's Assistant <$cook>  Sheep Shearer <$sheep>  Doric's Quest <$doric>  Imp Catcher <$imp>");
+mes("Goblin Diplomacy <$gobdip>  Witch's Potion <$hetty>  Vampire Slayer <$vampire>  Demon Slayer <$demon>");
+mes("Prince Ali Rescue <$prince>  Knight's Sword <$squire>  Druidic Ritual <$druid>  Fishing Contest <$fishingcompo>");
+mes("Merlin's Crystal <$arthur>  Jungle Potion <$junglepotion>  Family Crest <$crest>  Holy Grail <$grail>  Lost City <$zanaris>");

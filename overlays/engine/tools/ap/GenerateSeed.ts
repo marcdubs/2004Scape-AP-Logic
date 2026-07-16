@@ -29,8 +29,11 @@ import {
     PlacementSimResult,
     PoolMode,
     ProgressionCopy,
+    QUEST_GATE_IDS,
+    applyQuestGates,
     buildItemPool,
     buildLocationCatalog,
+    buildQuestGateCopies,
     computeReachability,
     realUnlockKeys,
     simulatePlacementSpheres
@@ -228,7 +231,7 @@ function writePlacements(dir: string, seed: number, pool: PoolMode, placements: 
         goals: spoiler.goalStatus.map(g => ({ id: g.goal.id, name: g.goal.name, reached: g.reached, sphereReached: g.sphereReached }))
     };
 
-    const out = { seed, pool, placements: placementsOut, spoiler: spoilerOut };
+    const out = { seed, pool, questGates: [...QUEST_GATE_IDS], placements: placementsOut, spoiler: spoilerOut };
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'ap-placements.json'), JSON.stringify(out, null, 2) + '\n');
 }
@@ -285,9 +288,13 @@ function stageAndValidate(realConfigDir: string, seed: number, pool: PoolMode, p
 
 function generateOnce(seed: number, pool: PoolMode, quests: QuestReq[], goals: Goal[], locations: LocationDef[], maxProgressionLevel: number): { placements: Map<string, PlacementRecord>; spoiler: PlacementSimResult } {
     const rand = mulberry32(seed);
-    const itemPool = buildItemPool(pool);
-    const { placements } = assumedFill(locations, quests, itemPool, maxProgressionLevel, rand);
-    const spoiler = simulatePlacementSpheres(locations, quests, goals, placements);
+    // Family D: gated quests can't complete (in logic) until their `quest_<id>` pool item
+    // is collected - both the fill's reachability and the spoiler walk must see the gates,
+    // or the fill could bury a gate item behind its own quest's check.
+    const gatedQuests = applyQuestGates(quests, QUEST_GATE_IDS);
+    const itemPool = [...buildItemPool(pool), ...buildQuestGateCopies(quests)];
+    const { placements } = assumedFill(locations, gatedQuests, itemPool, maxProgressionLevel, rand);
+    const spoiler = simulatePlacementSpheres(locations, gatedQuests, goals, placements);
     return { placements, spoiler };
 }
 
@@ -325,7 +332,7 @@ function main(): void {
     const quests = loadQuests();
     const goals = loadGoals();
     const locations = buildLocationCatalog(quests);
-    const itemPoolSize = buildItemPool(args.pool).length;
+    const itemPoolSize = buildItemPool(args.pool).length + buildQuestGateCopies(quests).length;
 
     console.log(`GenerateSeed: building placement-mode seed ${args.seed} (pool=${args.pool}, maxProgressionLevel=${args.maxProgressionLevel})...`);
 

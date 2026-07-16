@@ -16,7 +16,7 @@ import { fileURLToPath } from 'url';
 import { loadSeedConfig } from './ConfigLoader.js';
 import { runSimulation } from './Engine.js';
 import { buildQuestIndex, renderPlacementV0, renderPlacementV1, renderPlacementV2, renderV0, renderV1, renderV2, toJsonSafe, toJsonSafePlacement } from './Narrate.js';
-import { buildLocationCatalog, loadPlacements, simulatePlacementSpheres } from './PlacementEngine.js';
+import { applyQuestGates, buildLocationCatalog, loadPlacements, simulatePlacementSpheres } from './PlacementEngine.js';
 import { Goal, QuestReq } from './types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -76,8 +76,10 @@ function main(): void {
     const placementsFile = loadPlacements(configDir);
     if (placementsFile.present) {
         const locations = buildLocationCatalog(quests);
+        // Family D: lock the seed's declared questGates behind their `quest_<id>` items.
+        const gatedQuests = applyQuestGates(quests, placementsFile.questGates);
         const startingCounts = seedConfig.unlocks.present ? seedConfig.unlocks.unlocks : undefined;
-        const result = simulatePlacementSpheres(locations, quests, goals, placementsFile.placements, startingCounts);
+        const result = simulatePlacementSpheres(locations, gatedQuests, goals, placementsFile.placements, startingCounts);
 
         const lines =
             verbosity === 0
