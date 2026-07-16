@@ -386,3 +386,29 @@ main#app {
     color: var(--warn);
     font-size: 0.75rem;
 }
+
+/* ---- Unlocks tab ---- */
+
+.unlocks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 0 2rem;
+    align-items: start;
+}
+
+.unlocks-heading {
+    margin: 1.1rem 0 0.4rem;
+    font-size: 0.95rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.unlock-locked td:last-child {
+    color: var(--warn);
+}
+
+.unlock-open td:last-child,
+.unlock-maxed td:last-child {
+    color: var(--accent);
+}

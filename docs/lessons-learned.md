@@ -2190,3 +2190,16 @@ pool items); DS excluded per the earlier decision. Design facts:
 - Verified: typecheck, pack build clean, worker import-order repro still clean
   (Player gained the ApQuestGates import - type-only Player rule respected).
   NOT in-game tested - needs a fresh seed roll (new-run) to actually place gates.
+
+## Session addendum: tracker "Unlocks" tab (2026-07-16, same session)
+
+New tracker tab showing the player's CURRENT unlock state - gear tiers, tool tiers,
+all 18 skill caps, and every family-D quest gate (open/LOCKED with an X/17 counter).
+`buildUnlocksPanel()` in web.ts composes it server-side from getUnlockCount (fresh
+per request - grants mutate ap-unlocks.json mid-play) + questGates from
+ap-placements.json; GEAR_TIER_LEVELS/PICKAXE_TIERS/AXE_TIERS/GEAR_FAMILY_LABELS are
+now exported from ApUnlockOverrides for it. Not a spoiler surface: shows only items
+already received plus the gated-quest LIST (which blocked-start messages announce
+anyway), never where the remaining items are placed. present:false (sentinel 99 on
+progressive_melee = no ap-unlocks.json = not an AP run) hides the panel with an
+explanatory empty-state. Engine/web change only - restart, no pack rebuild.

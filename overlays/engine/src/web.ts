@@ -19,6 +19,7 @@ import OnDemand from '#/engine/OnDemand.js';
 import { tryParseInt } from '#/util/TryParse.js';
 import ObjType from '#/cache/config/ObjType.js';
 import { getDropOverrideCount } from '#/engine/ApDropOverrides.js';
+import { AXE_TIERS, GEAR_FAMILY_LABELS, GEAR_TIER_LEVELS, PICKAXE_TIERS, getUnlockCount, questGateLabel } from '#/engine/ApUnlockOverrides.js';
 import { getEntranceOverrideCount } from '#/engine/ApEntranceOverrides.js';
 import { getGatherOverrideCount } from '#/engine/ApGatherOverrides.js';
 import { getProcessOverrideCount } from '#/engine/ApProcessOverrides.js';
@@ -277,6 +278,65 @@ function collectDropIds(map: Record<string, string> | undefined, slotIds: Set<nu
 // been discovered plus per-category totals (not a spoiler, just table sizes);
 // ?spoiler=1 additionally merges the full override tables as if everything had been
 // discovered, for UI development without playing.
+// Cappable skills, mirror of PlacementEngine.ts's CAPPABLE_SKILLS (hitpoints is never
+// capped). Cap formula 20 + 10*count mirrors ApUnlockOverrides.getSkillCap.
+const UNLOCK_CAP_SKILLS = ['attack', 'strength', 'defence', 'ranged', 'prayer', 'magic', 'cooking', 'woodcutting', 'fletching', 'fishing', 'firemaking', 'crafting', 'smithing', 'mining', 'herblore', 'agility', 'thieving', 'runecraft'];
+
+// The player's CURRENT unlock state for the tracker's "Unlocks" tab. Not a spoiler
+// surface: this only ever reflects items already received (ap-unlocks.json) plus which
+// quest gates exist at all (questGates in ap-placements.json - the seed announces its
+// gated quest LIST to the player anyway via blocked-start messages; where the unlock
+// items are placed is never exposed here). Re-read per request: grants mutate
+// ap-unlocks.json mid-play and getUnlockCount's ensureFresh picks that up.
+function buildUnlocksPanel(): unknown {
+    // getUnlockCount returns the sentinel 99 when no ap-unlocks.json exists (not an AP
+    // placement run) - real counts never come close (max is 8, a fully-capped skill).
+    if (getUnlockCount('progressive_melee') >= 99) {
+        return { present: false };
+    }
+
+    const gear = Object.entries(GEAR_FAMILY_LABELS).map(([key, label]) => {
+        const count = getUnlockCount(key);
+        const tier = Math.min(count, GEAR_TIER_LEVELS.length);
+        return {
+            label,
+            count,
+            max: GEAR_TIER_LEVELS.length,
+            detail: tier === 0 ? 'starter (bronze-grade) only' : `tier ${tier} - lv ${GEAR_TIER_LEVELS[tier - 1]}+ equipment`
+        };
+    });
+
+    const tools = [
+        { key: 'progressive_pickaxe', label: 'Pickaxe', tiers: PICKAXE_TIERS },
+        { key: 'progressive_axe', label: 'Axe', tiers: AXE_TIERS }
+    ].map(({ key, label, tiers }) => {
+        const count = getUnlockCount(key);
+        const idx = Math.min(count, tiers.length);
+        return { label, count, max: tiers.length, detail: idx === 0 ? 'bronze' : tiers[idx - 1] };
+    });
+
+    const caps = UNLOCK_CAP_SKILLS.map(skill => ({
+        skill,
+        cap: Math.min(99, 20 + 10 * getUnlockCount(`progressive_${skill}`))
+    }));
+
+    let quests: { label: string; unlocked: boolean }[] = [];
+    try {
+        const placementsPath = 'data/config/ap-placements.json';
+        if (fs.existsSync(placementsPath)) {
+            const parsed = JSON.parse(fs.readFileSync(placementsPath, 'utf8')) as { questGates?: unknown[] };
+            quests = (parsed.questGates ?? [])
+                .filter((id): id is string => typeof id === 'string')
+                .map(id => ({ label: questGateLabel(`quest_${id}`), unlocked: getUnlockCount(`quest_${id}`) >= 1 }))
+                .sort((a, b) => a.label.localeCompare(b.label));
+        }
+    } catch {
+        // panel is best-effort; a malformed placements file just hides the quests section
+    }
+
+    return { present: true, gear, tools, caps, quests };
+}
+
 function buildApTrackerResponse(spoilerMode: boolean): unknown {
     const discoveries = getTrackerState();
     const dropNames = loadDropNames();
@@ -332,6 +392,7 @@ function buildApTrackerResponse(spoilerMode: boolean): unknown {
 
     return {
         discoveries,
+        unlocks: buildUnlocksPanel(),
         names: { items, dropSlots, dropUnits, places },
         totals: {
             entrances: getEntranceOverrideCount(),

@@ -663,6 +663,61 @@
         showPanPulse(viewport);
     }
 
+    // ---- render: unlocks (current received-item state from ap-unlocks.json - never
+    // reveals where unplaced items are hidden, see buildUnlocksPanel in web.ts) ----
+
+    function fillUnlockTable(tableId, rows, rowBuilder) {
+        var tbody = document.getElementById(tableId).querySelector('tbody');
+        tbody.textContent = '';
+        for (var i = 0; i < rows.length; i++) {
+            tbody.appendChild(rowBuilder(rows[i]));
+        }
+    }
+
+    function renderUnlocksTab() {
+        var data = state.data;
+        if (!data) {
+            return;
+        }
+        var unlocks = data.unlocks || { present: false };
+        var grid = document.querySelector('#tab-unlocks .unlocks-grid');
+        document.getElementById('unlocks-empty').hidden = !!unlocks.present;
+        if (grid) {
+            grid.hidden = !unlocks.present;
+        }
+        if (!unlocks.present) {
+            document.getElementById('unlocks-counter').textContent = '';
+            return;
+        }
+
+        fillUnlockTable('unlocks-gear-table', unlocks.gear || [], function (g) {
+            return makeRow(g.label, g.count + ' / ' + g.max, g.detail);
+        });
+        fillUnlockTable('unlocks-tools-table', unlocks.tools || [], function (t) {
+            return makeRow(t.label, t.count + ' / ' + t.max, t.detail);
+        });
+        fillUnlockTable('unlocks-caps-table', unlocks.caps || [], function (c) {
+            var name = c.skill.charAt(0).toUpperCase() + c.skill.slice(1);
+            var tr = makeRow(name, '', String(c.cap));
+            if (c.cap >= 99) {
+                tr.className = 'unlock-maxed';
+            }
+            return tr;
+        });
+
+        var quests = unlocks.quests || [];
+        var unlockedQuests = quests.filter(function (q) {
+            return q.unlocked;
+        }).length;
+        document.getElementById('unlocks-quests-counter').textContent = quests.length ? '(' + unlockedQuests + ' / ' + quests.length + ' unlocked)' : '';
+        document.getElementById('unlocks-quests-empty').hidden = quests.length > 0;
+        fillUnlockTable('unlocks-quests-table', quests, function (q) {
+            var tr = makeRow(q.label, '', q.unlocked ? 'open' : 'LOCKED');
+            tr.className = q.unlocked ? 'unlock-open' : 'unlock-locked';
+            return tr;
+        });
+    }
+
     // ---- render all ----
 
     function renderAll() {
@@ -671,6 +726,7 @@
         renderBestiaryTab();
         renderTeleportsTab();
         renderEntrancesTab();
+        renderUnlocksTab();
         renderMap();
     }
 

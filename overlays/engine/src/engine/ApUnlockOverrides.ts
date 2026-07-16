@@ -211,7 +211,8 @@ export function grantUnlock(name: string, count: number): number {
 // tools/ <-> engine import across the build boundary).
 // ---------------------------------------------------------------------------
 
-const GEAR_FAMILY_LABELS: Record<string, string> = {
+// Exported for web.ts's tracker "Unlocks" panel alongside describeUnlock.
+export const GEAR_FAMILY_LABELS: Record<string, string> = {
     progressive_melee: 'Melee',
     progressive_armour: 'Armour',
     progressive_ranged: 'Ranged',
@@ -220,12 +221,12 @@ const GEAR_FAMILY_LABELS: Record<string, string> = {
 
 // tier (1-indexed) -> base-level threshold it unlocks. Mirrors
 // PlacementEngine.ts's GEAR_TIER_LEVELS and levelrequire.rs2's ap_gear_locked.
-const GEAR_TIER_LEVELS = [5, 10, 20, 30, 40, 45, 60];
+export const GEAR_TIER_LEVELS = [5, 10, 20, 30, 40, 45, 60];
 
 // Mirrors PlacementEngine.ts's PICKAXE_TIERS/AXE_TIERS (verified against
 // mining.rs2's ap_pickaxe_tier and woodcut.rs2's axe fallback cascade).
-const PICKAXE_TIERS = ['iron', 'steel', 'mithril', 'adamant', 'rune'];
-const AXE_TIERS = ['iron', 'steel', 'black', 'mithril', 'adamant', 'rune'];
+export const PICKAXE_TIERS = ['iron', 'steel', 'mithril', 'adamant', 'rune'];
+export const AXE_TIERS = ['iron', 'steel', 'black', 'mithril', 'adamant', 'rune'];
 
 function capitalize(s: string): string {
     return s.charAt(0).toUpperCase() + s.slice(1);

@@ -16,6 +16,7 @@
         <button class="tab-btn" data-tab="recipes">Recipes</button>
         <button class="tab-btn" data-tab="bestiary">Bestiary</button>
         <button class="tab-btn" data-tab="teleports">Teleports</button>
+        <button class="tab-btn" data-tab="unlocks">Unlocks</button>
     </nav>
     <div class="topbar-right">
         <span id="status" class="status">connecting&hellip;</span>
@@ -91,6 +92,39 @@
             <tbody></tbody>
         </table>
         <div class="empty-state" id="teleports-empty" hidden>Nothing discovered yet. Go cast a teleport spell!</div>
+    </section>
+
+    <section id="tab-unlocks" class="tab-panel">
+        <h2>Unlocks <span class="counter" id="unlocks-counter"></span></h2>
+        <p class="tab-desc">Everything the Archipelago placement has granted you so far &mdash; gear tiers, tool tiers, skill caps, and quest gates. This reflects only items already received; it never reveals where the remaining ones are hidden.</p>
+        <div class="unlocks-grid">
+            <div>
+                <h3 class="unlocks-heading">Gear</h3>
+                <table class="discovery-table" id="unlocks-gear-table">
+                    <thead><tr><th>Family</th><th>Copies</th><th>Unlocked</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+                <h3 class="unlocks-heading">Tools</h3>
+                <table class="discovery-table" id="unlocks-tools-table">
+                    <thead><tr><th>Tool</th><th>Copies</th><th>Best usable</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+                <h3 class="unlocks-heading">Quest gates <span class="counter" id="unlocks-quests-counter"></span></h3>
+                <table class="discovery-table" id="unlocks-quests-table">
+                    <thead><tr><th>Quest</th><th></th><th>Status</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+                <div class="empty-state" id="unlocks-quests-empty" hidden>This seed has no quest gates (rolled before family D existed).</div>
+            </div>
+            <div>
+                <h3 class="unlocks-heading">Skill caps</h3>
+                <table class="discovery-table" id="unlocks-caps-table">
+                    <thead><tr><th>Skill</th><th></th><th>Cap</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="empty-state" id="unlocks-empty" hidden>Not an Archipelago placement run (no ap-unlocks.json on the server) &mdash; everything is unlocked.</div>
     </section>
 </main>
 
