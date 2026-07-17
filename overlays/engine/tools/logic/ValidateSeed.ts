@@ -41,6 +41,11 @@ const VERBOSE = argv.includes('--verbose') || argv.includes('-v');
 // the new layout - stranded progression against the stale table is expected there and
 // must not fail the roll. GenerateSeed's staged validation stays strict (no flag).
 const LENIENT_PLACEMENTS = argv.includes('--lenient-placements');
+// Fail unless EVERY quest completes, not just the goals - RandomizeEntrances's
+// phase-1 reroll criterion ("prefer entrance tables that strand nothing"). Meant for
+// a placements-free config dir: with placements present, family-D gate items can
+// legitimately arrive late/stranded and would fail this for non-spatial reasons.
+const STRICT_QUESTS = argv.includes('--strict-quests');
 const REGION_GRAPH_PATH = argVal('--region-graph') ?? path.join('tools', 'logic', 'region-graph.json');
 const QUEST_REGIONS_PATH = path.join('tools', 'logic', 'data', 'quest-regions.json');
 const GENERATED_REGIONS_PATH = path.join('tools', 'logic', 'data', 'quest-regions.generated.json');
@@ -760,9 +765,19 @@ function main(): void {
         }
     }
 
-    const seedOk = allGoalsReached && (LENIENT_PLACEMENTS || strandedProgression.length === 0);
+    const seedOk = allGoalsReached && (LENIENT_PLACEMENTS || strandedProgression.length === 0) && (!STRICT_QUESTS || blockedQuests.length === 0);
+    const failReasons: string[] = [];
+    if (!allGoalsReached) {
+        failReasons.push('goal(s) unreachable');
+    }
+    if (!LENIENT_PLACEMENTS && strandedProgression.length > 0) {
+        failReasons.push(`${strandedProgression.length} stranded progression item(s)`);
+    }
+    if (STRICT_QUESTS && blockedQuests.length > 0) {
+        failReasons.push(`${blockedQuests.length} quest(s) blocked (--strict-quests)`);
+    }
     console.log('');
-    console.log(seedOk ? 'RESULT: all goals reachable, all progression collectable.' : `RESULT: BLOCKED - ${allGoalsReached ? '' : 'goal(s) unreachable'}${!allGoalsReached && strandedProgression.length > 0 ? ' + ' : ''}${strandedProgression.length > 0 ? `${strandedProgression.length} stranded progression item(s)` : ''} - see above.`);
+    console.log(seedOk ? 'RESULT: all goals reachable, all progression collectable.' : `RESULT: BLOCKED - ${failReasons.join(' + ')} - see above.`);
 
     if (JSON_OUT) {
         const out = {

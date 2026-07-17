@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 import { printInfo, printWarning } from '#/util/Logger.js';
@@ -331,6 +332,42 @@ function parseArgs() {
 // once by BuildRegionGraph.ts); when it doesn't, validation is skipped with a loud
 // warning rather than failing the roll - a seed without validation is exactly what
 // every seed was before this existed.
+/**
+ * Spatial quality of the just-written table: validates a scratch config holding only
+ * the spatial tables (no placements/unlocks, so stale run state can't pollute the
+ * verdict) and reports how many quests the table strands. null = validator
+ * unavailable/other error.
+ */
+function spatialQuality(): { goalsOk: boolean; strandedQuests: number } | null {
+    if (!fs.existsSync('tools/logic/region-graph.json')) {
+        return null;
+    }
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-entrance-strict-'));
+    const jsonOut = path.join(scratch, 'result.json');
+    try {
+        for (const name of ['ap-entrances.json', 'ap-gated-areas.json', 'ap-spawn.json']) {
+            const src = path.join('data', 'config', name);
+            if (fs.existsSync(src)) {
+                fs.copyFileSync(src, path.join(scratch, name));
+            }
+        }
+        try {
+            execNpxTsx(['tools/logic/ValidateSeed.ts', '--config-dir', scratch, '--strict-quests', '--json', jsonOut], { stdio: 'pipe' });
+        } catch {
+            // exit 1 = blocked; the JSON report is still written and read below.
+        }
+        if (!fs.existsSync(jsonOut)) {
+            return null;
+        }
+        const parsed = JSON.parse(fs.readFileSync(jsonOut, 'utf8')) as { allGoalsReached: boolean; blockedQuests: unknown[] };
+        return { goalsOk: parsed.allGoalsReached, strandedQuests: parsed.blockedQuests.length };
+    } catch {
+        return null;
+    } finally {
+        fs.rmSync(scratch, { recursive: true, force: true });
+    }
+}
+
 function validateSeed(): boolean | null {
     if (!fs.existsSync('tools/logic/region-graph.json')) {
         printWarning('seed validation SKIPPED: tools/logic/region-graph.json missing - run BuildRegionGraph.ts once to enable reroll-until-valid');
@@ -686,6 +723,13 @@ function runAttempt(seed: number, dryRun: boolean, rewrite: boolean, mixed: bool
 }
 
 const MAX_REROLL_ATTEMPTS = 20;
+// Phase 1: the first N attempts demand a table where EVERY quest is spatially
+// completable (ValidateSeed --strict-quests against a placements-free scratch config).
+// If none of them lands one, phase 2 falls back to the original criterion (all goals
+// reachable) for the rest of the budget - a playable-but-imperfect table beats
+// exhausting the roll (checks in stranded quests just become filler via GenerateSeed's
+// feasibility exclusion).
+const STRICT_QUEST_ATTEMPTS = 5;
 
 function main() {
     if (!fs.existsSync(ENTRANCE_DIR)) {
@@ -695,7 +739,44 @@ function main() {
 
     const { seed: startSeed, dryRun, rewrite, mixed, noValidate } = parseArgs();
 
-    for (let attempt = 0; attempt < MAX_REROLL_ATTEMPTS; attempt++) {
+    // Phase 1 (skipped for --dry-run/--no-validate, which keep legacy behavior):
+    // write + spatially grade STRICT_QUEST_ATTEMPTS candidate tables. A table that
+    // strands ZERO quests wins immediately; otherwise the least-stranded goals-ok
+    // candidate is re-written (deterministic per seed) and accepted - its stranded
+    // quests' checks become filler via GenerateSeed's feasibility exclusion. If no
+    // candidate even reaches the goals, phase 2 falls back to the legacy
+    // reroll-until-goals-ok loop over the remaining budget.
+    if (!dryRun && !noValidate) {
+        let best: { seed: number; strandedQuests: number } | null = null;
+        for (let attempt = 0; attempt < STRICT_QUEST_ATTEMPTS; attempt++) {
+            const seed = (startSeed + attempt) >>> 0;
+            runAttempt(seed, dryRun, rewrite, mixed, true);
+            const quality = spatialQuality();
+            if (quality === null) {
+                printWarning('spatial grading unavailable (region graph / validator error) - falling back to the legacy goals-only reroll loop');
+                best = null;
+                break;
+            }
+            if (quality.goalsOk && quality.strandedQuests === 0) {
+                printInfo(`seed ${seed} strands NOTHING - all 63 quests spatially completable (attempt ${attempt + 1}/${STRICT_QUEST_ATTEMPTS})`);
+                printInfo('restart the server to load the new entrance layout (no content rebuild needed)');
+                return;
+            }
+            printInfo(`seed ${seed}: ${quality.goalsOk ? `${quality.strandedQuests} quest(s) stranded` : 'GOALS unreachable'} (attempt ${attempt + 1}/${STRICT_QUEST_ATTEMPTS})`);
+            if (quality.goalsOk && (best === null || quality.strandedQuests < best.strandedQuests)) {
+                best = { seed, strandedQuests: quality.strandedQuests };
+            }
+        }
+        if (best !== null) {
+            runAttempt(best.seed, dryRun, rewrite, mixed, true);
+            printInfo(`no perfect table in ${STRICT_QUEST_ATTEMPTS} attempt(s) - accepted the least-stranded candidate: seed ${best.seed} (${best.strandedQuests} stranded quest(s) -> their checks become filler)`);
+            printInfo('restart the server to load the new entrance layout (no content rebuild needed)');
+            return;
+        }
+        printWarning(`none of the ${STRICT_QUEST_ATTEMPTS} graded candidates reached the goals - continuing with the legacy reroll loop`);
+    }
+
+    for (let attempt = STRICT_QUEST_ATTEMPTS; attempt < MAX_REROLL_ATTEMPTS; attempt++) {
         const seed = (startSeed + attempt) >>> 0;
         const shouldReroll = runAttempt(seed, dryRun, rewrite, mixed, noValidate);
         if (!shouldReroll) {
