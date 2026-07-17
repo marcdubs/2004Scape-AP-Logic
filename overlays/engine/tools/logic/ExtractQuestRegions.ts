@@ -529,8 +529,10 @@ function main(): void {
                     const caseMatch = /^\s*case\s+([^:]*):/.exec(line);
                     const caseTiles = caseMatch ? [...caseMatch[1].matchAll(/[0-3]_\d+_\d+_\d+_\d+/g)].map(m => parseRawCoord(m[0])) : null;
 
-                    // absolute destination: p_teleport/p_telejump/~climb_ladder(<literal>)
-                    const abs = /(?:p_teleport|p_telejump|~climb_ladder)\(\s*([0-3]_\d+_\d+_\d+_\d+)/.exec(line);
+                    // absolute destination: teleports, ladder climbs, and forced walks
+                    // (~forcewalk/2 = skill_agility's clipped telewalk - obstacle
+                    // crossings like the desert jail rocks or Elena's sewer pipe).
+                    const abs = /(?:p_teleport|p_telejump|~climb_ladder|~forcewalk2?)\(\s*([0-3]_\d+_\d+_\d+_\d+)/.exec(line);
                     if (abs) {
                         emitEdge(caseTiles ?? contextFor(), resolveTile(parseRawCoord(abs[1])), caseTiles !== null, prov);
                         continue;
@@ -575,7 +577,7 @@ function main(): void {
                     // approach offset that landing-precision work could not - see
                     // lessons-learned "Relative-destination stairs"); loc_coord is the
                     // loc's own tile. Both delta off the case/subject placement tile.
-                    const rel = /(?:p_teleport|p_telejump|~climb_ladder)\(\s*movecoord\(\s*(?:coord|loc_coord)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/.exec(line);
+                    const rel = /(?:p_teleport|p_telejump|~climb_ladder|~forcewalk2?)\(\s*movecoord\(\s*(?:coord|loc_coord)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/.exec(line);
                     if (rel) {
                         const dx = parseInt(rel[1], 10);
                         const dy = parseInt(rel[2], 10);

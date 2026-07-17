@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generatedAt": "2026-07-17T01:19:56.167Z",
+    "generatedAt": "2026-07-17T10:09:33.835Z",
     "regionGraph": "tools/logic/region-graph.json",
     "mainlandRegionId": 37,
     "questCount": 64,
@@ -8463,6 +8463,22 @@
     {
       "from": [
         {
+          "raw": "0_45_73_3_15",
+          "region": 4,
+          "mainland": false
+        }
+      ],
+      "dest": {
+        "raw": "0_39_48_5_15",
+        "region": 37,
+        "mainland": true
+      },
+      "viaCase": false,
+      "provenance": "scripts/quests/quest_itwatchtower/scripts/quest_itwatchtower.rs2:293"
+    },
+    {
+      "from": [
+        {
           "raw": "0_39_47_30_25",
           "region": 12102,
           "mainland": false
@@ -9412,6 +9428,22 @@
     {
       "from": [
         {
+          "raw": "0_36_71_9_47",
+          "region": 15734,
+          "mainland": false
+        }
+      ],
+      "dest": {
+        "raw": "0_34_49_11_49",
+        "region": 15256,
+        "mainland": false
+      },
+      "viaCase": false,
+      "provenance": "scripts/quests/quest_regicide/scripts/quest_regicide.rs2:514"
+    },
+    {
+      "from": [
+        {
           "raw": "0_34_49_9_47",
           "region": 15256,
           "mainland": false
@@ -9424,22 +9456,6 @@
       },
       "viaCase": false,
       "provenance": "scripts/quests/quest_regicide/scripts/quest_regicide.rs2:542"
-    },
-    {
-      "from": [
-        {
-          "raw": "0_36_71_9_47",
-          "region": 15734,
-          "mainland": false
-        }
-      ],
-      "dest": {
-        "raw": "0_34_49_7_49",
-        "region": 15256,
-        "mainland": false
-      },
-      "viaCase": false,
-      "provenance": "scripts/quests/quest_regicide/scripts/quest_regicide.rs2:594"
     },
     {
       "from": [
@@ -9980,6 +9996,22 @@
     {
       "from": [
         {
+          "raw": "0_38_151_11_54",
+          "region": 1519,
+          "mainland": false
+        }
+      ],
+      "dest": {
+        "raw": "0_38_151_22_59",
+        "region": 11026,
+        "mainland": false
+      },
+      "viaCase": false,
+      "provenance": "scripts/quests/quest_upass/scripts/upass_bridge.rs2:73"
+    },
+    {
+      "from": [
+        {
           "raw": "0_38_151_4_53",
           "region": 11069,
           "mainland": false
@@ -9992,22 +10024,6 @@
       },
       "viaCase": false,
       "provenance": "scripts/quests/quest_upass/scripts/upass_bridge.rs2:94"
-    },
-    {
-      "from": [
-        {
-          "raw": "0_38_151_4_52",
-          "region": 1519,
-          "mainland": false
-        }
-      ],
-      "dest": {
-        "raw": "0_38_151_15_52",
-        "region": 11026,
-        "mainland": false
-      },
-      "viaCase": false,
-      "provenance": "scripts/quests/quest_upass/scripts/upass_bridge.rs2:106"
     },
     {
       "from": [

@@ -2342,3 +2342,42 @@ md5), 37/63 quests region-feasible from scratch, 26 quest checks filler-only.
   strict logic - 18 progression items sit on now-provably-stranded checks (strict
   exit 1, lenient exit 0, all 3 goals reachable). A GenerateSeed re-run fixes it but
   resets placement-mode run state - the user decides when.
+
+## Session addendum: full quest-by-quest curation - 63/63 region-feasible (2026-07-17, same session)
+
+The backlog is CLEARED: region-only validation (scratch config, no placements)
+completes 63/63 quests, GenerateSeed reports 63/63 region-feasible with 0
+filler-only checks and passes strict validation on attempt 0.
+
+- **New extractor mechanism**: `~forcewalk`/`~forcewalk2` (skill_agility's clipped
+  telewalk) added to the absolute+relative destination regexes - obstacle crossings
+  (desert jail rocks, Elena's sewer pipe) are walks, not teleports.
+- **New curated primitive: `openAreas`** in quest-regions.json (consumed by
+  ValidateSeed step 2c + RegionFeasibility's hub edges): named boxes whose
+  intersecting regions are treated as mutually connected and connected to listed
+  anchors. THE scalable answer for quest gauntlets (Underground Pass: ~80 obstacle
+  micro-regions; the viking portal maze: ~109) whose internal transitions are
+  bespoke handlers. Blanket justification, valid for every entry: ONLY the
+  353-record ladders+stairs set is ever shuffled; everything else is
+  seed-independent vanilla; item/level needs along the way are narrative-only per
+  the sim's documented policy.
+- **CRITICAL guard**: upper levels have world-spanning walkable void/roof
+  megaregions (level 3: 1.1M tiles, region 3; level 2: 250k, region 29). A box
+  overlapping one by a single tile would connect it - and thereby every stray
+  cutscene coord on that level worldwide. `OPEN_AREA_MEMBER_TILE_CAP = 100000`
+  (largest legit area, Kharazi underground, is ~40k) excludes them in both
+  consumers; grand-tree-tops additionally uses tight boxes around the branch
+  platforms.
+- **23 open areas curated** (underground-pass, tirannwn, kharazi-jungle, trollheim,
+  fremennik-trial-maze, fisher-realm, desert-mining-camp, gutanoth-skavid,
+  lighthouse, mort-myre, crest-dungeon, elemental-workshop, tamayu-hunt,
+  fight-arena-prison, mourner-yard, plague-tunnels, lumber-yard,
+  sorcerers-tower-top, grand-tree-tops, baxtorian-falls, temple-of-ikov-depths,
+  yanille-dungeon, fishing-platform) + 1 ignore (squire: shared cupboards.rs2
+  multi-quest block misattribution). Each entry's note names the vanilla mechanism.
+- **Interesting cascade**: Draynor manor top (grail whistle + haunted) looked
+  seed-stranded (its spiral stair was shuffled away, one-way pools don't preserve
+  arrivals) but became reachable once the open areas connected the regions feeding
+  the right shuffled staircase chain - the fixpoint found a route no one hand-traced.
+- Sanity level: reachable regions 5154/16455 in the region-only run (not a runaway
+  16k), spot-checked goals green, generation deterministic.

@@ -82,10 +82,191 @@
 
     "generated": {
         "_comment": "Review lever over quest-regions.generated.json (see GeneratedQuestRegions.ts). ignoreGlobal: evidence keys exempted for every quest (shared-helper noise). ignore: per-quest key lists a human judged optional/flavor/alternative-route. Every entry should say WHY in _notes.",
-        "_notes": {},
+        "_notes": {
+            "squire": "general_use/scripts/cupboards.rs2 is a shared multi-quest cupboard dispatcher; the block touches %squire but the 0_41_53_36_34 cupboard belongs to a different area's cupboard in the same block - not a Knight's Sword requirement."
+        },
         "ignoreGlobal": [],
-        "ignore": {}
+        "ignore": {
+            "squire": ["coord|0_41_53_36_34"]
+        }
     },
+
+    "_openAreasComment": "Curated traversable quest areas (see ValidateSeed's OpenArea). Justification pattern for every entry: ONLY the 353-record ladders+stairs script set is ever shuffled; these areas' internal/approach transitions are bespoke handlers (agility obstacles, scripted gates/doors, dialogue hops, machete chops), so their vanilla connectivity is seed-independent. Item/level requirements along the way are narrative-only per docs/progression-sim.md's documented policy. Boxes deliberately avoid upper-level void megaregions (member tile cap in code).",
+    "openAreas": [
+        {
+            "name": "underground-pass",
+            "connectTo": ["mainland"],
+            "note": "Underground Pass gauntlet: entrance cave from West Ardougne + rock/bridge/well/tunnel obstacles (upass_obstacles.rs2, quest_upass.rs2 - p_teleport/~forcewalk handlers, some via variables the extractor can't follow). Includes the Iban temple level-1 areas and Koftik's end cave. Needed by upass + regicide.",
+            "boxes": [
+                { "levels": [0], "x1": 2304, "z1": 9600, "x2": 2495, "z2": 9727 },
+                { "levels": [0], "x1": 2304, "z1": 9792, "x2": 2367, "z2": 9919 },
+                { "levels": [0], "x1": 2304, "z1": 4544, "x2": 2367, "z2": 4607 },
+                { "levels": [1], "x1": 2112, "z1": 4544, "x2": 2175, "z2": 4671 },
+                { "levels": [1], "x1": 1984, "z1": 4672, "x2": 2047, "z2": 4735 }
+            ]
+        },
+        {
+            "name": "tirannwn",
+            "connectTo": ["mainland"],
+            "note": "Elf lands west of the mountains (regicide): reached through the Underground Pass exit / Arandar - the pass traversal itself is the underground-pass entry above; the regicide leg (voyage temple wells, catapult, trap hand-holds) is all bespoke quest handlers.",
+            "boxes": [{ "levels": [0], "x1": 2112, "z1": 3072, "x2": 2367, "z2": 3327 }]
+        },
+        {
+            "name": "kharazi-jungle",
+            "connectTo": ["karamja"],
+            "note": "Kharazi jungle surface (legends: dense jungle chopped with a machete - oplocu handlers) + the underground temple/cave complex (marked walls, winch ropes, force barriers - quest_legends.rs2 label/oploc handlers) + the winch-down cave. Needed by legends + zombiequeen (its inzone box overlaps the same underground region).",
+            "boxes": [
+                { "levels": [0], "x1": 2752, "z1": 2880, "x2": 3007, "z2": 2943 },
+                { "levels": [0], "x1": 2624, "z1": 9216, "x2": 2943, "z2": 9407 },
+                { "levels": [0], "x1": 2368, "z1": 4672, "x2": 2431, "z2": 4735 }
+            ]
+        },
+        {
+            "name": "trollheim",
+            "connectTo": ["mainland"],
+            "note": "Death Plateau approach pocket + Troll Stronghold interior + Eadgar's area (troll/eadgar): mountain paths, stronghold doors (troll_stronghold_entrance/exit p_teleports extracted, approach pocket bespoke), cell doors, storeroom.",
+            "boxes": [
+                { "levels": [0], "x1": 2816, "z1": 3584, "x2": 2879, "z2": 3647 },
+                { "levels": [0, 1], "x1": 2816, "z1": 9920, "x2": 2879, "z2": 10111 }
+            ]
+        },
+        {
+            "name": "fremennik-trial-maze",
+            "connectTo": ["mainland"],
+            "note": "Swensen the Navigator's portal maze (viking): entered via his trapdoor in Rellekka (trial dialogue flow), rooms interconnect by vt_mazeportal p_telejumps (extracted, but the maze has no non-portal approach so every room roots).",
+            "boxes": [{ "levels": [0], "x1": 2624, "z1": 9984, "x2": 2687, "z2": 10047 }]
+        },
+        {
+            "name": "fisher-realm",
+            "connectTo": ["karamja"],
+            "note": "Holy Grail's Fisher Realm, both variants (sad 41_73 / restored 43_73): entered by the magic whistle from the Karamja tower zone (opheld teleport, extracted); this entry merges the realm's interior splits (castle outer door, the broken bridge to the fisherman) which are quest-flow crossings.",
+            "boxes": [
+                { "levels": [0, 1, 2], "x1": 2624, "z1": 4672, "x2": 2687, "z2": 4735 },
+                { "levels": [0, 1, 2], "x1": 2752, "z1": 4672, "x2": 2815, "z2": 4735 }
+            ]
+        },
+        {
+            "name": "desert-mining-camp",
+            "connectTo": ["mainland"],
+            "note": "Tourist Trap: the camp interior + between-gates pocket + underground mine. Entered by the guarded gate / getting captured (dialogue), interior via cell-window rocks (~forcewalk2), mine cart (oploc2), mine cave (_desertrescue_minecave category oplocs).",
+            "boxes": [
+                { "levels": [0], "x1": 3264, "z1": 9408, "x2": 3327, "z2": 9471 },
+                { "levels": [0], "x1": 3264, "z1": 3008, "x2": 3327, "z2": 3071 }
+            ]
+        },
+        {
+            "name": "gutanoth-skavid",
+            "connectTo": ["mainland"],
+            "note": "Gu'Tanoth ogre city outskirts (grew's island behind the toll/bridge) + the skavid caves (itwatchtower: enter_skavid_cave / teleport_dark_skavid_cave labels; chompybird's ogre cave shares the underground square).",
+            "boxes": [
+                { "levels": [0], "x1": 2496, "z1": 9408, "x2": 2623, "z2": 9471 },
+                { "levels": [0], "x1": 2496, "z1": 3072, "x2": 2559, "z2": 3135 }
+            ]
+        },
+        {
+            "name": "lighthouse",
+            "connectTo": ["mainland"],
+            "note": "Horror from the Deep: basalt-rock stepping stones north of Rellekka (basalt_rocks.rs2 - movement handlers, not teleports) + the lighthouse basement (strange wall).",
+            "boxes": [
+                { "levels": [0], "x1": 2496, "z1": 3584, "x2": 2559, "z2": 3647 },
+                { "levels": [0, 1], "x1": 2496, "z1": 4608, "x2": 2559, "z2": 4671 }
+            ]
+        },
+        {
+            "name": "mort-myre",
+            "connectTo": ["mainland"],
+            "note": "Nature Spirit (druidspirit): Mort Myre swamp behind the guarded gate + the grotto island and its underground (grotto bridge/door handlers, filliman's teleports use variables).",
+            "boxes": [
+                { "levels": [0], "x1": 3328, "z1": 3136, "x2": 3455, "z2": 3391 },
+                { "levels": [0, 1], "x1": 3328, "z1": 9728, "x2": 3455, "z2": 9791 }
+            ]
+        },
+        {
+            "name": "crest-dungeon",
+            "connectTo": ["mainland"],
+            "note": "Family Crest lever/door dungeon (m42_151 underground): all seven blocked groups are its interior levers/doors; the dungeon's entrance and internal doors are bespoke quest handlers (quest_crest.rs2), not pool entrances.",
+            "boxes": [{ "levels": [0], "x1": 2688, "z1": 9664, "x2": 2751, "z2": 9727 }]
+        },
+        {
+            "name": "elemental-workshop",
+            "connectTo": ["mainland"],
+            "note": "Elemental Workshop interior (entered via the odd wall + battered book, extracted); one interior machine-room pocket (0_42_154_48_26) sits behind a scripted door the extractor missed.",
+            "boxes": [{ "levels": [0], "x1": 2688, "z1": 9856, "x2": 2751, "z2": 9919 }]
+        },
+        {
+            "name": "tamayu-hunt",
+            "connectTo": ["karamja"],
+            "note": "tbwt: Tamayu's Shaikahan hunt area - reached during his dialogue-driven hunt sequence (tbwt_tamayu.rs2 script teleports through variables).",
+            "boxes": [{ "levels": [0], "x1": 2496, "z1": 4544, "x2": 2559, "z2": 4607 }]
+        },
+        {
+            "name": "fight-arena-prison",
+            "connectTo": ["mainland"],
+            "note": "Fight Arena's prison wing: entered through the arena building via quest-scripted guard doors; the one blocked coord is the mid-quest cell teleport target.",
+            "boxes": [{ "levels": [0], "x1": 2560, "z1": 3136, "x2": 2623, "z2": 3199 }]
+        },
+        {
+            "name": "mourner-yard",
+            "connectTo": ["mainland"],
+            "note": "Biohazard: the mourner HQ backyard/watchtower base pocket - reached by the scripted fence-climb teleport during the break-in (def_coord table + p_teleport($var), invisible to the extractor).",
+            "boxes": [{ "levels": [0], "x1": 2540, "z1": 3290, "x2": 2580, "z2": 3320 }]
+        },
+        {
+            "name": "plague-tunnels",
+            "connectTo": ["mainland"],
+            "note": "Elena's rescue: the plague house tunnels/basement under West Ardougne (mud pile exit extracted; the entrance manhole/trapdoor is a bespoke handler).",
+            "boxes": [{ "levels": [0], "x1": 2496, "z1": 9664, "x2": 2623, "z2": 9791 }]
+        },
+        {
+            "name": "lumber-yard",
+            "connectTo": ["mainland"],
+            "note": "Gertrude's Cat: the lumber yard behind the broken fence (squeeze-through handler) + the upstairs nest area.",
+            "boxes": [{ "levels": [0, 1], "x1": 3264, "z1": 3456, "x2": 3327, "z2": 3519 }]
+        },
+        {
+            "name": "sorcerers-tower-top",
+            "connectTo": ["mainland"],
+            "note": "Scorpion Catcher: Thormac at the top (level 3) of the Sorcerer's Tower - internal ladders are any-source generics whose relative destinations chain floor by floor; the top-floor hop roots because its ladder's placement sits inside the level-2 room region.",
+            "boxes": [{ "levels": [3], "x1": 2688, "z1": 3392, "x2": 2751, "z2": 3455 }]
+        },
+        {
+            "name": "grand-tree-tops",
+            "connectTo": ["mainland"],
+            "note": "Grand Tree: the tree's upper branches (level 2 watch post, level 3 glider platform - tight boxes to dodge the void megaregions) + Femi's cart-smuggle spot inside the stronghold gate (dialogue).",
+            "boxes": [
+                { "levels": [2], "x1": 2484, "z1": 3463, "x2": 2492, "z2": 3471 },
+                { "levels": [3], "x1": 2459, "z1": 3495, "x2": 2471, "z2": 3507 },
+                { "levels": [0], "x1": 2432, "z1": 3328, "x2": 2495, "z2": 3391 }
+            ]
+        },
+        {
+            "name": "baxtorian-falls",
+            "connectTo": ["mainland"],
+            "note": "Waterfall Quest: the ledge rocks/overhanging tree crossings on the falls (rope-on-rock oplocu handlers) + the waterfall dungeon behind the ledge door.",
+            "boxes": [
+                { "levels": [0], "x1": 2496, "z1": 3456, "x2": 2559, "z2": 3519 },
+                { "levels": [0], "x1": 2560, "z1": 9856, "x2": 2623, "z2": 9919 }
+            ]
+        },
+        {
+            "name": "temple-of-ikov-depths",
+            "connectTo": ["mainland"],
+            "note": "Temple of Ikov dungeon chain (dark stairs extracted; deeper sections behind the ice bridge / Winelda's teleport root because their handlers use variables).",
+            "boxes": [{ "levels": [0], "x1": 2624, "z1": 9728, "x2": 2687, "z2": 9919 }]
+        },
+        {
+            "name": "yanille-dungeon",
+            "connectTo": ["mainland"],
+            "note": "Yanille agility dungeon (itwatchtower's poison spiders): entered via agility obstacles (bespoke), not pool entrances.",
+            "boxes": [{ "levels": [0], "x1": 2560, "z1": 9536, "x2": 2623, "z2": 9599 }]
+        },
+        {
+            "name": "fishing-platform",
+            "connectTo": ["mainland"],
+            "note": "Sea Slug: the Fishing Platform and Holgart's small island - Holgart's rowboat is an NPC-dialogue transport (same class as the Karamja/Entrana boats).",
+            "boxes": [{ "levels": [0], "x1": 2752, "z1": 3264, "x2": 2815, "z2": 3327 }]
+        }
+    ],
 
     "quests": {
         "dragon": {

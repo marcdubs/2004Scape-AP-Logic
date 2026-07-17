@@ -147,13 +147,58 @@ interface AnchorDef {
     z: number;
     note?: string;
 }
+interface OpenAreaBox {
+    levels: number[];
+    x1: number;
+    z1: number;
+    x2: number;
+    z2: number;
+}
+interface OpenArea {
+    name: string;
+    connectTo: string[]; // anchor names
+    boxes: OpenAreaBox[];
+    note?: string;
+}
+
 interface QuestRegionsFile {
     anchors: Record<string, AnchorDef>;
     alwaysConnected: { from: string; to: string; note?: string }[];
+    /** Curated traversable areas: every region intersecting the boxes is treated as
+     *  mutually connected and connected to the named anchors. For quest gauntlets
+     *  whose internal transitions are bespoke handlers (agility obstacles, scripted
+     *  gates, dialogue hops) - by construction NEVER in the ladders+stairs shuffle
+     *  pool, so their vanilla connectivity is seed-independent; item/level needs are
+     *  narrative-only per the sim's documented policy. */
+    openAreas?: OpenArea[];
     quests: Record<string, { requiredAnchors: string[]; notes?: string }>;
     goals: Record<string, { requiredAnchors: string[]; notes?: string }>;
     /** Review lever over quest-regions.generated.json - see GeneratedQuestRegions.ts. */
     generated?: GeneratedIgnores;
+}
+
+// Regions larger than this are never open-area members: upper levels have
+// world-spanning walkable "void/roof" megaregions (e.g. the 1.1M-tile level-3 one)
+// that a box overlapping them by a tile would otherwise connect globally. The largest
+// legitimate quest area (Kharazi underground) is ~40k tiles.
+const OPEN_AREA_MEMBER_TILE_CAP = 100000;
+
+/** Region ids intersecting an open area's boxes. */
+function resolveOpenAreaMembers(area: OpenArea, graph: RegionGraph): Set<number> {
+    const members = new Set<number>();
+    for (const box of area.boxes) {
+        for (const level of box.levels) {
+            for (let x = box.x1; x <= box.x2; x++) {
+                for (let z = box.z1; z <= box.z2; z++) {
+                    const id = graph.regionAt(x, z, level);
+                    if (id !== 0 && (graph.regionsById.get(id)?.tileCount ?? 0) <= OPEN_AREA_MEMBER_TILE_CAP) {
+                        members.add(id);
+                    }
+                }
+            }
+        }
+    }
+    return members;
 }
 
 function loadQuestRegions(): QuestRegionsFile {
@@ -256,6 +301,7 @@ function main(): void {
     for (const [name, def] of Object.entries(qr.anchors)) {
         anchorRegions.set(name, graph.resolveRegion({ level: def.level, x: def.x, z: def.z }));
     }
+    const openAreas = (qr.openAreas ?? []).map(area => ({ area, members: resolveOpenAreaMembers(area, graph) }));
 
     // Extracted quest spatial requirements (quest-regions.generated.json) - every
     // evidence group needs >=1 reachable region before the quest/goal counts as
@@ -417,6 +463,23 @@ function main(): void {
             }
             reachableRegions.add(se.toRegion);
             changed = true;
+        }
+
+        // 2c. curated open areas: reachable via a connectTo anchor or any member.
+        for (const { area, members } of openAreas) {
+            const anchorIn = area.connectTo.some(name => {
+                const r = anchorRegions.get(name);
+                return r !== undefined && r !== 0 && reachableRegions.has(r);
+            });
+            if (!anchorIn && ![...members].some(id => reachableRegions.has(id))) {
+                continue;
+            }
+            for (const id of members) {
+                if (!reachableRegions.has(id)) {
+                    reachableRegions.add(id);
+                    changed = true;
+                }
+            }
         }
 
         // 3. gated areas.

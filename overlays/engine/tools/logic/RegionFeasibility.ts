@@ -30,6 +30,7 @@ const VANILLA_SPAWN_RAW = '0_50_50_21_18'; // matches ValidateSeed/ApSpawnOverri
 interface CuratedFile {
     anchors: Record<string, { level: number; x: number; z: number }>;
     alwaysConnected: { from: string; to: string }[];
+    openAreas?: { name: string; connectTo: string[]; boxes: { levels: number[]; x1: number; z1: number; x2: number; z2: number }[] }[];
     generated?: { ignore?: Record<string, string[]>; ignoreGlobal?: string[] };
     quests: Record<string, { requiredAnchors: string[] }>;
 }
@@ -117,6 +118,34 @@ export function buildRegionModel(configDir: string, toolsLogicDir = path.join('t
         const b = anchorRegions.get(ac.to) ?? 0;
         addEdge(a, b);
         addEdge(b, a);
+    }
+
+    // curated open areas: every member region connects bidirectionally to each
+    // connectTo anchor (hub topology - ValidateSeed's all-at-once step, expressed as
+    // edges so the BFS also assigns hop distances through the area).
+    for (const area of curated.openAreas ?? []) {
+        const members = new Set<number>();
+        for (const box of area.boxes) {
+            for (const level of box.levels) {
+                for (let x = box.x1; x <= box.x2; x++) {
+                    for (let z = box.z1; z <= box.z2; z++) {
+                        const id = graph.regionAt(x, z, level);
+                        // tile cap mirrors ValidateSeed's OPEN_AREA_MEMBER_TILE_CAP:
+                        // never let a box swallow an upper-level void megaregion.
+                        if (id !== 0 && (graph.regionsById.get(id)?.tileCount ?? 0) <= 100000) {
+                            members.add(id);
+                        }
+                    }
+                }
+            }
+        }
+        for (const name of area.connectTo) {
+            const hub = anchorRegions.get(name) ?? 0;
+            for (const m of members) {
+                addEdge(hub, m);
+                addEdge(m, hub);
+            }
+        }
     }
 
     // gated areas: interior regions connect from their border when the require is
