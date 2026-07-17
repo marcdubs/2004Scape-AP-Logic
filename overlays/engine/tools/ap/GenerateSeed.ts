@@ -22,6 +22,7 @@ import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import { RegionModel, buildRegionModel, feasibleQuestSet, questDistanceScore, questRegionFeasible } from '../logic/RegionFeasibility.js';
 import { execNpxTsx } from '../shared/Npx.js';
 import { mulberry32, shuffle } from '../shared/Prng.js';
 import {
@@ -127,6 +128,99 @@ interface FillResult {
     processingOrder: string[];
 }
 
+// ---------------------------------------------------------------------------
+// Spatial context: region feasibility + spawn-distance weighting
+// (tools/logic/RegionFeasibility.ts - "progressive checks by accessibility").
+// ---------------------------------------------------------------------------
+
+interface SpatialContext {
+    /** Location ids whose quest the strict region validator can never complete -
+     *  excluded from progression (filler only), or the seed would always fail its
+     *  own staged validation with stranded items. */
+    infeasibleLocationIds: Set<string>;
+    /** Per-location distance score (lower = closer to this seed's spawn); null =
+     *  region model unavailable, fill stays uniform. */
+    scores: Map<string, number> | null;
+    note: string;
+}
+
+function buildSpatialContext(configDir: string, quests: QuestReq[], locations: LocationDef[]): SpatialContext {
+    let model: RegionModel | null = null;
+    try {
+        model = buildRegionModel(configDir);
+    } catch (err) {
+        console.warn(`GenerateSeed: region model failed to load (${(err as Error).message}) - spatial weighting disabled`);
+    }
+    if (!model) {
+        return { infeasibleLocationIds: new Set(), scores: null, note: 'region model absent (region-graph.json / quest-regions.generated.json missing) - uniform fill, no feasibility exclusion' };
+    }
+    const feasible = feasibleQuestSet(model, quests);
+
+    const questScore = new Map<string, number>();
+    const finiteScores: number[] = [];
+    for (const q of quests) {
+        const s = questDistanceScore(model, q.id);
+        if (!Number.isNaN(s) && Number.isFinite(s)) {
+            questScore.set(q.id, s);
+            finiteScores.push(s);
+        }
+    }
+    finiteScores.sort((a, b) => a - b);
+    const median = finiteScores.length > 0 ? finiteScores[finiteScores.length >> 1] : 0;
+    const barcrawlScore = questRegionFeasible(model, 'barcrawl') ? questDistanceScore(model, 'barcrawl') : median;
+
+    const infeasibleLocationIds = new Set<string>();
+    const scores = new Map<string, number>();
+    for (const loc of locations) {
+        switch (loc.kind) {
+            case 'quest':
+                if (loc.questId !== undefined && !feasible.has(loc.questId)) {
+                    infeasibleLocationIds.add(loc.id);
+                }
+                scores.set(loc.id, questScore.get(loc.questId ?? '') ?? median);
+                break;
+            case 'ds': // stage checks collapse to Dragon Slayer's own reachability rule.
+                scores.set(loc.id, questScore.get('dragon') ?? median);
+                break;
+            case 'barcrawl':
+                scores.set(loc.id, Number.isFinite(barcrawlScore) && !Number.isNaN(barcrawlScore) ? barcrawlScore : median);
+                break;
+            default: // first_xp / first_kill / level - non-spatial, interleave mid-pack.
+                scores.set(loc.id, median);
+                break;
+        }
+    }
+    return {
+        infeasibleLocationIds,
+        scores,
+        note: `spawn region ${model.spawnRegion}, ${feasible.size}/${quests.length} quests region-feasible, ${infeasibleLocationIds.size} quest check(s) filler-only, spawn-distance weighting ON`
+    };
+}
+
+/**
+ * Rank-geometric weighted pick: candidates sorted by distance score (near-spawn
+ * first, id tiebreak for determinism), rank i weighted GEO^i. One rand() call per
+ * pick, same as the uniform path it replaces.
+ */
+const GEO = 0.93;
+function pickSpatial(candidates: LocationDef[], scores: Map<string, number> | null, rand: () => number): LocationDef {
+    if (scores === null || candidates.length === 1) {
+        return candidates[Math.floor(rand() * candidates.length)];
+    }
+    const sorted = [...candidates].sort((a, b) => (scores.get(a.id) ?? 0) - (scores.get(b.id) ?? 0) || a.id.localeCompare(b.id));
+    const total = (1 - Math.pow(GEO, sorted.length)) / (1 - GEO);
+    let r = rand() * total;
+    let w = 1;
+    for (const loc of sorted) {
+        r -= w;
+        if (r <= 0) {
+            return loc;
+        }
+        w *= GEO;
+    }
+    return sorted[sorted.length - 1];
+}
+
 /**
  * Standard Archipelago assumed-fill: process progression copies in a random (seeded)
  * order; for each one, compute reachability assuming every OTHER copy in the pool
@@ -137,10 +231,11 @@ interface FillResult {
  * because whichever copy was hardest to place (processed last) was proven reachable
  * without needing itself.
  */
-function assumedFill(locations: LocationDef[], quests: QuestReq[], pool: ProgressionCopy[], maxProgressionLevel: number, rand: () => number): FillResult {
+function assumedFill(locations: LocationDef[], quests: QuestReq[], pool: ProgressionCopy[], maxProgressionLevel: number, rand: () => number, spatial: SpatialContext): FillResult {
     const progressionEligible = new Set(
         locations
             .filter(loc => loc.kind !== 'level' || (loc.level !== undefined && loc.level <= maxProgressionLevel))
+            .filter(loc => !spatial.infeasibleLocationIds.has(loc.id))
             .map(loc => loc.id)
     );
     const unassigned = new Set(locations.map(loc => loc.id));
@@ -168,7 +263,7 @@ function assumedFill(locations: LocationDef[], quests: QuestReq[], pool: Progres
             throw new FillError(`assumed-fill: no reachable, unassigned location for ${copy.uid} (${copy.display}) - pool/location catalog mismatch or a genuinely unbeatable configuration`);
         }
 
-        const pick = candidates[Math.floor(rand() * candidates.length)];
+        const pick = pickSpatial(candidates, spatial.scores, rand);
         placements.set(pick.id, { item: copy.placementItem, count: copy.placementCount, display: copy.display, copy });
         unassigned.delete(pick.id);
     }
@@ -286,14 +381,14 @@ function stageAndValidate(realConfigDir: string, seed: number, pool: PoolMode, p
 // Main
 // ---------------------------------------------------------------------------
 
-function generateOnce(seed: number, pool: PoolMode, quests: QuestReq[], goals: Goal[], locations: LocationDef[], maxProgressionLevel: number): { placements: Map<string, PlacementRecord>; spoiler: PlacementSimResult } {
+function generateOnce(seed: number, pool: PoolMode, quests: QuestReq[], goals: Goal[], locations: LocationDef[], maxProgressionLevel: number, spatial: SpatialContext): { placements: Map<string, PlacementRecord>; spoiler: PlacementSimResult } {
     const rand = mulberry32(seed);
     // Family D: gated quests can't complete (in logic) until their `quest_<id>` pool item
     // is collected - both the fill's reachability and the spoiler walk must see the gates,
     // or the fill could bury a gate item behind its own quest's check.
     const gatedQuests = applyQuestGates(quests, QUEST_GATE_IDS);
     const itemPool = [...buildItemPool(pool), ...buildQuestGateCopies(quests)];
-    const { placements } = assumedFill(locations, gatedQuests, itemPool, maxProgressionLevel, rand);
+    const { placements } = assumedFill(locations, gatedQuests, itemPool, maxProgressionLevel, rand, spatial);
     const spoiler = simulatePlacementSpheres(locations, gatedQuests, goals, placements);
     return { placements, spoiler };
 }
@@ -335,6 +430,8 @@ function main(): void {
     const itemPoolSize = buildItemPool(args.pool).length + buildQuestGateCopies(quests).length;
 
     console.log(`GenerateSeed: building placement-mode seed ${args.seed} (pool=${args.pool}, maxProgressionLevel=${args.maxProgressionLevel})...`);
+    const spatial = buildSpatialContext(args.configDir, quests, locations);
+    console.log(`GenerateSeed: spatial context - ${spatial.note}`);
 
     let attempt = 0;
     let lastError: string | null = null;
@@ -343,7 +440,7 @@ function main(): void {
         let placements: Map<string, PlacementRecord>;
         let spoiler: PlacementSimResult;
         try {
-            const result = generateOnce(trySeed, args.pool, quests, goals, locations, args.maxProgressionLevel);
+            const result = generateOnce(trySeed, args.pool, quests, goals, locations, args.maxProgressionLevel, spatial);
             placements = result.placements;
             spoiler = result.spoiler;
         } catch (err) {

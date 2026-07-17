@@ -2263,3 +2263,82 @@ shuffle-pool staircases, islands, instances, gated interiors).
   a locked `.win32-x64-*` temp dir (Windows-side file lock on esbuild.exe). Harmless:
   if `ls node_modules/@esbuild/` shows BOTH linux-x64 and win32-x64, proceed - the
   leftover temp dir doesn't break either side.
+
+## Session addendum: extracted regions wired into ValidateSeed + region-aware fill (2026-07-17, same session)
+
+The extractor's output is now LIVE LOGIC, not just a draft, and GenerateSeed is
+region-aware ("progressive checks by accessibility"). End state: GenerateSeed
+--dry-run passes strict validation on attempt 0, deterministic (same seed = same
+md5), 37/63 quests region-feasible from scratch, 26 quest checks filler-only.
+
+- **ValidateSeed consumes quest-regions.generated.json** (GeneratedQuestRegions.ts):
+  every evidence item = a requirement GROUP (any-of regions, >=1 must be reachable)
+  gating quest/goal completion; extracted edges join the fixpoint (step 2b). Curated
+  quest-regions.json gained a `generated` section (`ignore` per quest by evidence
+  `key`, `ignoreGlobal`) as the human review lever - ignoring is the ONLY relaxation.
+  Optimistic edges never enter curated gated-area interiors (step 3 stays the sole
+  authority there).
+- **Extractor v2 mechanisms** (each added after a triage round, in order of impact):
+  (1) WORLD EDGES - quest-agnostic transitions from EVERY block: literal
+  p_teleport/p_telejump/~climb_ladder, `case <coord> :` lines give precise triggers
+  (reproduces the vanilla ladders+stairs edge set; consumers drop edges whose case
+  trigger the seed's overrides replaced), movecoord(coord|loc_coord,dx,dy,dz)
+  relatives (region-level resolution absorbs the 1-2 tile player-vs-trigger offset
+  that landing-precision work could not), scripted door/gate traversal
+  (open_and_close_door/loc_change loc-subject blocks probe flanking regions),
+  label/proc/queue delegation depth 1 (caller context -> callee teleport dests;
+  arg-driven helpers like ~set_sail have no literals so are naturally skipped).
+  (2) ADJACENCY SEMANTICS - interaction evidence (subject/entity-ref/dynamic-spawn)
+  is satisfied from ANY region within radius 3 of a placement: ops work through
+  fences/bars (Wormbrain's jail, the mourner watchtower). Any-of lists are deduped
+  BY REGION before capping (cap 24) so a satisfiable region can't be truncated away.
+  (3) INZONE PAIRS - inzone(a,b) corners are a bounding box, not standing spots: one
+  any-of group sampled across the box (corners/center/midpoints, all levels in
+  span); zone-trigger subjects sample their 8x8 box. Before this fix a grandtree
+  inzone corner landed in the 1.1M-tile empty level-3 "sky" region.
+- **Triage method that worked**: cluster unsatisfied groups by unreachable region
+  (blockedQuests now in ValidateSeed --json), then optimistic-BFS (assume ALL edges)
+  to separate cascade blockage from true ROOTS. Roots = real transport gaps.
+- **Strictness**: placements present => every non-filler placement must be collected
+  by the fixpoint or the seed FAILS ("stranded progression"). New
+  `--lenient-placements` downgrades that to a report - used ONLY by
+  RandomizeEntrances's reroll loop (it validates before placements are regenerated
+  for the new layout; goals-reachability is its contract).
+- **RegionFeasibility.ts** (new): maximal-player-state region fixpoint from the
+  seed's spawn over the same tables, CONSERVATIVE where the validator is (unknown
+  varp gates closed, hero/legends flags closed) so feasibility never exceeds what
+  strict validation accepts. Exposes feasibleQuestSet (region + prereq chain + QP
+  fixpoint) and questDistanceScore (max over groups of min over tiles of
+  hops*10000+euclid from spawn).
+- **GenerateSeed**: buildSpatialContext excludes infeasible quests' checks from
+  progression (filler-only) and weights assumed fill's location pick by spawn
+  distance - rank-geometric GEO=0.93 over score-sorted candidates, one rand() per
+  pick, ds stages inherit dragon's score, barcrawl bars the barcrawl score,
+  level/xp/kill checks sit at the median (non-spatial). Beatability guarantee
+  unchanged (still only picks reachable candidates).
+- **Curated additions**: entrana + crandor anchors and their alwaysConnected boat
+  edges (monk_of_entrana.rs2 ~set_sail; Dragon Slayer ship) - with radius-3
+  adjacency these took the live-config completion from 16/63 to 32/63 and made all
+  3 goals green.
+- **FOOTGUN (bit this session)**: `install.js` copies the CHECKED-IN
+  quest-regions.generated.json over the engine's freshly-regenerated one. After any
+  install that should use new extraction: re-run ExtractQuestRegions.ts, and copy
+  the result back into overlays/ so the checked-in artifact stays current. Symptom
+  of staleness: `[undefined]` evidence keys in ValidateSeed output, wrong edge
+  counts.
+- **Remaining curation backlog** (quests still region-infeasible from scratch, all
+  with known root causes from the triage - each needs either a curated transport
+  edge with a script-verified note, or per-quest ignores for cutscene/failure-path
+  coords): upass/regicide (Underground Pass obstacle chain + Tirannwn),
+  legends/zombiequeen (Kharazi jungle), eadgar/troll (Trollheim), viking (Fremennik
+  trial maze), grail remnants (fisher-realm castle doors), haunted (Draynor manor
+  top), druidspirit (Mort Myre grotto), desertrescue (mining camp), itwatchtower
+  (skavid caves), horror (lighthouse bridge), crest dungeon, elemental_workshop
+  bookcase room, seaslug (fishing platform boat), scorpcatcher, elena, fluffs,
+  fishingcompo, biohazard (mourner HQ), arena (jail = failure path, likely ignore),
+  squire, tbwt, waterfall, ikov, grandtree, sheep/cook/doric/druid gate-cascades.
+  The system is safe meanwhile: their checks hold filler, seeds validate green.
+- **Live seed status told to the user**: current ap-placements.json predates the
+  strict logic - 18 progression items sit on now-provably-stranded checks (strict
+  exit 1, lenient exit 0, all 3 goals reachable). A GenerateSeed re-run fixes it but
+  resets placement-mode run state - the user decides when.

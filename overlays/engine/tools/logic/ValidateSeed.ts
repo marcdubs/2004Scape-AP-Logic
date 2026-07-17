@@ -24,6 +24,7 @@ import { Goal, QuestReq, StatName } from '../sim/types.js';
 
 import { WorldTile, parseRawCoord } from './Coords.js';
 import { GatedArea, GatedAreaRequire, RequireContext, describeRequire, loadGatedAreas, requireSatisfied } from './GatedAreas.js';
+import { GeneratedIgnores, RequirementGroup, buildRequirementGroups, collectScriptEdges, loadGeneratedQuestRegions, usableWorldEdges } from './GeneratedQuestRegions.js';
 import { RegionGraph, loadRegionGraph } from './RegionGraph.js';
 
 // ---- CLI args ----
@@ -36,8 +37,13 @@ function argVal(flag: string): string | undefined {
 const CONFIG_DIR = argVal('--config-dir') ?? 'data/config';
 const JSON_OUT = argVal('--json');
 const VERBOSE = argv.includes('--verbose') || argv.includes('-v');
+// RandomizeEntrances's reroll loop validates BEFORE placements are (re)generated for
+// the new layout - stranded progression against the stale table is expected there and
+// must not fail the roll. GenerateSeed's staged validation stays strict (no flag).
+const LENIENT_PLACEMENTS = argv.includes('--lenient-placements');
 const REGION_GRAPH_PATH = argVal('--region-graph') ?? path.join('tools', 'logic', 'region-graph.json');
 const QUEST_REGIONS_PATH = path.join('tools', 'logic', 'data', 'quest-regions.json');
+const GENERATED_REGIONS_PATH = path.join('tools', 'logic', 'data', 'quest-regions.generated.json');
 const QUESTS_PATH = path.join('tools', 'sim', 'data', 'quests.json');
 const GOALS_PATH = path.join('tools', 'sim', 'data', 'goals.json');
 
@@ -146,6 +152,8 @@ interface QuestRegionsFile {
     alwaysConnected: { from: string; to: string; note?: string }[];
     quests: Record<string, { requiredAnchors: string[]; notes?: string }>;
     goals: Record<string, { requiredAnchors: string[]; notes?: string }>;
+    /** Review lever over quest-regions.generated.json - see GeneratedQuestRegions.ts. */
+    generated?: GeneratedIgnores;
 }
 
 function loadQuestRegions(): QuestRegionsFile {
@@ -249,6 +257,34 @@ function main(): void {
         anchorRegions.set(name, graph.resolveRegion({ level: def.level, x: def.x, z: def.z }));
     }
 
+    // Extracted quest spatial requirements (quest-regions.generated.json) - every
+    // evidence group needs >=1 reachable region before the quest/goal counts as
+    // completable, and script-teleport edges join the region fixpoint. Absent file =
+    // curated-anchors-only behavior (pre-extractor semantics).
+    const generated = loadGeneratedQuestRegions(GENERATED_REGIONS_PATH);
+    const generatedGroups = generated ? buildRequirementGroups(generated, qr.generated) : new Map<string, RequirementGroup[]>();
+    // quest script edges + quest-agnostic world edges, minus vanilla transitions the
+    // seed's overrides replaced (their trigger runs the override, not the case body).
+    const overriddenTriggers = new Set(entranceEdges.map(e => e.key.split(':')[0]));
+    // Optimistic extracted edges must never bypass the curated area-gate model: any
+    // edge INTO a gated area's interior regions is dropped (step 3 of the fixpoint is
+    // the sole authority on entering those; leaving them stays fine).
+    const gatedInterior = new Set<number>();
+    for (const ra of resolvedAreas) {
+        for (const id of ra.gatedRegionIds) {
+            gatedInterior.add(id);
+        }
+    }
+    const scriptEdges = (generated ? [...collectScriptEdges(generated), ...usableWorldEdges(generated, overriddenTriggers)] : []).filter(se => !gatedInterior.has(se.toRegion));
+
+    function unsatisfiedGroups(id: string, reachable: Set<number>): RequirementGroup[] {
+        const groups = generatedGroups.get(id);
+        if (!groups) {
+            return [];
+        }
+        return groups.filter(g => !g.regions.some(r => reachable.has(r)));
+    }
+
     const rawQuests: QuestReq[] = JSON.parse(fs.readFileSync(QUESTS_PATH, 'utf8')).quests;
     // Family D: the active seed's questGates lock those quests behind `quest_<id>`
     // placement items (tracked in placementCounts like every other unlock key).
@@ -325,7 +361,10 @@ function main(): void {
                 skillsSatisfied(g.skills, caps) &&
                 qp >= (g.requiredQp ?? 0) &&
                 questsChainSatisfied(g.quests, undefined, completed) &&
-                regionsSatisfied(qr.goals[g.id]?.requiredAnchors, anchorRegions, reachableRegions)
+                regionsSatisfied(qr.goals[g.id]?.requiredAnchors, anchorRegions, reachableRegions) &&
+                // generated entries can match goal ids too (the barcrawl folder is a
+                // goal, not a sim quest - its extracted bars gate the goal directly).
+                unsatisfiedGroups(g.id, reachableRegions).length === 0
             ) {
                 goalSphere.set(g.id, sphere);
                 newlyReached.push(g.id);
@@ -369,6 +408,17 @@ function main(): void {
             }
         }
 
+        // 2b. script-teleport edges from the extracted draft (quest p_teleports -
+        // fisher realm, Crandor, instances). Ungated/optimistic, see
+        // GeneratedQuestRegions.ts's collectScriptEdges for the judgment call.
+        for (const se of scriptEdges) {
+            if (reachableRegions.has(se.toRegion) || !se.fromRegions.some(r => reachableRegions.has(r))) {
+                continue;
+            }
+            reachableRegions.add(se.toRegion);
+            changed = true;
+        }
+
         // 3. gated areas.
         for (const ra of resolvedAreas) {
             if (![...ra.outsideRegionIds].some(id => reachableRegions.has(id))) {
@@ -396,7 +446,8 @@ function main(): void {
                 qp >= (q.requiredQp ?? 0) &&
                 questsChainSatisfied(q.quests, q.questsAny, completed) &&
                 (q.gateKey === undefined || (placementCounts.get(q.gateKey) ?? 0) >= 1) &&
-                regionsSatisfied(qr.quests[q.id]?.requiredAnchors, anchorRegions, reachableRegions)
+                regionsSatisfied(qr.quests[q.id]?.requiredAnchors, anchorRegions, reachableRegions) &&
+                unsatisfiedGroups(q.id, reachableRegions).length === 0
             ) {
                 newlyCompleted.push(q);
             }
@@ -456,6 +507,19 @@ function main(): void {
 
     const allGoalsReached = goals.every(g => goalSphere.has(g.id));
 
+    // Placement-mode strictness: every non-filler (progression) placement must have
+    // been collected by the fixpoint. A region-stranded check holding a progression
+    // item is a broken seed even when the goals happen to be reachable without it -
+    // this is exactly the failure class the extracted quest regions exist to catch.
+    const strandedProgression: { location: string; display: string }[] = [];
+    if (placementsFile.present) {
+        for (const [locId, rec] of placementsFile.placements) {
+            if (rec.item !== 'filler' && !placementVisited.has(locId)) {
+                strandedProgression.push({ location: locId, display: rec.display ?? rec.item });
+            }
+        }
+    }
+
     // ---- reporting ----
 
     console.log('=== ValidateSeed (region-aware seed beatability) ===');
@@ -466,9 +530,49 @@ function main(): void {
     console.log(`Skill caps: ${placementsFile.present ? `from ap-placements.json (growing - ${placementFindsLog.length} progression item(s) collected this run)` : seedConfig.unlocks.present ? 'from ap-unlocks.json' : 'uncapped (vanilla - no ap-unlocks.json)'}`);
     console.log(`Placements table: ${placementsFile.present ? `${placementsFile.placements.size} location(s), pool ${placementsFile.pool}` : 'ABSENT (vanilla check rewards, no unlock gating from checks)'}`);
     console.log(`Region graph: ${graph.meta.regionCount} regions total, mainland id=${graph.meta.mainlandRegionId}`);
+    const groupCount = [...generatedGroups.values()].reduce((a, g) => a + g.length, 0);
+    console.log(`Extracted quest regions: ${generated ? `${generatedGroups.size} quest(s), ${groupCount} requirement group(s), ${scriptEdges.length} script edge(s)` : 'ABSENT (curated anchors only)'}`);
     console.log('');
     console.log(`Reachable regions: ${reachableRegions.size} / ${graph.meta.regionCount}`);
     console.log(`Quests completed: ${completed.size} / ${quests.length} (${qp} QP)`);
+    const blockedQuests = quests.filter(q => !completed.has(q.id));
+    if (blockedQuests.length > 0) {
+        console.log('');
+        console.log('Blocked quests:');
+        for (const q of blockedQuests) {
+            const reasons: string[] = [];
+            if (!skillsSatisfied(q.skills, statCaps)) {
+                reasons.push('skill caps');
+            }
+            if (qp < (q.requiredQp ?? 0)) {
+                reasons.push(`QP ${qp}/${q.requiredQp}`);
+            }
+            if (!questsChainSatisfied(q.quests, q.questsAny, completed)) {
+                reasons.push('prerequisite quest(s)');
+            }
+            if (q.gateKey !== undefined && (placementCounts.get(q.gateKey) ?? 0) < 1) {
+                reasons.push(`quest-gate item ${q.gateKey} never collected`);
+            }
+            if (!regionsSatisfied(qr.quests[q.id]?.requiredAnchors, anchorRegions, reachableRegions)) {
+                reasons.push('curated region anchor(s) unreachable');
+            }
+            const unsat = unsatisfiedGroups(q.id, reachableRegions);
+            console.log(`  ${q.id}: ${reasons.length ? reasons.join(', ') : ''}${unsat.length ? `${reasons.length ? ', ' : ''}${unsat.length} extracted region group(s) unreachable` : ''}`);
+            for (const g of unsat.slice(0, VERBOSE ? unsat.length : 4)) {
+                console.log(`      - ${g.label} [${g.key}] region(s) ${g.regions.slice(0, 4).join(',')} @ ${g.tiles[0].raw} (${g.provenance[0]})`);
+            }
+            if (!VERBOSE && unsat.length > 4) {
+                console.log(`      ... ${unsat.length - 4} more (use --verbose)`);
+            }
+        }
+    }
+    if (strandedProgression.length > 0) {
+        console.log('');
+        console.log(`Stranded progression item(s) - placement location never reachable (${strandedProgression.length}):`);
+        for (const s of strandedProgression) {
+            console.log(`  ${s.location} -> ${s.display}`);
+        }
+    }
     console.log('');
 
     if (VERBOSE) {
@@ -530,6 +634,9 @@ function main(): void {
                 lines.push(`region anchor "${name}" (region ${region}) unreachable: ${explainRegionUnreachable(region)}`);
             }
         }
+        for (const grp of unsatisfiedGroups(g.id, reachableRegions).slice(0, 6)) {
+            lines.push(`extracted requirement "${grp.label}" [${grp.key}] unreachable (region(s) ${grp.regions.slice(0, 4).join(',')} @ ${grp.tiles[0].raw}, ${grp.provenance[0]})`);
+        }
         if (lines.length === 0) {
             lines.push('no unmet requirement found - likely blocked transitively by an unreached quest; see quest list above');
         }
@@ -590,8 +697,9 @@ function main(): void {
         }
     }
 
+    const seedOk = allGoalsReached && (LENIENT_PLACEMENTS || strandedProgression.length === 0);
     console.log('');
-    console.log(allGoalsReached ? 'RESULT: all goals reachable.' : 'RESULT: BLOCKED - see above.');
+    console.log(seedOk ? 'RESULT: all goals reachable, all progression collectable.' : `RESULT: BLOCKED - ${allGoalsReached ? '' : 'goal(s) unreachable'}${!allGoalsReached && strandedProgression.length > 0 ? ' + ' : ''}${strandedProgression.length > 0 ? `${strandedProgression.length} stranded progression item(s)` : ''} - see above.`);
 
     if (JSON_OUT) {
         const out = {
@@ -605,6 +713,11 @@ function main(): void {
             spheres,
             goals: goals.map(g => ({ id: g.id, name: g.name, reachedAtSphere: goalSphere.get(g.id) ?? null, blockers: goalSphere.has(g.id) ? [] : diagnoseGoal(g) })),
             allGoalsReached,
+            strandedProgression,
+            blockedQuests: blockedQuests.map(q => ({
+                id: q.id,
+                unsatisfiedGroups: unsatisfiedGroups(q.id, reachableRegions).map(g => ({ key: g.key, label: g.label, regions: g.regions, tiles: g.tiles.map(t => t.raw), provenance: g.provenance }))
+            })),
             lintWarnings,
             placements: placementsFile.present ? { pool: placementsFile.pool, locationCount: placementsFile.placements.size, finds: placementFindsLog } : null
         };
@@ -612,7 +725,7 @@ function main(): void {
         console.log(`Wrote ${JSON_OUT}`);
     }
 
-    process.exitCode = allGoalsReached ? 0 : 1;
+    process.exitCode = seedOk ? 0 : 1;
 }
 
 main();

@@ -26,6 +26,18 @@
             "z": 9817,
             "note": "King black dragon NPC placement, m42_153.jm2 (real mapZ 53, +100 underground/instanced convention) local(28,25). Region-graph-verified as its own isolated region."
         },
+        "entrana": {
+            "level": 0,
+            "x": 2851,
+            "z": 3349,
+            "note": "High Priest's church tile, area_entrana. Reached ONLY by the Port Sarim monks' boat - monk_of_entrana.rs2:23 `~set_sail(\"Entrana\", ..., 1_44_52_18_3, ^sail_port_sarim_to_entrana, 13)` - an NPC-dialogue transport exactly like the Karamja boat: never parsed by EntranceParser, never shuffled. Needed by grail (High Priest + crone) and hero (Entrana firebird feather)."
+        },
+        "crandor": {
+            "level": 0,
+            "x": 2833,
+            "z": 3255,
+            "note": "Crandor surface next to the crandor_rock_opening loc (m43-44_50). Reached by the Dragon Slayer ship (Ned, dialogue + quest stage - crandor.rs2's own notes in the dragon quest entry apply: never in the ladders+stairs pool, never shuffled). Once the surface is reachable, the extracted world edges from crandor_rock_opening/crandor_climbing_rope (crandor.rs2 oploc p_teleports) connect the underground lair chain automatically."
+        },
         "kbd_lever_room": {
             "level": 0,
             "x": 3067,
@@ -48,6 +60,16 @@
         },
         {
             "from": "mainland",
+            "to": "entrana",
+            "note": "Port Sarim monks' boat (monk_of_entrana.rs2 ~set_sail) - NPC-dialogue transport, never shuffled, same modeling convention as the Karamja boat."
+        },
+        {
+            "from": "mainland",
+            "to": "crandor",
+            "note": "Dragon Slayer ship via Ned (quest-stage dialogue transport, never shuffled). OPTIMISTIC per the documented convention: the ship exists once the quest reaches that stage; the validator's quest model tracks the stage requirements (maps, QP 32) separately."
+        },
+        {
+            "from": "mainland",
             "to": "lava_maze_mirror_landing",
             "note": "lava_maze.rs2's mirror-ladder teleport pair, always vanilla/never shuffled (surface trigger 0_47_60_8_9 is ordinary wilderness overworld terrain, already part of mainland)."
         },
@@ -57,6 +79,13 @@
             "note": "king_black_dragon.rs2's dragonkinginlever/dragonkingoutlever pair - a real, always-vanilla, never-shuffled entrance to the boss room. See kbd_lever_room's note for the still-missing link from lava_maze_mirror_landing to here."
         }
     ],
+
+    "generated": {
+        "_comment": "Review lever over quest-regions.generated.json (see GeneratedQuestRegions.ts). ignoreGlobal: evidence keys exempted for every quest (shared-helper noise). ignore: per-quest key lists a human judged optional/flavor/alternative-route. Every entry should say WHY in _notes.",
+        "_notes": {},
+        "ignoreGlobal": [],
+        "ignore": {}
+    },
 
     "quests": {
         "dragon": {

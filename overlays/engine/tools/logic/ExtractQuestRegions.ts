@@ -42,9 +42,9 @@ const QUESTS_DIR = path.join(SCRIPTS_ROOT, 'quests');
 // logic) and dev-only trees.
 const SKIP_DIRS = new Set(['ap', '_test', '_unpack']);
 
-// Cap stored any-of placement lists (generic NPCs like `man` have hundreds of
-// spawns); mainland-satisfiability is computed over ALL placements before capping.
-const ANYOF_CAP = 12;
+// Cap stored any-of region lists AFTER region-dedupe (generic NPCs like `man` have
+// hundreds of spawns but few distinct regions); mainlandOk is computed pre-cap.
+const ANYOF_CAP = 24;
 
 type Domain = 'npc' | 'loc' | 'obj';
 
@@ -274,6 +274,9 @@ interface ResolvedTile {
 }
 
 interface Evidence {
+    /** Stable dedupe key ("<kind>|<entity-or-coord>") - the handle curated
+     *  quest-regions.json ignore-lists use to exempt an item from validation. */
+    key: string;
     kind: 'subject' | 'zone-trigger' | 'coord' | 'teleport-dest' | 'inzone' | 'entity-ref' | 'dynamic-spawn';
     domain?: Domain;
     name?: string; // entity/category name for subject/entity-ref kinds
@@ -287,6 +290,23 @@ interface Evidence {
 interface QuestEdge {
     dest: ResolvedTile;
     fromRegions: number[]; // candidate source regions from same-block context
+    provenance: string;
+}
+
+/**
+ * A quest-agnostic physical transition extracted from ANY rs2 block (not just
+ * quest-attributed ones): bespoke cave entrances, sewer ladders, non-shuffle-pool
+ * stairs - every `p_teleport`/`p_telejump` to a literal destination. `from` is precise
+ * when the teleport sits on a `case <coord> :` line (the case coord IS the trigger
+ * tile - this reproduces the vanilla ladders+stairs edge set exactly); otherwise it
+ * falls back to the block's subject placements / zone / inzone context. Consumers
+ * must drop edges whose from-tile the seed's entrance overrides replace (the override
+ * preamble preempts the vanilla case body at runtime).
+ */
+interface WorldEdge {
+    from: ResolvedTile[];
+    dest: ResolvedTile;
+    viaCase: boolean;
     provenance: string;
 }
 
@@ -352,23 +372,58 @@ function main(): void {
         return { tiles, flags };
     }
 
+    /**
+     * All distinct walkable regions within `radius` of the tile, as ResolvedTiles
+     * sharing the placement's raw coord. Interaction evidence (subjects, entity refs,
+     * dynamic spawns) is satisfied from ANY of these: ops work at melee range and
+     * through fences/bars/counters, so a penned NPC (Wormbrain in his jail, the
+     * mourner on the watchtower) does not require entering its own tiny region -
+     * standing in a neighboring one suffices.
+     */
+    function resolveNearby(tile: WorldTile, radius = 3): ResolvedTile[] {
+        const raw = toRawCoord(tile);
+        const seen = new Map<number, ResolvedTile>();
+        for (let dx = -radius; dx <= radius; dx++) {
+            for (let dz = -radius; dz <= radius; dz++) {
+                const region = graph.regionAt(tile.x + dx, tile.z + dz, tile.level);
+                if (region !== 0 && !seen.has(region)) {
+                    seen.set(region, { raw, region, mainland: region === mainlandId });
+                }
+            }
+        }
+        return [...seen.values()];
+    }
+
+    const ADJACENT_KINDS = new Set<Evidence['kind']>(['subject', 'entity-ref', 'dynamic-spawn']);
+
     function addEvidence(questId: string, kind: Evidence['kind'], key: string, tiles: WorldTile[], prov: string, opts: { domain?: Domain; name?: string; flags?: string[] } = {}): Evidence {
         const draft = drafts.get(questId)!;
         const dedupeKey = `${kind}|${key}`;
         let ev = draft.evidence.get(dedupeKey);
         if (!ev) {
-            const resolved = tiles.map(resolveTile);
+            const resolved = ADJACENT_KINDS.has(kind) ? tiles.flatMap(t => resolveNearby(t)) : tiles.map(resolveTile);
             const walkable = resolved.filter(r => r.region !== 0);
+            // any-of semantics only cares about DISTINCT regions - dedupe by region
+            // (one representative tile each) BEFORE capping, so a satisfiable region
+            // can never be truncated away by placement multiplicity.
+            const byRegion = new Map<number, ResolvedTile>();
+            for (const t of walkable) {
+                if (!byRegion.has(t.region)) {
+                    byRegion.set(t.region, t);
+                }
+            }
+            const distinct = [...byRegion.values()];
             const flags = [...(opts.flags ?? [])];
             if (resolved.length > 0 && walkable.length === 0) {
                 flags.push('unwalkable');
             }
             ev = {
+                key: dedupeKey,
                 kind,
                 domain: opts.domain,
                 name: opts.name,
-                anyOf: walkable.slice(0, ANYOF_CAP),
-                anyOfTotal: walkable.length,
+                anyOf: distinct.slice(0, ANYOF_CAP),
+                anyOfTotal: distinct.length,
                 mainlandOk: walkable.some(r => r.mainland),
                 provenance: [],
                 flags
@@ -381,7 +436,34 @@ function main(): void {
         return ev;
     }
 
+    // ---- pre-pass: index every label/proc body's literal teleport destinations.
+    // Subject blocks frequently delegate the actual p_teleport to a label (
+    // "@open_camp_door", "~ikov_winelda_teleport") - when a subject block calls one,
+    // the callee's destinations become edges from the caller's context. Depth 1 only;
+    // arg-driven helpers (~set_sail) have no literals in their bodies, so they are
+    // naturally skipped rather than special-cased. ----
+    const procTeleportDests = new Map<string, { raw: string; prov: string }[]>();
+    for (const file of walkFiles(SCRIPTS_ROOT, '.rs2')) {
+        for (const block of parseBlocks(file)) {
+            if (block.trigger !== 'label' && block.trigger !== 'proc' && block.trigger !== 'queue') {
+                continue;
+            }
+            for (const { line, num } of block.lines) {
+                const m = /(?:p_teleport|p_telejump)\(\s*([0-3]_\d+_\d+_\d+_\d+)/.exec(line);
+                if (!m) {
+                    continue;
+                }
+                if (!procTeleportDests.has(block.subject)) {
+                    procTeleportDests.set(block.subject, []);
+                }
+                procTeleportDests.get(block.subject)!.push({ raw: m[1], prov: `${block.file}:${num}` });
+            }
+        }
+    }
+
     // ---- walk every rs2 block ----
+    const worldEdges: WorldEdge[] = [];
+    const worldEdgeSigs = new Set<string>();
     let filesScanned = 0;
     let blocksAttributed = 0;
     for (const file of walkFiles(SCRIPTS_ROOT, '.rs2')) {
@@ -391,6 +473,123 @@ function main(): void {
         const folderQuest = folderQuestMatch && drafts.has(folderQuestMatch[1]) ? folderQuestMatch[1] : null;
 
         for (const block of parseBlocks(file)) {
+            // ---- world-edge pass: quest-agnostic physical transitions, EVERY block ----
+            {
+                const dom = subjectDomain(block.trigger);
+                const isPlayerTrigger = dom !== null && !block.trigger.startsWith('ai_');
+                let contextTiles: WorldTile[] | null = null;
+                const contextFor = (): WorldTile[] => {
+                    if (contextTiles !== null) {
+                        return contextTiles;
+                    }
+                    contextTiles = [];
+                    if (dom === 'zone') {
+                        try {
+                            contextTiles.push(parseRawCoord(block.subject));
+                        } catch {
+                            /* malformed zone subject */
+                        }
+                    } else if (isPlayerTrigger && dom !== null) {
+                        for (const subj of block.subject.split(',').map(s => s.trim())) {
+                            contextTiles.push(...placementsFor(dom, subj).tiles);
+                        }
+                    }
+                    for (const { line } of block.lines) {
+                        for (const m of line.matchAll(/inzone\(\s*([0-3]_\d+_\d+_\d+_\d+)/g)) {
+                            contextTiles.push(parseRawCoord(m[1]));
+                        }
+                    }
+                    return contextTiles;
+                };
+                const emitEdge = (fromTiles: WorldTile[], dest: ResolvedTile, viaCase: boolean, prov: string) => {
+                    if (dest.region === 0) {
+                        return;
+                    }
+                    const uniqueByRegion = new Map(
+                        fromTiles
+                            .map(t => resolveTile(t))
+                            .filter(t => t.region !== 0 && t.region !== dest.region)
+                            .map(t => [t.region, t] as const)
+                    );
+                    if (uniqueByRegion.size === 0) {
+                        return;
+                    }
+                    const fromList = [...uniqueByRegion.values()];
+                    const sig = `${fromList
+                        .map(t => t.region)
+                        .sort((a, b) => a - b)
+                        .join(',')}>${dest.region}`;
+                    if (!worldEdgeSigs.has(sig)) {
+                        worldEdgeSigs.add(sig);
+                        worldEdges.push({ from: fromList.slice(0, 16), dest, viaCase, provenance: prov });
+                    }
+                };
+                for (const { line, num } of block.lines) {
+                    const prov = `${block.file}:${num}`;
+                    const caseMatch = /^\s*case\s+([^:]*):/.exec(line);
+                    const caseTiles = caseMatch ? [...caseMatch[1].matchAll(/[0-3]_\d+_\d+_\d+_\d+/g)].map(m => parseRawCoord(m[0])) : null;
+
+                    // absolute destination: p_teleport/p_telejump/~climb_ladder(<literal>)
+                    const abs = /(?:p_teleport|p_telejump|~climb_ladder)\(\s*([0-3]_\d+_\d+_\d+_\d+)/.exec(line);
+                    if (abs) {
+                        emitEdge(caseTiles ?? contextFor(), resolveTile(parseRawCoord(abs[1])), caseTiles !== null, prov);
+                        continue;
+                    }
+
+                    // scripted door/gate traversal: the handler opens the loc and the
+                    // player walks through (no teleport), so the loc's flanking regions
+                    // connect. Probe each cardinal neighbor of the placement tile - a
+                    // door that splits the graph has >=2 distinct regions around it.
+                    if (dom === 'loc' && /open_and_close_door|loc_change\(/.test(line)) {
+                        for (const t of contextFor()) {
+                            const sides = new Map<number, WorldTile>();
+                            for (const [dx, dz] of [[0, 1], [0, -1], [1, 0], [-1, 0], [0, 2], [0, -2], [2, 0], [-2, 0]] as const) {
+                                const nb = { level: t.level, x: t.x + dx, z: t.z + dz };
+                                const rid = graph.regionAt(nb.x, nb.z, nb.level);
+                                if (rid !== 0 && !sides.has(rid)) {
+                                    sides.set(rid, nb);
+                                }
+                            }
+                            const rids = [...sides.keys()];
+                            for (let a = 0; a < rids.length; a++) {
+                                for (let b = a + 1; b < rids.length; b++) {
+                                    emitEdge([sides.get(rids[a])!], resolveTile(sides.get(rids[b])!), false, prov);
+                                }
+                            }
+                        }
+                        continue;
+                    }
+
+                    // label/proc/queue delegation: caller context -> callee's teleport dests.
+                    if (isPlayerTrigger) {
+                        for (const m of line.matchAll(/[~@]([a-z_0-9]+)|(?:^|[^a-z_])(?:queue|longqueue|weakqueue|strongqueue)\(\s*([a-z_0-9]+)/g)) {
+                            for (const dest of procTeleportDests.get(m[1] ?? m[2]) ?? []) {
+                                emitEdge(caseTiles ?? contextFor(), resolveTile(parseRawCoord(dest.raw)), caseTiles !== null, `${prov} via ${dest.prov}`);
+                            }
+                        }
+                    }
+
+                    // relative destination: movecoord(coord|loc_coord, dx, dy(level), dz)
+                    // inside a teleport/climb call. `coord` is the operating player's tile
+                    // ~ the trigger tile (region-level resolution absorbs the 1-2 tile
+                    // approach offset that landing-precision work could not - see
+                    // lessons-learned "Relative-destination stairs"); loc_coord is the
+                    // loc's own tile. Both delta off the case/subject placement tile.
+                    const rel = /(?:p_teleport|p_telejump|~climb_ladder)\(\s*movecoord\(\s*(?:coord|loc_coord)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/.exec(line);
+                    if (rel) {
+                        const dx = parseInt(rel[1], 10);
+                        const dy = parseInt(rel[2], 10);
+                        const dz = parseInt(rel[3], 10);
+                        for (const t of caseTiles ?? contextFor()) {
+                            const destLevel = t.level + dy;
+                            if (destLevel < 0 || destLevel > 3) {
+                                continue;
+                            }
+                            emitEdge([t], resolveTile({ level: destLevel, x: t.x + dx, z: t.z + dz }), caseTiles !== null, prov);
+                        }
+                    }
+                }
+            }
             // attribution: quest folder membership + any quest varp the block touches.
             const quests = new Set<string>();
             if (folderQuest) {
@@ -414,7 +613,17 @@ function main(): void {
                 const dom = subjectDomain(block.trigger);
                 if (dom === 'zone') {
                     try {
-                        addEvidence(questId, 'zone-trigger', block.subject, [parseRawCoord(block.subject)], headerProv);
+                        // zone subjects are the SW corner of an 8x8 zone - sample the
+                        // box, any overlapping region satisfies (player is somewhere in it).
+                        const c = parseRawCoord(block.subject);
+                        const samples = [
+                            [0, 0],
+                            [7, 7],
+                            [0, 7],
+                            [7, 0],
+                            [4, 4]
+                        ].map(([dx, dz]) => ({ level: c.level, x: c.x + dx, z: c.z + dz }));
+                        addEvidence(questId, 'zone-trigger', block.subject, samples, headerProv);
                     } catch {
                         /* malformed zone subject - ignore */
                     }
@@ -454,20 +663,43 @@ function main(): void {
                         }
                     }
 
-                    // raw coord literals, classified by enclosing command.
+                    // inzone(cornerA, cornerB, ...) FIRST: the two corners are a
+                    // bounding box, not standing spots - the player stands SOMEWHERE
+                    // inside, so the pair forms ONE any-of group sampled across the
+                    // box (corners, center, edge midpoints). Level span (e.g.
+                    // 0_.._0_0 .. 2_.._63_63) samples every level in range.
+                    const inzoneSpans = new Set<string>();
+                    for (const m of line.matchAll(/inzone\(\s*([0-3]_\d+_\d+_\d+_\d+)\s*,\s*([0-3]_\d+_\d+_\d+_\d+)/g)) {
+                        inzoneSpans.add(m[1]).add(m[2]);
+                        const a = parseRawCoord(m[1]);
+                        const b = parseRawCoord(m[2]);
+                        const samples: WorldTile[] = [];
+                        for (let level = Math.min(a.level, b.level); level <= Math.max(a.level, b.level); level++) {
+                            const [x1, x2] = [Math.min(a.x, b.x), Math.max(a.x, b.x)];
+                            const [z1, z2] = [Math.min(a.z, b.z), Math.max(a.z, b.z)];
+                            const mx = (x1 + x2) >> 1;
+                            const mz = (z1 + z2) >> 1;
+                            for (const [x, z] of [[x1, z1], [x2, z2], [x1, z2], [x2, z1], [mx, mz], [mx, z1], [mx, z2], [x1, mz], [x2, mz]] as const) {
+                                samples.push({ level, x, z });
+                            }
+                        }
+                        noteContext(addEvidence(questId, 'inzone', `${m[1]}..${m[2]}`, samples, prov));
+                    }
+
+                    // remaining raw coord literals, classified by enclosing command.
                     for (const m of line.matchAll(COORD_LIT_RE)) {
                         const raw = m[0];
+                        if (inzoneSpans.has(raw)) {
+                            continue; // consumed by the inzone pair grouping above.
+                        }
                         const tile = parseRawCoord(raw);
                         const before = line.slice(0, m.index);
                         const isTeleport = /(p_teleport|p_telejump)\(\s*$/.test(before) || /(p_teleport|p_telejump)\([^()]*$/.test(before);
-                        const isInzone = /inzone\([^()]*$/.test(before);
                         if (isTeleport) {
                             const ev = addEvidence(questId, 'teleport-dest', raw, [tile], prov);
                             if (ev.anyOf.length > 0) {
                                 drafts.get(questId)!.edges.push({ dest: ev.anyOf[0], fromRegions: [], provenance: prov });
                             }
-                        } else if (isInzone) {
-                            noteContext(addEvidence(questId, 'inzone', raw, [tile], prov));
                         } else {
                             addEvidence(questId, 'coord', raw, [tile], prov);
                         }
@@ -573,6 +805,7 @@ function main(): void {
             note: 'DRAFT static extraction - over-collects by design (mandatory vs optional steps are not distinguished). Review needs-review quests against walkthroughs before merging into quest-regions.json.'
         },
         summary: { allMainland, needsReview },
+        worldEdges,
         quests: questsOut
     };
 
@@ -580,6 +813,7 @@ function main(): void {
     fs.writeFileSync(OUT_PATH, JSON.stringify(output, null, 2) + '\n');
 
     console.log(`ExtractQuestRegions: ${filesScanned} rs2 files, ${blocksAttributed} attributed blocks, ${questIds.length} quests in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    console.log(`  world edges: ${worldEdges.length} (${worldEdges.filter(e => e.viaCase).length} via switch-case triggers)`);
     console.log(`  all-mainland: ${allMainland.length}   needs-review: ${needsReview.length}`);
     for (const id of needsReview) {
         console.log(`  [review] ${id}: ${questsOut[id].reviewReasons.join('; ')}`);

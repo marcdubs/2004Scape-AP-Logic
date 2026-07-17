@@ -337,7 +337,10 @@ function validateSeed(): boolean | null {
         return null;
     }
     try {
-        execNpxTsx(['tools/logic/ValidateSeed.ts'], { stdio: 'pipe' });
+        // --lenient-placements: this loop runs BEFORE GenerateSeed re-places items for
+        // the new layout, so stranded progression against the stale placement table is
+        // expected and must not burn rerolls; goals-reachability is the contract here.
+        execNpxTsx(['tools/logic/ValidateSeed.ts', '--lenient-placements'], { stdio: 'pipe' });
         return true;
     } catch (err) {
         const e = err as { status?: number; stdout?: Buffer };
