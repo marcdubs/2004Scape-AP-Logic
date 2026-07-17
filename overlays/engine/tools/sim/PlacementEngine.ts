@@ -59,7 +59,7 @@ import { Goal, QuestReq, STAT_NAMES, StatName } from './types.js';
 // Location catalog
 // ---------------------------------------------------------------------------
 
-export type LocationKind = 'quest' | 'ds' | 'barcrawl' | 'first_xp' | 'first_kill' | 'level' | 'activity';
+export type LocationKind = 'quest' | 'ds' | 'barcrawl' | 'first_xp' | 'first_kill' | 'level' | 'activity' | 'music';
 
 export interface LocationDef {
     id: string;
@@ -170,6 +170,54 @@ export const NOTABLE_KILL_IDS = [
     'first_kill_green_dragon'
 ];
 
+// Music-track unlock checks (check surface #8, added 2026-07-17). Generated from
+// content's music.dbrow: every track with an `unlock` field (230 of 233; only
+// Newbie Melody lacks one), each a unique (musicmulti_1..9, bit) pair - the
+// matching bit watches live in ap-checks.json. Unlocks fire from
+// [label,music_playbyregion] (music.rs2): first entry into any mapsquare mapped
+// in musicregion.dbrow does a guarded ~music_setvar -> Player.setVar -> the
+// watcher. All 230 are region-triggered, i.e. "reached area X for the first
+// time" exploration checks. fillerOnly for now (set at buildLocationCatalog):
+// 230 always-reachable locations would otherwise dominate assumed fill and turn
+// most seeds into world-tour progression - flip deliberately if that's wanted.
+export const MUSIC_TRACK_IDS: readonly string[] = [
+    'music_adventure', 'music_al_kharid', 'music_alone', 'music_ambient_jungle', 'music_arabian', 'music_arabian2', 'music_arabian3',
+    'music_arabique', 'music_army_of_darkness', 'music_arrival', 'music_attack1', 'music_attack2', 'music_attack3', 'music_attack4',
+    'music_attack5', 'music_attack6', 'music_attention', 'music_autumn_voyage', 'music_background', 'music_ballad_of_enchantment',
+    'music_baroque', 'music_beyond', 'music_big_chords', 'music_book_of_spells', 'music_camelot', 'music_cave_background', 'music_cavern',
+    'music_chain_of_command', 'music_crystal_cave', 'music_crystal_sword', 'music_dangerous', 'music_dark', 'music_deep_wildy',
+    'music_desert_voyage', 'music_doorways', 'music_dream', 'music_dunjun', 'music_egypt', 'music_emotion', 'music_emperor',
+    'music_expanse', 'music_expecting', 'music_expedition', 'music_faerie', 'music_fanfare', 'music_fanfare3', 'music_fishing',
+    'music_flute_salad', 'music_forever', 'music_gaol', 'music_garden', 'music_gnome_king', 'music_gnome_theme', 'music_gnome_village',
+    'music_gnome_village2', 'music_gnome', 'music_gnomeball', 'music_greatness', 'music_harmony', 'music_high_seas', 'music_horizon',
+    'music_iban', 'music_in_the_manor', 'music_inspiration', 'music_intrepid', 'music_jolly_r', 'music_jungle_island', 'music_jungly1',
+    'music_jungly2', 'music_jungly3', 'music_knightly', 'music_lasting', 'music_legion', 'music_lightness', 'music_lightwalk',
+    'music_long_ago', 'music_long_way_home', 'music_lullaby', 'music_mage_arena', 'music_magic_dance', 'music_magical_journey',
+    'music_march', 'music_medieval', 'music_mellow', 'music_miles_away', 'music_miracle_dance', 'music_monarch_waltz', 'music_moody',
+    'music_neverland', 'music_nightfall', 'music_oriental', 'music_overture', 'music_parade', 'music_quest', 'music_regal', 'music_reggae',
+    'music_reggae2', 'music_riverside', 'music_royale', 'music_rune_essence', 'music_sad_meadow', 'music_scape_cave', 'music_scape_sad',
+    'music_scape_wild', 'music_sea_shanty', 'music_sea_shanty2', 'music_serenade', 'music_serene', 'music_shine', 'music_soundscape',
+    'music_spirit', 'music_splendour', 'music_spooky', 'music_spooky_jungle', 'music_starlight', 'music_start', 'music_still_night',
+    'music_talking_forest', 'music_the_desert', 'music_the_shadow', 'music_the_tower', 'music_theme', 'music_trawler',
+    'music_trawler_minor', 'music_tree_spirits', 'music_tribal_background', 'music_tribal', 'music_tribal2', 'music_trinity',
+    'music_troubled', 'music_underground', 'music_unknown_land', 'music_underground_pass', 'music_upcoming', 'music_venture',
+    'music_vision', 'music_voodoo_cult', 'music_voyage', 'music_wander', 'music_waterfall', 'music_wilderness2', 'music_wilderness3',
+    'music_wilderness4', 'music_witching', 'music_wonder', 'music_wonderous', 'music_workshop', 'music_lonesome', 'music_scape_soft',
+    'music_shining', 'music_yesteryear', 'music_fanfare2', 'music_tomorrow', 'music_duel_arena', 'music_ice_melody', 'music_wolf_mountain',
+    'music_harmony2', 'music_venture2', 'music_landlubber', 'music_undercurrent', 'music_nomad', 'music_zealot', 'music_cellar_song',
+    'music_heart_and_mind', 'music_close_quarters', 'music_escape', 'music_grumpy', 'music_chompy_hunt', 'music_twilight',
+    'music_morytania', 'music_dead_quiet', 'music_village', 'music_bone_dance', 'music_mausoleum', 'music_forbidden', 'music_cursed',
+    'music_understanding', 'music_principality', 'music_tremble', 'music_kingdom', 'music_hermit', 'music_stagnant', 'music_breeze',
+    'music_stratosphere', 'music_time_out', 'music_natural', 'music_grotto', 'music_waterlogged', 'music_artistry', 'music_aztec',
+    'music_elven_mist', 'music_forest', 'music_lost_soul', 'music_meridian', 'music_woodland', 'music_overpass', 'music_contest',
+    'music_sojourn', 'music_crystal_castle', 'music_marzipan', 'music_insect_queen', 'music_mad_eadgar', 'music_bandit_camp',
+    'music_sunburn', 'music_competition', 'music_everywhere', 'music_exposed', 'music_well_of_voyage', 'music_righteousness',
+    'music_shadowland', 'music_lair', 'music_deadlands', 'music_rellekka', 'music_saga', 'music_borderland', 'music_legend',
+    'music_warrior', 'music_lighthouse', 'music_out_of_the_deep', 'music_the_navigator', 'music_wildwood', 'music_barbarianism',
+    'music_complication', 'music_down_to_earth', 'music_courage', 'music_superstition', 'music_pirates_of_peril', 'music_dangerous_road',
+    'music_faithless', 'music_tiptoe'
+];
+
 // The 18 cappable skills (STAT_NAMES minus hitpoints, which is never capped - see
 // ConfigLoader.ts/ApUnlockOverrides.ts). Matches ApChecks.ts's onXpGain exactly (it skips
 // PlayerStat.HITPOINTS for both first_xp and level_ checks).
@@ -203,6 +251,9 @@ export function buildLocationCatalog(quests: QuestReq[]): LocationDef[] {
     }
     for (const a of ACTIVITY_LOCATIONS) {
         locs.push({ ...a, kind: 'activity' });
+    }
+    for (const id of MUSIC_TRACK_IDS) {
+        locs.push({ id, kind: 'music', fillerOnly: true }); // see MUSIC_TRACK_IDS comment
     }
 
     return locs;
@@ -429,6 +480,9 @@ export function reachableFromState(locations: LocationDef[], quests: QuestReq[],
                 if (loc.skill === undefined || loc.level === undefined || caps[loc.skill] >= loc.level) {
                     reachable.add(loc.id);
                 }
+                break;
+            case 'music':
+                reachable.add(loc.id); // map fully open by design - walking there is always possible.
                 break;
         }
     }

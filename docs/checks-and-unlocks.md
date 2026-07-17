@@ -49,7 +49,7 @@ swap happens in exactly one place.
 | 5 | First kill (+ curated notable kills) | 1 + ~15 | `[proc,npc_death]` overlay | small–medium |
 | 6 | Skill level milestones | option-scaled, ~50–190 | `advancestat` / `addXp` level-crossing | small |
 | 7 | Activity/minigame checks | 13 | `%ap_activities` bits + `%magearena` gte watches (see below) | **DONE** (2026-07-17) |
-| 8 | Music-track unlock surfaces | future | `%musicmulti_1..9` perm bitfields (surveyed 2026-07-17) | not now |
+| 8 | Music-track unlock checks | 230 | `%musicmulti_1..9` bit watches (see below) | **DONE** (2026-07-17, filler-only) |
 
 That's a pool of **~150–300 locations** at defaults — a healthy AP world size.
 Details per surface:
@@ -183,6 +183,25 @@ real one. The AP objs have no category; their handlers replicate each tier's
 exact roll loop (2–4/3–5/4–6 rolls, 1/84–1/66–1/45 rare) via the global vanilla
 table procs and present through the real `trail_reward` interface, touching no
 trail state.
+
+### 8. Music-track unlock checks — **built 2026-07-17** (filler-only)
+
+The built-in exploration check system: 230 of rev 274's 233 tracks carry an
+`unlock` field (a unique `musicmulti_1..9` varp + bit pair; only Newbie Melody
+has none), and `[label,music_playbyregion]` (`music/scripts/music.rs2`) does a
+guarded `~music_setvar` — i.e. a watched perm-varp `setbit` — the FIRST time
+the player enters any mapsquare mapped in `musicregion.dbrow`. So each check is
+"reached area X for the first time" with zero content hooks: 230 generated bit
+watches in `ap-checks.json` (`music_<track_name>` ids) + the generated
+`MUSIC_TRACK_IDS` mirror in `PlacementEngine.ts` (kind `'music'`, always
+reachable — the map is fully open by design).
+
+**Deliberately `fillerOnly` for now**: 230 always-reachable locations would
+dominate assumed fill and turn most seeds into a world tour. Pre-AP they still
+announce + roll a reward on every first-visit, which is the fun part. Flip the
+flag in `buildLocationCatalog` if exploration-based progression is wanted
+(that's essentially the OSRS apworld's chunk system, so it's a defensible
+future option). Location pool 287 → 517 (345 filler).
 
 ---
 
