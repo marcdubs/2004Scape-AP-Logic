@@ -236,6 +236,7 @@ function assumedFill(locations: LocationDef[], quests: QuestReq[], pool: Progres
         locations
             .filter(loc => loc.kind !== 'level' || (loc.level !== undefined && loc.level <= maxProgressionLevel))
             .filter(loc => !spatial.infeasibleLocationIds.has(loc.id))
+            .filter(loc => !loc.fillerOnly)
             .map(loc => loc.id)
     );
     const unassigned = new Set(locations.map(loc => loc.id));

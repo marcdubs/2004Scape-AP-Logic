@@ -105,6 +105,21 @@
 
         { "varbit": "horrorquest", "mode": "gte", "value": 10, "check": "quest_horror" },
 
-        { "varp": "eadgar_quest", "mode": "gte", "value": 110, "check": "quest_eadgar" }
+        { "varp": "eadgar_quest", "mode": "gte", "value": 110, "check": "quest_eadgar" },
+
+        { "varp": "ap_activities", "mode": "bit", "value": 0, "check": "trail_easy_complete" },
+        { "varp": "ap_activities", "mode": "bit", "value": 1, "check": "trail_medium_complete" },
+        { "varp": "ap_activities", "mode": "bit", "value": 2, "check": "trail_hard_complete" },
+        { "varp": "ap_activities", "mode": "bit", "value": 3, "check": "trawler_win" },
+        { "varp": "ap_activities", "mode": "bit", "value": 4, "check": "agility_gnome_course" },
+        { "varp": "ap_activities", "mode": "bit", "value": 5, "check": "agility_barbarian_course" },
+        { "varp": "ap_activities", "mode": "bit", "value": 6, "check": "agility_wilderness_course" },
+        { "varp": "ap_activities", "mode": "bit", "value": 7, "check": "gnomeball_goal" },
+        { "varp": "ap_activities", "mode": "bit", "value": 8, "check": "agility_arena_ticket" },
+        { "varp": "ap_activities", "mode": "bit", "value": 9, "check": "ranging_guild_ticket" },
+
+        { "varp": "magearena", "mode": "gte", "value": 6, "check": "mage_arena_kolodion" },
+        { "varp": "magearena", "mode": "gte", "value": 7, "check": "mage_arena_god_cape" },
+        { "varp": "magearena", "mode": "gte", "value": 8, "check": "mage_arena_god_staff" }
     ]
 }

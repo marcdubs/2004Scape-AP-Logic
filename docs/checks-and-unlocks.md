@@ -48,7 +48,8 @@ swap happens in exactly one place.
 | 4 | First XP in each skill | up to 19 | engine `Player.addXp` hook | small |
 | 5 | First kill (+ curated notable kills) | 1 + ~15 | `[proc,npc_death]` overlay | small–medium |
 | 6 | Skill level milestones | option-scaled, ~50–190 | `advancestat` / `addXp` level-crossing | small |
-| 7 | Music/clue/minigame surfaces | future | varbits (surveyed 2026-07-13, present in rev 274) | not now |
+| 7 | Activity/minigame checks | 13 | `%ap_activities` bits + `%magearena` gte watches (see below) | **DONE** (2026-07-17) |
+| 8 | Music-track unlock surfaces | future | `%musicmulti_1..9` perm bitfields (surveyed 2026-07-17) | not now |
 
 That's a pool of **~150–300 locations** at defaults — a healthy AP world size.
 Details per surface:
@@ -142,6 +143,46 @@ milestone levels keeps it data-driven). Milestone density should be an option:
 These are exactly the OSRS apworld's "tasks by skill" shape, and they interact
 beautifully with skill-cap unlocks (below): a capped skill's milestones are
 out-of-logic until its cap items arrive.
+
+### 7. Activity/minigame checks — **built 2026-07-17**
+
+13 checks over the completable activities rev 274 actually ships (surveyed this
+session; music tracks remain surface #8, future). Two mechanisms, both riding
+the existing watcher — no new engine seams:
+
+- **`%ap_activities`** (new perm varp, bits 0–9, `ap.varp` + bit map comment in
+  `ap_checks.rs2`): one-line `~ap_activity_mark(bit, id)` hooks (the `%ap_kills`
+  shape: once-ever early return, if_close/p_finduid/queue-retry) in whole-file
+  CRLF overlays of the vanilla scripts —
+  `trail_easy/medium/hard_complete` (each tier's `trail_clue_<tier>_reward`
+  proc, before `~trail_complete`), `trawler_win` (`[queue,trawler_player_win]`),
+  `agility_gnome/barbarian/wilderness_course` (each course's lap-bonus branch in
+  `update_<course>_varp`, before the progress reset), `gnomeball_goal`
+  (`gnomeball_shoot.rs2` "...and score!" branch), `agility_arena_ticket`
+  (`agilityarena.rs2` ticket `inv_add`), `ranging_guild_ticket`
+  (`competition_judge.rs2` payout, guarded `$token_count > 0`).
+- **`%magearena` direct watches** (zero content hooks — it's already a perm,
+  strictly-increasing lifetime counter, varp 114): `mage_arena_kolodion` (>= 6),
+  `mage_arena_god_cape` (>= 7), `mage_arena_god_staff` (>= 8).
+
+Generator/sim: new `'activity'` LocationKind + `ACTIVITY_LOCATIONS` in
+`PlacementEngine.ts` (skill gates mirror what the vanilla scripts enforce:
+barbarian course 35 / wilderness 52 agility, ranging guild 40 ranged, trawler
+15 fishing, mage arena 60 magic), reachability = caps-vs-gate like `'level'`.
+The three trail checks are `fillerOnly` (new LocationDef flag, filtered in
+GenerateSeed's assumed fill): clue ACQUISITION is monster-drop RNG, so logic
+never requires finishing a trail — they still fire and hold filler. Location
+pool 274 → 287.
+
+**AP casket junk items** (same session): three NEW objs `ap_casket_easy/medium/
+hard` (`ap_caskets.obj/.rs2`) + a `caskets` reward category (1-in-15 roll,
+HP-tiered 1/30/55). Deliberately NOT the vanilla casket objs: every vanilla
+casket carries `category=trail_casket_<tier>` whose opheld handler advances the
+shared `%trail_status` — a freebie would start a phantom trail or corrupt a
+real one. The AP objs have no category; their handlers replicate each tier's
+exact roll loop (2–4/3–5/4–6 rolls, 1/84–1/66–1/45 rare) via the global vanilla
+table procs and present through the real `trail_reward` interface, touching no
+trail state.
 
 ---
 

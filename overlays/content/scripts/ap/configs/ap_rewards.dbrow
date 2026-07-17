@@ -1257,3 +1257,29 @@ data=category,armour
 data=min_level,45
 data=reward,viking_helmet_range
 data=qty,1
+
+// ---- caskets (AP junk treasure-trail caskets - configs/ap_caskets.obj,
+// handlers in ap_caskets.rs2). Tiered on hitpoints as an overall-progress
+// proxy (see ap_level_for_category): fresh accounts roll easy caskets, the
+// min_level+1 reservoir weighting shifts rolls toward medium/hard as HP
+// grows. ----
+[ap_reward_casket_easy]
+table=ap_rewards
+data=category,caskets
+data=min_level,1
+data=reward,ap_casket_easy
+data=qty,1
+
+[ap_reward_casket_medium]
+table=ap_rewards
+data=category,caskets
+data=min_level,30
+data=reward,ap_casket_medium
+data=qty,1
+
+[ap_reward_casket_hard]
+table=ap_rewards
+data=category,caskets
+data=min_level,55
+data=reward,ap_casket_hard
+data=qty,1

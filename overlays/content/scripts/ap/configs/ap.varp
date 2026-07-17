@@ -4,6 +4,16 @@ scope=perm
 [ap_kills]
 scope=perm
 
+// AP: activity/minigame accomplishment bits (checks-and-unlocks.md check
+// surface #7 - treasure trails, fishing trawler, agility course laps, mage
+// arena, gnomeball, agility arena). Same pattern as %ap_kills: rs2 hooks in
+// the overlaid vanilla scripts set a bit once-ever via ~ap_activity_mark, the
+// engine varp watcher (ap-checks.json "ap_activities" bit watches) turns the
+// flip into the actual check firing. Bit assignments live with the watch
+// table + the hooks in ap_checks.rs2 - keep all three in sync.
+[ap_activities]
+scope=perm
+
 // AP: per-skill banked XP (2026-07-16, "struck with inspiration hits your level
 // cap" fix - docs/lessons-learned.md progressive-cap section). When
 // ApUnlockOverrides.clampStatXp truncates an xp gain at the current progressive

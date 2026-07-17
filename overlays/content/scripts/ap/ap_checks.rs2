@@ -149,6 +149,55 @@ if (testbit(%ap_kills, $bit) = ^false) {
 }
 
 // ------------------------------------------------------------------
+// Activity/minigame accomplishment tracking (check surface #7): treasure
+// trail tier completions, fishing trawler wins, agility course laps, mage
+// arena milestones, gnomeball goals, agility arena pillars/tickets. Exact
+// %ap_kills shape, separate varp: hooks in the overlaid vanilla activity
+// scripts call ~ap_activity_mark(bit, check_id), the write flows through
+// Player.setVar -> ApChecks.onVarpSet, and the "ap_activities" bit watches in
+// ap-checks.json fire the check (placement consult, dedupe, announce all
+// engine-side - see the placement-mode wiring note above ap_track_kill).
+//
+// Bit map (keep in sync with ap-checks.json's ap_activities watches AND the
+// hook call sites in the overlaid vanilla scripts):
+//   0  trail_easy_complete       (trail_clue_easy_reward, before ~trail_complete)
+//   1  trail_medium_complete     (trail_clue_medium_reward, before ~trail_complete)
+//   2  trail_hard_complete       (trail_clue_hard_reward, before ~trail_complete)
+//   3  trawler_win               ([queue,trawler_player_win] in trawler_win.rs2)
+//   4  agility_gnome_course      (update_gnome_varp lap-bonus branch)
+//   5  agility_barbarian_course  (update_barbarian_varp lap-bonus branch)
+//   6  agility_wilderness_course (update_wilderness_varp lap-bonus branch)
+//   7  gnomeball_goal            (gnomeball_shoot "...and score!" branch)
+//   8  agility_arena_ticket      (agilityarena.rs2 ticket inv_add)
+//   9  ranging_guild_ticket      (competition_judge.rs2 archery_ticket inv_add)
+//
+// Mage Arena needs NO bit here: %magearena (varp 114, scope=perm) is already a
+// strictly-increasing lifetime counter, so mage_arena_kolodion / _god_cape /
+// _god_staff are plain gte watches on it in ap-checks.json (6/7/8) - the
+// data-only path, zero content hooks.
+//
+// $check_id is documentation-only here, same as ap_kill_mark.
+// ------------------------------------------------------------------
+
+[proc,ap_activity_mark](int $bit, string $check_id)
+if (testbit(%ap_activities, $bit) = ^true) {
+    return;
+}
+if_close;
+if (p_finduid(uid) = true) {
+    if (testbit(%ap_activities, $bit) = ^false) {
+        %ap_activities = setbit(%ap_activities, $bit);
+    }
+} else {
+    queue*(ap_activity_mark_retry, 0)($bit, $check_id);
+}
+
+[queue,ap_activity_mark_retry](int $bit, string $check_id)
+if (testbit(%ap_activities, $bit) = ^false) {
+    %ap_activities = setbit(%ap_activities, $bit);
+}
+
+// ------------------------------------------------------------------
 // Test commands (see docs/goals-and-checks.md "Test command infrastructure").
 // ------------------------------------------------------------------
 
@@ -178,5 +227,7 @@ if (p_finduid(uid) = false) {
     return;
 }
 mes("AP checks - kill flags set: <tostring(bitcount(%ap_kills))> (first kill: <tostring(testbit(%ap_kills, 0))>)");
+mes("Activity flags set: <tostring(bitcount(%ap_activities))>/10 (trails e/m/h: <tostring(testbit(%ap_activities, 0))>/<tostring(testbit(%ap_activities, 1))>/<tostring(testbit(%ap_activities, 2))>)");
+mes("Mage arena stage (%magearena): <tostring(%magearena)>");
 mes("Barcrawl bars signed: <tostring(bitcount(getbit_range(%barcrawl, 3, 12)))>/10");
 mes("Dragon Slayer stage (%dragonquest): <tostring(%dragonquest)>");

@@ -2437,3 +2437,45 @@ addendum: RandomizeEntrances grades 5 candidate tables via ValidateSeed
 --strict-quests --json on a placements-free scratch dir and keeps the
 least-stranded goals-ok one (perfect tables are empirically rare: ~0/20 samples).
 Tracker's Unlocks tab reads questGates dynamically - no hardcoded 17 anywhere.
+
+## Session: activity checks + AP caskets (2026-07-17)
+
+Check surface #7 built - 13 activity/minigame checks + the casket junk-reward
+category. Full design record in checks-and-unlocks.md section 7; what a future
+session needs beyond that:
+
+- **Vanilla trail caskets are NOT stateless** - `[opheld1,_trail_casket_<tier>]`
+  is a CATEGORY handler that unconditionally advances the shared `%trail_status`
+  progress bits (and its completion test has an RNG tail:
+  `add(progress,2) >= maxsteps & random(2)=0`), so gifting a vanilla casket would
+  start a phantom trail or short-circuit a real one. That's why
+  `ap_casket_easy/medium/hard` exist (no category -> no vanilla handler; own
+  opheld1 replicates the tier roll loop + presents via the real trail_reward
+  interface, skipping only `~clear_trail_progress`). If a later feature hands out
+  clue items, same trap applies to CLUES (opheld also advances state).
+- **`%magearena` needed zero hooks** - perm varp 114, strictly increasing
+  (1..8: started/4 fights/complete/prayed=cape/staff_given) - gte watches only.
+  When surveying a new activity, always check for a lifetime-monotonic perm varp
+  FIRST; hooks are the fallback. Counterexamples found: `%trawler` cycles 2<->3
+  every round (gte watch would work once but the transition semantics are ugly -
+  hooked the queue script instead); course-progress varps are perm but ZEROED on
+  lap completion; `%targetscore` resets on judge payout; `%gnomeball_owedball`
+  is overloaded (confiscation flag, not a win marker - do NOT watch it).
+- **`~ap_activity_mark` bit map lives in three places** that must stay in sync:
+  ap_checks.rs2 (comment + hooks), ap-checks.json (`ap_activities` bit watches),
+  PlacementEngine.ts `ACTIVITY_LOCATIONS`. Same discipline as the kill list.
+- **`LocationDef.fillerOnly`** is the new generic "never holds progression"
+  flag (GenerateSeed assumed-fill filter). Trails use it (clue drops are RNG);
+  use it for any future luck-gated check.
+- The varp.pack staleness race hit AGAIN on `%ap_activities` (third time) -
+  `rm content/pack/varp.pack`, rebuild (1:31). obj.pack auto-appended the three
+  casket objs fine (ids 3894-3896) without the workaround.
+- Verified offline: pack build clean, engine typecheck clean, GenerateSeed
+  --seed 777 --dry-run places progression on activity checks (gnome course,
+  gnomeball, arena ticket in sphere 0-2), trails stay filler, spheres + all
+  three goals still complete. NOT in-game tested. User checklist:
+  `::apchecks` (new "Activity flags" line), `::apcheckfire trail_easy_complete`,
+  complete a gnome course lap (expect check announce), `::apreward caskets 60`
+  (expect a casket -> open it -> trail reward interface, `%trail_status`
+  untouched - verify via a real in-progress clue surviving), and a trawler win
+  with a second account if convenient.

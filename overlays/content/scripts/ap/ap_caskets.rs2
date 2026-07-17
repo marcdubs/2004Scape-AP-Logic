@@ -1,0 +1,62 @@
+// AP junk-reward caskets (configs/ap_caskets.obj - see the comment there for
+// why these are new objs and not vanilla trail caskets). Each open handler
+// mirrors the roll loop at the top of the matching vanilla
+// trail_clue_<tier>_reward proc EXACTLY (same roll count, same rare odds, same
+// gosub targets - those normal/rare table procs are global, so they're reused
+// as-is), then presents the loot through the same trail_reward interface +
+// [queue,trail_give_reward] delivery the real trails use. The ONLY vanilla
+// step deliberately skipped is ~trail_complete's ~clear_trail_progress - an AP
+// casket must never touch %trail_status (that's the whole reason these objs
+// exist). opheld ops run with protected access, same guarantee the vanilla
+// casket handlers rely on for inv_del/if_openmain.
+
+[opheld1,ap_casket_easy]
+inv_del(inv, ap_casket_easy, 1);
+def_int $rolls = calc(2 + random(3));
+def_int $roll = 0;
+while ($roll < $rolls) {
+    if (random(84) = 0) {
+        gosub(trail_clue_easy_rare);
+    } else {
+        gosub(trail_clue_easy_normal);
+    }
+    $roll = calc($roll + 1);
+}
+~ap_casket_present;
+
+[opheld1,ap_casket_medium]
+inv_del(inv, ap_casket_medium, 1);
+def_int $rolls = calc(3 + random(3));
+def_int $roll = 0;
+while ($roll < $rolls) {
+    if (random(66) = 0) {
+        gosub(trail_clue_medium_rare);
+    } else {
+        gosub(trail_clue_medium_normal);
+    }
+    $roll = calc($roll + 1);
+}
+~ap_casket_present;
+
+[opheld1,ap_casket_hard]
+inv_del(inv, ap_casket_hard, 1);
+def_int $rolls = calc(4 + random(3));
+def_int $roll = 0;
+while ($roll < $rolls) {
+    if (random(45) = 0) {
+        gosub(trail_clue_hard_rare);
+    } else {
+        gosub(trail_clue_hard_normal);
+    }
+    $roll = calc($roll + 1);
+}
+~ap_casket_present;
+
+// trail_complete minus ~clear_trail_progress and minus the "completed the
+// Treasure Trail" line (this wasn't a trail).
+[proc,ap_casket_present]
+mes("You open the casket...");
+~music_jingle("treasure hunt win");
+inv_transmit(trail_rewardinv, trail_reward:inv);
+if_openmain(trail_reward);
+queue(trail_give_reward, 0, 0);

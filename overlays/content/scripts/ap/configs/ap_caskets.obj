@@ -1,0 +1,56 @@
+// AP junk-reward caskets (docs/checks-and-unlocks.md "Treasure Trails"). Three
+// NEW objs rather than reusing any vanilla trail casket: every vanilla casket
+// carries category=trail_casket_<tier>, whose [opheld1,_trail_casket_<tier>]
+// handler unconditionally advances the SHARED %trail_status progress counter -
+// a freebie vanilla casket would kick off a phantom trail or corrupt/short-
+// circuit a real in-progress one (verified against progress_clue_* in
+// game_trail). These have NO category, so only their own handlers in
+// ap_caskets.rs2 apply: open -> roll that tier's real reward table directly,
+// zero trail state touched. Visual fields cloned from
+// trail_clue_easy_map001_casket. Pack ids auto-append on build (lessons-learned
+// "content/pack/*.pack").
+
+[ap_casket_easy]
+name=Casket (easy)
+desc=An Archipelago reward casket. I hope there's treasure in it.
+weight=5kg
+model=inv_casket
+2dxof=3
+2dyof=-6
+2dzoom=1410
+2dyan=1592
+2dxan=164
+cost=50
+iop1=Open
+members=yes
+tradeable=no
+
+[ap_casket_medium]
+name=Casket (medium)
+desc=An Archipelago reward casket. I hope there's treasure in it.
+weight=5kg
+model=inv_casket
+2dxof=3
+2dyof=-6
+2dzoom=1410
+2dyan=1592
+2dxan=164
+cost=50
+iop1=Open
+members=yes
+tradeable=no
+
+[ap_casket_hard]
+name=Casket (hard)
+desc=An Archipelago reward casket. I hope there's treasure in it.
+weight=5kg
+model=inv_casket
+2dxof=3
+2dyof=-6
+2dzoom=1410
+2dyan=1592
+2dxan=164
+cost=50
+iop1=Open
+members=yes
+tradeable=no

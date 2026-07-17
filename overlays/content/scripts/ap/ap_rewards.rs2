@@ -57,7 +57,7 @@ ap_stat_advance_raw($stat, $exp);
 mes("You are struck by inspiration! +<tostring(calc($exp / 10))> <~stat_name($stat)> XP.");
 
 [proc,ap_random_category]()(string)
-def_int $r = random(14);
+def_int $r = random(15);
 if ($r = 0) {
     return("armour");
 } else if ($r = 1) {
@@ -84,6 +84,8 @@ if ($r = 0) {
     return("runecraft_supplies");
 } else if ($r = 12) {
     return("crafting_supplies");
+} else if ($r = 13) {
+    return("caskets");
 }
 return("keepsakes");
 
@@ -113,6 +115,12 @@ if (compare($category, "armour") = 0) {
     return(stat_base(runecraft));
 } else if (compare($category, "crafting_supplies") = 0) {
     return(stat_base(crafting));
+} else if (compare($category, "caskets") = 0) {
+    // trail reward caskets (the user-requested "junk casket" filler - see
+    // checks-and-unlocks.md "Treasure Trails"). Tiered on hitpoints as an
+    // overall-progress proxy, same reasoning as potions/food: a fresh account
+    // rolls easy caskets, a developed one can also roll medium/hard.
+    return(stat_base(hitpoints));
 } else if (compare($category, "keepsakes") = 0) {
     // flat pool - every keepsakes row is min_level 1, so the weighted
     // reservoir roll (weight = min_level + 1) is naturally uniform across
@@ -185,7 +193,7 @@ if (inv_freespace(inv) > 0 | (oc_stackable($item) = true & inv_total(inv, $item)
 // make); with args, forces category/tier so every level bracket can be
 // eyeballed without playing to it. Valid category names: armour, weapons,
 // ranged_gear, arrows, runes, potions, food, tools, cash, xp, herb_supplies,
-// runecraft_supplies, crafting_supplies, keepsakes - an unrecognized name
+// runecraft_supplies, crafting_supplies, caskets, keepsakes - an unrecognized name
 // rolls no eligible rows and prints ap_deliver_reward's "no reward available"
 // message. xp ignores $level entirely (it's not tiered - see
 // ap_grant_xp_reward); keepsakes ignores $level too (flat pool).

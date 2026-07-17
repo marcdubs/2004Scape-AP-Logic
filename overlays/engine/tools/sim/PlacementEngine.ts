@@ -59,16 +59,18 @@ import { Goal, QuestReq, STAT_NAMES, StatName } from './types.js';
 // Location catalog
 // ---------------------------------------------------------------------------
 
-export type LocationKind = 'quest' | 'ds' | 'barcrawl' | 'first_xp' | 'first_kill' | 'level';
+export type LocationKind = 'quest' | 'ds' | 'barcrawl' | 'first_xp' | 'first_kill' | 'level' | 'activity';
 
 export interface LocationDef {
     id: string;
     kind: LocationKind;
-    /** For 'level' locations: the skill and the milestone N. */
+    /** For 'level' locations: the skill and the milestone N. For 'activity': the hard skill gate the vanilla script enforces, if any. */
     skill?: StatName;
     level?: number;
     /** For 'quest' locations: the quests.json id (id === `quest_${questId}`, matches the quest dirname). */
     questId?: string;
+    /** Never receives a progression item (GenerateSeed's assumed fill skips it); it still exists as a filler location. */
+    fillerOnly?: boolean;
 }
 
 // Dragon Slayer stage watches - copied verbatim from data/config/ap-checks.json's
@@ -78,6 +80,32 @@ export interface LocationDef {
 export const DS_STAGE_IDS = ['ds_started', 'ds_oziach', 'ds_ship_ready', 'ds_map_complete', 'ds_sailed', 'ds_complete'] as const;
 
 export const BARCRAWL_BAR_IDS = Array.from({ length: 10 }, (_, i) => `barcrawl_bar_${i + 1}`);
+
+// Activity/minigame checks (check surface #7, added 2026-07-17) - mirrors
+// ap-checks.json's ap_activities bit watches + %magearena gte watches, and the
+// ~ap_activity_mark hooks in the overlaid vanilla scripts (ap_checks.rs2 has the
+// bit map). skill/level record the hard gate the vanilla script itself enforces
+// (verified in-source this session: wilderness course refuses entry under 52
+// agility, barbarian ledge under 35, ranging guild door under 40 ranged, trawler
+// fish need 15 fishing, kolodion needs 60 magic); entries without one are
+// sphere-0-ish. The three trail tiers are fillerOnly: CLUE ACQUISITION is
+// monster-drop RNG (trail_clue_drop.rs2), so logic must never require finishing
+// a trail - they still fire as checks and hold filler.
+export const ACTIVITY_LOCATIONS: readonly Omit<LocationDef, 'kind'>[] = [
+    { id: 'trail_easy_complete', fillerOnly: true },
+    { id: 'trail_medium_complete', fillerOnly: true },
+    { id: 'trail_hard_complete', fillerOnly: true },
+    { id: 'trawler_win', skill: 'fishing', level: 15 },
+    { id: 'agility_gnome_course' },
+    { id: 'agility_barbarian_course', skill: 'agility', level: 35 },
+    { id: 'agility_wilderness_course', skill: 'agility', level: 52 },
+    { id: 'gnomeball_goal' },
+    { id: 'agility_arena_ticket' },
+    { id: 'ranging_guild_ticket', skill: 'ranged', level: 40 },
+    { id: 'mage_arena_kolodion', skill: 'magic', level: 60 },
+    { id: 'mage_arena_god_cape', skill: 'magic', level: 60 },
+    { id: 'mage_arena_god_staff', skill: 'magic', level: 60 }
+];
 
 // Family D (docs/checks-and-unlocks.md unlock family D): quests locked behind a
 // `quest_<id>` pool item. Until the item is collected the quest can neither be
@@ -172,6 +200,9 @@ export function buildLocationCatalog(quests: QuestReq[]): LocationDef[] {
         for (const n of LEVEL_MILESTONES) {
             locs.push({ id: `level_${skill}_${n}`, kind: 'level', skill, level: n });
         }
+    }
+    for (const a of ACTIVITY_LOCATIONS) {
+        locs.push({ ...a, kind: 'activity' });
     }
 
     return locs;
@@ -388,6 +419,14 @@ export function reachableFromState(locations: LocationDef[], quests: QuestReq[],
                 break;
             case 'level':
                 if (loc.skill && loc.level !== undefined && caps[loc.skill] >= loc.level) {
+                    reachable.add(loc.id);
+                }
+                break;
+            case 'activity':
+                // Gated only by the vanilla script's own skill requirement (recorded on
+                // the def), applied against progressive caps like 'level'; ungated
+                // activities are sphere-0-ish, same reasoning as barcrawl/first_kill.
+                if (loc.skill === undefined || loc.level === undefined || caps[loc.skill] >= loc.level) {
                     reachable.add(loc.id);
                 }
                 break;
