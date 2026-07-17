@@ -114,6 +114,20 @@ export const enum ScriptOpcode {
     // same explicit-numbering reasoning as AP_ENTRANCE_OVERRIDE above.
     AP_APPLY_BANKED_XP = 1909,
 
+    // custom: Archipelago user-facing option lookup (ap-options.json) - lets rs2
+    // gate optional features (addon reward items, etc.) on the same toggles the
+    // engine/tools read - same explicit-numbering reasoning as
+    // AP_ENTRANCE_OVERRIDE above.
+    AP_OPTION = 1910,
+
+    // custom: Archipelago NPC Teleport addon - fuzzy lookup over the "spoken to
+    // while holding the writ" registry (ApNpcTeleport.ts). Two single-return
+    // commands (name / packed coord by ranked index) instead of one tuple
+    // return - simpler stack contract - same explicit-numbering reasoning as
+    // AP_ENTRANCE_OVERRIDE above.
+    AP_NPCTP_MATCH_NAME = 1911,
+    AP_NPCTP_MATCH_COORD = 1912,
+
     // Player ops (2000-2499)
     AFK_EVENT = 2000,
     ALLOWDESIGN,
@@ -572,6 +586,9 @@ export const ScriptOpcodeMap: Map<string, number> = new Map([
     ['AP_HOME_COORD', ScriptOpcode.AP_HOME_COORD],
     ['AP_REROLL_LOOK', ScriptOpcode.AP_REROLL_LOOK],
     ['AP_APPLY_BANKED_XP', ScriptOpcode.AP_APPLY_BANKED_XP],
+    ['AP_OPTION', ScriptOpcode.AP_OPTION],
+    ['AP_NPCTP_MATCH_NAME', ScriptOpcode.AP_NPCTP_MATCH_NAME],
+    ['AP_NPCTP_MATCH_COORD', ScriptOpcode.AP_NPCTP_MATCH_COORD],
 
     ['AFK_EVENT', ScriptOpcode.AFK_EVENT],
     ['ALLOWDESIGN', ScriptOpcode.ALLOWDESIGN],

@@ -16,7 +16,7 @@ import { fileURLToPath } from 'url';
 import { loadSeedConfig } from './ConfigLoader.js';
 import { runSimulation } from './Engine.js';
 import { buildQuestIndex, renderPlacementV0, renderPlacementV1, renderPlacementV2, renderV0, renderV1, renderV2, toJsonSafe, toJsonSafePlacement } from './Narrate.js';
-import { applyQuestGates, buildLocationCatalog, loadPlacements, simulatePlacementSpheres } from './PlacementEngine.js';
+import { applyQuestGates, buildLocationCatalog, loadApOptions, loadPlacements, simulatePlacementSpheres } from './PlacementEngine.js';
 import { Goal, QuestReq } from './types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -75,7 +75,7 @@ function main(): void {
     // the exact vanilla-path code below, untouched - byte-compatible with prior behavior.
     const placementsFile = loadPlacements(configDir);
     if (placementsFile.present) {
-        const locations = buildLocationCatalog(quests);
+        const locations = buildLocationCatalog(quests, loadApOptions(configDir));
         // Family D: lock the seed's declared questGates behind their `quest_<id>` items.
         const gatedQuests = applyQuestGates(quests, placementsFile.questGates);
         const startingCounts = seedConfig.unlocks.present ? seedConfig.unlocks.unlocks : undefined;

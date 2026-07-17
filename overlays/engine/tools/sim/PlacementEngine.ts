@@ -73,6 +73,37 @@ export interface LocationDef {
     fillerOnly?: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// AP options (data/config/ap-options.json) - user-facing feature toggles, e.g.
+// whether the 230 music-track checks exist at all (an AP game already paired
+// with lots of checks may want them off). Read by the generator/validator/
+// simulator here AND independently by the runtime watcher (ApChecks.ts's own
+// inline loader - engine src cannot import from tools/) - keep the file format
+// and defaults in sync between the two loaders. Missing file or bad JSON =
+// every option at its default (fail-open, same policy as every other AP table).
+// ---------------------------------------------------------------------------
+
+export interface ApOptions {
+    /** Music-track unlock checks exist (catalog + watches). Default true. */
+    musicChecks: boolean;
+}
+
+export function loadApOptions(configDir: string): ApOptions {
+    const defaults: ApOptions = { musicChecks: true };
+    try {
+        const file = path.join(configDir, 'ap-options.json');
+        if (!fs.existsSync(file)) {
+            return defaults;
+        }
+        const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+        return {
+            musicChecks: typeof parsed.musicChecks === 'boolean' ? parsed.musicChecks : defaults.musicChecks
+        };
+    } catch {
+        return defaults;
+    }
+}
+
 // Dragon Slayer stage watches - copied verbatim from data/config/ap-checks.json's
 // "dragonquest" entries (read this session; static/shipped, not seed-regenerated - see
 // docs/placement-mode.md "Locations"). If a future session adds/renames stages there,
@@ -225,7 +256,7 @@ export const CAPPABLE_SKILLS: StatName[] = STAT_NAMES.filter(s => s !== 'hitpoin
 
 export const LEVEL_MILESTONES = [10, 20, 30, 40, 50, 60, 70, 80, 90];
 
-export function buildLocationCatalog(quests: QuestReq[]): LocationDef[] {
+export function buildLocationCatalog(quests: QuestReq[], options?: Partial<ApOptions>): LocationDef[] {
     const locs: LocationDef[] = [];
 
     for (const q of quests) {
@@ -252,8 +283,10 @@ export function buildLocationCatalog(quests: QuestReq[]): LocationDef[] {
     for (const a of ACTIVITY_LOCATIONS) {
         locs.push({ ...a, kind: 'activity' });
     }
-    for (const id of MUSIC_TRACK_IDS) {
-        locs.push({ id, kind: 'music', fillerOnly: true }); // see MUSIC_TRACK_IDS comment
+    if (options?.musicChecks !== false) {
+        for (const id of MUSIC_TRACK_IDS) {
+            locs.push({ id, kind: 'music', fillerOnly: true }); // see MUSIC_TRACK_IDS comment
+        }
     }
 
     return locs;

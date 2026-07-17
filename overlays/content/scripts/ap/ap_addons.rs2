@@ -1,0 +1,203 @@
+// AP addon reward items (configs/ap_addons.obj) - Bank Box, Tree Compass,
+// Teleporting Focus (+ Greater), NPC Teleport. Delivery/rolling lives in
+// ap_rewards.rs2 (~ap_try_addon_reward); this file is the item behavior.
+// opheld triggers run with protected access (verified engine-side in
+// OpHeldHandler - same guarantee ap_caskets.rs2 relies on), so dialogs and
+// p_telejump work directly. Usage is deliberately NOT option-gated: disabling
+// an addon in ap-options.json stops it ROLLING as a reward, it never bricks an
+// already-delivered item.
+
+// ------------------------------------------------------------------
+// Bank Box - remote bank access. @openbank (interface_bank/scripts/bank.rs2)
+// is the same globally-addressable label every bank booth/banker jumps to; it
+// has no proximity/PIN preconditions in this rev (bank PINs are 2008+).
+// ------------------------------------------------------------------
+[opheld1,ap_bank_box]
+@openbank;
+
+// ------------------------------------------------------------------
+// Tree Compass - teleport to any of the four spirit tree sites. Coords are the
+// vanilla ^*_tree teleport destinations (area_gnome/configs/
+// spirit_tree.constant - constants are global across files in this dialect).
+// Deliberately BYPASSES the vanilla %treequest/%grandtree talk-gates: the
+// compass itself is the AP unlock for this travel network (problems.txt:
+// "might allow for access to more locations so could be part of the game
+// logic"). Standard item-teleport gating otherwise: 20-wilderness cap (spell
+// threshold, stricter than glory's 30) + ~pre_tele_checks zone blocks.
+// ------------------------------------------------------------------
+[opheld1,ap_tree_compass]
+def_int $choice = ~p_choice5_header("Tree Gnome Village.", 1, "Tree Gnome Stronghold.", 2, "North of Varrock.", 3, "Battlefield of Khazard.", 4, "Nowhere.", 5, "The needle spins... where to?");
+if ($choice = 5) {
+    mes("You remain where you were.");
+    return;
+}
+if (~wilderness_level(coord) > 20) {
+    mes("A mysterious force blocks your teleport.");
+    mes("You can't use this teleport after level 20 wilderness.");
+    return;
+}
+if (~pre_tele_checks(coord) = false) {
+    return;
+}
+switch_int($choice) {
+    case 1 : ~player_teleport_normal(^village_tree);
+    case 2 : ~player_teleport_normal(^stronghold_tree);
+    case 3 : ~player_teleport_normal(^varrock_tree);
+    case 4 : ~player_teleport_normal(^khazard_tree);
+}
+
+// ------------------------------------------------------------------
+// Teleporting Focus - Store saves the current spot into %ap_focus_coord
+// (type=coord perm varp), Rub teleports back. The Greater variant drives TWO
+// slots (%ap_focus_coord shared + %ap_focus_coord_2) through a slot-picker
+// dialog. Store refuses anywhere Rub couldn't legally return to (wilderness,
+// ~pre_tele_checks zones) so a stored coord is always teleportable-to later.
+// ------------------------------------------------------------------
+
+// Shared store guard: returns true if the CURRENT position may be stored.
+[proc,ap_focus_store_allowed]()(boolean)
+if (~wilderness_level(coord) > 0) {
+    mes("The focus refuses to bind to the wilderness.");
+    return(false);
+}
+if (~pre_tele_checks(coord) = false) {
+    return(false);
+}
+return(true);
+
+// Shared rub-out guard: returns true if teleporting FROM here is allowed.
+[proc,ap_focus_rub_allowed]()(boolean)
+if (~wilderness_level(coord) > 20) {
+    mes("A mysterious force blocks your teleport.");
+    mes("You can't use this teleport after level 20 wilderness.");
+    return(false);
+}
+if (~pre_tele_checks(coord) = false) {
+    return(false);
+}
+return(true);
+
+[opheld1,ap_teleporting_focus]
+if (~ap_focus_store_allowed = false) {
+    return;
+}
+%ap_focus_coord = coord;
+mes("The focus glows softly as it memorises this location.");
+
+[opheld2,ap_teleporting_focus]
+if (%ap_focus_coord = null) {
+    mes("The focus is dark - it has no location stored.");
+    return;
+}
+if (~ap_focus_rub_allowed = false) {
+    return;
+}
+~player_teleport_normal(%ap_focus_coord);
+
+[opheld1,ap_greater_teleporting_focus]
+if (~ap_focus_store_allowed = false) {
+    return;
+}
+def_int $choice = ~p_choice2_header("Slot 1 <~ap_focus_slot_desc(%ap_focus_coord)>", 1, "Slot 2 <~ap_focus_slot_desc(%ap_focus_coord_2)>", 2, "Store this location in which slot?");
+if ($choice = 1) {
+    %ap_focus_coord = coord;
+    mes("The focus glows softly as it memorises this location into slot 1.");
+} else if ($choice = 2) {
+    %ap_focus_coord_2 = coord;
+    mes("The focus glows softly as it memorises this location into slot 2.");
+}
+
+[opheld2,ap_greater_teleporting_focus]
+if (%ap_focus_coord = null & %ap_focus_coord_2 = null) {
+    mes("The focus is dark - it has no locations stored.");
+    return;
+}
+if (~ap_focus_rub_allowed = false) {
+    return;
+}
+def_int $choice = ~p_choice3_header("Slot 1 <~ap_focus_slot_desc(%ap_focus_coord)>", 1, "Slot 2 <~ap_focus_slot_desc(%ap_focus_coord_2)>", 2, "Nowhere.", 3, "Teleport to which stored location?");
+if ($choice = 1) {
+    if (%ap_focus_coord = null) {
+        mes("That slot is empty.");
+        return;
+    }
+    ~player_teleport_normal(%ap_focus_coord);
+} else if ($choice = 2) {
+    if (%ap_focus_coord_2 = null) {
+        mes("That slot is empty.");
+        return;
+    }
+    ~player_teleport_normal(%ap_focus_coord_2);
+}
+
+// "(empty)" / "(stored)" suffix for the slot-picker rows - coords can't be
+// prettily named without a region table, so stored-ness is the honest label.
+[proc,ap_focus_slot_desc](coord $stored)(string)
+if ($stored = null) {
+    return("(empty)");
+}
+return("(stored)");
+
+// ------------------------------------------------------------------
+// NPC Teleport - engine-tracked "spoken to while holding this" NPC registry
+// (ApNpcTeleport.ts, hooked from Player.tryInteract on opnpc1/apnpc1) + a
+// ::apnpctp <name> fuzzy lookup. The item's Activate op just explains the
+// command, since this rev has no script-side free-text input (verified: no
+// string-input op exists; the ::command cheat path is the only text entry).
+// Accessibility filter is record-time by construction: an NPC only enters the
+// registry when the player is standing there talking to it.
+// ------------------------------------------------------------------
+[opheld1,ap_npc_teleport]
+~mesbox("The writ hums with stored acquaintances.|Type @dbl@::apnpctp@bla@ followed by a name to teleport to any NPC you|have spoken to while carrying it - for example @dbl@::apnpctp aubury@bla@.");
+
+// ::apnpctp <query> - fuzzy-match talked-to NPCs, offer up to 4 + cancel.
+// Debugprocs run unprotected -> hop into a queue script for dialog/teleport.
+[debugproc,ap_npctp](string $query)
+if (inv_total(inv, ap_npc_teleport) < 1) {
+    mes("You need the NPC Teleport writ in your inventory to do that.");
+    return;
+}
+if (string_length($query) < 1) {
+    mes("Usage: ::apnpctp followed by part of an NPC name.");
+    return;
+}
+queue*(ap_npctp_go, 0)($query);
+
+[queue,ap_npctp_go](string $query)
+def_string $n1 = ap_npctp_match_name($query, 0);
+if (compare($n1, "") = 0) {
+    mes("The writ doesn't recall anyone matching '<$query>'.");
+    mes("(It only remembers NPCs you spoke to while carrying it.)");
+    return;
+}
+def_string $n2 = ap_npctp_match_name($query, 1);
+def_string $n3 = ap_npctp_match_name($query, 2);
+def_string $n4 = ap_npctp_match_name($query, 3);
+def_int $choice = 0;
+if (compare($n2, "") = 0) {
+    $choice = ~p_choice2_header($n1, 1, "Nowhere.", 9, "Teleport to whom?");
+} else if (compare($n3, "") = 0) {
+    $choice = ~p_choice3_header($n1, 1, $n2, 2, "Nowhere.", 9, "Teleport to whom?");
+} else if (compare($n4, "") = 0) {
+    $choice = ~p_choice4_header($n1, 1, $n2, 2, $n3, 3, "Nowhere.", 9, "Teleport to whom?");
+} else {
+    $choice = ~p_choice5_header($n1, 1, $n2, 2, $n3, 3, $n4, 4, "Nowhere.", 9, "Teleport to whom?");
+}
+if ($choice = 9 | $choice = 0) {
+    mes("You remain where you were.");
+    return;
+}
+def_coord $dest = ap_npctp_match_coord($query, calc($choice - 1));
+if ($dest = null) {
+    mes("The writ's memory of that one has faded.");
+    return;
+}
+if (~wilderness_level(coord) > 20) {
+    mes("A mysterious force blocks your teleport.");
+    mes("You can't use this teleport after level 20 wilderness.");
+    return;
+}
+if (~pre_tele_checks(coord) = false) {
+    return;
+}
+~player_teleport_normal($dest);

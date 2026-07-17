@@ -20,6 +20,8 @@ import { getProcessSwap } from '#/engine/ApProcessOverrides.js';
 import { getEntranceOverride } from '#/engine/ApEntranceOverrides.js';
 import { applyAllBankedXp, getUnlockCount } from '#/engine/ApUnlockOverrides.js';
 import { recordDiscovery } from '#/engine/ApTracker.js';
+import * as ApNpcTeleport from '#/engine/ApNpcTeleport.js';
+import { getApOption } from '#/engine/ApOptions.js';
 import { getHomeCoord } from '#/engine/ApSpawnOverrides.js';
 import { randomizeAppearance } from '#/engine/ApNewPlayer.js';
 import { applyAreaGate } from '#/engine/ApAreaGates.js';
@@ -576,6 +578,30 @@ const ServerOps: CommandHandlers = {
     // Never null: falls back to vanilla Lumbridge when no ap-spawn.json exists.
     [ScriptOpcode.AP_HOME_COORD]: state => {
         state.pushInt(getHomeCoord());
+    },
+
+    // custom: Archipelago user-facing option lookup (ap-options.json via
+    // ApOptions.getApOption). Unknown names fail open to 1 (enabled).
+    [ScriptOpcode.AP_OPTION]: state => {
+        const name = state.popString();
+
+        state.pushInt(getApOption(name) ? 1 : 0);
+    },
+
+    // custom: Archipelago NPC Teleport addon lookups (ApNpcTeleport registry).
+    // Name returns '' past the last match; coord returns -1 (script null).
+    [ScriptOpcode.AP_NPCTP_MATCH_NAME]: state => {
+        const index = state.popInt();
+        const query = state.popString();
+
+        state.pushString(ApNpcTeleport.matchName(query, index));
+    },
+
+    [ScriptOpcode.AP_NPCTP_MATCH_COORD]: state => {
+        const index = state.popInt();
+        const query = state.popString();
+
+        state.pushInt(ApNpcTeleport.matchCoord(query, index));
     },
 
     // custom: Archipelago skip-tutorial support - re-roll the active player's

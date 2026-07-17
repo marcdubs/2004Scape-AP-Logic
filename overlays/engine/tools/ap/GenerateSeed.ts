@@ -34,6 +34,7 @@ import {
     applyQuestGates,
     buildItemPool,
     buildLocationCatalog,
+    loadApOptions,
     buildQuestGateCopies,
     computeReachability,
     realUnlockKeys,
@@ -358,7 +359,7 @@ function stageAndValidate(realConfigDir: string, seed: number, pool: PoolMode, p
     // Region/entrance/gated-area/spawn tables are independent of placement mode - carry
     // the REAL ones over (read-only copy) so the validator's region-aware logic still
     // means something, without ever writing to the real config dir until validation passes.
-    for (const name of ['ap-entrances.json', 'ap-gated-areas.json', 'ap-spawn.json']) {
+    for (const name of ['ap-entrances.json', 'ap-gated-areas.json', 'ap-spawn.json', 'ap-options.json']) {
         const src = path.join(realConfigDir, name);
         if (fs.existsSync(src)) {
             fs.copyFileSync(src, path.join(scratchDir, name));
@@ -427,7 +428,7 @@ function main(): void {
     const args = parseArgs(process.argv.slice(2));
     const quests = loadQuests();
     const goals = loadGoals();
-    const locations = buildLocationCatalog(quests);
+    const locations = buildLocationCatalog(quests, loadApOptions(args.configDir));
     const itemPoolSize = buildItemPool(args.pool).length + buildQuestGateCopies(quests).length;
 
     console.log(`GenerateSeed: building placement-mode seed ${args.seed} (pool=${args.pool}, maxProgressionLevel=${args.maxProgressionLevel})...`);

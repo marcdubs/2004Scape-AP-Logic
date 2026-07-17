@@ -2507,3 +2507,53 @@ Surface #8 built - 230 music-track unlock checks, ZERO content hooks. Key facts:
 - No new varps -> the varp.pack staleness race did NOT apply this time (only
   ap-checks.json + tools changed; no pack rebuild needed at all, install.js +
   typecheck + dry-run was the whole verification loop).
+
+## Session: options system, addon items, delivery fix (2026-07-17, later same day)
+
+problems.txt round: delivery bug fix, ap-options.json, four addon items, relics
+research (docs/relics-proposal.md). Details in checks-and-unlocks.md "Options &
+addon items"; hard-won bits for future sessions:
+
+- **Reward delivery bug #2**: `inv_freespace(inv) > 0` is NOT "the reward fits" -
+  a 25x NON-stackable reward (blankrune - rune essence is unstackable in this
+  rev) into 5 free slots ground-drops 20. ap_deliver_reward now requires
+  freespace >= qty for non-stackables, else banks the WHOLE reward. Any future
+  inv_add of qty>1 non-stackables must do the same math.
+- **rs2 string literals cannot contain `<` `>`** - they're interpolation syntax
+  (`<tostring(...)>`); "type ::apnpctp <name>" was a syntax error. Reword.
+- **The pack staleness race generalizes, but the fix does NOT**: `rm varp.pack`
+  is safe (regenerates identically - crawl order is deterministic and there are
+  no side entries), but **`rm obj.pack` is DESTRUCTIVE** - it renumbers every
+  obj (crawl order != historical order) and silently DROPS all `cert_*` rows
+  (they're skipped by the crawl; they exist only as explicit pack lines), which
+  broke the build (`cert_mithril_bar could not be resolved`) and would have
+  corrupted every saved bank. Recovery: `git -C ../Server/content checkout
+  pack/obj.pack`, then HAND-APPEND `nextid=name` lines for new objs (this
+  session: 3894-3896 caskets re-added + 3897-3901 addons). `touch` on the
+  source .obj did NOT trigger revalidation on this DrvFs setup - hand-append is
+  the reliable obj recipe.
+- **Coord varps are first-class**: `type=coord scope=perm`, `%v = coord;`,
+  `p_telejump(%v)`, and `= null` is TRUE for a never-set coord varp (vanilla
+  precedent: exit_essence_mine_coord) - no pack/unpack math needed.
+- **Engine hooks into vanilla files are DIRECT edits to the ../Server checkout**
+  (uncommitted; e.g. Player.ts setVar/addXp hooks) - only NEW modules live in
+  overlays/engine/src. This session added the third+fourth such hook (both
+  tryInteract branches -> ApNpcTeleport.onNpcTalk, gated on
+  targetOp = APNPC1 & target instanceof Npc). If ../Server is ever re-cloned,
+  re-apply these from `git -C ../Server/engine diff` (kept uncommitted).
+- **ap-options.json has THREE readers** that must stay format/default-synced:
+  engine ApOptions.ts (runtime, cached per boot), tools
+  PlacementEngine.loadApOptions (generator/validator/sim), and rs2 via the
+  ap_option command (opcode 1910). New toggles: add to ApOptions DEFAULTS +
+  shipped json; tools loader only if the toggle affects the location catalog.
+- **::command args**: the cheat line is lowercased and space-split; a
+  (string $x) debugproc receives ONE word. ::apnpctp therefore matches
+  multi-word NPC names by first word/substring only.
+- Verified offline: pack build clean (post obj.pack recovery), typecheck clean,
+  seed 777 dry-run unchanged (517 locations / 172 placed / goals complete).
+  NOT in-game tested. User checklist: ::apreward addons (expect Bank Box, then
+  compass, focus, greater, writ on repeats), Bank Box "Bank" op, compass
+  4-destination teleport, focus Store/Rub (+greater 2-slot dialogs), talk to an
+  NPC holding the writ then ::apnpctp <partial name>, rune-essence reward with
+  a nearly-full inventory (expect full 25 in bank, nothing on floor),
+  musicChecks:false boot (watch count log line shows "230 disabled").

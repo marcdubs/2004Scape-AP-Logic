@@ -1,0 +1,89 @@
+// AP addon reward items (problems.txt 2026-07-17, docs/checks-and-unlocks.md
+// "Addon items"). Each is gated by an ap-options.json toggle at REWARD-ROLL
+// time (ap_try_addon_reward in ap_rewards.rs2) - an already-delivered item
+// keeps working if its option is later disabled (fail-open usage, consistent
+// with every other AP toggle). Visual assets are borrowed from vanilla objs:
+// casket (bank box - user request), trail sextant (tree compass), staff orb
+// recolors (foci), sealed scroll (npc teleport). Pack ids auto-append on
+// build.
+
+[ap_bank_box]
+name=Bank Box
+desc=A magical box connected to every bank in RuneScape.
+weight=5kg
+model=inv_casket
+2dxof=3
+2dyof=-6
+2dzoom=1410
+2dyan=1592
+2dxan=164
+cost=50
+iop1=Bank
+members=yes
+tradeable=no
+
+[ap_tree_compass]
+name=Tree Compass
+desc=Its needle always points to the nearest spirit tree.
+weight=200g
+model=inv_trail_sextant
+2dxof=3
+2dyof=10
+2dzoom=690
+2dyan=124
+2dxan=488
+cost=50
+iop1=Teleport
+members=yes
+tradeable=no
+
+[ap_teleporting_focus]
+name=Teleporting Focus
+desc=Stores a single location within its crystal lattice.
+weight=1lb
+model=inv_stafforb
+recol1s=23263
+recol1d=30753
+2dxof=3
+2dyof=3
+2dzoom=790
+2dyan=96
+2dxan=316
+cost=100
+iop1=Store
+iop2=Rub
+members=yes
+tradeable=no
+
+[ap_greater_teleporting_focus]
+name=Greater Teleporting Focus
+desc=Stores two locations within its crystal lattice.
+weight=1lb
+model=inv_stafforb
+recol1s=23263
+recol1d=17350
+2dxof=3
+2dyof=3
+2dzoom=790
+2dyan=96
+2dxan=316
+cost=200
+iop1=Store
+iop2=Rub
+members=yes
+tradeable=no
+
+[ap_npc_teleport]
+name=NPC Teleport
+desc=A writ of summoning - it works the other way around.
+weight=10g
+model=inv_scrollwithseal
+2dxof=1
+2dyof=7
+2dzoom=1040
+2dyan=120
+2dxan=380
+cost=100
+iop1=Activate
+members=yes
+tradeable=no

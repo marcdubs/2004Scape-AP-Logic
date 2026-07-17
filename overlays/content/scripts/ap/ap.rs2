@@ -128,3 +128,17 @@ if (%ap_kbd_killed = 1) {
 // progressive cap when the XP arrived) that now fits under the current caps.
 // Login safety net; caps rising via a check grant applies it engine-side already.
 [command,ap_apply_banked_xp]
+
+// info: custom - user-facing option lookup (data/config/ap-options.json via
+// engine ApOptions). 1 = enabled, 0 = disabled; unknown names fail open to 1.
+// Used to gate optional addon reward items (Bank Box, Tree Compass, ...).
+[command,ap_option](string $name)(int)
+
+// info: custom - NPC Teleport addon lookup (engine ApNpcTeleport registry of
+// NPCs the player has spoken to while carrying the writ). Fuzzy-matches $query
+// against recorded display names; $index selects the ranked match (0-based).
+// _name returns "" past the last match; _coord returns null likewise. Two
+// single-return commands instead of one tuple return, deliberately - simpler
+// stack contract.
+[command,ap_npctp_match_name](string $query, int $index)(string)
+[command,ap_npctp_match_coord](string $query, int $index)(coord)

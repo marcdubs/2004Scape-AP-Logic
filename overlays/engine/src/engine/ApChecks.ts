@@ -15,6 +15,7 @@ import path from 'path';
 
 import VarBitType from '#/cache/config/VarBitType.js';
 import VarPlayerType from '#/cache/config/VarPlayerType.js';
+import { getApOption } from '#/engine/ApOptions.js';
 import * as ApUnlockOverrides from '#/engine/ApUnlockOverrides.js';
 import { recordDiscovery } from '#/engine/ApTracker.js';
 import type Player from '#/engine/entity/Player.js';
@@ -96,10 +97,20 @@ function loadWatches(): Map<number, Watch[]> {
         const parsed = JSON.parse(fs.readFileSync(WATCHES_PATH, 'utf8')) as { watches?: unknown[] };
         let loaded = 0;
         let unknown = 0;
+        let optionedOut = 0;
+        const musicChecks = getApOption('musicChecks');
 
         for (const raw of parsed.watches ?? []) {
             if (!isRawWatch(raw)) {
                 printWarning(`AP checks: skipping malformed watch entry ${JSON.stringify(raw)}`);
+                continue;
+            }
+
+            // Option gate (ap-options.json): music-track checks can be turned off
+            // wholesale - the id prefix is the contract (every music watch is
+            // "music_<track>", nothing else uses that prefix).
+            if (!musicChecks && raw.check.startsWith('music_')) {
+                optionedOut++;
                 continue;
             }
 
@@ -133,7 +144,7 @@ function loadWatches(): Map<number, Watch[]> {
             loaded++;
         }
 
-        printInfo(`AP checks: loaded ${loaded} varp watch(es)${unknown > 0 ? ` (${unknown} unresolved)` : ''}`);
+        printInfo(`AP checks: loaded ${loaded} varp watch(es)${unknown > 0 ? ` (${unknown} unresolved)` : ''}${optionedOut > 0 ? ` (${optionedOut} disabled by ap-options.json)` : ''}`);
     } catch (err) {
         printWarning(`AP checks: failed to parse ${WATCHES_PATH}, no varp-watch checks active (${err instanceof Error ? err.message : err})`);
     }

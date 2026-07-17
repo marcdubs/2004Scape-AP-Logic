@@ -19,7 +19,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { allSkillCaps, loadSeedConfig } from '../sim/ConfigLoader.js';
-import { applyPlacementItem, applyQuestGates, buildLocationCatalog, capsFromCounts, loadPlacements, reachableFromState } from '../sim/PlacementEngine.js';
+import { applyPlacementItem, applyQuestGates, buildLocationCatalog, capsFromCounts, loadApOptions, loadPlacements, reachableFromState } from '../sim/PlacementEngine.js';
 import { Goal, QuestReq, StatName } from '../sim/types.js';
 
 import { WorldTile, parseRawCoord } from './Coords.js';
@@ -343,7 +343,7 @@ function main(): void {
     const goals: Goal[] = JSON.parse(fs.readFileSync(GOALS_PATH, 'utf8')).goals;
     const questsById = new Map(quests.map(q => [q.id, q]));
 
-    const placementLocations = placementsFile.present ? buildLocationCatalog(quests) : [];
+    const placementLocations = placementsFile.present ? buildLocationCatalog(quests, loadApOptions(CONFIG_DIR)) : [];
     function recomputeCapsFromPlacements(): void {
         statCaps = capsFromCounts(placementCounts);
         statCapsLower = new Map(Object.entries(statCaps).map(([k, v]) => [k.toLowerCase(), v]));

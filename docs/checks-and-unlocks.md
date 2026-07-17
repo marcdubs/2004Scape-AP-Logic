@@ -203,6 +203,52 @@ flag in `buildLocationCatalog` if exploration-based progression is wanted
 (that's essentially the OSRS apworld's chunk system, so it's a defensible
 future option). Location pool 287 → 517 (345 filler).
 
+**Configurable (2026-07-17):** `data/config/ap-options.json` `"musicChecks":
+false` removes all 230 from BOTH the runtime watcher (`ApChecks.loadWatches`
+skips `music_*` ids) and the generator/validator/simulator catalog
+(`loadApOptions` → `buildLocationCatalog`) — for AP games already paired with
+lots of checks. Two deliberate loaders (engine `ApOptions.ts`, tools
+`PlacementEngine.loadApOptions`) — keep formats/defaults in sync. Regenerate
+the seed after flipping it; the option file is carried into GenerateSeed's
+validation scratch dir.
+
+## Options & addon items (`ap-options.json`, built 2026-07-17)
+
+`data/config/ap-options.json` is the user-facing toggle file (boot-time; all
+keys default true; missing file = all enabled). rs2 reads it through the
+`ap_option(string)(int)` engine command (opcode 1910). Current keys:
+`musicChecks`, `addonBankBox`, `addonTreeCompass`, `addonTeleportingFocus`,
+`addonNpcTeleport`.
+
+**Addon items** (problems.txt requests; `ap_addons.obj`/`ap_addons.rs2`): a new
+`addons` reward-roll slot (1-in-16) delivers the first enabled-and-unowned item
+on a fixed ladder — Bank Box → Tree Compass → Teleporting Focus → Greater
+Teleporting Focus (only once the basic focus is owned) → NPC Teleport; all
+owned/disabled → keepsake fallback. Ownership = inventory or bank, so lost
+items become rollable again. Disabling an option stops future rolls but never
+bricks a delivered item.
+
+- **Bank Box** — casket-model item, `Bank` op jumps to the global `@openbank`
+  label (no PIN/proximity preconditions exist in this rev).
+- **Tree Compass** — teleports to any of the four spirit-tree sites
+  (`^*_tree` constants), deliberately bypassing the vanilla Tree Gnome
+  Village / Grand Tree talk-gates (the item IS the unlock; candidate for AP
+  logic later). Standard 20-wilderness + `~pre_tele_checks` gating.
+- **Teleporting Focus / Greater** — `Store`/`Rub` ops; stored spots live in
+  `%ap_focus_coord` (+`_2` for greater's second slot; slot 1 shared) as
+  `type=coord` perm varps. Store refuses anywhere Rub couldn't return to
+  (any wilderness, `pre_tele_checks` zones).
+- **NPC Teleport** — engine-tracked registry (`ApNpcTeleport.ts`, hooked from
+  `Player.tryInteract` on Talk-to) of NPCs spoken to while carrying the writ;
+  `::apnpctp <name>` fuzzy-looks-up (top 4 + cancel via choice dialogs) and
+  teleports to the NPC's spawn-home coord. Registry persists to
+  `ap-npc-teleport.json` (not per-seed). Known limitation: the cheat parser
+  passes one word, so multi-word names match on their first word/substring.
+
+Reward-roll odds today: 16 slots — 13 goods categories, caskets, addons,
+keepsakes(default). See also [relics-proposal.md](relics-proposal.md) for the
+researched Leagues-relics expansion that would ride this same option system.
+
 ---
 
 ## Rewards (the filler pool)

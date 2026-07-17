@@ -14,6 +14,18 @@ scope=perm
 [ap_activities]
 scope=perm
 
+// AP addon: Teleporting Focus stored locations (ap_addons.rs2). Slot 1 is
+// shared by the basic and greater focus; slot 2 is greater-only. type=coord is
+// a first-class persistable varp type (precedent: arhein_crate_coord,
+// exit_essence_mine_coord, macro_event_target_coord).
+[ap_focus_coord]
+type=coord
+scope=perm
+
+[ap_focus_coord_2]
+type=coord
+scope=perm
+
 // AP: per-skill banked XP (2026-07-16, "struck with inspiration hits your level
 // cap" fix - docs/lessons-learned.md progressive-cap section). When
 // ApUnlockOverrides.clampStatXp truncates an xp gain at the current progressive

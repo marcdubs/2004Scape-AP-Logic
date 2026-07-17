@@ -42,7 +42,55 @@ if (compare($category, "xp") = 0) {
     ~ap_grant_xp_reward;
     return;
 }
+if (compare($category, "addons") = 0) {
+    if (~ap_try_addon_reward = true) {
+        return;
+    }
+    // every enabled addon already owned (or all disabled) - the slot falls
+    // back to a keepsake so the roll is never a dud.
+    ~ap_deliver_reward(~ap_roll_reward("keepsakes", 1));
+    return;
+}
 ~ap_deliver_reward(~ap_roll_reward($category, ~ap_level_for_category($category)));
+
+// The addon drop ladder (problems.txt 2026-07-17): first enabled-and-not-yet-
+// owned item in a fixed power-curve order is delivered. Ownership = inventory
+// OR bank (these are untradeable and not equippable, so those are the only two
+// places one can live); a dropped/destroyed addon therefore becomes rollable
+// again, which is the desired self-healing behavior. The Greater focus only
+// rolls once the basic focus is owned ("upgraded to store 2 locations" -
+// problems.txt), and both keep working side by side (slot 1 is shared).
+// ap_option consults data/config/ap-options.json engine-side.
+[proc,ap_try_addon_reward]()(boolean)
+if (ap_option("addonBankBox") = 1 & ~ap_addon_owned(ap_bank_box) = false) {
+    ~ap_deliver_reward(ap_bank_box, 1);
+    return(true);
+}
+if (ap_option("addonTreeCompass") = 1 & ~ap_addon_owned(ap_tree_compass) = false) {
+    ~ap_deliver_reward(ap_tree_compass, 1);
+    return(true);
+}
+if (ap_option("addonTeleportingFocus") = 1) {
+    if (~ap_addon_owned(ap_teleporting_focus) = false & ~ap_addon_owned(ap_greater_teleporting_focus) = false) {
+        ~ap_deliver_reward(ap_teleporting_focus, 1);
+        return(true);
+    }
+    if (~ap_addon_owned(ap_teleporting_focus) = true & ~ap_addon_owned(ap_greater_teleporting_focus) = false) {
+        ~ap_deliver_reward(ap_greater_teleporting_focus, 1);
+        return(true);
+    }
+}
+if (ap_option("addonNpcTeleport") = 1 & ~ap_addon_owned(ap_npc_teleport) = false) {
+    ~ap_deliver_reward(ap_npc_teleport, 1);
+    return(true);
+}
+return(false);
+
+[proc,ap_addon_owned](namedobj $item)(boolean)
+if (inv_total(inv, $item) > 0 | inv_total(bank, $item) > 0) {
+    return(true);
+}
+return(false);
 
 // info: custom - XP-drop reward category (10k-50k real XP in a uniformly
 // random skill, all 19 including hitpoints - flat random across all of them
@@ -57,7 +105,7 @@ ap_stat_advance_raw($stat, $exp);
 mes("You are struck by inspiration! +<tostring(calc($exp / 10))> <~stat_name($stat)> XP.");
 
 [proc,ap_random_category]()(string)
-def_int $r = random(15);
+def_int $r = random(16);
 if ($r = 0) {
     return("armour");
 } else if ($r = 1) {
@@ -86,6 +134,8 @@ if ($r = 0) {
     return("crafting_supplies");
 } else if ($r = 13) {
     return("caskets");
+} else if ($r = 14) {
+    return("addons");
 }
 return("keepsakes");
 
@@ -175,17 +225,36 @@ return($chosen_item, $chosen_qty);
 // ground-drop the user saw. Gate the stack-fits-without-a-slot case behind
 // oc_stackable so non-stackables only take the inventory branch when a slot is
 // actually free.
+//
+// Bug fix 2 (2026-07-17, user report: 25x rune essence with a partly-full
+// inventory - some landed, the rest hit the floor): "a slot is actually free"
+// is not enough for a MULTI-QTY non-stackable reward (blankrune x25, potions
+// x3, ...) - inv_add fills whatever slots exist and ground-drops the
+// remainder, and the bank branch was never reached because freespace was > 0.
+// The inventory branch now requires room for the WHOLE quantity
+// (freespace >= qty for non-stackables); anything short of that banks the
+// entire reward instead of splitting. Bank overflow is not handled by design:
+// bank.inv is stackall (240 distinct slots), so a full bank means 240 distinct
+// item types - not a state worth code here.
 [proc,ap_deliver_reward](namedobj $item, int $qty)
 if ($item = null) {
     mes("AP: no reward available for that roll.");
     return;
 }
-if (inv_freespace(inv) > 0 | (oc_stackable($item) = true & inv_total(inv, $item) > 0)) {
+def_boolean $fits = false;
+if (oc_stackable($item) = true) {
+    if (inv_freespace(inv) > 0 | inv_total(inv, $item) > 0) {
+        $fits = true;
+    }
+} else if (inv_freespace(inv) >= $qty) {
+    $fits = true;
+}
+if ($fits = true) {
     inv_add(inv, $item, $qty);
     mes("Archipelago reward: <tostring($qty)> x <oc_name($item)>!");
 } else {
     inv_add(bank, $item, $qty);
-    mes("Archipelago reward: <tostring($qty)> x <oc_name($item)> (inventory full, sent to your bank)!");
+    mes("Archipelago reward: <tostring($qty)> x <oc_name($item)> (no inventory space, sent to your bank)!");
 }
 
 // ::apreward [category] [level] - bare = fully random category + the
@@ -193,7 +262,7 @@ if (inv_freespace(inv) > 0 | (oc_stackable($item) = true & inv_total(inv, $item)
 // make); with args, forces category/tier so every level bracket can be
 // eyeballed without playing to it. Valid category names: armour, weapons,
 // ranged_gear, arrows, runes, potions, food, tools, cash, xp, herb_supplies,
-// runecraft_supplies, crafting_supplies, caskets, keepsakes - an unrecognized name
+// runecraft_supplies, crafting_supplies, caskets, addons, keepsakes - an unrecognized name
 // rolls no eligible rows and prints ap_deliver_reward's "no reward available"
 // message. xp ignores $level entirely (it's not tiered - see
 // ap_grant_xp_reward); keepsakes ignores $level too (flat pool).
@@ -215,6 +284,12 @@ if (compare($category, "") = 0) {
 }
 if (compare($category, "xp") = 0) {
     ~ap_grant_xp_reward;
+    return;
+}
+if (compare($category, "addons") = 0) {
+    if (~ap_try_addon_reward = false) {
+        mes("AP: all enabled addon items already owned (or all addons disabled).");
+    }
     return;
 }
 if ($level <= 0) {
