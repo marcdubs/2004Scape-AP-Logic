@@ -2410,3 +2410,30 @@ view now 63/63 (live strict, region-only scratch, generator feasibility).
   previously-infeasible checks still HOLD filler (placed before the fix) - harmless,
   just not progression-bearing. A GenerateSeed rerun would make all 274 checks
   progression-eligible but resets run state - offered, user's call.
+
+## Session addendum: all-quests gating + hidden quest tab (2026-07-17, same session)
+
+User: "only 17 gated quests makes it less progressive" -> QUEST_GATE_IDS expanded to
+61 (every quest except dragon - prior user decision, goal quest stays 32 QP - and
+horror - varbit completion watch, the varp-write veto can't key off it). Pool
+128 -> 172 progression items. All shipped-ap-checks.json quest watches turned out
+plain-varp (the old "cog bits / blackarmgang OR" exclusions were about START paths,
+not watches): start-path leaks are handled by ApQuestGates' new EXTRA_GATE_VARPS
+(blackarmgang +phoenixgang, upass +ibanmulti - both PROVEN from update_questlist's
+special cases; other quests' alternate paths, if any, fail OPEN = quest startable
+despite lock, mild and logic-safe).
+
+Quest tab: new overlays/content/scripts/general/scripts/quests.rs2 (first full
+vanilla-file content overlay besides levelrequire) - ~ap_quest_tab_entry wraps all
+61 gated entries of ~update_questlist: locked (unlock count < 1 AND progress 0) ->
+if_settext "???" + grey 0x5A5A5A; else restore the questlist.if name + vanilla
+colour proc. ap_unlock_count returns 99 outside AP runs = vanilla untouched.
+Component ids match quest ids EXCEPT fortress -> blackknight. ap_checks.rs2's
+unlock-announce branch now calls ~update_questlist so the tab un-hides the moment
+the item lands (also flips the sidebar to the quest tab - vanilla-parity behavior
+of that proc). Generated programmatically from the vanilla file (CRLF preserved,
+names parsed from questlist.if); pack build 1:41 clean. Best-of-5 entrance grading
+addendum: RandomizeEntrances grades 5 candidate tables via ValidateSeed
+--strict-quests --json on a placements-free scratch dir and keeps the
+least-stranded goals-ok one (perfect tables are empirically rare: ~0/20 samples).
+Tracker's Unlocks tab reads questGates dynamically - no hardcoded 17 anywhere.
