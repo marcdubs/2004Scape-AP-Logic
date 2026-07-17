@@ -2203,3 +2203,63 @@ already received plus the gated-quest LIST (which blocked-start messages announc
 anyway), never where the remaining items are placed. present:false (sentinel 99 on
 progressive_melee = no ap-unlocks.json = not an AP run) hides the panel with an
 explanatory empty-state. Engine/web change only - restart, no pack rebuild.
+
+## Session addendum: quest-region extractor (2026-07-17)
+
+The user challenged the "62 of 63 quests only need the mainland" assumption, and the
+data proved them right: `tools/logic/ExtractQuestRegions.ts` (new) statically parses
+all quest spatial requirements and found only **8 of 64 quests are satisfiable
+entirely on the mainland region**. 56 need review/anchoring (upstairs NPCs behind
+shuffle-pool staircases, islands, instances, gated interiors).
+
+- **How it works**: for each quest, gathers rs2 trigger blocks from the quest folder
+  PLUS any block tree-wide that touches the quest's varps (declared in
+  `configs/*.varp`; quest logic leaks heavily - Dragon Slayer's varps appear in 21+
+  non-quest files under doors/, areas/, ladders+stairs/). From each block it
+  extracts: trigger-subject entities (`[opnpc1,x]`/`[oploc1,x]`/`[opobj*,x]`/
+  `[ai_*,x]`, `_category` subjects expanded via `category=` config lines), zone
+  triggers, raw coord literals (comment-stripped, classified by enclosing command:
+  p_teleport/p_telejump -> script-edge destination, inzone -> zone corner, else
+  generic), and `npc_find`/`npc_add`/`loc_add`/`obj_add` entity refs. Placements come
+  from the jm2 `==== NPC/OBJ/LOC ====` sections via pack-file id->name; every tile
+  resolves to a region id via region-graph.json.
+- **Semantics**: entities with multiple placements are ANY-OF (scripts trigger on the
+  entity TYPE - any reachable placement satisfies the interaction; `mainlandOk` =
+  some placement is mainland). Static extraction over-collects (can't tell mandatory
+  from flavor), so the draft is conservative in the safe direction: it can flag a
+  fine seed, never bless a broken one. p_teleport literals also emit draft EDGES with
+  same-block context regions as candidate sources (Holy Grail's Karamja<->fisher-realm
+  pair extracts perfectly, both directions + correct source region).
+- **Output**: `tools/logic/data/quest-regions.generated.json` (~1.6MB, checked in
+  like region-graph.json) - per quest: classification (all-mainland/needs-review),
+  region rollup, provenance-annotated evidence (`file:line`), edges, flags
+  (unresolved-category, unwalkable = cutscene/unbuilt tile, no-placements =
+  script-spawned-only). Run from Server/engine:
+  `npx tsx tools/logic/ExtractQuestRegions.ts` (~19s, no pack build needed).
+- **RegionGraph extracted to tools/logic/RegionGraph.ts** (verbatim from
+  ValidateSeed.ts, which now imports it) so the extractor and the planned
+  GenerateSeed spawn-distance weighting share one implementation. ValidateSeed
+  re-run post-refactor: identical result (474 regions, 63/63 quests, 3/3 goals).
+- **Spot-checks that build confidence**: Dragon Slayer -> Duke Horacio upstairs
+  (level 1 Lumbridge castle, behind a shuffle-pool staircase) + Guildmaster inside
+  the QP-gated Champions' Guild + Crandor +100 instance regions; Imp Catcher ->
+  Mizgog level 2 Wizards' Tower. All real, all missed by the single hand-curated
+  anchor that existed before. `barcrawl` appears as a 64th "quest" (folder exists,
+  sim models it as a goal) - expected, maps to the barcrawl goal.
+- **Known limits (v1, documented not silently dropped)**: proc/label calls are NOT
+  followed cross-file (varp sweep is the cross-file mechanism; following shared
+  helpers like ~set_sail would over-collect wildly); `p_teleport($var)` where the
+  var holds a def_coord literal is captured as a generic coord but not as an edge;
+  opnpct/oploct spell-subjects and a few `_category` subjects flag as unresolved.
+- **Next steps agreed with the user**: (1) review/merge needs-review quests into
+  curated quest-regions.json - the review question per item is only "mandatory or
+  optional?", the spatial facts are machine-verified; (2) extend quest-regions.json
+  schema with any-of anchor groups + derived script edges and teach ValidateSeed to
+  consume them; (3) bridge RegionGraph into GenerateSeed for spawn-distance-weighted
+  progression placement (assumed fill's uniform candidate pick at
+  GenerateSeed.ts:171 becomes distance-weighted - safe, fill only ever places into
+  provably reachable locations).
+- **Env note**: the esbuild ping-pong fix hit an `ENOTEMPTY`/`Input/output error` on
+  a locked `.win32-x64-*` temp dir (Windows-side file lock on esbuild.exe). Harmless:
+  if `ls node_modules/@esbuild/` shows BOTH linux-x64 and win32-x64, proceed - the
+  leftover temp dir doesn't break either side.
