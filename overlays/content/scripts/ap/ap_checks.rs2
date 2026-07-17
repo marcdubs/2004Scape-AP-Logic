@@ -24,6 +24,10 @@
 if ($is_unlock = 1) {
     ~music_jingle("quest complete 1");
     mes("AP check <~ap_prettify_check_id($check_id)>: received <$display>!");
+    // A "Quest unlock" item may have just revealed a hidden quest-tab entry -
+    // refresh the tab immediately rather than waiting for the next login
+    // (~update_questlist is cheap and idempotent; see ~ap_quest_tab_entry).
+    ~update_questlist;
 } else {
     mes("Archipelago check: <~ap_prettify_check_id($check_id)>!");
     ~ap_grant_check_reward;

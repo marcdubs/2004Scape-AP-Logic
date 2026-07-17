@@ -47,6 +47,20 @@ interface Gate {
     label: string;
 }
 
+// Quests whose START writes a varp other than (or in addition to) their completion
+// watch varp - the veto must cover every start path. Verified against
+// general/scripts/quests.rs2's update_questlist special cases:
+//   - blackarmgang (Shield of Arrav): joining the Phoenix Gang writes %phoenixgang,
+//     the Black Arm path writes %blackarmgang (the watch varp).
+//   - upass (Underground Pass): stage 1 sets a bit in %ibanmulti instead of the
+//     %upass progress varp.
+// Extra varps fail soft: an unresolved name is skipped with a warning (quest stays
+// gated via its watch varp at minimum).
+const EXTRA_GATE_VARPS: Record<string, string[]> = {
+    blackarmgang: ['phoenixgang'],
+    upass: ['ibanmulti']
+};
+
 let gatesByVarp: Map<number, Gate> | null = null;
 
 function loadGates(): Map<number, Gate> {
@@ -91,7 +105,16 @@ function loadGates(): Map<number, Gate> {
             continue;
         }
         const key = `quest_${questId}`;
-        map.set(varpId, { questId, key, label: questGateLabel(key) });
+        const gate: Gate = { questId, key, label: questGateLabel(key) };
+        map.set(varpId, gate);
+        for (const extra of EXTRA_GATE_VARPS[questId] ?? []) {
+            const extraId = VarPlayerType.getId(extra);
+            if (extraId === -1) {
+                printWarning(`AP quest gates: extra varp "${extra}" for gated quest "${questId}" did not resolve - that start path stays open`);
+                continue;
+            }
+            map.set(extraId, gate);
+        }
     }
 
     printInfo(`AP quest gates: ${map.size} quest-start gate(s) active`);

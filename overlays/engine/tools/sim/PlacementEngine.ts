@@ -79,16 +79,17 @@ export const DS_STAGE_IDS = ['ds_started', 'ds_oziach', 'ds_ship_ready', 'ds_map
 
 export const BARCRAWL_BAR_IDS = Array.from({ length: 10 }, (_, i) => `barcrawl_bar_${i + 1}`);
 
-// Family D (docs/checks-and-unlocks.md unlock family D): curated quests that placement
-// mode locks behind a `quest_<id>` pool item. Until the item is collected the quest can
-// neither be STARTED in-game (engine/src/engine/ApQuestGates.ts vetoes the 0 -> started
-// varp write - keep its QUEST_GATE_LABELS mirror in sync with this list) nor completed
-// in logic (Engine.gateSatisfied). Curation rules: plain-varp gte quests only (cog's
-// bit-mode counter, horror's varbit, and blackarmgang's two-watch OR-shape are excluded
-// because the runtime gate keys off "varp goes 0 -> nonzero"), never the Dragon Slayer
-// goal quest (user decision 2026-07-16: DS stays 32 QP + combat floor, no gate item),
-// spread across easy/mid/hard so gates land in every band of the sphere structure.
-export const QUEST_GATE_IDS: readonly string[] = ['cook', 'sheep', 'doric', 'imp', 'gobdip', 'hetty', 'vampire', 'demon', 'prince', 'squire', 'druid', 'fishingcompo', 'arthur', 'junglepotion', 'crest', 'grail', 'zanaris'];
+// Family D (docs/checks-and-unlocks.md unlock family D): quests locked behind a
+// `quest_<id>` pool item. Until the item is collected the quest can neither be
+// STARTED in-game (engine/src/engine/ApQuestGates.ts vetoes the 0 -> started varp
+// write - keep its EXTRA_GATE_VARPS + ApUnlockOverrides' QUEST_GATE_LABELS and the
+// content overlay's update_questlist in sync with this list) nor completed in logic
+// (Engine.gateSatisfied). Expanded 2026-07-17 (user decision: "all quests in the
+// pool") from the original curated 17 to EVERY quest except: dragon (user decision
+// 2026-07-16: the Dragon Slayer goal quest stays 32 QP + combat floor, no gate
+// item) and horror (its completion watch is a varbit - the varp-write veto can't
+// key off it reliably).
+export const QUEST_GATE_IDS: readonly string[] = ['arena', 'arthur', 'ball', 'biohazard', 'blackarmgang', 'blackknight', 'chompybird', 'cog', 'cook', 'crest', 'death', 'demon', 'desertrescue', 'doric', 'druid', 'druidspirit', 'drunkmonk', 'eadgar', 'elemental_workshop', 'elena', 'fishingcompo', 'fluffs', 'gobdip', 'grail', 'grandtree', 'haunted', 'hazeelcult', 'hero', 'hetty', 'hunt', 'ikov', 'imp', 'itexam', 'itgronigen', 'itwatchtower', 'junglepotion', 'legends', 'mcannon', 'mortton', 'murder', 'priest', 'priestperil', 'prince', 'regicide', 'romeojuliet', 'runemysteries', 'scorpcatcher', 'seaslug', 'sheep', 'sheepherder', 'squire', 'tbwt', 'totem', 'tree', 'troll', 'upass', 'vampire', 'viking', 'waterfall', 'zanaris', 'zombiequeen'];
 
 /** The ap-unlocks.json key a family-D gate reads for quest `questId`. */
 export function questGateKey(questId: string): string {
