@@ -238,25 +238,29 @@ export function buildItemPool(mode: PoolMode): ProgressionCopy[] {
     // `ap_unlock_count(key) < tier`, so N copies collected == tier N unlocked). ---
     for (const family of GEAR_FAMILIES) {
         for (let tier = 1; tier <= 7; tier++) {
-            const levelThreshold = GEAR_TIER_LEVELS[tier - 1];
+            // Display is deliberately tier-neutral (standard AP convention): every copy
+            // is mechanically identical (count += 1, engine unlocks tier N at count N),
+            // so the player always receives their NEXT tier regardless of which pool
+            // copy they find - a tier-flavored label would misstate the grant.
             pool.push({
                 uid: `${family.key}#${tier}`,
                 placementItem: family.key,
                 placementCount: 1,
-                display: `Progressive ${family.label} (tier ${tier} - unlocks lv ${levelThreshold}+ ${family.label.toLowerCase()} equipment)`,
+                display: `Progressive ${family.label}`,
                 isGroupSynthetic: false,
                 apply: counts => bump(counts, family.key, 1)
             });
         }
     }
 
-    // --- tools: pickaxe x5 (tiers 1..5), axe x6 (tiers 1..6), count += 1 each. ---
+    // --- tools: pickaxe x5 (tiers 1..5), axe x6 (tiers 1..6), count += 1 each.
+    // Tier-neutral displays for the same reason as gear above. ---
     for (let tier = 1; tier <= PICKAXE_TIERS.length; tier++) {
         pool.push({
             uid: `progressive_pickaxe#${tier}`,
             placementItem: 'progressive_pickaxe',
             placementCount: 1,
-            display: `Progressive Pickaxe (${PICKAXE_TIERS[tier - 1]})`,
+            display: 'Progressive Pickaxe',
             isGroupSynthetic: false,
             apply: counts => bump(counts, 'progressive_pickaxe', 1)
         });
@@ -266,7 +270,7 @@ export function buildItemPool(mode: PoolMode): ProgressionCopy[] {
             uid: `progressive_axe#${tier}`,
             placementItem: 'progressive_axe',
             placementCount: 1,
-            display: `Progressive Axe (${AXE_TIERS[tier - 1]})`,
+            display: 'Progressive Axe',
             isGroupSynthetic: false,
             apply: counts => bump(counts, 'progressive_axe', 1)
         });
