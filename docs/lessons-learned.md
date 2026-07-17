@@ -2381,3 +2381,32 @@ filler-only checks and passes strict validation on attempt 0.
   the right shuffled staircase chain - the fixpoint found a route no one hand-traced.
 - Sanity level: reachable regions 5154/16455 in the region-only run (not a runaway
   16k), spot-checked goals green, generation deterministic.
+
+## Session addendum: last 5 blockers + the megaregion lesson (2026-07-17, same session)
+
+After the user's fresh run rolled (seed 480430917), 5 quests showed blocked:
+upass (+ legends/regicide prerequisite dominoes), tree, squire. All fixed; every
+view now 63/63 (live strict, region-only scratch, generator feasibility).
+
+- **squire**: cupboards.rs2's [label,search_cupboard] is the world-wide cupboard
+  dispatcher (one switch_coord over every cupboard, %squire in the block) - all six
+  non-Vyvin coords ignored, Vyvin's (2_46_52_40_8) kept as the real requirement.
+- **tree**: gnome-village-maze open area - the maze center is entered via
+  treegnomelooserailing's ~agility_exactmove (computed coords, unextractable). A
+  LATENT gap masked until now: earlier entrance tables happened to drop a shuffled
+  arrival inside the maze region.
+- **upass**: two walkway locs resolve into the LEVEL-1 MEGAREGION (region ~730,
+  415k tiles). Curated per-quest ignores; traversal is the underground-pass open
+  area's job.
+- **MEGAREGION LESSON (tried and reverted)**: filtering level>=1 megaregions out of
+  extraction resolution looked principled but regressed region-only completion
+  63 -> 51 and dropped 88 world edges. The merged upper-level layers are PARTIALLY
+  LEGITIMATE - real upstairs floors merge into them and world edges route THROUGH
+  them (stair -> mega landing -> adjacent room). Megaregions must stay in
+  resolution/edges; only (a) open-area membership (tile cap) and (b) individual
+  evidence items (curated ignores) exclude them. Note to this effect lives in both
+  ExtractQuestRegions.ts and quest-regions.json's _notes.upass.
+- The user's live run (seed 480430917) validates fully green; its 5
+  previously-infeasible checks still HOLD filler (placed before the fix) - harmless,
+  just not progression-bearing. A GenerateSeed rerun would make all 274 checks
+  progression-eligible but resets run state - offered, user's call.

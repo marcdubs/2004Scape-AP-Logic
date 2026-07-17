@@ -341,6 +341,13 @@ function main(): void {
 
     const drafts = new Map<string, QuestDraft>(questIds.map(id => [id, { evidence: new Map(), edges: [] }]));
 
+    // NOTE on upper-level megaregions (level 1: 415k tiles, level 2: ~250k, level 3:
+    // 1.1M): these merged walkable layers are PARTIALLY legitimate - real upstairs
+    // floors merge into them, and world edges route through them - so they must NOT
+    // be filtered out of resolution (tried 2026-07-17: dropped 88 world edges and
+    // regressed region-only completion 63->51). Evidence that resolves ONLY into a
+    // megaregion (the Underground Pass level-1 walkways) is instead handled by
+    // targeted curated ignores; open-area membership has its own tile cap.
     function resolveTile(tile: WorldTile): ResolvedTile {
         const region = graph.resolveRegion(tile);
         return { raw: toRawCoord(tile), region, mainland: region === mainlandId };

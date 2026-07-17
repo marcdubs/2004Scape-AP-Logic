@@ -83,11 +83,13 @@
     "generated": {
         "_comment": "Review lever over quest-regions.generated.json (see GeneratedQuestRegions.ts). ignoreGlobal: evidence keys exempted for every quest (shared-helper noise). ignore: per-quest key lists a human judged optional/flavor/alternative-route. Every entry should say WHY in _notes.",
         "_notes": {
-            "squire": "general_use/scripts/cupboards.rs2 is a shared multi-quest cupboard dispatcher; the block touches %squire but the 0_41_53_36_34 cupboard belongs to a different area's cupboard in the same block - not a Knight's Sword requirement."
+            "upass": "upass_ledge and the narrow walkway (upass_obstacles.rs2) sit on the LEVEL-1 MEGAREGION (region ~730, 415k tiles - the world's merged level-1 walkable layer, a collision-map artifact that swallows the pass's upper walkways). Whether a seed 'reaches' that artifact region is arbitrary (any shuffled stair landing anywhere on it flips the answer), so requiring it is meaningless; the pass traversal itself is modeled by the underground-pass open area. Do NOT try to filter megaregions out of extraction instead - they are load-bearing for world edges (see ExtractQuestRegions.ts's note; tried and reverted 2026-07-17).",
+            "squire": "general_use/scripts/cupboards.rs2's [label,search_cupboard] is the WORLD-WIDE cupboard dispatcher (one switch_coord over every searchable cupboard); it touches %squire so the whole block attributes to squire, but only 2_46_52_40_8 (Sir Vyvin's room, Falador castle level 2 - kept, NOT ignored) is a Knight's Sword requirement. The ignored coords are Morgan's house (vampire's garlic), Alrena's house (elena), the exam centre (itexam), and three flavor cupboards (sorcerers tower / fight arena / ranging guild)."
         },
         "ignoreGlobal": [],
         "ignore": {
-            "squire": ["coord|0_41_53_36_34"]
+            "squire": ["coord|0_41_53_36_34", "coord|1_48_51_24_4", "coord|0_40_52_14_6", "coord|0_52_52_26_4", "coord|0_42_53_10_12", "coord|0_40_49_29_46"],
+            "upass": ["subject|loc:upass_ledge", "subject|loc:walkway_upass_narrow_mid_top"]
         }
     },
 
@@ -259,6 +261,12 @@
             "connectTo": ["mainland"],
             "note": "Yanille agility dungeon (itwatchtower's poison spiders): entered via agility obstacles (bespoke), not pool entrances.",
             "boxes": [{ "levels": [0], "x1": 2560, "z1": 9536, "x2": 2623, "z2": 9599 }]
+        },
+        {
+            "name": "gnome-village-maze",
+            "connectTo": ["mainland"],
+            "note": "Tree Gnome Village hedge-maze center (King Bolren, the spirit tree clearing): entered by squeezing through the loose railing - gnomevillage_fence.rs2's [oploc1,treegnomelooserailing] uses ~agility_exactmove with computed coords, invisible to static extraction. Latent gap surfaced by seed 480430917 (earlier entrance tables happened to drop a shuffled arrival inside the maze region, masking it).",
+            "boxes": [{ "levels": [0], "x1": 2530, "z1": 3155, "x2": 2560, "z2": 3185 }]
         },
         {
             "name": "fishing-platform",
