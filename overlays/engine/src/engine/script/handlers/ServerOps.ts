@@ -588,20 +588,19 @@ const ServerOps: CommandHandlers = {
         state.pushInt(getApOption(name) ? 1 : 0);
     },
 
-    // custom: Archipelago NPC Teleport addon lookups (ApNpcTeleport registry).
-    // Name returns '' past the last match; coord returns -1 (script null).
-    [ScriptOpcode.AP_NPCTP_MATCH_NAME]: state => {
+    // custom: Archipelago NPC Teleport addon lookups (ApNpcTeleport registry,
+    // recency-ordered - index 0 = most recently talked to). Name returns ''
+    // past the last entry; coord returns -1 (script null).
+    [ScriptOpcode.AP_NPCTP_NAME]: state => {
         const index = state.popInt();
-        const query = state.popString();
 
-        state.pushString(ApNpcTeleport.matchName(query, index));
+        state.pushString(ApNpcTeleport.nameAt(index));
     },
 
-    [ScriptOpcode.AP_NPCTP_MATCH_COORD]: state => {
+    [ScriptOpcode.AP_NPCTP_COORD]: state => {
         const index = state.popInt();
-        const query = state.popString();
 
-        state.pushInt(ApNpcTeleport.matchCoord(query, index));
+        state.pushInt(ApNpcTeleport.coordAt(index));
     },
 
     // custom: Archipelago skip-tutorial support - re-roll the active player's

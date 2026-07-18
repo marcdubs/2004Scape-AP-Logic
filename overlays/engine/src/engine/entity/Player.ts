@@ -24,6 +24,7 @@ import Loc from '#/engine/entity/Loc.js';
 import { ModalState } from '#/engine/entity/ModalState.js';
 import { MoveSpeed } from '#/engine/entity/MoveSpeed.js';
 import * as ApChecks from '#/engine/ApChecks.js';
+import * as ApNpcTeleport from '#/engine/ApNpcTeleport.js';
 import * as ApQuestGates from '#/engine/ApQuestGates.js';
 import { clampStatXp } from '#/engine/ApUnlockOverrides.js';
 import { MoveStrategy } from '#/engine/entity/MoveStrategy.js';
@@ -1182,6 +1183,11 @@ export default class Player extends PathingEntity {
             this.target = null;
             this.clearWaypoints();
 
+            // AP: NPC Teleport addon - record Talk-to targets while the writ is held
+            if (target instanceof Npc && this.targetOp === ServerTriggerType.APNPC1) {
+                ApNpcTeleport.onNpcTalk(this, target);
+            }
+
             this.executeScript(ScriptRunner.init(opTrigger, this, target), true);
 
             // If p_opnpc was called, remember it for later
@@ -1203,6 +1209,11 @@ export default class Player extends PathingEntity {
 
             this.target = null;
             this.clearWaypoints();
+
+            // AP: NPC Teleport addon - record Talk-to targets while the writ is held
+            if (target instanceof Npc && this.targetOp === ServerTriggerType.APNPC1) {
+                ApNpcTeleport.onNpcTalk(this, target);
+            }
 
             this.executeScript(ScriptRunner.init(apTrigger, this, target), true);
 

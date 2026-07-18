@@ -38,7 +38,7 @@ members=yes
 tradeable=no
 
 [ap_teleporting_focus]
-name=Teleporting Focus
+name=Teleport Focus
 desc=Stores a single location within its crystal lattice.
 weight=1lb
 model=inv_stafforb
@@ -50,13 +50,13 @@ recol1d=30753
 2dyan=96
 2dxan=316
 cost=100
-iop1=Store
-iop2=Rub
+iop1=Rub
+iop2=Store
 members=yes
 tradeable=no
 
 [ap_greater_teleporting_focus]
-name=Greater Teleporting Focus
+name=Teleport Focus (2)
 desc=Stores two locations within its crystal lattice.
 weight=1lb
 model=inv_stafforb
@@ -68,8 +68,8 @@ recol1d=17350
 2dyan=96
 2dxan=316
 cost=200
-iop1=Store
-iop2=Rub
+iop1=Rub
+iop2=Store
 members=yes
 tradeable=no
 
@@ -84,6 +84,7 @@ model=inv_scrollwithseal
 2dyan=120
 2dxan=380
 cost=100
-iop1=Activate
+iop1=Teleport
+iop2=Last
 members=yes
 tradeable=no

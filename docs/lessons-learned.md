@@ -2535,12 +2535,13 @@ addon items"; hard-won bits for future sessions:
 - **Coord varps are first-class**: `type=coord scope=perm`, `%v = coord;`,
   `p_telejump(%v)`, and `= null` is TRUE for a never-set coord varp (vanilla
   precedent: exit_essence_mine_coord) - no pack/unpack math needed.
-- **Engine hooks into vanilla files are DIRECT edits to the ../Server checkout**
-  (uncommitted; e.g. Player.ts setVar/addXp hooks) - only NEW modules live in
-  overlays/engine/src. This session added the third+fourth such hook (both
-  tryInteract branches -> ApNpcTeleport.onNpcTalk, gated on
-  targetOp = APNPC1 & target instanceof Npc). If ../Server is ever re-cloned,
-  re-apply these from `git -C ../Server/engine diff` (kept uncommitted).
+- **CORRECTED 2026-07-18: hooked vanilla engine files are WHOLE-FILE OVERLAYS**
+  (overlays/engine/src/engine/entity/Player.ts etc.), NOT direct ../Server
+  edits. This session edited only the ../Server copy of Player.ts for the
+  ApNpcTeleport.onNpcTalk hook; the next install.js overwrote it with the
+  overlay copy and the hook silently vanished (user's "apnpctp never worked"
+  bug). Rule: ANY edit to a file that exists under overlays/ goes in THIS repo
+  first, always - check `find overlays -name <file>` before touching ../Server.
 - **ap-options.json has THREE readers** that must stay format/default-synced:
   engine ApOptions.ts (runtime, cached per boot), tools
   PlacementEngine.loadApOptions (generator/validator/sim), and rs2 via the
@@ -2557,3 +2558,36 @@ addon items"; hard-won bits for future sessions:
   NPC holding the writ then ::apnpctp <partial name>, rune-essence reward with
   a nearly-full inventory (expect full 25 in bank, nothing on floor),
   musicChecks:false boot (watch count log line shows "230 disabled").
+
+## Session addendum (2026-07-18): addon polish round (problems.txt #2)
+
+- **Root cause of "NPC Teleport never records"**: the onNpcTalk hook was added
+  to ../Server/engine Player.ts directly, but Player.ts is an overlay file -
+  install.js clobbered the hook. Now lives in overlays/engine Player.ts (both
+  tryInteract branches, before executeScript: `target instanceof Npc &&
+  targetOp === ServerTriggerType.APNPC1` - targetOp stays APNPC1 in the op
+  branch too; op triggers resolve via `targetOp + 7`).
+- **::apnpctp is GONE** (space-split cheat args can't carry multi-word names +
+  user disliked the UX). The writ is now iop1=Teleport (paged p_choice dialog,
+  3 names/page, "More..." wraps to page 0 at the end, choice codes 1-3/8/9)
+  and iop2=Last (instant teleport to most recent). Engine ops 1911/1912
+  renamed AP_NPCTP_NAME/AP_NPCTP_COORD - index-based, recency-ordered
+  (index 0 = most recent).
+- **Recency**: Map insertion order is the recency order; re-talk = delete+set
+  to bump to end; persisted as an ORDERED ARRAY ({npcs:[{id,...}]}) because a
+  JSON object iterates integer-like keys numerically and loses order. Loader
+  still accepts the old object format.
+- **Renames** (display name= only, debugnames/pack ids untouched - safe for
+  saves): "Teleporting Focus" -> "Teleport Focus", "Greater Teleporting
+  Focus" -> "Teleport Focus (2)" (long name caused UI issues). Both foci now
+  iop1=Rub, iop2=Store (handlers swapped to match).
+- **rs2 while-loop dialogs work fine** inside a protected opheld trigger
+  (paged pick list re-opens p_choice each iteration; every path returns or
+  advances the page).
+- Verified offline: install + typecheck clean, pack build 1:53 clean (no new
+  pack entries this round - renames don't touch obj.pack). NOT in-game
+  tested. User checklist: focus right-click shows Rub first on both; names
+  "Teleport Focus"/"Teleport Focus (2)"; talk to a few NPCs holding the writ,
+  writ Teleport lists them most-recent-first (More... pages, Nowhere exits),
+  writ Last jumps to the latest one; registry survives restart
+  (data/config/ap-npc-teleport.json); wilderness >20 blocks all of them.

@@ -135,10 +135,9 @@ if (%ap_kbd_killed = 1) {
 [command,ap_option](string $name)(int)
 
 // info: custom - NPC Teleport addon lookup (engine ApNpcTeleport registry of
-// NPCs the player has spoken to while carrying the writ). Fuzzy-matches $query
-// against recorded display names; $index selects the ranked match (0-based).
-// _name returns "" past the last match; _coord returns null likewise. Two
-// single-return commands instead of one tuple return, deliberately - simpler
-// stack contract.
-[command,ap_npctp_match_name](string $query, int $index)(string)
-[command,ap_npctp_match_coord](string $query, int $index)(coord)
+// NPCs the player has spoken to while carrying the writ). Recency-ordered:
+// $index 0 is the most recently talked-to NPC. _name returns "" past the last
+// entry; _coord returns null likewise. Two single-return commands instead of
+// one tuple return, deliberately - simpler stack contract.
+[command,ap_npctp_name](int $index)(string)
+[command,ap_npctp_coord](int $index)(coord)

@@ -1,6 +1,9 @@
-// Archipelago "NPC Teleport" addon (problems.txt 2026-07-17): the registry of
-// NPCs the player has spoken to WHILE CARRYING the ap_npc_teleport writ, plus
-// the fuzzy lookup behind the ::apnpctp command (ap_addons.rs2).
+// Archipelago "NPC Teleport" addon (problems.txt 2026-07-17, reworked
+// 2026-07-18): the registry of NPCs the player has spoken to WHILE CARRYING
+// the ap_npc_teleport writ, exposed to rs2 as a RECENCY-ORDERED list (index 0
+// = most recently talked to) behind the writ's Teleport/Last ops
+// (ap_addons.rs2). The old ::apnpctp fuzzy-search command is gone - the cheat
+// parser can't carry multi-word names and the UX was disliked.
 //
 // Hooked from Player.tryInteract (both the op and ap execution branches) when
 // targetOp is APNPC1 (Talk-to) and the target is an Npc - the single generic
@@ -41,6 +44,11 @@ interface KnownNpc {
     level: number;
 }
 
+// Map insertion order IS the recency order (oldest first, most recent last);
+// re-talking to a known NPC re-inserts it at the end. Persisted as an ordered
+// array for the same reason - a JSON object would iterate integer-like keys
+// numerically and lose the order.
+
 let known: Map<number, KnownNpc> | null = null;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let writObjId: number | -2 | null = null; // -2 = lookup failed, treat as "never held"
@@ -53,8 +61,14 @@ function load(): Map<number, KnownNpc> {
     }
 
     try {
-        const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as { npcs?: Record<string, unknown> };
-        for (const [typeId, raw] of Object.entries(parsed.npcs ?? {})) {
+        const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as { npcs?: unknown };
+        // current format: ordered array of {id, name, x, z, level} (oldest
+        // first); also accepts the short-lived 2026-07-17 object format
+        // (order lost - acceptable, recency rebuilds as the player talks).
+        const entries: [unknown, unknown][] = Array.isArray(parsed.npcs)
+            ? parsed.npcs.map((n): [unknown, unknown] => [(n as Record<string, unknown>)?.id, n])
+            : Object.entries((parsed.npcs as Record<string, unknown>) ?? {});
+        for (const [typeId, raw] of entries) {
             const id = Number(typeId);
             if (!Number.isInteger(id) || !raw || typeof raw !== 'object') {
                 continue;
@@ -89,9 +103,9 @@ async function persist(): Promise<void> {
         return;
     }
     try {
-        const npcs: Record<string, KnownNpc> = {};
+        const npcs: (KnownNpc & { id: number })[] = [];
         for (const [id, entry] of known) {
-            npcs[String(id)] = entry;
+            npcs.push({ id, ...entry });
         }
         await fs.promises.mkdir(path.dirname(STORE_PATH), { recursive: true });
         await fs.promises.writeFile(STORE_PATH, JSON.stringify({ npcs }, null, 4), 'utf8');
@@ -129,11 +143,17 @@ export function onNpcTalk(player: Player, npc: Npc): void {
         if (known === null) {
             known = load();
         }
-        if (known.has(npc.type)) {
+
+        if (!holdingWrit(player)) {
             return;
         }
 
-        if (!holdingWrit(player)) {
+        const existing = known.get(npc.type);
+        if (existing) {
+            // re-talk: bump to most-recent (Map insertion order = recency)
+            known.delete(npc.type);
+            known.set(npc.type, existing);
+            schedulePersist();
             return;
         }
 
@@ -149,43 +169,30 @@ export function onNpcTalk(player: Player, npc: Npc): void {
     }
 }
 
-// Fuzzy match: exact name beats prefix beats substring; ties alphabetical.
-// Query arrives lowercased (the cheat handler lowercases the whole line).
-function matches(query: string): KnownNpc[] {
+// Recency-ordered view: index 0 = most recently talked to. The Map stores
+// oldest-first, so reverse on read; registry sizes are tiny (talked-to NPC
+// types), no need to cache the reversed array.
+function byRecency(): KnownNpc[] {
     if (known === null) {
         known = load();
     }
-
-    const q = query.toLowerCase();
-    const scored: { score: number; entry: KnownNpc }[] = [];
-    for (const entry of known.values()) {
-        const name = entry.name.toLowerCase();
-        if (name === q) {
-            scored.push({ score: 0, entry });
-        } else if (name.startsWith(q)) {
-            scored.push({ score: 1, entry });
-        } else if (name.includes(q)) {
-            scored.push({ score: 2, entry });
-        }
-    }
-    scored.sort((a, b) => a.score - b.score || a.entry.name.localeCompare(b.entry.name));
-    return scored.map(s => s.entry);
+    return [...known.values()].reverse();
 }
 
-/** Ranked match #index's display name, or '' past the end. */
-export function matchName(query: string, index: number): string {
+/** Recency entry #index's display name, or '' past the end. */
+export function nameAt(index: number): string {
     try {
-        const m = matches(query);
+        const m = byRecency();
         return index >= 0 && index < m.length ? m[index].name : '';
     } catch {
         return '';
     }
 }
 
-/** Ranked match #index's packed home coord, or -1 (script null) past the end. */
-export function matchCoord(query: string, index: number): number {
+/** Recency entry #index's packed home coord, or -1 (script null) past the end. */
+export function coordAt(index: number): number {
     try {
-        const m = matches(query);
+        const m = byRecency();
         if (index < 0 || index >= m.length) {
             return -1;
         }

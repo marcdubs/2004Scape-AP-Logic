@@ -78,13 +78,6 @@ if (~pre_tele_checks(coord) = false) {
 return(true);
 
 [opheld1,ap_teleporting_focus]
-if (~ap_focus_store_allowed = false) {
-    return;
-}
-%ap_focus_coord = coord;
-mes("The focus glows softly as it memorises this location.");
-
-[opheld2,ap_teleporting_focus]
 if (%ap_focus_coord = null) {
     mes("The focus is dark - it has no location stored.");
     return;
@@ -94,7 +87,14 @@ if (~ap_focus_rub_allowed = false) {
 }
 ~player_teleport_normal(%ap_focus_coord);
 
-[opheld1,ap_greater_teleporting_focus]
+[opheld2,ap_teleporting_focus]
+if (~ap_focus_store_allowed = false) {
+    return;
+}
+%ap_focus_coord = coord;
+mes("The focus glows softly as it memorises this location.");
+
+[opheld2,ap_greater_teleporting_focus]
 if (~ap_focus_store_allowed = false) {
     return;
 }
@@ -107,7 +107,7 @@ if ($choice = 1) {
     mes("The focus glows softly as it memorises this location into slot 2.");
 }
 
-[opheld2,ap_greater_teleporting_focus]
+[opheld1,ap_greater_teleporting_focus]
 if (%ap_focus_coord = null & %ap_focus_coord_2 = null) {
     mes("The focus is dark - it has no locations stored.");
     return;
@@ -140,54 +140,16 @@ return("(stored)");
 
 // ------------------------------------------------------------------
 // NPC Teleport - engine-tracked "spoken to while holding this" NPC registry
-// (ApNpcTeleport.ts, hooked from Player.tryInteract on opnpc1/apnpc1) + a
-// ::apnpctp <name> fuzzy lookup. The item's Activate op just explains the
-// command, since this rev has no script-side free-text input (verified: no
-// string-input op exists; the ::command cheat path is the only text entry).
-// Accessibility filter is record-time by construction: an NPC only enters the
-// registry when the player is standing there talking to it.
+// (ApNpcTeleport.ts, hooked from Player.tryInteract on Talk-to). The registry
+// is recency-ordered (index 0 = most recently talked to), so "Teleport" pages
+// through a pick-list dialog and "Last" jumps straight to index 0 - no typed
+// command (removed 2026-07-18: the ::cheat parser can't carry spaces and the
+// UX was disliked). Accessibility filter is record-time by construction: an
+// NPC only enters the registry when the player is standing there talking.
 // ------------------------------------------------------------------
-[opheld1,ap_npc_teleport]
-~mesbox("The writ hums with stored acquaintances.|Type @dbl@::apnpctp@bla@ followed by a name to teleport to any NPC you|have spoken to while carrying it - for example @dbl@::apnpctp aubury@bla@.");
 
-// ::apnpctp <query> - fuzzy-match talked-to NPCs, offer up to 4 + cancel.
-// Debugprocs run unprotected -> hop into a queue script for dialog/teleport.
-[debugproc,ap_npctp](string $query)
-if (inv_total(inv, ap_npc_teleport) < 1) {
-    mes("You need the NPC Teleport writ in your inventory to do that.");
-    return;
-}
-if (string_length($query) < 1) {
-    mes("Usage: ::apnpctp followed by part of an NPC name.");
-    return;
-}
-queue*(ap_npctp_go, 0)($query);
-
-[queue,ap_npctp_go](string $query)
-def_string $n1 = ap_npctp_match_name($query, 0);
-if (compare($n1, "") = 0) {
-    mes("The writ doesn't recall anyone matching '<$query>'.");
-    mes("(It only remembers NPCs you spoke to while carrying it.)");
-    return;
-}
-def_string $n2 = ap_npctp_match_name($query, 1);
-def_string $n3 = ap_npctp_match_name($query, 2);
-def_string $n4 = ap_npctp_match_name($query, 3);
-def_int $choice = 0;
-if (compare($n2, "") = 0) {
-    $choice = ~p_choice2_header($n1, 1, "Nowhere.", 9, "Teleport to whom?");
-} else if (compare($n3, "") = 0) {
-    $choice = ~p_choice3_header($n1, 1, $n2, 2, "Nowhere.", 9, "Teleport to whom?");
-} else if (compare($n4, "") = 0) {
-    $choice = ~p_choice4_header($n1, 1, $n2, 2, $n3, 3, "Nowhere.", 9, "Teleport to whom?");
-} else {
-    $choice = ~p_choice5_header($n1, 1, $n2, 2, $n3, 3, $n4, 4, "Nowhere.", 9, "Teleport to whom?");
-}
-if ($choice = 9 | $choice = 0) {
-    mes("You remain where you were.");
-    return;
-}
-def_coord $dest = ap_npctp_match_coord($query, calc($choice - 1));
+// Shared teleport-out guard + jump. Returns early with a message if blocked.
+[proc,ap_npctp_teleport](coord $dest)
 if ($dest = null) {
     mes("The writ's memory of that one has faded.");
     return;
@@ -201,3 +163,68 @@ if (~pre_tele_checks(coord) = false) {
     return;
 }
 ~player_teleport_normal($dest);
+
+// "Teleport" - paged pick list, 3 names per page, most recent first.
+// Choice codes: 1-3 = name slots, 8 = next page, 9 = stay.
+[opheld1,ap_npc_teleport]
+if (compare(ap_npctp_name(0), "") = 0) {
+    mes("The writ is blank - it only remembers NPCs you speak to");
+    mes("while carrying it.");
+    return;
+}
+def_int $page = 0;
+def_int $base = 0;
+def_string $n1 = "";
+def_string $n2 = "";
+def_string $n3 = "";
+def_int $choice = 0;
+def_int $browsing = 1;
+while ($browsing = 1) {
+    $base = calc($page * 3);
+    $n1 = ap_npctp_name($base);
+    $n2 = ap_npctp_name(calc($base + 1));
+    $n3 = ap_npctp_name(calc($base + 2));
+    if (compare(ap_npctp_name(calc($base + 3)), "") ! 0 | $page > 0) {
+        // more pages exist (or we can wrap back to the start)
+        if (compare($n2, "") = 0) {
+            $choice = ~p_choice3_header($n1, 1, "More...", 8, "Nowhere.", 9, "Teleport to whom?");
+        } else if (compare($n3, "") = 0) {
+            $choice = ~p_choice4_header($n1, 1, $n2, 2, "More...", 8, "Nowhere.", 9, "Teleport to whom?");
+        } else {
+            $choice = ~p_choice5_header($n1, 1, $n2, 2, $n3, 3, "More...", 8, "Nowhere.", 9, "Teleport to whom?");
+        }
+    } else {
+        if (compare($n2, "") = 0) {
+            $choice = ~p_choice2_header($n1, 1, "Nowhere.", 9, "Teleport to whom?");
+        } else if (compare($n3, "") = 0) {
+            $choice = ~p_choice3_header($n1, 1, $n2, 2, "Nowhere.", 9, "Teleport to whom?");
+        } else {
+            $choice = ~p_choice4_header($n1, 1, $n2, 2, $n3, 3, "Nowhere.", 9, "Teleport to whom?");
+        }
+    }
+    if ($choice >= 1 & $choice <= 3) {
+        ~ap_npctp_teleport(ap_npctp_coord(calc($base + $choice - 1)));
+        return;
+    }
+    if ($choice = 8) {
+        if (compare(ap_npctp_name(calc($base + 3)), "") = 0) {
+            $page = 0;
+        } else {
+            $page = calc($page + 1);
+        }
+    } else {
+        mes("You remain where you were.");
+        return;
+    }
+}
+
+// "Last" - straight to the most recently talked-to NPC, no dialog.
+[opheld2,ap_npc_teleport]
+def_string $n1 = ap_npctp_name(0);
+if (compare($n1, "") = 0) {
+    mes("The writ is blank - it only remembers NPCs you speak to");
+    mes("while carrying it.");
+    return;
+}
+mes("The writ tugs you towards <$n1>.");
+~ap_npctp_teleport(ap_npctp_coord(0));

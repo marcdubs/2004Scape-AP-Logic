@@ -120,13 +120,14 @@ export const enum ScriptOpcode {
     // AP_ENTRANCE_OVERRIDE above.
     AP_OPTION = 1910,
 
-    // custom: Archipelago NPC Teleport addon - fuzzy lookup over the "spoken to
-    // while holding the writ" registry (ApNpcTeleport.ts). Two single-return
-    // commands (name / packed coord by ranked index) instead of one tuple
-    // return - simpler stack contract - same explicit-numbering reasoning as
-    // AP_ENTRANCE_OVERRIDE above.
-    AP_NPCTP_MATCH_NAME = 1911,
-    AP_NPCTP_MATCH_COORD = 1912,
+    // custom: Archipelago NPC Teleport addon - recency-ordered lookup over the
+    // "spoken to while holding the writ" registry (ApNpcTeleport.ts); index 0
+    // is the most recently talked-to NPC. Two single-return commands (name /
+    // packed coord by index) instead of one tuple return - simpler stack
+    // contract - same explicit-numbering reasoning as AP_ENTRANCE_OVERRIDE
+    // above.
+    AP_NPCTP_NAME = 1911,
+    AP_NPCTP_COORD = 1912,
 
     // Player ops (2000-2499)
     AFK_EVENT = 2000,
@@ -587,8 +588,8 @@ export const ScriptOpcodeMap: Map<string, number> = new Map([
     ['AP_REROLL_LOOK', ScriptOpcode.AP_REROLL_LOOK],
     ['AP_APPLY_BANKED_XP', ScriptOpcode.AP_APPLY_BANKED_XP],
     ['AP_OPTION', ScriptOpcode.AP_OPTION],
-    ['AP_NPCTP_MATCH_NAME', ScriptOpcode.AP_NPCTP_MATCH_NAME],
-    ['AP_NPCTP_MATCH_COORD', ScriptOpcode.AP_NPCTP_MATCH_COORD],
+    ['AP_NPCTP_NAME', ScriptOpcode.AP_NPCTP_NAME],
+    ['AP_NPCTP_COORD', ScriptOpcode.AP_NPCTP_COORD],
 
     ['AFK_EVENT', ScriptOpcode.AFK_EVENT],
     ['ALLOWDESIGN', ScriptOpcode.ALLOWDESIGN],
