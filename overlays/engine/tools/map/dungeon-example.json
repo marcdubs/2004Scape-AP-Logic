@@ -1,0 +1,23 @@
+{
+    "mapsquareX": 0,
+    "mapsquareZ": 0,
+    "level": 0,
+    "floor": "darkstone",
+    "wall": "stonewall",
+    "rooms": [
+        { "x": 5, "z": 5, "width": 10, "height": 8 },
+        { "x": 20, "z": 6, "width": 8, "height": 8 }
+    ],
+    "corridors": [
+        { "x": 15, "z": 8, "width": 5, "height": 2 }
+    ],
+    "doors": [
+        { "x": 19, "z": 8, "id": "secretdoor" }
+    ],
+    "monsters": [
+        { "id": "dungeon_rat", "x": 23, "z": 9 }
+    ],
+    "objects": [
+        { "id": "coins", "count": 25, "x": 9, "z": 8 }
+    ]
+}
