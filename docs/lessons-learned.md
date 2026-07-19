@@ -2622,3 +2622,35 @@ javaclient) against overlays/. Results:
 - Audit recipe (rerun any time): for each repo `git status --porcelain`,
   map each path against overlays/<repo>/..., `cmp` the ones that exist
   (0 DRIFT this run), and explain every NO-OVERLAY as noise/generated/runtime.
+
+## Session addendum (2026-07-19): NPC-teleport landing fix + first no-music playthrough roll
+
+problems.txt round ("teleporting to bankers puts the player inside the bank"):
+
+- **ApNpcTeleport now records the PLAYER's tile at talk time, never the npc's.**
+  The old code stored `npc.startX/startZ/startLevel` - a banker's spawn-home is
+  behind the impassable bank counter, so the writ teleport landed players inside
+  the booth. The player's own talk tile is walkable by construction (they were
+  standing on it), which is also the accessibility rule the feature wanted all
+  along. No walkability nudge needed.
+- **Registry is keyed by NPC display name now, not type id** (user request:
+  "override the last NPC with that same name"). Every talk does delete+set with
+  the player's current tile - one dedup, one recency bump, one location refresh
+  in a single motion. The world's many same-name NPCs ("Banker", "Man") collapse
+  to a single latest-wins menu row. rs2 side needed ZERO changes - ops 1911/1912
+  are index-into-recency-order, agnostic to the map key.
+- Persist format is now `{npcs:[{name,x,z,level}]}` (no id). Loader still accepts
+  both older formats and collapses same-name duplicates latest-wins. The live
+  `data/config/ap-npc-teleport.json` was deleted anyway - every stored coord was
+  an npc spawn-home (i.e. the bug), and a fresh playthrough was starting.
+- **First real playthrough rolled with `musicChecks:false`**: the OVERLAY
+  `data/config/ap-options.json` now ships musicChecks=false (install.js copies
+  unconditionally, so editing only the live copy would revert on next install;
+  engine DEFAULTS in ApOptions.ts stay true - the shipped json is the knob).
+  `new-run.sh` end-to-end, seed 271031246, mimic drops / shuffle gather+process /
+  city spawn / per-skill pool: 287 placements, zero music_ locations (verified in
+  ap-placements.json), ValidateSeed lenient-pass - 62/63 quests, all 3 goals, all
+  progression collectable. The one blocked quest is cog (Clock Tower blue-cog
+  region 6480/6484 unreachable under this entrance shuffle) - benign: infeasible
+  quests' checks are excluded from the catalog at GenerateSeed time, so its
+  placed "Quest unlock: Clock Tower" item is effectively filler this seed.

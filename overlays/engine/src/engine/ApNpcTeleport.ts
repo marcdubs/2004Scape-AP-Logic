@@ -10,12 +10,17 @@
 // chokepoint for talk interactions; per-NPC rs2 edits are not viable since
 // nearly every talkable NPC has its own dedicated opnpc1 script.
 //
-// Location semantics: the npc's startX/startZ/startLevel spawn-home is
-// recorded, not its live wander position - stable across restarts because map
-// spawns are deterministic. Accessibility filter is record-time by
-// construction (the player was standing there talking), which is exactly the
-// user's stated rule ("only allows access to NPCs the player has previously
-// been able to access").
+// Location semantics (problems.txt 2026-07-19): the PLAYER's own tile at
+// talk time is recorded, never the npc's position - the npc's spawn-home is
+// frequently inside its own furniture (bankers stand behind the impassable
+// bank counter), so teleporting to it strands the player. The player's talk
+// tile is walkable by construction (they were standing on it), which also
+// makes the accessibility filter record-time by construction ("only allows
+// access to NPCs the player has previously been able to access").
+//
+// The registry is keyed by NPC display name, not type id: talking to another
+// NPC with the same name (the world has many "Banker"s) overrides the earlier
+// entry instead of piling up duplicate identical menu rows - latest wins.
 //
 // Global (single-player server), persisted like ApChecks' fired set: debounced
 // async write to data/config/ap-npc-teleport.json, survives restarts, NOT
@@ -45,16 +50,16 @@ interface KnownNpc {
 }
 
 // Map insertion order IS the recency order (oldest first, most recent last);
-// re-talking to a known NPC re-inserts it at the end. Persisted as an ordered
-// array for the same reason - a JSON object would iterate integer-like keys
-// numerically and lose the order.
+// every talk re-inserts the name at the end. Persisted as an ordered array for
+// the same reason - a JSON object would iterate integer-like keys numerically
+// and lose the order.
 
-let known: Map<number, KnownNpc> | null = null;
+let known: Map<string, KnownNpc> | null = null;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let writObjId: number | -2 | null = null; // -2 = lookup failed, treat as "never held"
 
-function load(): Map<number, KnownNpc> {
-    const map = new Map<number, KnownNpc>();
+function load(): Map<string, KnownNpc> {
+    const map = new Map<string, KnownNpc>();
 
     if (!fs.existsSync(STORE_PATH)) {
         return map;
@@ -62,20 +67,20 @@ function load(): Map<number, KnownNpc> {
 
     try {
         const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as { npcs?: unknown };
-        // current format: ordered array of {id, name, x, z, level} (oldest
-        // first); also accepts the short-lived 2026-07-17 object format
-        // (order lost - acceptable, recency rebuilds as the player talks).
-        const entries: [unknown, unknown][] = Array.isArray(parsed.npcs)
-            ? parsed.npcs.map((n): [unknown, unknown] => [(n as Record<string, unknown>)?.id, n])
-            : Object.entries((parsed.npcs as Record<string, unknown>) ?? {});
-        for (const [typeId, raw] of entries) {
-            const id = Number(typeId);
-            if (!Number.isInteger(id) || !raw || typeof raw !== 'object') {
+        // current format: ordered array of {name, x, z, level} (oldest first);
+        // also accepts the older array-with-id and 2026-07-17 object formats
+        // (their coords were the npc's spawn-home, possibly unwalkable - kept
+        // anyway, self-heals to the player's tile on the next talk). Same-name
+        // duplicates from the old id-keyed format collapse to the latest.
+        const entries: unknown[] = Array.isArray(parsed.npcs) ? parsed.npcs : Object.values((parsed.npcs as Record<string, unknown>) ?? {});
+        for (const raw of entries) {
+            if (!raw || typeof raw !== 'object') {
                 continue;
             }
             const n = raw as Record<string, unknown>;
             if (typeof n.name === 'string' && typeof n.x === 'number' && typeof n.z === 'number' && typeof n.level === 'number') {
-                map.set(id, { name: n.name, x: n.x, z: n.z, level: n.level });
+                map.delete(n.name);
+                map.set(n.name, { name: n.name, x: n.x, z: n.z, level: n.level });
             }
         }
     } catch (err) {
@@ -103,10 +108,7 @@ async function persist(): Promise<void> {
         return;
     }
     try {
-        const npcs: (KnownNpc & { id: number })[] = [];
-        for (const [id, entry] of known) {
-            npcs.push({ id, ...entry });
-        }
+        const npcs: KnownNpc[] = [...known.values()];
         await fs.promises.mkdir(path.dirname(STORE_PATH), { recursive: true });
         await fs.promises.writeFile(STORE_PATH, JSON.stringify({ npcs }, null, 4), 'utf8');
     } catch (err) {
@@ -148,21 +150,16 @@ export function onNpcTalk(player: Player, npc: Npc): void {
             return;
         }
 
-        const existing = known.get(npc.type);
-        if (existing) {
-            // re-talk: bump to most-recent (Map insertion order = recency)
-            known.delete(npc.type);
-            known.set(npc.type, existing);
-            schedulePersist();
-            return;
-        }
-
         const type = NpcType.get(npc.type);
         if (!type || !type.name) {
             return;
         }
 
-        known.set(npc.type, { name: type.name, x: npc.startX, z: npc.startZ, level: npc.startLevel });
+        // latest talk wins: delete+set bumps the name to most-recent (Map
+        // insertion order = recency) AND overrides any same-name NPC recorded
+        // elsewhere; the PLAYER's tile is stored, never the npc's (see header).
+        known.delete(type.name);
+        known.set(type.name, { name: type.name, x: player.x, z: player.z, level: player.level });
         schedulePersist();
     } catch (err) {
         printWarning(`AP npc-teleport: onNpcTalk failed (${err instanceof Error ? err.message : err})`);

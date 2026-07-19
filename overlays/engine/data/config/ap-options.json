@@ -1,5 +1,5 @@
 {
-    "musicChecks": true,
+    "musicChecks": false,
     "addonBankBox": true,
     "addonTreeCompass": true,
     "addonTeleportingFocus": true,
