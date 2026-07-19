@@ -1,6 +1,6 @@
 # 2004Scape-AP-Logic
 
-Archipelago randomizer logic and tooling for [2004scape](https://github.com/LostCityRS) (Server/Engine-TS/Content).
+Archipelago randomizer logic and tooling for [2004scape](https://github.com/LostCityRS) (Server/Engine-TS/Content), targeting **LostCity revision 274**.
 
 This repo does **not** fork LostCityRS. `Server`, `engine`, `content`, `webclient`, and
 `javaclient` stay plain, unmodified LostCityRS checkouts (a sibling directory, set up
@@ -20,7 +20,9 @@ boot the game server, open the tracker, connect, play. Steps 1-2 are one-time.
 
 Prereqs: the `Server/` LostCityRS checkout as a **sibling** of this repo (set up
 the normal LostCityRS way), Node 20+, and Python 3.10+ for the Archipelago
-server. Any OS works; the game server and the Archipelago server can be the
+server. Use **revision 274** for the checkout - it's the only revision this
+project has been tested against; other revisions may work, but you use them at
+your own risk. Any OS works; the game server and the Archipelago server can be the
 same machine or different ones.
 
 ```
