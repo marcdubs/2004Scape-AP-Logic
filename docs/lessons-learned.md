@@ -2766,3 +2766,33 @@ friction, zero API drift. Facts:
   persists in <multidata-dir>/AP_<id>.apsave (delete = fresh run); Windows game
   server connects via localhost:38281 (WSL2 forwarding). Currently RUNNING in
   the background with a fresh save; runbook in apworld/README.md.
+
+## Session addendum (2026-07-19d): tracker "Archipelago" setup tab
+
+User request: configure AP credentials from the tracker instead of hand-editing
+JSON. Facts:
+
+- **ApClient gained reconfigure()/getApStatus()/probeServer()**; initApClient
+  is now just reconfigure(). reconfigure tears down socket + pending reconnect
+  timer and re-reads config/data - safe in any state, including enable-at-
+  runtime (delivery timer + session load all live behind it). lastError module
+  var feeds the status readout (set on socket error/ConnectionRefused/missing
+  datapackage, cleared on Connected).
+- **web.ts routes**: GET/PUT /ap/archipelago.json (read = config+status; write
+  = validate, persist, reconfigure - config changes apply live), POST
+  /ap/archipelago/test -> probeServer(host, port): one-shot socket that waits
+  for RoomInfo and reports version/seed_name/games/password, never touches the
+  live client. web.ts previously had NO POST branch in handleWebRequest - one
+  exists now; keep new POST routes inside it.
+- **Form-vs-poll rule in app.js**: the credentials form is filled from the
+  server exactly once (and after an explicit save); the 5s status poll only
+  ever updates the status table. Filling the form on every poll would clobber
+  in-progress edits - easy trap on any future settings UI.
+- **Verified**: typecheck clean, node --check on app.js, and a scratch-cwd
+  harness against the LIVE MultiServer: probe ok (0.6.8, hasOurGame),
+  dead-port probe fails cleanly, enable-by-file + reconfigure() connects
+  (status connected, slot Marcus), disable + reconfigure() goes inactive.
+  HTTP routes themselves not exercised (needs the Windows server boot - user
+  checklist: open tracker -> Archipelago tab, Test connection against
+  localhost:38281, Save & Connect, watch status flip to connected).
+- Engine/web-only change: restart picks it up, NO pack rebuild needed.

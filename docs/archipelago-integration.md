@@ -122,6 +122,12 @@ as strong as what GenerateSeed enforces locally today.
   module completely inert (the same fail-open convention as every Ap* table).
   Not part of ap-options.json: that file is a 3-reader boolean-toggle contract
   (engine/tools/rs2), this is engine-only connection config.
+  **Managed from the tracker's "Archipelago" tab** (added 2026-07-19): GET/PUT
+  `/ap/archipelago.json` reads/writes the file and hot-applies it via
+  `ApClient.reconfigure()` (no restart), and POST `/ap/archipelago/test`
+  probes any host/port for the RoomInfo greeting (AP version, seed name,
+  whether a 2004Scape slot is hosted, password requirement) without touching
+  the live connection. Hand-editing the JSON still works for headless setups.
 - **Lifecycle**: `initApClient()` called from `startWeb()` (web.ts is already
   an overlay and runs exactly once at boot on the main thread - no new overlay
   file needed, and worker threads never touch it). Reconnect with backoff

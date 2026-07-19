@@ -94,6 +94,7 @@ let sentChecks = new Set<string>();
 let ws: WebSocket | null = null;
 let connected = false; // Connected packet received
 let goal = 'dragon';
+let lastError: string | null = null; // most recent connection problem, for the tracker's setup page
 let reconnectAttempt = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
@@ -452,11 +453,13 @@ function handlePacket(packet: { cmd?: string } & Record<string, unknown>): void 
         case 'Connected':
             connected = true;
             reconnectAttempt = 0;
+            lastError = null;
             printInfo(`AP client: connected to ${config?.host}:${config?.port} as "${config?.slot}"`);
             applySlotData(packet.slot_data as Record<string, unknown> | undefined);
             sendFullResync();
             break;
         case 'ConnectionRefused':
+            lastError = `refused: ${JSON.stringify(packet.errors ?? packet)}`;
             printError(`AP client: connection refused: ${JSON.stringify(packet.errors ?? packet)}`);
             break;
         case 'ReceivedItems':
@@ -510,6 +513,7 @@ function connect(): void {
 
     ws.on('error', (err: Error) => {
         // 'close' follows and handles the retry; just log once per attempt.
+        lastError = err.message;
         if (reconnectAttempt === 0) {
             printWarning(`AP client: socket error (${err.message})`);
         }
@@ -542,14 +546,49 @@ export function onCheckFired(checkId: string): void {
 
 /** Boot entry point, called once from startWeb() (web.ts overlay - main thread only). No-op without config. */
 export function initApClient(): void {
+    reconfigure();
+}
+
+/**
+ * (Re)loads ap-archipelago.json and (re)connects - the tracker's Archipelago
+ * setup page calls this after writing new credentials, so config changes apply
+ * live without a server restart. Also the shared init path (initApClient
+ * delegates here). Safe to call in any state: tears down an existing socket
+ * and pending reconnect first, and cleanly disables the client when the config
+ * is absent/disabled.
+ */
+export function reconfigure(): void {
+    if (reconnectTimer !== null) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+    }
+    reconnectAttempt = 0;
+    lastError = null;
+    if (ws !== null) {
+        try {
+            ws.removeAllListeners();
+            ws.terminate();
+        } catch {
+            // already dead
+        }
+        ws = null;
+    }
+    connected = false;
+
+    const wasActive = config !== null;
     config = loadConfig();
     if (config === null) {
-        return; // not an AP run
+        data = null;
+        if (wasActive) {
+            printInfo('AP client: disabled (config removed or enabled=false)');
+        }
+        return;
     }
 
     data = loadData();
     if (data === null) {
         config = null;
+        lastError = 'datapackage (ap-archipelago-data.json) missing - run tools/ap/ExportApWorldData.ts';
         return;
     }
 
@@ -562,4 +601,95 @@ export function initApClient(): void {
     printInfo(`AP client: enabled (${checkToLocationId.size} locations, ${itemsById.size} items mapped)`);
     startDeliveryTimer();
     connect();
+}
+
+/** Live client state for the tracker's Archipelago setup page. */
+export function getApStatus(): Record<string, unknown> {
+    return {
+        active: isApModeActive(),
+        connected,
+        host: config?.host ?? null,
+        port: config?.port ?? null,
+        slot: config?.slot ?? null,
+        goal: isApModeActive() ? goal : null,
+        sentChecks: sentChecks.size,
+        receivedItems: session.receivedCount,
+        pendingDeliveries: session.pending.length,
+        goalSent: session.goalSent,
+        lastError
+    };
+}
+
+export interface ProbeResult {
+    ok: boolean;
+    error?: string;
+    version?: string;
+    seedName?: string;
+    passwordRequired?: boolean;
+    games?: string[];
+    hasOurGame?: boolean;
+}
+
+/**
+ * One-shot connectivity probe for the setup page's "Test connection" button:
+ * opens a fresh socket, waits for the server's RoomInfo greeting, and reports
+ * what's hosted there. Independent of the live client - never touches its
+ * state, so testing other hosts while connected is safe.
+ */
+export function probeServer(host: string, port: number, timeoutMs: number = 5000): Promise<ProbeResult> {
+    return new Promise(resolve => {
+        let socket: WebSocket;
+        try {
+            socket = new WebSocket(`ws://${host}:${port}`);
+        } catch (err) {
+            resolve({ ok: false, error: err instanceof Error ? err.message : String(err) });
+            return;
+        }
+
+        let done = false;
+        const finish = (result: ProbeResult) => {
+            if (done) {
+                return;
+            }
+            done = true;
+            clearTimeout(timer);
+            try {
+                socket.removeAllListeners();
+                socket.terminate();
+            } catch {
+                // already closed
+            }
+            resolve(result);
+        };
+
+        const timer = setTimeout(() => finish({ ok: false, error: `no RoomInfo within ${timeoutMs}ms` }), timeoutMs);
+        if (typeof timer.unref === 'function') {
+            timer.unref();
+        }
+
+        socket.on('message', (raw: Buffer) => {
+            try {
+                const packets = JSON.parse(raw.toString()) as ({ cmd?: string } & Record<string, unknown>)[];
+                for (const packet of packets) {
+                    if (packet.cmd === 'RoomInfo') {
+                        const version = packet.version as { major?: number; minor?: number; build?: number } | undefined;
+                        const games = Array.isArray(packet.games) ? (packet.games as string[]) : [];
+                        finish({
+                            ok: true,
+                            version: version ? `${version.major}.${version.minor}.${version.build}` : undefined,
+                            seedName: typeof packet.seed_name === 'string' ? packet.seed_name : undefined,
+                            passwordRequired: packet.password === true,
+                            games,
+                            hasOurGame: games.includes(data?.game ?? '2004Scape')
+                        });
+                        return;
+                    }
+                }
+            } catch (err) {
+                finish({ ok: false, error: `bad packet: ${err instanceof Error ? err.message : err}` });
+            }
+        });
+        socket.on('error', (err: Error) => finish({ ok: false, error: err.message }));
+        socket.on('close', () => finish({ ok: false, error: 'connection closed before RoomInfo' }));
+    });
 }

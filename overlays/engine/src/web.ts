@@ -18,7 +18,7 @@ import { createDefaultWorldConfig, loadWorldConfig, normalizeWorldConfig, saveWo
 import OnDemand from '#/engine/OnDemand.js';
 import { tryParseInt } from '#/util/TryParse.js';
 import ObjType from '#/cache/config/ObjType.js';
-import { initApClient } from '#/engine/ApClient.js';
+import { getApStatus, initApClient, probeServer, reconfigure } from '#/engine/ApClient.js';
 import { getDropOverrideCount } from '#/engine/ApDropOverrides.js';
 import { AXE_TIERS, GEAR_FAMILY_LABELS, GEAR_TIER_LEVELS, GEAR_TIER_NAMES, GEAR_TIER_STARTERS, PICKAXE_TIERS, getUnlockCount, questGateLabel } from '#/engine/ApUnlockOverrides.js';
 import { getEntranceOverrideCount } from '#/engine/ApEntranceOverrides.js';
@@ -341,6 +341,52 @@ function buildUnlocksPanel(): unknown {
     return { present: true, gear, tools, caps, quests };
 }
 
+// ---------------------------------------------------------------------------
+// Archipelago connection setup (tracker "Archipelago" tab). GET returns the
+// stored credentials + the live client status; PUT writes ap-archipelago.json
+// and hot-applies it via ApClient.reconfigure() (no server restart);
+// POST /ap/archipelago/test probes an arbitrary host/port for a RoomInfo
+// greeting without touching the live client. Single-user local server - same
+// no-auth stance as the rest of the tracker routes.
+// ---------------------------------------------------------------------------
+
+const AP_CONNECTION_PATH = 'data/config/ap-archipelago.json';
+
+function readApConnectionConfig(): Record<string, unknown> {
+    const parsed = readJsonFile<Record<string, unknown>>(AP_CONNECTION_PATH);
+    return {
+        enabled: parsed?.enabled === true,
+        host: typeof parsed?.host === 'string' ? parsed.host : 'localhost',
+        port: typeof parsed?.port === 'number' ? parsed.port : 38281,
+        slot: typeof parsed?.slot === 'string' ? parsed.slot : '',
+        password: typeof parsed?.password === 'string' ? parsed.password : ''
+    };
+}
+
+function writeApConnectionConfig(body: unknown): { ok: boolean; error?: string } {
+    if (!body || typeof body !== 'object') {
+        return { ok: false, error: 'invalid payload' };
+    }
+    const raw = body as Record<string, unknown>;
+    const enabled = raw.enabled === true;
+    const host = typeof raw.host === 'string' ? raw.host.trim() : '';
+    const port = typeof raw.port === 'number' && Number.isInteger(raw.port) && raw.port > 0 && raw.port <= 65535 ? raw.port : NaN;
+    const slot = typeof raw.slot === 'string' ? raw.slot.trim() : '';
+    const password = typeof raw.password === 'string' && raw.password.length > 0 ? raw.password : null;
+
+    if (enabled && (host.length === 0 || Number.isNaN(port) || slot.length === 0)) {
+        return { ok: false, error: 'host, port and slot are required to enable' };
+    }
+
+    try {
+        fs.mkdirSync(path.dirname(AP_CONNECTION_PATH), { recursive: true });
+        fs.writeFileSync(AP_CONNECTION_PATH, JSON.stringify({ enabled, host: host || 'localhost', port: Number.isNaN(port) ? 38281 : port, slot: slot || 'Player', password }, null, 2) + '\n', 'utf8');
+        return { ok: true };
+    } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+}
+
 function buildApTrackerResponse(spoilerMode: boolean): unknown {
     const discoveries = getTrackerState();
     const dropNames = loadDropNames();
@@ -473,6 +519,8 @@ async function handleWebRequest(req: Request): Promise<Response> {
             }
         } else if (url.pathname === '/ap/tracker.json') {
             return jsonResponse(buildApTrackerResponse(url.searchParams.get('spoiler') === '1'));
+        } else if (url.pathname === '/ap/archipelago.json') {
+            return jsonResponse({ config: readApConnectionConfig(), status: getApStatus() });
         } else if (Environment.node.debug) {
             if (url.pathname === '/maped') {
                 return new Response(await ejs.renderFile('view/maped.ejs'), {
@@ -507,6 +555,20 @@ async function handleWebRequest(req: Request): Promise<Response> {
             return streamFile(publicPath, MIME_TYPES.get(path.extname(publicPath)) ?? 'text/plain');
         }
     } else if (req.method === 'PUT') {
+        if (url.pathname === '/ap/archipelago.json') {
+            let body: unknown;
+            try {
+                body = await req.json();
+            } catch {
+                return jsonResponse({ ok: false, error: 'invalid JSON payload' }, 400);
+            }
+            const result = writeApConnectionConfig(body);
+            if (!result.ok) {
+                return jsonResponse(result, 400);
+            }
+            reconfigure();
+            return jsonResponse({ ok: true, config: readApConnectionConfig(), status: getApStatus() });
+        }
         if (Environment.node.debug) {
             if (url.pathname.startsWith('/content/')) {
                 const name = url.pathname.replace('/content/', '');
@@ -520,6 +582,21 @@ async function handleWebRequest(req: Request): Promise<Response> {
                 await fs.promises.writeFile(filePath, body);
                 return new Response(null, { status: 200 });
             }
+        }
+    } else if (req.method === 'POST') {
+        if (url.pathname === '/ap/archipelago/test') {
+            let body: Record<string, unknown>;
+            try {
+                body = (await req.json()) as Record<string, unknown>;
+            } catch {
+                return jsonResponse({ ok: false, error: 'invalid JSON payload' }, 400);
+            }
+            const host = typeof body.host === 'string' && body.host.trim().length > 0 ? body.host.trim() : null;
+            const port = typeof body.port === 'number' && Number.isInteger(body.port) && body.port > 0 && body.port <= 65535 ? body.port : null;
+            if (!host || !port) {
+                return jsonResponse({ ok: false, error: 'host and port are required' }, 400);
+            }
+            return jsonResponse(await probeServer(host, port));
         }
     }
 

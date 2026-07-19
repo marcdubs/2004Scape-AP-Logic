@@ -17,6 +17,7 @@
         <button class="tab-btn" data-tab="bestiary">Bestiary</button>
         <button class="tab-btn" data-tab="teleports">Teleports</button>
         <button class="tab-btn" data-tab="unlocks">Unlocks</button>
+        <button class="tab-btn" data-tab="archipelago">Archipelago</button>
     </nav>
     <div class="topbar-right">
         <span id="status" class="status">connecting&hellip;</span>
@@ -127,6 +128,32 @@
             </div>
         </div>
         <div class="empty-state" id="unlocks-empty" hidden>Not an Archipelago placement run (no ap-unlocks.json on the server) &mdash; everything is unlocked.</div>
+    </section>
+
+    <section id="tab-archipelago" class="tab-panel">
+        <h2>Archipelago</h2>
+        <p class="tab-desc">Connect this game server to an Archipelago multiworld. Credentials are stored server-side (data/config/ap-archipelago.json) and apply immediately &mdash; no restart, no hand-editing. While connected, fired checks are reported automatically and received items are delivered in-game.</p>
+        <div class="ap-setup-grid">
+            <div class="ap-form">
+                <h3 class="unlocks-heading">Connection</h3>
+                <label class="ap-field"><span>Enabled</span><input type="checkbox" id="ap-enabled"></label>
+                <label class="ap-field"><span>Host</span><input type="text" id="ap-host" placeholder="archipelago.gg or localhost"></label>
+                <label class="ap-field"><span>Port</span><input type="number" id="ap-port" min="1" max="65535" placeholder="38281"></label>
+                <label class="ap-field"><span>Slot name</span><input type="text" id="ap-slot" placeholder="your player name in the multiworld"></label>
+                <label class="ap-field"><span>Password</span><input type="text" id="ap-password" placeholder="(leave empty if none)"></label>
+                <div class="ap-buttons">
+                    <button id="ap-test" class="ap-btn" type="button">Test connection</button>
+                    <button id="ap-save" class="ap-btn primary" type="button">Save &amp; Connect</button>
+                </div>
+                <div id="ap-form-msg" class="ap-msg" hidden></div>
+                <div id="ap-test-result" class="ap-msg" hidden></div>
+            </div>
+            <div>
+                <h3 class="unlocks-heading">Status</h3>
+                <table class="discovery-table" id="ap-status-table"><tbody></tbody></table>
+                <p class="tab-desc">Disconnections retry in the background with backoff; checks fired while offline are kept locally and resync on the next connect.</p>
+            </div>
+        </div>
     </section>
 </main>
 

@@ -785,6 +785,149 @@
         });
     }
 
+    // ---- Archipelago connection setup tab ----
+    // GET /ap/archipelago.json = stored credentials + live client status;
+    // PUT same path saves + hot-applies; POST /ap/archipelago/test probes a
+    // host/port for the AP RoomInfo greeting. The form is only filled from the
+    // server ONCE (and after an explicit save) so polling never clobbers edits.
+
+    var apFormFilled = false;
+
+    function apMsg(id, text, kind) {
+        var el = document.getElementById(id);
+        el.hidden = !text;
+        el.textContent = text || '';
+        el.className = 'ap-msg' + (kind ? ' ' + kind : '');
+    }
+
+    function fillApForm(config) {
+        document.getElementById('ap-enabled').checked = !!config.enabled;
+        document.getElementById('ap-host').value = config.host || '';
+        document.getElementById('ap-port').value = config.port || 38281;
+        document.getElementById('ap-slot').value = config.slot || '';
+        document.getElementById('ap-password').value = config.password || '';
+        apFormFilled = true;
+    }
+
+    function renderApStatus(status) {
+        var tbody = document.getElementById('ap-status-table').querySelector('tbody');
+        tbody.textContent = '';
+        function row(label, value, cls) {
+            var tr = document.createElement('tr');
+            var tdA = document.createElement('td');
+            tdA.textContent = label;
+            var tdB = document.createElement('td');
+            tdB.textContent = value;
+            if (cls) {
+                tdB.className = cls;
+            }
+            tr.appendChild(tdA);
+            tr.appendChild(tdB);
+            tbody.appendChild(tr);
+        }
+        if (!status || !status.active) {
+            row('State', 'disabled', 'ap-state-off');
+            if (status && status.lastError) {
+                row('Last error', status.lastError, 'ap-state-err');
+            }
+            return;
+        }
+        row('State', status.connected ? 'connected' : 'retrying…', status.connected ? 'ap-state-ok' : 'ap-state-warn');
+        row('Server', (status.host || '?') + ':' + (status.port || '?'));
+        row('Slot', status.slot || '?');
+        row('Goal', status.goal || '?');
+        row('Checks sent', String(status.sentChecks));
+        row('Items received', String(status.receivedItems));
+        if (status.pendingDeliveries > 0) {
+            row('Awaiting delivery', status.pendingDeliveries + ' (log in to receive)');
+        }
+        if (status.goalSent) {
+            row('Victory', 'reported!', 'ap-state-ok');
+        }
+        if (status.lastError && !status.connected) {
+            row('Last error', status.lastError, 'ap-state-err');
+        }
+    }
+
+    function fetchApStatus() {
+        fetch('/ap/archipelago.json', { cache: 'no-store' })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!apFormFilled) {
+                    fillApForm(data.config || {});
+                }
+                renderApStatus(data.status);
+            })
+            .catch(function () { /* offline - main status pill already shows it */ });
+    }
+
+    function apFormValues() {
+        return {
+            enabled: document.getElementById('ap-enabled').checked,
+            host: document.getElementById('ap-host').value.trim(),
+            port: parseInt(document.getElementById('ap-port').value, 10) || 38281,
+            slot: document.getElementById('ap-slot').value.trim(),
+            password: document.getElementById('ap-password').value
+        };
+    }
+
+    function initArchipelagoTab() {
+        document.getElementById('ap-test').addEventListener('click', function () {
+            var values = apFormValues();
+            if (!values.host) {
+                apMsg('ap-test-result', 'Enter a host to test.', 'err');
+                return;
+            }
+            apMsg('ap-test-result', 'Testing ' + values.host + ':' + values.port + '…');
+            fetch('/ap/archipelago/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ host: values.host, port: values.port })
+            })
+                .then(function (res) { return res.json(); })
+                .then(function (result) {
+                    if (result.ok) {
+                        var bits = ['Archipelago ' + (result.version || '?') + ' is up'];
+                        if (result.seedName) {
+                            bits.push('seed ' + result.seedName);
+                        }
+                        bits.push(result.hasOurGame ? '2004Scape slot hosted ✓' : 'WARNING: no 2004Scape game in this room');
+                        if (result.passwordRequired) {
+                            bits.push('password required');
+                        }
+                        apMsg('ap-test-result', bits.join(' · '), result.hasOurGame ? 'ok' : 'warn');
+                    } else {
+                        apMsg('ap-test-result', 'Unreachable: ' + (result.error || 'unknown error'), 'err');
+                    }
+                })
+                .catch(function (err) { apMsg('ap-test-result', 'Test failed: ' + err.message, 'err'); });
+        });
+
+        document.getElementById('ap-save').addEventListener('click', function () {
+            var values = apFormValues();
+            apMsg('ap-form-msg', 'Saving…');
+            fetch('/ap/archipelago.json', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(values)
+            })
+                .then(function (res) { return res.json(); })
+                .then(function (result) {
+                    if (result.ok) {
+                        apMsg('ap-form-msg', values.enabled ? 'Saved - connecting…' : 'Saved (disabled).', 'ok');
+                        fillApForm(result.config || values);
+                        renderApStatus(result.status);
+                    } else {
+                        apMsg('ap-form-msg', 'Not saved: ' + (result.error || 'unknown error'), 'err');
+                    }
+                })
+                .catch(function (err) { apMsg('ap-form-msg', 'Save failed: ' + err.message, 'err'); });
+        });
+
+        fetchApStatus();
+        setInterval(fetchApStatus, POLL_MS);
+    }
+
     // ---- render all ----
 
     function renderAll() {
@@ -805,6 +948,7 @@
         initMapControls();
         initEntranceSearch();
         initShowLockedToggle();
+        initArchipelagoTab();
         fetchMeta();
         fetchTracker();
         setInterval(fetchTracker, POLL_MS);
