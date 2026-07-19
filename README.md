@@ -7,6 +7,8 @@ This repo does **not** fork LostCityRS. `Server`, `engine`, `content`, `webclien
 the normal way via `Server/start.sh`). Everything Archipelago-specific lives here
 instead, and gets deployed on top via `scripts/install.js`.
 
+Yes, I used a whole lot of AI to build this, driving it with a lot of human design and testing. Documentation is often written by AI too in order to keep it up to date with the codebase. Documentation that is useful to the AI is also useful to humans, so I keep it in the repo. It also allows for future improvements to be built with the full context of what came before, in both documentation and code. The AI is not perfect, but it is a force multiplier for me and for you.
+
 **New session / new agent?** Read [docs/lessons-learned.md](docs/lessons-learned.md)
 first - it captures the architecture decisions, the rs2/engine recipes, the
 environment gotchas, and where the project is heading.
