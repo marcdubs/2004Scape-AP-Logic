@@ -19,27 +19,33 @@ boot the game server, open the tracker, connect, play. Steps 1-2 are one-time.
 ### 1. One-time: game-server setup
 
 Prereqs: the `Server/` LostCityRS checkout as a **sibling** of this repo (set up
-the normal LostCityRS way), Node 20+, and - for the Archipelago server - WSL (or
-any Linux/mac shell) with Python 3.10+.
+the normal LostCityRS way), Node 20+, and Python 3.10+ for the Archipelago
+server. Any OS works; the game server and the Archipelago server can be the
+same machine or different ones.
 
 ```
 node scripts/install.js                             # deploy this repo's overlays -> ../Server
 cd ../Server/engine && npx tsx tools/pack/Build.ts  # one content pack build (~2 min)
 ```
 
-If `tsx` dies with an esbuild platform error (happens when switching between
-Windows and WSL): `cd ../Server/engine && npm install && npm install --no-save --force @esbuild/win32-x64`.
+If `tsx` dies with an esbuild platform error (can happen when the same checkout
+is used from two OSes, e.g. Windows + WSL): `cd ../Server/engine && npm install`,
+then additionally `npm install --no-save --force @esbuild/<the-other-platform>`
+(e.g. `@esbuild/win32-x64`) if you keep switching back and forth.
 
 Optional flags in `Server/engine/data/config/world.json`: `web.port` (tracker/
 client port, examples below assume 8080), `apSkipTutorial: true` (new accounts
 skip Tutorial Island), `xpRate`.
 
-### 2. One-time: Archipelago server setup (WSL)
+### 2. One-time: Archipelago server setup
 
-The archipelago.gg website can't generate for custom worlds, so self-host:
+The archipelago.gg website can't generate for custom worlds, so self-host.
+Clone anywhere you like (shown for a POSIX shell; on Windows use `python`
+instead of `python3` and `venv\Scripts\` instead of `venv/bin/` - or run it
+under WSL):
 
 ```
-cd ~ && git clone --depth 1 https://github.com/ArchipelagoMW/Archipelago.git
+git clone --depth 1 https://github.com/ArchipelagoMW/Archipelago.git
 cd Archipelago && python3 -m venv venv
 ./venv/bin/pip install "setuptools>=75,<81"
 ./venv/bin/pip install -r requirements.txt
@@ -50,13 +56,13 @@ Install the 2004Scape world and a player YAML:
 
 ```
 cd <this repo>/apworld && python3 build.py          # packages rs2004scape.apworld
-cp rs2004scape.apworld ~/Archipelago/custom_worlds/
+cp rs2004scape.apworld <Archipelago checkout>/custom_worlds/
 ```
 
-`~/Archipelago/Players/Marcus.yaml`:
+`<Archipelago checkout>/Players/<Insert Username>.yaml`:
 
 ```yaml
-name: Marcus
+name: <Insert Username>
 game: 2004Scape
 2004Scape:
   goal: dragon_slayer      # or barcrawl / kbd
@@ -81,8 +87,10 @@ zeroed unlock state, and cleared check/tracker ledgers.
 
 ### 4. Per run: generate + host the multiworld
 
+From the Archipelago checkout (the middle command just pulls the
+`.archipelago` multidata out of the generated zip - any unzip tool works):
+
 ```
-cd ~/Archipelago
 ./venv/bin/python Generate.py --player_files_path Players --outputpath output
 python3 -c "import zipfile,glob; z=sorted(glob.glob('output/AP_*.zip'))[-1]; \
   zipfile.ZipFile(z).extract([n for n in zipfile.ZipFile(z).namelist() if n.endswith('.archipelago')][0], 'output')"
@@ -94,11 +102,12 @@ to the multidata - delete it to reset the run, regenerate for a new seed.
 
 ### 5. Boot the game server and play
 
-1. On Windows: start the game server as usual (`cd Server/engine && npx tsx src/app.ts`,
+1. Start the game server as usual (`cd Server/engine && npx tsx src/app.ts`,
    wait for `World ready`).
 2. **Tracker**: open http://localhost:8080/ap/ - map, discoveries, unlocks.
 3. **Connect to Archipelago**: tracker -> **Archipelago** tab -> host
-   `localhost`, port `38281`, slot name from your YAML (`Marcus`) -> **Test
+   `localhost` (or wherever the AP server runs; a WSL-hosted server is
+   `localhost` from Windows), port `38281`, slot name from your YAML -> **Test
    connection** (expect "2004Scape slot hosted ✓") -> **Save & Connect**. The
    status panel flips to *connected*; no restart needed. (Headless equivalent:
    write `Server/engine/data/config/ap-archipelago.json` by hand.)
