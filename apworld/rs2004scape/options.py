@@ -1,7 +1,7 @@
 # Options for the 2004Scape Archipelago world (docs/archipelago-integration.md).
 from dataclasses import dataclass
 
-from Options import Choice, OptionSet, PerGameCommonOptions, Toggle
+from Options import Choice, DefaultOnToggle, OptionSet, PerGameCommonOptions, Toggle
 
 GOAL_NAMES = ("dragon_slayer", "barcrawl", "kbd", "heroes", "legends")
 
@@ -42,6 +42,39 @@ class ProgressiveQuests(Toggle):
     default = 0
 
 
+class GearProgression(DefaultOnToggle):
+    """Include the Progressive Melee / Armour / Ranged / Magic items - each copy
+    unlocks the next equipment tier. Off: those items are removed from the pool
+    and every equipment tier is usable from the start."""
+
+    display_name = "Gear Progression"
+
+
+class ToolProgression(DefaultOnToggle):
+    """Include the Progressive Pickaxe and Progressive Axe items - each copy
+    unlocks the next tool tier. Off: those items are removed from the pool and
+    every pickaxe/axe is usable from the start."""
+
+    display_name = "Tool Progression"
+
+
+class SkillCaps(DefaultOnToggle):
+    """Include the Progressive <Skill> Cap items - every skill starts capped at
+    level 20 and each copy raises that skill's cap by 20. Off: those items are
+    removed from the pool and no skill is ever capped."""
+
+    display_name = "Skill Caps"
+
+
+class QuestUnlocks(DefaultOnToggle):
+    """Include the quest unlock items - most quests can't be started until
+    their unlock arrives. Off: quest unlock items are removed from the pool,
+    every quest is startable from the start, and progressive_quests is
+    ignored."""
+
+    display_name = "Quest Unlocks"
+
+
 class MusicChecks(Toggle):
     """Include the 230 music-track discovery checks (first visit to each music
     region) as filler locations. The game server adopts this automatically on
@@ -55,5 +88,9 @@ class MusicChecks(Toggle):
 class RS2004Options(PerGameCommonOptions):
     goal: Goal
     extra_goals: ExtraGoals
+    gear_progression: GearProgression
+    tool_progression: ToolProgression
+    skill_caps: SkillCaps
+    quest_unlocks: QuestUnlocks
     progressive_quests: ProgressiveQuests
     music_checks: MusicChecks

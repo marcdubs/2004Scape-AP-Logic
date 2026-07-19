@@ -18,7 +18,9 @@ any character on that server - or share the slot with friends on the same server
 
 ## What does randomization do to this game?
 
-Progression is rebuilt around Archipelago items:
+Progression is rebuilt around Archipelago items - and each family below has its own on/off option
+(`gear_progression`, `tool_progression`, `skill_caps`, `quest_unlocks`), so you can play with any subset; a disabled
+family's items stay out of the pool and that system is unrestricted from the start:
 
 - **Skill caps**: every skill starts capped at level 20. "Progressive &lt;Skill&gt; Cap" items raise a skill's cap by
   20 each, up to 99 (Hitpoints is never capped).

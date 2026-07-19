@@ -22,7 +22,13 @@ const DEFAULTS: Record<string, boolean> = {
     addonBankBox: true,
     addonTreeCompass: true,
     addonTeleportingFocus: true,
-    addonNpcTeleport: true
+    addonNpcTeleport: true,
+    // item-category toggles (AP slot options): false = that family's items are
+    // not in the pool and the system is unrestricted from the start
+    // (ApUnlockOverrides.getUnlockCount reports 99 for its keys).
+    gearProgression: true,
+    toolProgression: true,
+    skillCaps: true
 };
 
 let cache: Record<string, boolean> | null = null;

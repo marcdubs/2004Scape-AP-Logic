@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import VarPlayerType from '#/cache/config/VarPlayerType.js';
+import { getApOption } from '#/engine/ApOptions.js';
 import type Player from '#/engine/entity/Player.js';
 import { PlayerStatEnabled } from '#/engine/entity/PlayerStat.js';
 import { printInfo, printWarning } from '#/util/Logger.js';
@@ -91,7 +92,32 @@ function ensureFresh(): void {
 // How many of a named progressive unlock the player has received
 // (e.g. "progressive_melee", "progressive_pickaxe"). 99 = effectively unlimited (no
 // table = not an AP run). A table that exists but lacks the key = 0 received so far.
+// Item-category slot options (adopted into ap-options.json from slot_data): a
+// disabled category reports 99 - the same "unrestricted" sentinel as running
+// with no unlocks table at all, so every consumer (gear/tool gates, the
+// Math.min(99, ...) cap formula, the tracker) already handles it.
+const GEAR_KEYS = new Set(['progressive_melee', 'progressive_armour', 'progressive_ranged', 'progressive_magic']);
+const TOOL_KEYS = new Set(['progressive_pickaxe', 'progressive_axe']);
+
+function categoryDisabled(name: string): boolean {
+    if (GEAR_KEYS.has(name)) {
+        return !getApOption('gearProgression');
+    }
+    if (TOOL_KEYS.has(name)) {
+        return !getApOption('toolProgression');
+    }
+    // every remaining progressive_<skill> key is a skill cap (progressive_quest
+    // is a counter, not a gate - quest gating is governed by the questGates list)
+    if (name.startsWith('progressive_') && name !== 'progressive_quest') {
+        return !getApOption('skillCaps');
+    }
+    return false;
+}
+
 export function getUnlockCount(name: string): number {
+    if (categoryDisabled(name)) {
+        return 99;
+    }
     ensureFresh();
     if (table === null) {
         return 99;

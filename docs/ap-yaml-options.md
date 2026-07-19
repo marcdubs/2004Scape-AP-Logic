@@ -55,6 +55,23 @@ prerequisite always unlocks before anything that needs it. The order is fixed
 per apworld build (it's a curated difficulty matrix, not seeded); the exact
 sequence is `questUnlockOrder` in `rs2004scape/data/rs2004_data.json`.
 
+### Item-category toggles: `gear_progression` / `tool_progression` / `skill_caps` / `quest_unlocks`
+
+All `true` by default - each one removes a whole item family from the pool and
+leaves that system unrestricted from the start of the run. The game server
+adopts these from slot_data on connect (a disabled family's unlock counts
+report as maxed; `quest_unlocks: false` also empties the quest-gate list).
+
+| option | items removed when `false` | effect when `false` |
+|---|---|---|
+| `gear_progression` | Progressive Melee/Armour/Ranged/Magic (7 copies each) | every equipment tier usable immediately |
+| `tool_progression` | Progressive Pickaxe (5) + Progressive Axe (6) | every pickaxe/axe usable immediately |
+| `skill_caps` | all `Progressive <Skill> Cap` items (72 copies) | no skill is ever capped |
+| `quest_unlocks` | all `Quest Unlock: <name>` items / `Progressive Quest Unlock` | every quest startable immediately; `progressive_quests` is ignored |
+
+Turning families off shrinks the progression pool (filler pads the difference),
+so leave at least one meaningful family on unless you want a pure-filler world.
+
 ### `music_checks`
 
 `false` (default) / `true`. Adds 230 "first visit to each music-track region"

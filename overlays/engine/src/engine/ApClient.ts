@@ -290,6 +290,14 @@ function applySlotData(slotData: Record<string, unknown> | undefined): void {
             .catch(err => printWarning(`AP client: failed to reset watch cache (${err instanceof Error ? err.message : err})`));
     }
 
+    // item-category toggles: false = family not in the pool, system unrestricted
+    // (ApUnlockOverrides.getUnlockCount reports 99 for the family's keys)
+    for (const key of ['gearProgression', 'toolProgression', 'skillCaps'] as const) {
+        if (typeof slotData[key] === 'boolean') {
+            setApOption(key, slotData[key]);
+        }
+    }
+
     const gates = Array.isArray(slotData.questGates) ? slotData.questGates.filter((g): g is string => typeof g === 'string') : null;
     if (!gates) {
         return;

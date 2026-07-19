@@ -52,6 +52,9 @@ for _name, _def in ITEMS.items():
 FILLER_NAME = "Mystery Reward"
 PROGRESSIVE_QUEST_NAME = "Progressive Quest Unlock"
 
+GEAR_ITEM_NAMES = {"Progressive Melee", "Progressive Armour", "Progressive Ranged", "Progressive Magic"}
+TOOL_ITEM_NAMES = {"Progressive Pickaxe", "Progressive Axe"}
+
 # difficulty-ordered gated quests; copy N of the progressive item unlocks entry N-1
 QUEST_ORDER = DATA["questUnlockOrder"]
 QUEST_ORDER_INDEX = {qid: i for i, qid in enumerate(QUEST_ORDER)}
@@ -139,6 +142,8 @@ class RS2004World(World):
     # ------------------------------------------------------------------
 
     def _has_cap(self, state, skill: str, level: int) -> bool:
+        if not self.options.skill_caps:
+            return True  # caps disabled: no skill is ever capped
         if skill == "hitpoints":
             return True  # hitpoints is never capped
         need = cap_copies_needed(level)
@@ -157,7 +162,7 @@ class RS2004World(World):
     def _quest_rule(self, state, qid: str) -> bool:
         quest = QUESTS[qid]
 
-        if qid in GATED_QUEST_IDS:
+        if qid in GATED_QUEST_IDS and self.options.quest_unlocks:
             if self.options.progressive_quests:
                 need = QUEST_ORDER_INDEX[qid] + 1
                 if not state.has(PROGRESSIVE_QUEST_NAME, self.player, need):
@@ -279,11 +284,22 @@ class RS2004World(World):
         # copies of the progressive item; classic mode skips the progressive item
         per_quest_unlocks = set(QUEST_UNLOCK_ITEM_BY_ID.values())
         progressive = bool(self.options.progressive_quests)
+        skipped = set()
+        if not self.options.gear_progression:
+            skipped |= GEAR_ITEM_NAMES
+        if not self.options.tool_progression:
+            skipped |= TOOL_ITEM_NAMES
+        if not self.options.skill_caps:
+            skipped |= set(CAP_ITEM_BY_SKILL.values())
+        if not self.options.quest_unlocks:
+            skipped |= per_quest_unlocks | {PROGRESSIVE_QUEST_NAME}
+        elif progressive:
+            skipped |= per_quest_unlocks
+        else:
+            skipped.add(PROGRESSIVE_QUEST_NAME)
         pool = []
         for name, item_def in ITEMS.items():
-            if progressive and name in per_quest_unlocks:
-                continue
-            if not progressive and name == PROGRESSIVE_QUEST_NAME:
+            if name in skipped:
                 continue
             for _ in range(item_def.get("copies", 0)):
                 pool.append(self.create_item(name))
@@ -301,10 +317,15 @@ class RS2004World(World):
 
     def fill_slot_data(self) -> dict:
         goal_keys = self._goal_keys()
+        quest_unlocks = bool(self.options.quest_unlocks.value)
         return {
             "goal": goal_keys[0],  # pre-multi-goal servers read this
             "goals": goal_keys,
-            "progressiveQuests": bool(self.options.progressive_quests.value),
+            "gearProgression": bool(self.options.gear_progression.value),
+            "toolProgression": bool(self.options.tool_progression.value),
+            "skillCaps": bool(self.options.skill_caps.value),
+            "progressiveQuests": quest_unlocks and bool(self.options.progressive_quests.value),
             "musicChecks": bool(self.options.music_checks.value),
-            "questGates": sorted(GATED_QUEST_IDS)
+            # no quest unlock items -> no gates: the server leaves every quest open
+            "questGates": sorted(GATED_QUEST_IDS) if quest_unlocks else []
         }

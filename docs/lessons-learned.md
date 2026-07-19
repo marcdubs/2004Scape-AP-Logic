@@ -2870,3 +2870,26 @@ checkout as the reference implementation):
 - NOT done: solo GenerateSeed placement mode ignores progressive_quests and
   multi-goal (AP-only options for now); tracker Unlocks tab shows the raw
   progressive_quest counter only via its quest_<id> effects.
+
+## Addendum (2026-07-19, archipelago-core-prep branch): item-category toggles
+
+`gear_progression` / `tool_progression` / `skill_caps` / `quest_unlocks`
+(DefaultOnToggle each): off = family's items out of the pool + system
+unrestricted from the start. The wiring pattern to reuse for any future
+category:
+
+- apworld: skip family in create_items, bypass in rules (_has_cap returns True
+  when skill_caps off; quest gate check skipped when quest_unlocks off),
+  slot_data carries gearProgression/toolProgression/skillCaps booleans.
+- Server: applySlotData adopts them into ap-options.json (same mechanism as
+  musicChecks); ApUnlockOverrides.getUnlockCount returns 99 for a disabled
+  family's keys BEFORE consulting the table - 99 is the same "unrestricted"
+  sentinel as running with no ap-unlocks.json, so every consumer (gear/tool
+  gates, Math.min(99, 20+10*n) caps, tracker) already handles it. No new
+  code paths downstream.
+- quest_unlocks=false needs NO unlock-count handling at all: slot_data just
+  sends questGates: [] and ApQuestGates gates nothing.
+- WebHost gotcha: `pkill -f WebHost.py` from a compound bash command whose own
+  cmdline contains "WebHost.py" kills your own shell (exit 144) before later
+  parts run - pkill/pgrep -f match the invoking command too.
+- 80 tests + 4551 subtests green; engine tsc clean; world_version 0.4.0.
