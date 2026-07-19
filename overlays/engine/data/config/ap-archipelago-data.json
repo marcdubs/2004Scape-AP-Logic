@@ -1,0 +1,4726 @@
+{
+  "_generated": "tools/ap/ExportApWorldData.ts (2026-07-19) - ids are append-only, do not hand-edit",
+  "game": "2004Scape",
+  "locationBaseId": 20040000,
+  "itemBaseId": 20045000,
+  "capsFormula": {
+    "base": 20,
+    "perCount": 10
+  },
+  "locations": {
+    "quest_dragon": {
+      "id": 20040000,
+      "name": "Quest: Dragon Slayer",
+      "kind": "quest",
+      "questId": "dragon"
+    },
+    "quest_arena": {
+      "id": 20040001,
+      "name": "Quest: Fight Arena",
+      "kind": "quest",
+      "questId": "arena"
+    },
+    "quest_arthur": {
+      "id": 20040002,
+      "name": "Quest: Merlin's Crystal",
+      "kind": "quest",
+      "questId": "arthur"
+    },
+    "quest_ball": {
+      "id": 20040003,
+      "name": "Quest: Witch's House",
+      "kind": "quest",
+      "questId": "ball"
+    },
+    "quest_biohazard": {
+      "id": 20040004,
+      "name": "Quest: Biohazard",
+      "kind": "quest",
+      "questId": "biohazard"
+    },
+    "quest_blackarmgang": {
+      "id": 20040005,
+      "name": "Quest: Shield of Arrav",
+      "kind": "quest",
+      "questId": "blackarmgang"
+    },
+    "quest_blackknight": {
+      "id": 20040006,
+      "name": "Quest: Black Knights' Fortress",
+      "kind": "quest",
+      "questId": "blackknight"
+    },
+    "quest_chompybird": {
+      "id": 20040007,
+      "name": "Quest: Big Chompy Bird Hunting",
+      "kind": "quest",
+      "questId": "chompybird"
+    },
+    "quest_cog": {
+      "id": 20040008,
+      "name": "Quest: Clock Tower",
+      "kind": "quest",
+      "questId": "cog"
+    },
+    "quest_cook": {
+      "id": 20040009,
+      "name": "Quest: Cook's Assistant",
+      "kind": "quest",
+      "questId": "cook"
+    },
+    "quest_crest": {
+      "id": 20040010,
+      "name": "Quest: Family Crest",
+      "kind": "quest",
+      "questId": "crest"
+    },
+    "quest_death": {
+      "id": 20040011,
+      "name": "Quest: Death Plateau",
+      "kind": "quest",
+      "questId": "death"
+    },
+    "quest_demon": {
+      "id": 20040012,
+      "name": "Quest: Demon Slayer",
+      "kind": "quest",
+      "questId": "demon"
+    },
+    "quest_desertrescue": {
+      "id": 20040013,
+      "name": "Quest: Tourist Trap",
+      "kind": "quest",
+      "questId": "desertrescue"
+    },
+    "quest_doric": {
+      "id": 20040014,
+      "name": "Quest: Doric's Quest",
+      "kind": "quest",
+      "questId": "doric"
+    },
+    "quest_druid": {
+      "id": 20040015,
+      "name": "Quest: Druidic Ritual",
+      "kind": "quest",
+      "questId": "druid"
+    },
+    "quest_druidspirit": {
+      "id": 20040016,
+      "name": "Quest: Nature Spirit",
+      "kind": "quest",
+      "questId": "druidspirit"
+    },
+    "quest_drunkmonk": {
+      "id": 20040017,
+      "name": "Quest: Monk's Friend",
+      "kind": "quest",
+      "questId": "drunkmonk"
+    },
+    "quest_eadgar": {
+      "id": 20040018,
+      "name": "Quest: Eadgar's Ruse",
+      "kind": "quest",
+      "questId": "eadgar"
+    },
+    "quest_elemental_workshop": {
+      "id": 20040019,
+      "name": "Quest: Elemental Workshop",
+      "kind": "quest",
+      "questId": "elemental_workshop"
+    },
+    "quest_elena": {
+      "id": 20040020,
+      "name": "Quest: Plague City",
+      "kind": "quest",
+      "questId": "elena"
+    },
+    "quest_fishingcompo": {
+      "id": 20040021,
+      "name": "Quest: Fishing Contest",
+      "kind": "quest",
+      "questId": "fishingcompo"
+    },
+    "quest_fluffs": {
+      "id": 20040022,
+      "name": "Quest: Gertrude's Cat",
+      "kind": "quest",
+      "questId": "fluffs"
+    },
+    "quest_gobdip": {
+      "id": 20040023,
+      "name": "Quest: Goblin Diplomacy",
+      "kind": "quest",
+      "questId": "gobdip"
+    },
+    "quest_grail": {
+      "id": 20040024,
+      "name": "Quest: Holy Grail",
+      "kind": "quest",
+      "questId": "grail"
+    },
+    "quest_grandtree": {
+      "id": 20040025,
+      "name": "Quest: The Grand Tree",
+      "kind": "quest",
+      "questId": "grandtree"
+    },
+    "quest_haunted": {
+      "id": 20040026,
+      "name": "Quest: Ernest the Chicken",
+      "kind": "quest",
+      "questId": "haunted"
+    },
+    "quest_hazeelcult": {
+      "id": 20040027,
+      "name": "Quest: Hazeel Cult",
+      "kind": "quest",
+      "questId": "hazeelcult"
+    },
+    "quest_hero": {
+      "id": 20040028,
+      "name": "Quest: Heroes' Quest",
+      "kind": "quest",
+      "questId": "hero"
+    },
+    "quest_hetty": {
+      "id": 20040029,
+      "name": "Quest: Witch's Potion",
+      "kind": "quest",
+      "questId": "hetty"
+    },
+    "quest_horror": {
+      "id": 20040030,
+      "name": "Quest: Horror from the Deep",
+      "kind": "quest",
+      "questId": "horror"
+    },
+    "quest_hunt": {
+      "id": 20040031,
+      "name": "Quest: Pirate's Treasure",
+      "kind": "quest",
+      "questId": "hunt"
+    },
+    "quest_ikov": {
+      "id": 20040032,
+      "name": "Quest: Temple of Ikov",
+      "kind": "quest",
+      "questId": "ikov"
+    },
+    "quest_imp": {
+      "id": 20040033,
+      "name": "Quest: Imp Catcher",
+      "kind": "quest",
+      "questId": "imp"
+    },
+    "quest_itexam": {
+      "id": 20040034,
+      "name": "Quest: The Digsite",
+      "kind": "quest",
+      "questId": "itexam"
+    },
+    "quest_itgronigen": {
+      "id": 20040035,
+      "name": "Quest: Observatory Quest",
+      "kind": "quest",
+      "questId": "itgronigen"
+    },
+    "quest_itwatchtower": {
+      "id": 20040036,
+      "name": "Quest: Watchtower",
+      "kind": "quest",
+      "questId": "itwatchtower"
+    },
+    "quest_junglepotion": {
+      "id": 20040037,
+      "name": "Quest: Jungle Potion",
+      "kind": "quest",
+      "questId": "junglepotion"
+    },
+    "quest_legends": {
+      "id": 20040038,
+      "name": "Quest: Legends' Quest",
+      "kind": "quest",
+      "questId": "legends"
+    },
+    "quest_mcannon": {
+      "id": 20040039,
+      "name": "Quest: Dwarf Cannon",
+      "kind": "quest",
+      "questId": "mcannon"
+    },
+    "quest_mortton": {
+      "id": 20040040,
+      "name": "Quest: Shades of Mort'ton",
+      "kind": "quest",
+      "questId": "mortton"
+    },
+    "quest_murder": {
+      "id": 20040041,
+      "name": "Quest: Murder Mystery",
+      "kind": "quest",
+      "questId": "murder"
+    },
+    "quest_priest": {
+      "id": 20040042,
+      "name": "Quest: Restless Ghost",
+      "kind": "quest",
+      "questId": "priest"
+    },
+    "quest_priestperil": {
+      "id": 20040043,
+      "name": "Quest: Priest in Peril",
+      "kind": "quest",
+      "questId": "priestperil"
+    },
+    "quest_prince": {
+      "id": 20040044,
+      "name": "Quest: Prince Ali Rescue",
+      "kind": "quest",
+      "questId": "prince"
+    },
+    "quest_regicide": {
+      "id": 20040045,
+      "name": "Quest: Regicide",
+      "kind": "quest",
+      "questId": "regicide"
+    },
+    "quest_romeojuliet": {
+      "id": 20040046,
+      "name": "Quest: Romeo & Juliet",
+      "kind": "quest",
+      "questId": "romeojuliet"
+    },
+    "quest_runemysteries": {
+      "id": 20040047,
+      "name": "Quest: Rune Mysteries",
+      "kind": "quest",
+      "questId": "runemysteries"
+    },
+    "quest_scorpcatcher": {
+      "id": 20040048,
+      "name": "Quest: Scorpion Catcher",
+      "kind": "quest",
+      "questId": "scorpcatcher"
+    },
+    "quest_seaslug": {
+      "id": 20040049,
+      "name": "Quest: Sea Slug",
+      "kind": "quest",
+      "questId": "seaslug"
+    },
+    "quest_sheep": {
+      "id": 20040050,
+      "name": "Quest: Sheep Shearer",
+      "kind": "quest",
+      "questId": "sheep"
+    },
+    "quest_sheepherder": {
+      "id": 20040051,
+      "name": "Quest: Sheep Herder",
+      "kind": "quest",
+      "questId": "sheepherder"
+    },
+    "quest_squire": {
+      "id": 20040052,
+      "name": "Quest: Knight's Sword",
+      "kind": "quest",
+      "questId": "squire"
+    },
+    "quest_tbwt": {
+      "id": 20040053,
+      "name": "Quest: Tai Bwo Wannai Trio",
+      "kind": "quest",
+      "questId": "tbwt"
+    },
+    "quest_totem": {
+      "id": 20040054,
+      "name": "Quest: Tribal Totem",
+      "kind": "quest",
+      "questId": "totem"
+    },
+    "quest_tree": {
+      "id": 20040055,
+      "name": "Quest: Tree Gnome Village",
+      "kind": "quest",
+      "questId": "tree"
+    },
+    "quest_troll": {
+      "id": 20040056,
+      "name": "Quest: Troll Stronghold",
+      "kind": "quest",
+      "questId": "troll"
+    },
+    "quest_upass": {
+      "id": 20040057,
+      "name": "Quest: Underground Pass",
+      "kind": "quest",
+      "questId": "upass"
+    },
+    "quest_vampire": {
+      "id": 20040058,
+      "name": "Quest: Vampire Slayer",
+      "kind": "quest",
+      "questId": "vampire"
+    },
+    "quest_viking": {
+      "id": 20040059,
+      "name": "Quest: Trials of the Fremmenik",
+      "kind": "quest",
+      "questId": "viking"
+    },
+    "quest_waterfall": {
+      "id": 20040060,
+      "name": "Quest: Waterfall Quest",
+      "kind": "quest",
+      "questId": "waterfall"
+    },
+    "quest_zanaris": {
+      "id": 20040061,
+      "name": "Quest: Lost City",
+      "kind": "quest",
+      "questId": "zanaris"
+    },
+    "quest_zombiequeen": {
+      "id": 20040062,
+      "name": "Quest: Shilo Village",
+      "kind": "quest",
+      "questId": "zombiequeen"
+    },
+    "ds_started": {
+      "id": 20040063,
+      "name": "Dragon Slayer: Started",
+      "kind": "ds"
+    },
+    "ds_oziach": {
+      "id": 20040064,
+      "name": "Dragon Slayer: Oziach",
+      "kind": "ds"
+    },
+    "ds_ship_ready": {
+      "id": 20040065,
+      "name": "Dragon Slayer: Ship Ready",
+      "kind": "ds"
+    },
+    "ds_map_complete": {
+      "id": 20040066,
+      "name": "Dragon Slayer: Map Complete",
+      "kind": "ds"
+    },
+    "ds_sailed": {
+      "id": 20040067,
+      "name": "Dragon Slayer: Sailed",
+      "kind": "ds"
+    },
+    "ds_complete": {
+      "id": 20040068,
+      "name": "Dragon Slayer: Complete",
+      "kind": "ds"
+    },
+    "barcrawl_bar_1": {
+      "id": 20040069,
+      "name": "Barcrawl: Barcrawl Bar 1",
+      "kind": "barcrawl"
+    },
+    "barcrawl_bar_2": {
+      "id": 20040070,
+      "name": "Barcrawl: Barcrawl Bar 2",
+      "kind": "barcrawl"
+    },
+    "barcrawl_bar_3": {
+      "id": 20040071,
+      "name": "Barcrawl: Barcrawl Bar 3",
+      "kind": "barcrawl"
+    },
+    "barcrawl_bar_4": {
+      "id": 20040072,
+      "name": "Barcrawl: Barcrawl Bar 4",
+      "kind": "barcrawl"
+    },
+    "barcrawl_bar_5": {
+      "id": 20040073,
+      "name": "Barcrawl: Barcrawl Bar 5",
+      "kind": "barcrawl"
+    },
+    "barcrawl_bar_6": {
+      "id": 20040074,
+      "name": "Barcrawl: Barcrawl Bar 6",
+      "kind": "barcrawl"
+    },
+    "barcrawl_bar_7": {
+      "id": 20040075,
+      "name": "Barcrawl: Barcrawl Bar 7",
+      "kind": "barcrawl"
+    },
+    "barcrawl_bar_8": {
+      "id": 20040076,
+      "name": "Barcrawl: Barcrawl Bar 8",
+      "kind": "barcrawl"
+    },
+    "barcrawl_bar_9": {
+      "id": 20040077,
+      "name": "Barcrawl: Barcrawl Bar 9",
+      "kind": "barcrawl"
+    },
+    "barcrawl_bar_10": {
+      "id": 20040078,
+      "name": "Barcrawl: Barcrawl Bar 10",
+      "kind": "barcrawl"
+    },
+    "first_xp_attack": {
+      "id": 20040079,
+      "name": "First Attack XP",
+      "kind": "first_xp",
+      "skill": "attack"
+    },
+    "first_xp_defence": {
+      "id": 20040080,
+      "name": "First Defence XP",
+      "kind": "first_xp",
+      "skill": "defence"
+    },
+    "first_xp_strength": {
+      "id": 20040081,
+      "name": "First Strength XP",
+      "kind": "first_xp",
+      "skill": "strength"
+    },
+    "first_xp_ranged": {
+      "id": 20040082,
+      "name": "First Ranged XP",
+      "kind": "first_xp",
+      "skill": "ranged"
+    },
+    "first_xp_prayer": {
+      "id": 20040083,
+      "name": "First Prayer XP",
+      "kind": "first_xp",
+      "skill": "prayer"
+    },
+    "first_xp_magic": {
+      "id": 20040084,
+      "name": "First Magic XP",
+      "kind": "first_xp",
+      "skill": "magic"
+    },
+    "first_xp_cooking": {
+      "id": 20040085,
+      "name": "First Cooking XP",
+      "kind": "first_xp",
+      "skill": "cooking"
+    },
+    "first_xp_woodcutting": {
+      "id": 20040086,
+      "name": "First Woodcutting XP",
+      "kind": "first_xp",
+      "skill": "woodcutting"
+    },
+    "first_xp_fletching": {
+      "id": 20040087,
+      "name": "First Fletching XP",
+      "kind": "first_xp",
+      "skill": "fletching"
+    },
+    "first_xp_fishing": {
+      "id": 20040088,
+      "name": "First Fishing XP",
+      "kind": "first_xp",
+      "skill": "fishing"
+    },
+    "first_xp_firemaking": {
+      "id": 20040089,
+      "name": "First Firemaking XP",
+      "kind": "first_xp",
+      "skill": "firemaking"
+    },
+    "first_xp_crafting": {
+      "id": 20040090,
+      "name": "First Crafting XP",
+      "kind": "first_xp",
+      "skill": "crafting"
+    },
+    "first_xp_smithing": {
+      "id": 20040091,
+      "name": "First Smithing XP",
+      "kind": "first_xp",
+      "skill": "smithing"
+    },
+    "first_xp_mining": {
+      "id": 20040092,
+      "name": "First Mining XP",
+      "kind": "first_xp",
+      "skill": "mining"
+    },
+    "first_xp_herblore": {
+      "id": 20040093,
+      "name": "First Herblore XP",
+      "kind": "first_xp",
+      "skill": "herblore"
+    },
+    "first_xp_agility": {
+      "id": 20040094,
+      "name": "First Agility XP",
+      "kind": "first_xp",
+      "skill": "agility"
+    },
+    "first_xp_thieving": {
+      "id": 20040095,
+      "name": "First Thieving XP",
+      "kind": "first_xp",
+      "skill": "thieving"
+    },
+    "first_xp_runecraft": {
+      "id": 20040096,
+      "name": "First Runecraft XP",
+      "kind": "first_xp",
+      "skill": "runecraft"
+    },
+    "first_kill": {
+      "id": 20040097,
+      "name": "First Kill",
+      "kind": "first_kill"
+    },
+    "first_kill_goblin": {
+      "id": 20040098,
+      "name": "First Kill Goblin",
+      "kind": "first_kill"
+    },
+    "first_kill_cow": {
+      "id": 20040099,
+      "name": "First Kill Cow",
+      "kind": "first_kill"
+    },
+    "first_kill_chicken": {
+      "id": 20040100,
+      "name": "First Kill Chicken",
+      "kind": "first_kill"
+    },
+    "first_kill_rat": {
+      "id": 20040101,
+      "name": "First Kill Rat",
+      "kind": "first_kill"
+    },
+    "first_kill_guard": {
+      "id": 20040102,
+      "name": "First Kill Guard",
+      "kind": "first_kill"
+    },
+    "first_kill_dwarf": {
+      "id": 20040103,
+      "name": "First Kill Dwarf",
+      "kind": "first_kill"
+    },
+    "first_kill_skeleton": {
+      "id": 20040104,
+      "name": "First Kill Skeleton",
+      "kind": "first_kill"
+    },
+    "first_kill_zombie": {
+      "id": 20040105,
+      "name": "First Kill Zombie",
+      "kind": "first_kill"
+    },
+    "first_kill_ghost": {
+      "id": 20040106,
+      "name": "First Kill Ghost",
+      "kind": "first_kill"
+    },
+    "first_kill_moss_giant": {
+      "id": 20040107,
+      "name": "First Kill Moss Giant",
+      "kind": "first_kill"
+    },
+    "first_kill_ice_giant": {
+      "id": 20040108,
+      "name": "First Kill Ice Giant",
+      "kind": "first_kill"
+    },
+    "first_kill_lesser_demon": {
+      "id": 20040109,
+      "name": "First Kill Lesser Demon",
+      "kind": "first_kill"
+    },
+    "first_kill_black_knight": {
+      "id": 20040110,
+      "name": "First Kill Black Knight",
+      "kind": "first_kill"
+    },
+    "first_kill_green_dragon": {
+      "id": 20040111,
+      "name": "First Kill Green Dragon",
+      "kind": "first_kill"
+    },
+    "level_attack_10": {
+      "id": 20040112,
+      "name": "Level 10 Attack",
+      "kind": "level",
+      "skill": "attack",
+      "level": 10
+    },
+    "level_attack_20": {
+      "id": 20040113,
+      "name": "Level 20 Attack",
+      "kind": "level",
+      "skill": "attack",
+      "level": 20
+    },
+    "level_attack_30": {
+      "id": 20040114,
+      "name": "Level 30 Attack",
+      "kind": "level",
+      "skill": "attack",
+      "level": 30
+    },
+    "level_attack_40": {
+      "id": 20040115,
+      "name": "Level 40 Attack",
+      "kind": "level",
+      "skill": "attack",
+      "level": 40
+    },
+    "level_attack_50": {
+      "id": 20040116,
+      "name": "Level 50 Attack",
+      "kind": "level",
+      "skill": "attack",
+      "level": 50
+    },
+    "level_attack_60": {
+      "id": 20040117,
+      "name": "Level 60 Attack",
+      "kind": "level",
+      "skill": "attack",
+      "level": 60
+    },
+    "level_attack_70": {
+      "id": 20040118,
+      "name": "Level 70 Attack",
+      "kind": "level",
+      "skill": "attack",
+      "level": 70
+    },
+    "level_attack_80": {
+      "id": 20040119,
+      "name": "Level 80 Attack",
+      "kind": "level",
+      "skill": "attack",
+      "level": 80
+    },
+    "level_attack_90": {
+      "id": 20040120,
+      "name": "Level 90 Attack",
+      "kind": "level",
+      "skill": "attack",
+      "level": 90
+    },
+    "level_defence_10": {
+      "id": 20040121,
+      "name": "Level 10 Defence",
+      "kind": "level",
+      "skill": "defence",
+      "level": 10
+    },
+    "level_defence_20": {
+      "id": 20040122,
+      "name": "Level 20 Defence",
+      "kind": "level",
+      "skill": "defence",
+      "level": 20
+    },
+    "level_defence_30": {
+      "id": 20040123,
+      "name": "Level 30 Defence",
+      "kind": "level",
+      "skill": "defence",
+      "level": 30
+    },
+    "level_defence_40": {
+      "id": 20040124,
+      "name": "Level 40 Defence",
+      "kind": "level",
+      "skill": "defence",
+      "level": 40
+    },
+    "level_defence_50": {
+      "id": 20040125,
+      "name": "Level 50 Defence",
+      "kind": "level",
+      "skill": "defence",
+      "level": 50
+    },
+    "level_defence_60": {
+      "id": 20040126,
+      "name": "Level 60 Defence",
+      "kind": "level",
+      "skill": "defence",
+      "level": 60
+    },
+    "level_defence_70": {
+      "id": 20040127,
+      "name": "Level 70 Defence",
+      "kind": "level",
+      "skill": "defence",
+      "level": 70
+    },
+    "level_defence_80": {
+      "id": 20040128,
+      "name": "Level 80 Defence",
+      "kind": "level",
+      "skill": "defence",
+      "level": 80
+    },
+    "level_defence_90": {
+      "id": 20040129,
+      "name": "Level 90 Defence",
+      "kind": "level",
+      "skill": "defence",
+      "level": 90
+    },
+    "level_strength_10": {
+      "id": 20040130,
+      "name": "Level 10 Strength",
+      "kind": "level",
+      "skill": "strength",
+      "level": 10
+    },
+    "level_strength_20": {
+      "id": 20040131,
+      "name": "Level 20 Strength",
+      "kind": "level",
+      "skill": "strength",
+      "level": 20
+    },
+    "level_strength_30": {
+      "id": 20040132,
+      "name": "Level 30 Strength",
+      "kind": "level",
+      "skill": "strength",
+      "level": 30
+    },
+    "level_strength_40": {
+      "id": 20040133,
+      "name": "Level 40 Strength",
+      "kind": "level",
+      "skill": "strength",
+      "level": 40
+    },
+    "level_strength_50": {
+      "id": 20040134,
+      "name": "Level 50 Strength",
+      "kind": "level",
+      "skill": "strength",
+      "level": 50
+    },
+    "level_strength_60": {
+      "id": 20040135,
+      "name": "Level 60 Strength",
+      "kind": "level",
+      "skill": "strength",
+      "level": 60
+    },
+    "level_strength_70": {
+      "id": 20040136,
+      "name": "Level 70 Strength",
+      "kind": "level",
+      "skill": "strength",
+      "level": 70
+    },
+    "level_strength_80": {
+      "id": 20040137,
+      "name": "Level 80 Strength",
+      "kind": "level",
+      "skill": "strength",
+      "level": 80
+    },
+    "level_strength_90": {
+      "id": 20040138,
+      "name": "Level 90 Strength",
+      "kind": "level",
+      "skill": "strength",
+      "level": 90
+    },
+    "level_ranged_10": {
+      "id": 20040139,
+      "name": "Level 10 Ranged",
+      "kind": "level",
+      "skill": "ranged",
+      "level": 10
+    },
+    "level_ranged_20": {
+      "id": 20040140,
+      "name": "Level 20 Ranged",
+      "kind": "level",
+      "skill": "ranged",
+      "level": 20
+    },
+    "level_ranged_30": {
+      "id": 20040141,
+      "name": "Level 30 Ranged",
+      "kind": "level",
+      "skill": "ranged",
+      "level": 30
+    },
+    "level_ranged_40": {
+      "id": 20040142,
+      "name": "Level 40 Ranged",
+      "kind": "level",
+      "skill": "ranged",
+      "level": 40
+    },
+    "level_ranged_50": {
+      "id": 20040143,
+      "name": "Level 50 Ranged",
+      "kind": "level",
+      "skill": "ranged",
+      "level": 50
+    },
+    "level_ranged_60": {
+      "id": 20040144,
+      "name": "Level 60 Ranged",
+      "kind": "level",
+      "skill": "ranged",
+      "level": 60
+    },
+    "level_ranged_70": {
+      "id": 20040145,
+      "name": "Level 70 Ranged",
+      "kind": "level",
+      "skill": "ranged",
+      "level": 70
+    },
+    "level_ranged_80": {
+      "id": 20040146,
+      "name": "Level 80 Ranged",
+      "kind": "level",
+      "skill": "ranged",
+      "level": 80
+    },
+    "level_ranged_90": {
+      "id": 20040147,
+      "name": "Level 90 Ranged",
+      "kind": "level",
+      "skill": "ranged",
+      "level": 90
+    },
+    "level_prayer_10": {
+      "id": 20040148,
+      "name": "Level 10 Prayer",
+      "kind": "level",
+      "skill": "prayer",
+      "level": 10
+    },
+    "level_prayer_20": {
+      "id": 20040149,
+      "name": "Level 20 Prayer",
+      "kind": "level",
+      "skill": "prayer",
+      "level": 20
+    },
+    "level_prayer_30": {
+      "id": 20040150,
+      "name": "Level 30 Prayer",
+      "kind": "level",
+      "skill": "prayer",
+      "level": 30
+    },
+    "level_prayer_40": {
+      "id": 20040151,
+      "name": "Level 40 Prayer",
+      "kind": "level",
+      "skill": "prayer",
+      "level": 40
+    },
+    "level_prayer_50": {
+      "id": 20040152,
+      "name": "Level 50 Prayer",
+      "kind": "level",
+      "skill": "prayer",
+      "level": 50
+    },
+    "level_prayer_60": {
+      "id": 20040153,
+      "name": "Level 60 Prayer",
+      "kind": "level",
+      "skill": "prayer",
+      "level": 60
+    },
+    "level_prayer_70": {
+      "id": 20040154,
+      "name": "Level 70 Prayer",
+      "kind": "level",
+      "skill": "prayer",
+      "level": 70
+    },
+    "level_prayer_80": {
+      "id": 20040155,
+      "name": "Level 80 Prayer",
+      "kind": "level",
+      "skill": "prayer",
+      "level": 80
+    },
+    "level_prayer_90": {
+      "id": 20040156,
+      "name": "Level 90 Prayer",
+      "kind": "level",
+      "skill": "prayer",
+      "level": 90
+    },
+    "level_magic_10": {
+      "id": 20040157,
+      "name": "Level 10 Magic",
+      "kind": "level",
+      "skill": "magic",
+      "level": 10
+    },
+    "level_magic_20": {
+      "id": 20040158,
+      "name": "Level 20 Magic",
+      "kind": "level",
+      "skill": "magic",
+      "level": 20
+    },
+    "level_magic_30": {
+      "id": 20040159,
+      "name": "Level 30 Magic",
+      "kind": "level",
+      "skill": "magic",
+      "level": 30
+    },
+    "level_magic_40": {
+      "id": 20040160,
+      "name": "Level 40 Magic",
+      "kind": "level",
+      "skill": "magic",
+      "level": 40
+    },
+    "level_magic_50": {
+      "id": 20040161,
+      "name": "Level 50 Magic",
+      "kind": "level",
+      "skill": "magic",
+      "level": 50
+    },
+    "level_magic_60": {
+      "id": 20040162,
+      "name": "Level 60 Magic",
+      "kind": "level",
+      "skill": "magic",
+      "level": 60
+    },
+    "level_magic_70": {
+      "id": 20040163,
+      "name": "Level 70 Magic",
+      "kind": "level",
+      "skill": "magic",
+      "level": 70
+    },
+    "level_magic_80": {
+      "id": 20040164,
+      "name": "Level 80 Magic",
+      "kind": "level",
+      "skill": "magic",
+      "level": 80
+    },
+    "level_magic_90": {
+      "id": 20040165,
+      "name": "Level 90 Magic",
+      "kind": "level",
+      "skill": "magic",
+      "level": 90
+    },
+    "level_cooking_10": {
+      "id": 20040166,
+      "name": "Level 10 Cooking",
+      "kind": "level",
+      "skill": "cooking",
+      "level": 10
+    },
+    "level_cooking_20": {
+      "id": 20040167,
+      "name": "Level 20 Cooking",
+      "kind": "level",
+      "skill": "cooking",
+      "level": 20
+    },
+    "level_cooking_30": {
+      "id": 20040168,
+      "name": "Level 30 Cooking",
+      "kind": "level",
+      "skill": "cooking",
+      "level": 30
+    },
+    "level_cooking_40": {
+      "id": 20040169,
+      "name": "Level 40 Cooking",
+      "kind": "level",
+      "skill": "cooking",
+      "level": 40
+    },
+    "level_cooking_50": {
+      "id": 20040170,
+      "name": "Level 50 Cooking",
+      "kind": "level",
+      "skill": "cooking",
+      "level": 50
+    },
+    "level_cooking_60": {
+      "id": 20040171,
+      "name": "Level 60 Cooking",
+      "kind": "level",
+      "skill": "cooking",
+      "level": 60
+    },
+    "level_cooking_70": {
+      "id": 20040172,
+      "name": "Level 70 Cooking",
+      "kind": "level",
+      "skill": "cooking",
+      "level": 70
+    },
+    "level_cooking_80": {
+      "id": 20040173,
+      "name": "Level 80 Cooking",
+      "kind": "level",
+      "skill": "cooking",
+      "level": 80
+    },
+    "level_cooking_90": {
+      "id": 20040174,
+      "name": "Level 90 Cooking",
+      "kind": "level",
+      "skill": "cooking",
+      "level": 90
+    },
+    "level_woodcutting_10": {
+      "id": 20040175,
+      "name": "Level 10 Woodcutting",
+      "kind": "level",
+      "skill": "woodcutting",
+      "level": 10
+    },
+    "level_woodcutting_20": {
+      "id": 20040176,
+      "name": "Level 20 Woodcutting",
+      "kind": "level",
+      "skill": "woodcutting",
+      "level": 20
+    },
+    "level_woodcutting_30": {
+      "id": 20040177,
+      "name": "Level 30 Woodcutting",
+      "kind": "level",
+      "skill": "woodcutting",
+      "level": 30
+    },
+    "level_woodcutting_40": {
+      "id": 20040178,
+      "name": "Level 40 Woodcutting",
+      "kind": "level",
+      "skill": "woodcutting",
+      "level": 40
+    },
+    "level_woodcutting_50": {
+      "id": 20040179,
+      "name": "Level 50 Woodcutting",
+      "kind": "level",
+      "skill": "woodcutting",
+      "level": 50
+    },
+    "level_woodcutting_60": {
+      "id": 20040180,
+      "name": "Level 60 Woodcutting",
+      "kind": "level",
+      "skill": "woodcutting",
+      "level": 60
+    },
+    "level_woodcutting_70": {
+      "id": 20040181,
+      "name": "Level 70 Woodcutting",
+      "kind": "level",
+      "skill": "woodcutting",
+      "level": 70
+    },
+    "level_woodcutting_80": {
+      "id": 20040182,
+      "name": "Level 80 Woodcutting",
+      "kind": "level",
+      "skill": "woodcutting",
+      "level": 80
+    },
+    "level_woodcutting_90": {
+      "id": 20040183,
+      "name": "Level 90 Woodcutting",
+      "kind": "level",
+      "skill": "woodcutting",
+      "level": 90
+    },
+    "level_fletching_10": {
+      "id": 20040184,
+      "name": "Level 10 Fletching",
+      "kind": "level",
+      "skill": "fletching",
+      "level": 10
+    },
+    "level_fletching_20": {
+      "id": 20040185,
+      "name": "Level 20 Fletching",
+      "kind": "level",
+      "skill": "fletching",
+      "level": 20
+    },
+    "level_fletching_30": {
+      "id": 20040186,
+      "name": "Level 30 Fletching",
+      "kind": "level",
+      "skill": "fletching",
+      "level": 30
+    },
+    "level_fletching_40": {
+      "id": 20040187,
+      "name": "Level 40 Fletching",
+      "kind": "level",
+      "skill": "fletching",
+      "level": 40
+    },
+    "level_fletching_50": {
+      "id": 20040188,
+      "name": "Level 50 Fletching",
+      "kind": "level",
+      "skill": "fletching",
+      "level": 50
+    },
+    "level_fletching_60": {
+      "id": 20040189,
+      "name": "Level 60 Fletching",
+      "kind": "level",
+      "skill": "fletching",
+      "level": 60
+    },
+    "level_fletching_70": {
+      "id": 20040190,
+      "name": "Level 70 Fletching",
+      "kind": "level",
+      "skill": "fletching",
+      "level": 70
+    },
+    "level_fletching_80": {
+      "id": 20040191,
+      "name": "Level 80 Fletching",
+      "kind": "level",
+      "skill": "fletching",
+      "level": 80
+    },
+    "level_fletching_90": {
+      "id": 20040192,
+      "name": "Level 90 Fletching",
+      "kind": "level",
+      "skill": "fletching",
+      "level": 90
+    },
+    "level_fishing_10": {
+      "id": 20040193,
+      "name": "Level 10 Fishing",
+      "kind": "level",
+      "skill": "fishing",
+      "level": 10
+    },
+    "level_fishing_20": {
+      "id": 20040194,
+      "name": "Level 20 Fishing",
+      "kind": "level",
+      "skill": "fishing",
+      "level": 20
+    },
+    "level_fishing_30": {
+      "id": 20040195,
+      "name": "Level 30 Fishing",
+      "kind": "level",
+      "skill": "fishing",
+      "level": 30
+    },
+    "level_fishing_40": {
+      "id": 20040196,
+      "name": "Level 40 Fishing",
+      "kind": "level",
+      "skill": "fishing",
+      "level": 40
+    },
+    "level_fishing_50": {
+      "id": 20040197,
+      "name": "Level 50 Fishing",
+      "kind": "level",
+      "skill": "fishing",
+      "level": 50
+    },
+    "level_fishing_60": {
+      "id": 20040198,
+      "name": "Level 60 Fishing",
+      "kind": "level",
+      "skill": "fishing",
+      "level": 60
+    },
+    "level_fishing_70": {
+      "id": 20040199,
+      "name": "Level 70 Fishing",
+      "kind": "level",
+      "skill": "fishing",
+      "level": 70
+    },
+    "level_fishing_80": {
+      "id": 20040200,
+      "name": "Level 80 Fishing",
+      "kind": "level",
+      "skill": "fishing",
+      "level": 80
+    },
+    "level_fishing_90": {
+      "id": 20040201,
+      "name": "Level 90 Fishing",
+      "kind": "level",
+      "skill": "fishing",
+      "level": 90
+    },
+    "level_firemaking_10": {
+      "id": 20040202,
+      "name": "Level 10 Firemaking",
+      "kind": "level",
+      "skill": "firemaking",
+      "level": 10
+    },
+    "level_firemaking_20": {
+      "id": 20040203,
+      "name": "Level 20 Firemaking",
+      "kind": "level",
+      "skill": "firemaking",
+      "level": 20
+    },
+    "level_firemaking_30": {
+      "id": 20040204,
+      "name": "Level 30 Firemaking",
+      "kind": "level",
+      "skill": "firemaking",
+      "level": 30
+    },
+    "level_firemaking_40": {
+      "id": 20040205,
+      "name": "Level 40 Firemaking",
+      "kind": "level",
+      "skill": "firemaking",
+      "level": 40
+    },
+    "level_firemaking_50": {
+      "id": 20040206,
+      "name": "Level 50 Firemaking",
+      "kind": "level",
+      "skill": "firemaking",
+      "level": 50
+    },
+    "level_firemaking_60": {
+      "id": 20040207,
+      "name": "Level 60 Firemaking",
+      "kind": "level",
+      "skill": "firemaking",
+      "level": 60
+    },
+    "level_firemaking_70": {
+      "id": 20040208,
+      "name": "Level 70 Firemaking",
+      "kind": "level",
+      "skill": "firemaking",
+      "level": 70
+    },
+    "level_firemaking_80": {
+      "id": 20040209,
+      "name": "Level 80 Firemaking",
+      "kind": "level",
+      "skill": "firemaking",
+      "level": 80
+    },
+    "level_firemaking_90": {
+      "id": 20040210,
+      "name": "Level 90 Firemaking",
+      "kind": "level",
+      "skill": "firemaking",
+      "level": 90
+    },
+    "level_crafting_10": {
+      "id": 20040211,
+      "name": "Level 10 Crafting",
+      "kind": "level",
+      "skill": "crafting",
+      "level": 10
+    },
+    "level_crafting_20": {
+      "id": 20040212,
+      "name": "Level 20 Crafting",
+      "kind": "level",
+      "skill": "crafting",
+      "level": 20
+    },
+    "level_crafting_30": {
+      "id": 20040213,
+      "name": "Level 30 Crafting",
+      "kind": "level",
+      "skill": "crafting",
+      "level": 30
+    },
+    "level_crafting_40": {
+      "id": 20040214,
+      "name": "Level 40 Crafting",
+      "kind": "level",
+      "skill": "crafting",
+      "level": 40
+    },
+    "level_crafting_50": {
+      "id": 20040215,
+      "name": "Level 50 Crafting",
+      "kind": "level",
+      "skill": "crafting",
+      "level": 50
+    },
+    "level_crafting_60": {
+      "id": 20040216,
+      "name": "Level 60 Crafting",
+      "kind": "level",
+      "skill": "crafting",
+      "level": 60
+    },
+    "level_crafting_70": {
+      "id": 20040217,
+      "name": "Level 70 Crafting",
+      "kind": "level",
+      "skill": "crafting",
+      "level": 70
+    },
+    "level_crafting_80": {
+      "id": 20040218,
+      "name": "Level 80 Crafting",
+      "kind": "level",
+      "skill": "crafting",
+      "level": 80
+    },
+    "level_crafting_90": {
+      "id": 20040219,
+      "name": "Level 90 Crafting",
+      "kind": "level",
+      "skill": "crafting",
+      "level": 90
+    },
+    "level_smithing_10": {
+      "id": 20040220,
+      "name": "Level 10 Smithing",
+      "kind": "level",
+      "skill": "smithing",
+      "level": 10
+    },
+    "level_smithing_20": {
+      "id": 20040221,
+      "name": "Level 20 Smithing",
+      "kind": "level",
+      "skill": "smithing",
+      "level": 20
+    },
+    "level_smithing_30": {
+      "id": 20040222,
+      "name": "Level 30 Smithing",
+      "kind": "level",
+      "skill": "smithing",
+      "level": 30
+    },
+    "level_smithing_40": {
+      "id": 20040223,
+      "name": "Level 40 Smithing",
+      "kind": "level",
+      "skill": "smithing",
+      "level": 40
+    },
+    "level_smithing_50": {
+      "id": 20040224,
+      "name": "Level 50 Smithing",
+      "kind": "level",
+      "skill": "smithing",
+      "level": 50
+    },
+    "level_smithing_60": {
+      "id": 20040225,
+      "name": "Level 60 Smithing",
+      "kind": "level",
+      "skill": "smithing",
+      "level": 60
+    },
+    "level_smithing_70": {
+      "id": 20040226,
+      "name": "Level 70 Smithing",
+      "kind": "level",
+      "skill": "smithing",
+      "level": 70
+    },
+    "level_smithing_80": {
+      "id": 20040227,
+      "name": "Level 80 Smithing",
+      "kind": "level",
+      "skill": "smithing",
+      "level": 80
+    },
+    "level_smithing_90": {
+      "id": 20040228,
+      "name": "Level 90 Smithing",
+      "kind": "level",
+      "skill": "smithing",
+      "level": 90
+    },
+    "level_mining_10": {
+      "id": 20040229,
+      "name": "Level 10 Mining",
+      "kind": "level",
+      "skill": "mining",
+      "level": 10
+    },
+    "level_mining_20": {
+      "id": 20040230,
+      "name": "Level 20 Mining",
+      "kind": "level",
+      "skill": "mining",
+      "level": 20
+    },
+    "level_mining_30": {
+      "id": 20040231,
+      "name": "Level 30 Mining",
+      "kind": "level",
+      "skill": "mining",
+      "level": 30
+    },
+    "level_mining_40": {
+      "id": 20040232,
+      "name": "Level 40 Mining",
+      "kind": "level",
+      "skill": "mining",
+      "level": 40
+    },
+    "level_mining_50": {
+      "id": 20040233,
+      "name": "Level 50 Mining",
+      "kind": "level",
+      "skill": "mining",
+      "level": 50
+    },
+    "level_mining_60": {
+      "id": 20040234,
+      "name": "Level 60 Mining",
+      "kind": "level",
+      "skill": "mining",
+      "level": 60
+    },
+    "level_mining_70": {
+      "id": 20040235,
+      "name": "Level 70 Mining",
+      "kind": "level",
+      "skill": "mining",
+      "level": 70
+    },
+    "level_mining_80": {
+      "id": 20040236,
+      "name": "Level 80 Mining",
+      "kind": "level",
+      "skill": "mining",
+      "level": 80
+    },
+    "level_mining_90": {
+      "id": 20040237,
+      "name": "Level 90 Mining",
+      "kind": "level",
+      "skill": "mining",
+      "level": 90
+    },
+    "level_herblore_10": {
+      "id": 20040238,
+      "name": "Level 10 Herblore",
+      "kind": "level",
+      "skill": "herblore",
+      "level": 10
+    },
+    "level_herblore_20": {
+      "id": 20040239,
+      "name": "Level 20 Herblore",
+      "kind": "level",
+      "skill": "herblore",
+      "level": 20
+    },
+    "level_herblore_30": {
+      "id": 20040240,
+      "name": "Level 30 Herblore",
+      "kind": "level",
+      "skill": "herblore",
+      "level": 30
+    },
+    "level_herblore_40": {
+      "id": 20040241,
+      "name": "Level 40 Herblore",
+      "kind": "level",
+      "skill": "herblore",
+      "level": 40
+    },
+    "level_herblore_50": {
+      "id": 20040242,
+      "name": "Level 50 Herblore",
+      "kind": "level",
+      "skill": "herblore",
+      "level": 50
+    },
+    "level_herblore_60": {
+      "id": 20040243,
+      "name": "Level 60 Herblore",
+      "kind": "level",
+      "skill": "herblore",
+      "level": 60
+    },
+    "level_herblore_70": {
+      "id": 20040244,
+      "name": "Level 70 Herblore",
+      "kind": "level",
+      "skill": "herblore",
+      "level": 70
+    },
+    "level_herblore_80": {
+      "id": 20040245,
+      "name": "Level 80 Herblore",
+      "kind": "level",
+      "skill": "herblore",
+      "level": 80
+    },
+    "level_herblore_90": {
+      "id": 20040246,
+      "name": "Level 90 Herblore",
+      "kind": "level",
+      "skill": "herblore",
+      "level": 90
+    },
+    "level_agility_10": {
+      "id": 20040247,
+      "name": "Level 10 Agility",
+      "kind": "level",
+      "skill": "agility",
+      "level": 10
+    },
+    "level_agility_20": {
+      "id": 20040248,
+      "name": "Level 20 Agility",
+      "kind": "level",
+      "skill": "agility",
+      "level": 20
+    },
+    "level_agility_30": {
+      "id": 20040249,
+      "name": "Level 30 Agility",
+      "kind": "level",
+      "skill": "agility",
+      "level": 30
+    },
+    "level_agility_40": {
+      "id": 20040250,
+      "name": "Level 40 Agility",
+      "kind": "level",
+      "skill": "agility",
+      "level": 40
+    },
+    "level_agility_50": {
+      "id": 20040251,
+      "name": "Level 50 Agility",
+      "kind": "level",
+      "skill": "agility",
+      "level": 50
+    },
+    "level_agility_60": {
+      "id": 20040252,
+      "name": "Level 60 Agility",
+      "kind": "level",
+      "skill": "agility",
+      "level": 60
+    },
+    "level_agility_70": {
+      "id": 20040253,
+      "name": "Level 70 Agility",
+      "kind": "level",
+      "skill": "agility",
+      "level": 70
+    },
+    "level_agility_80": {
+      "id": 20040254,
+      "name": "Level 80 Agility",
+      "kind": "level",
+      "skill": "agility",
+      "level": 80
+    },
+    "level_agility_90": {
+      "id": 20040255,
+      "name": "Level 90 Agility",
+      "kind": "level",
+      "skill": "agility",
+      "level": 90
+    },
+    "level_thieving_10": {
+      "id": 20040256,
+      "name": "Level 10 Thieving",
+      "kind": "level",
+      "skill": "thieving",
+      "level": 10
+    },
+    "level_thieving_20": {
+      "id": 20040257,
+      "name": "Level 20 Thieving",
+      "kind": "level",
+      "skill": "thieving",
+      "level": 20
+    },
+    "level_thieving_30": {
+      "id": 20040258,
+      "name": "Level 30 Thieving",
+      "kind": "level",
+      "skill": "thieving",
+      "level": 30
+    },
+    "level_thieving_40": {
+      "id": 20040259,
+      "name": "Level 40 Thieving",
+      "kind": "level",
+      "skill": "thieving",
+      "level": 40
+    },
+    "level_thieving_50": {
+      "id": 20040260,
+      "name": "Level 50 Thieving",
+      "kind": "level",
+      "skill": "thieving",
+      "level": 50
+    },
+    "level_thieving_60": {
+      "id": 20040261,
+      "name": "Level 60 Thieving",
+      "kind": "level",
+      "skill": "thieving",
+      "level": 60
+    },
+    "level_thieving_70": {
+      "id": 20040262,
+      "name": "Level 70 Thieving",
+      "kind": "level",
+      "skill": "thieving",
+      "level": 70
+    },
+    "level_thieving_80": {
+      "id": 20040263,
+      "name": "Level 80 Thieving",
+      "kind": "level",
+      "skill": "thieving",
+      "level": 80
+    },
+    "level_thieving_90": {
+      "id": 20040264,
+      "name": "Level 90 Thieving",
+      "kind": "level",
+      "skill": "thieving",
+      "level": 90
+    },
+    "level_runecraft_10": {
+      "id": 20040265,
+      "name": "Level 10 Runecraft",
+      "kind": "level",
+      "skill": "runecraft",
+      "level": 10
+    },
+    "level_runecraft_20": {
+      "id": 20040266,
+      "name": "Level 20 Runecraft",
+      "kind": "level",
+      "skill": "runecraft",
+      "level": 20
+    },
+    "level_runecraft_30": {
+      "id": 20040267,
+      "name": "Level 30 Runecraft",
+      "kind": "level",
+      "skill": "runecraft",
+      "level": 30
+    },
+    "level_runecraft_40": {
+      "id": 20040268,
+      "name": "Level 40 Runecraft",
+      "kind": "level",
+      "skill": "runecraft",
+      "level": 40
+    },
+    "level_runecraft_50": {
+      "id": 20040269,
+      "name": "Level 50 Runecraft",
+      "kind": "level",
+      "skill": "runecraft",
+      "level": 50
+    },
+    "level_runecraft_60": {
+      "id": 20040270,
+      "name": "Level 60 Runecraft",
+      "kind": "level",
+      "skill": "runecraft",
+      "level": 60
+    },
+    "level_runecraft_70": {
+      "id": 20040271,
+      "name": "Level 70 Runecraft",
+      "kind": "level",
+      "skill": "runecraft",
+      "level": 70
+    },
+    "level_runecraft_80": {
+      "id": 20040272,
+      "name": "Level 80 Runecraft",
+      "kind": "level",
+      "skill": "runecraft",
+      "level": 80
+    },
+    "level_runecraft_90": {
+      "id": 20040273,
+      "name": "Level 90 Runecraft",
+      "kind": "level",
+      "skill": "runecraft",
+      "level": 90
+    },
+    "trail_easy_complete": {
+      "id": 20040274,
+      "name": "Trail Easy Complete",
+      "kind": "activity",
+      "fillerOnly": true
+    },
+    "trail_medium_complete": {
+      "id": 20040275,
+      "name": "Trail Medium Complete",
+      "kind": "activity",
+      "fillerOnly": true
+    },
+    "trail_hard_complete": {
+      "id": 20040276,
+      "name": "Trail Hard Complete",
+      "kind": "activity",
+      "fillerOnly": true
+    },
+    "trawler_win": {
+      "id": 20040277,
+      "name": "Trawler Win",
+      "kind": "activity",
+      "skill": "fishing",
+      "level": 15
+    },
+    "agility_gnome_course": {
+      "id": 20040278,
+      "name": "Agility Gnome Course",
+      "kind": "activity"
+    },
+    "agility_barbarian_course": {
+      "id": 20040279,
+      "name": "Agility Barbarian Course",
+      "kind": "activity",
+      "skill": "agility",
+      "level": 35
+    },
+    "agility_wilderness_course": {
+      "id": 20040280,
+      "name": "Agility Wilderness Course",
+      "kind": "activity",
+      "skill": "agility",
+      "level": 52
+    },
+    "gnomeball_goal": {
+      "id": 20040281,
+      "name": "Gnomeball Goal",
+      "kind": "activity"
+    },
+    "agility_arena_ticket": {
+      "id": 20040282,
+      "name": "Agility Arena Ticket",
+      "kind": "activity"
+    },
+    "ranging_guild_ticket": {
+      "id": 20040283,
+      "name": "Ranging Guild Ticket",
+      "kind": "activity",
+      "skill": "ranged",
+      "level": 40
+    },
+    "mage_arena_kolodion": {
+      "id": 20040284,
+      "name": "Mage Arena Kolodion",
+      "kind": "activity",
+      "skill": "magic",
+      "level": 60
+    },
+    "mage_arena_god_cape": {
+      "id": 20040285,
+      "name": "Mage Arena God Cape",
+      "kind": "activity",
+      "skill": "magic",
+      "level": 60
+    },
+    "mage_arena_god_staff": {
+      "id": 20040286,
+      "name": "Mage Arena God Staff",
+      "kind": "activity",
+      "skill": "magic",
+      "level": 60
+    },
+    "music_adventure": {
+      "id": 20040287,
+      "name": "Music: Adventure",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_al_kharid": {
+      "id": 20040288,
+      "name": "Music: Al Kharid",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_alone": {
+      "id": 20040289,
+      "name": "Music: Alone",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_ambient_jungle": {
+      "id": 20040290,
+      "name": "Music: Ambient Jungle",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_arabian": {
+      "id": 20040291,
+      "name": "Music: Arabian",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_arabian2": {
+      "id": 20040292,
+      "name": "Music: Arabian2",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_arabian3": {
+      "id": 20040293,
+      "name": "Music: Arabian3",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_arabique": {
+      "id": 20040294,
+      "name": "Music: Arabique",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_army_of_darkness": {
+      "id": 20040295,
+      "name": "Music: Army Of Darkness",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_arrival": {
+      "id": 20040296,
+      "name": "Music: Arrival",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_attack1": {
+      "id": 20040297,
+      "name": "Music: Attack1",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_attack2": {
+      "id": 20040298,
+      "name": "Music: Attack2",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_attack3": {
+      "id": 20040299,
+      "name": "Music: Attack3",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_attack4": {
+      "id": 20040300,
+      "name": "Music: Attack4",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_attack5": {
+      "id": 20040301,
+      "name": "Music: Attack5",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_attack6": {
+      "id": 20040302,
+      "name": "Music: Attack6",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_attention": {
+      "id": 20040303,
+      "name": "Music: Attention",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_autumn_voyage": {
+      "id": 20040304,
+      "name": "Music: Autumn Voyage",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_background": {
+      "id": 20040305,
+      "name": "Music: Background",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_ballad_of_enchantment": {
+      "id": 20040306,
+      "name": "Music: Ballad Of Enchantment",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_baroque": {
+      "id": 20040307,
+      "name": "Music: Baroque",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_beyond": {
+      "id": 20040308,
+      "name": "Music: Beyond",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_big_chords": {
+      "id": 20040309,
+      "name": "Music: Big Chords",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_book_of_spells": {
+      "id": 20040310,
+      "name": "Music: Book Of Spells",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_camelot": {
+      "id": 20040311,
+      "name": "Music: Camelot",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_cave_background": {
+      "id": 20040312,
+      "name": "Music: Cave Background",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_cavern": {
+      "id": 20040313,
+      "name": "Music: Cavern",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_chain_of_command": {
+      "id": 20040314,
+      "name": "Music: Chain Of Command",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_crystal_cave": {
+      "id": 20040315,
+      "name": "Music: Crystal Cave",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_crystal_sword": {
+      "id": 20040316,
+      "name": "Music: Crystal Sword",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_dangerous": {
+      "id": 20040317,
+      "name": "Music: Dangerous",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_dark": {
+      "id": 20040318,
+      "name": "Music: Dark",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_deep_wildy": {
+      "id": 20040319,
+      "name": "Music: Deep Wildy",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_desert_voyage": {
+      "id": 20040320,
+      "name": "Music: Desert Voyage",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_doorways": {
+      "id": 20040321,
+      "name": "Music: Doorways",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_dream": {
+      "id": 20040322,
+      "name": "Music: Dream",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_dunjun": {
+      "id": 20040323,
+      "name": "Music: Dunjun",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_egypt": {
+      "id": 20040324,
+      "name": "Music: Egypt",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_emotion": {
+      "id": 20040325,
+      "name": "Music: Emotion",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_emperor": {
+      "id": 20040326,
+      "name": "Music: Emperor",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_expanse": {
+      "id": 20040327,
+      "name": "Music: Expanse",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_expecting": {
+      "id": 20040328,
+      "name": "Music: Expecting",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_expedition": {
+      "id": 20040329,
+      "name": "Music: Expedition",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_faerie": {
+      "id": 20040330,
+      "name": "Music: Faerie",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_fanfare": {
+      "id": 20040331,
+      "name": "Music: Fanfare",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_fanfare3": {
+      "id": 20040332,
+      "name": "Music: Fanfare3",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_fishing": {
+      "id": 20040333,
+      "name": "Music: Fishing",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_flute_salad": {
+      "id": 20040334,
+      "name": "Music: Flute Salad",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_forever": {
+      "id": 20040335,
+      "name": "Music: Forever",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_gaol": {
+      "id": 20040336,
+      "name": "Music: Gaol",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_garden": {
+      "id": 20040337,
+      "name": "Music: Garden",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_gnome_king": {
+      "id": 20040338,
+      "name": "Music: Gnome King",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_gnome_theme": {
+      "id": 20040339,
+      "name": "Music: Gnome Theme",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_gnome_village": {
+      "id": 20040340,
+      "name": "Music: Gnome Village",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_gnome_village2": {
+      "id": 20040341,
+      "name": "Music: Gnome Village2",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_gnome": {
+      "id": 20040342,
+      "name": "Music: Gnome",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_gnomeball": {
+      "id": 20040343,
+      "name": "Music: Gnomeball",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_greatness": {
+      "id": 20040344,
+      "name": "Music: Greatness",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_harmony": {
+      "id": 20040345,
+      "name": "Music: Harmony",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_high_seas": {
+      "id": 20040346,
+      "name": "Music: High Seas",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_horizon": {
+      "id": 20040347,
+      "name": "Music: Horizon",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_iban": {
+      "id": 20040348,
+      "name": "Music: Iban",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_in_the_manor": {
+      "id": 20040349,
+      "name": "Music: In The Manor",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_inspiration": {
+      "id": 20040350,
+      "name": "Music: Inspiration",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_intrepid": {
+      "id": 20040351,
+      "name": "Music: Intrepid",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_jolly_r": {
+      "id": 20040352,
+      "name": "Music: Jolly R",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_jungle_island": {
+      "id": 20040353,
+      "name": "Music: Jungle Island",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_jungly1": {
+      "id": 20040354,
+      "name": "Music: Jungly1",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_jungly2": {
+      "id": 20040355,
+      "name": "Music: Jungly2",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_jungly3": {
+      "id": 20040356,
+      "name": "Music: Jungly3",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_knightly": {
+      "id": 20040357,
+      "name": "Music: Knightly",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_lasting": {
+      "id": 20040358,
+      "name": "Music: Lasting",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_legion": {
+      "id": 20040359,
+      "name": "Music: Legion",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_lightness": {
+      "id": 20040360,
+      "name": "Music: Lightness",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_lightwalk": {
+      "id": 20040361,
+      "name": "Music: Lightwalk",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_long_ago": {
+      "id": 20040362,
+      "name": "Music: Long Ago",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_long_way_home": {
+      "id": 20040363,
+      "name": "Music: Long Way Home",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_lullaby": {
+      "id": 20040364,
+      "name": "Music: Lullaby",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_mage_arena": {
+      "id": 20040365,
+      "name": "Music: Mage Arena",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_magic_dance": {
+      "id": 20040366,
+      "name": "Music: Magic Dance",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_magical_journey": {
+      "id": 20040367,
+      "name": "Music: Magical Journey",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_march": {
+      "id": 20040368,
+      "name": "Music: March",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_medieval": {
+      "id": 20040369,
+      "name": "Music: Medieval",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_mellow": {
+      "id": 20040370,
+      "name": "Music: Mellow",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_miles_away": {
+      "id": 20040371,
+      "name": "Music: Miles Away",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_miracle_dance": {
+      "id": 20040372,
+      "name": "Music: Miracle Dance",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_monarch_waltz": {
+      "id": 20040373,
+      "name": "Music: Monarch Waltz",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_moody": {
+      "id": 20040374,
+      "name": "Music: Moody",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_neverland": {
+      "id": 20040375,
+      "name": "Music: Neverland",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_nightfall": {
+      "id": 20040376,
+      "name": "Music: Nightfall",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_oriental": {
+      "id": 20040377,
+      "name": "Music: Oriental",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_overture": {
+      "id": 20040378,
+      "name": "Music: Overture",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_parade": {
+      "id": 20040379,
+      "name": "Music: Parade",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_quest": {
+      "id": 20040380,
+      "name": "Music: Quest",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_regal": {
+      "id": 20040381,
+      "name": "Music: Regal",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_reggae": {
+      "id": 20040382,
+      "name": "Music: Reggae",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_reggae2": {
+      "id": 20040383,
+      "name": "Music: Reggae2",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_riverside": {
+      "id": 20040384,
+      "name": "Music: Riverside",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_royale": {
+      "id": 20040385,
+      "name": "Music: Royale",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_rune_essence": {
+      "id": 20040386,
+      "name": "Music: Rune Essence",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_sad_meadow": {
+      "id": 20040387,
+      "name": "Music: Sad Meadow",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_scape_cave": {
+      "id": 20040388,
+      "name": "Music: Scape Cave",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_scape_sad": {
+      "id": 20040389,
+      "name": "Music: Scape Sad",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_scape_wild": {
+      "id": 20040390,
+      "name": "Music: Scape Wild",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_sea_shanty": {
+      "id": 20040391,
+      "name": "Music: Sea Shanty",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_sea_shanty2": {
+      "id": 20040392,
+      "name": "Music: Sea Shanty2",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_serenade": {
+      "id": 20040393,
+      "name": "Music: Serenade",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_serene": {
+      "id": 20040394,
+      "name": "Music: Serene",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_shine": {
+      "id": 20040395,
+      "name": "Music: Shine",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_soundscape": {
+      "id": 20040396,
+      "name": "Music: Soundscape",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_spirit": {
+      "id": 20040397,
+      "name": "Music: Spirit",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_splendour": {
+      "id": 20040398,
+      "name": "Music: Splendour",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_spooky": {
+      "id": 20040399,
+      "name": "Music: Spooky",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_spooky_jungle": {
+      "id": 20040400,
+      "name": "Music: Spooky Jungle",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_starlight": {
+      "id": 20040401,
+      "name": "Music: Starlight",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_start": {
+      "id": 20040402,
+      "name": "Music: Start",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_still_night": {
+      "id": 20040403,
+      "name": "Music: Still Night",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_talking_forest": {
+      "id": 20040404,
+      "name": "Music: Talking Forest",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_the_desert": {
+      "id": 20040405,
+      "name": "Music: The Desert",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_the_shadow": {
+      "id": 20040406,
+      "name": "Music: The Shadow",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_the_tower": {
+      "id": 20040407,
+      "name": "Music: The Tower",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_theme": {
+      "id": 20040408,
+      "name": "Music: Theme",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_trawler": {
+      "id": 20040409,
+      "name": "Music: Trawler",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_trawler_minor": {
+      "id": 20040410,
+      "name": "Music: Trawler Minor",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_tree_spirits": {
+      "id": 20040411,
+      "name": "Music: Tree Spirits",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_tribal_background": {
+      "id": 20040412,
+      "name": "Music: Tribal Background",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_tribal": {
+      "id": 20040413,
+      "name": "Music: Tribal",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_tribal2": {
+      "id": 20040414,
+      "name": "Music: Tribal2",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_trinity": {
+      "id": 20040415,
+      "name": "Music: Trinity",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_troubled": {
+      "id": 20040416,
+      "name": "Music: Troubled",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_underground": {
+      "id": 20040417,
+      "name": "Music: Underground",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_unknown_land": {
+      "id": 20040418,
+      "name": "Music: Unknown Land",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_underground_pass": {
+      "id": 20040419,
+      "name": "Music: Underground Pass",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_upcoming": {
+      "id": 20040420,
+      "name": "Music: Upcoming",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_venture": {
+      "id": 20040421,
+      "name": "Music: Venture",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_vision": {
+      "id": 20040422,
+      "name": "Music: Vision",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_voodoo_cult": {
+      "id": 20040423,
+      "name": "Music: Voodoo Cult",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_voyage": {
+      "id": 20040424,
+      "name": "Music: Voyage",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_wander": {
+      "id": 20040425,
+      "name": "Music: Wander",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_waterfall": {
+      "id": 20040426,
+      "name": "Music: Waterfall",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_wilderness2": {
+      "id": 20040427,
+      "name": "Music: Wilderness2",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_wilderness3": {
+      "id": 20040428,
+      "name": "Music: Wilderness3",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_wilderness4": {
+      "id": 20040429,
+      "name": "Music: Wilderness4",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_witching": {
+      "id": 20040430,
+      "name": "Music: Witching",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_wonder": {
+      "id": 20040431,
+      "name": "Music: Wonder",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_wonderous": {
+      "id": 20040432,
+      "name": "Music: Wonderous",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_workshop": {
+      "id": 20040433,
+      "name": "Music: Workshop",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_lonesome": {
+      "id": 20040434,
+      "name": "Music: Lonesome",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_scape_soft": {
+      "id": 20040435,
+      "name": "Music: Scape Soft",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_shining": {
+      "id": 20040436,
+      "name": "Music: Shining",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_yesteryear": {
+      "id": 20040437,
+      "name": "Music: Yesteryear",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_fanfare2": {
+      "id": 20040438,
+      "name": "Music: Fanfare2",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_tomorrow": {
+      "id": 20040439,
+      "name": "Music: Tomorrow",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_duel_arena": {
+      "id": 20040440,
+      "name": "Music: Duel Arena",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_ice_melody": {
+      "id": 20040441,
+      "name": "Music: Ice Melody",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_wolf_mountain": {
+      "id": 20040442,
+      "name": "Music: Wolf Mountain",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_harmony2": {
+      "id": 20040443,
+      "name": "Music: Harmony2",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_venture2": {
+      "id": 20040444,
+      "name": "Music: Venture2",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_landlubber": {
+      "id": 20040445,
+      "name": "Music: Landlubber",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_undercurrent": {
+      "id": 20040446,
+      "name": "Music: Undercurrent",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_nomad": {
+      "id": 20040447,
+      "name": "Music: Nomad",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_zealot": {
+      "id": 20040448,
+      "name": "Music: Zealot",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_cellar_song": {
+      "id": 20040449,
+      "name": "Music: Cellar Song",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_heart_and_mind": {
+      "id": 20040450,
+      "name": "Music: Heart And Mind",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_close_quarters": {
+      "id": 20040451,
+      "name": "Music: Close Quarters",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_escape": {
+      "id": 20040452,
+      "name": "Music: Escape",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_grumpy": {
+      "id": 20040453,
+      "name": "Music: Grumpy",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_chompy_hunt": {
+      "id": 20040454,
+      "name": "Music: Chompy Hunt",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_twilight": {
+      "id": 20040455,
+      "name": "Music: Twilight",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_morytania": {
+      "id": 20040456,
+      "name": "Music: Morytania",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_dead_quiet": {
+      "id": 20040457,
+      "name": "Music: Dead Quiet",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_village": {
+      "id": 20040458,
+      "name": "Music: Village",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_bone_dance": {
+      "id": 20040459,
+      "name": "Music: Bone Dance",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_mausoleum": {
+      "id": 20040460,
+      "name": "Music: Mausoleum",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_forbidden": {
+      "id": 20040461,
+      "name": "Music: Forbidden",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_cursed": {
+      "id": 20040462,
+      "name": "Music: Cursed",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_understanding": {
+      "id": 20040463,
+      "name": "Music: Understanding",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_principality": {
+      "id": 20040464,
+      "name": "Music: Principality",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_tremble": {
+      "id": 20040465,
+      "name": "Music: Tremble",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_kingdom": {
+      "id": 20040466,
+      "name": "Music: Kingdom",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_hermit": {
+      "id": 20040467,
+      "name": "Music: Hermit",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_stagnant": {
+      "id": 20040468,
+      "name": "Music: Stagnant",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_breeze": {
+      "id": 20040469,
+      "name": "Music: Breeze",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_stratosphere": {
+      "id": 20040470,
+      "name": "Music: Stratosphere",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_time_out": {
+      "id": 20040471,
+      "name": "Music: Time Out",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_natural": {
+      "id": 20040472,
+      "name": "Music: Natural",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_grotto": {
+      "id": 20040473,
+      "name": "Music: Grotto",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_waterlogged": {
+      "id": 20040474,
+      "name": "Music: Waterlogged",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_artistry": {
+      "id": 20040475,
+      "name": "Music: Artistry",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_aztec": {
+      "id": 20040476,
+      "name": "Music: Aztec",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_elven_mist": {
+      "id": 20040477,
+      "name": "Music: Elven Mist",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_forest": {
+      "id": 20040478,
+      "name": "Music: Forest",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_lost_soul": {
+      "id": 20040479,
+      "name": "Music: Lost Soul",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_meridian": {
+      "id": 20040480,
+      "name": "Music: Meridian",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_woodland": {
+      "id": 20040481,
+      "name": "Music: Woodland",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_overpass": {
+      "id": 20040482,
+      "name": "Music: Overpass",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_contest": {
+      "id": 20040483,
+      "name": "Music: Contest",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_sojourn": {
+      "id": 20040484,
+      "name": "Music: Sojourn",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_crystal_castle": {
+      "id": 20040485,
+      "name": "Music: Crystal Castle",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_marzipan": {
+      "id": 20040486,
+      "name": "Music: Marzipan",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_insect_queen": {
+      "id": 20040487,
+      "name": "Music: Insect Queen",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_mad_eadgar": {
+      "id": 20040488,
+      "name": "Music: Mad Eadgar",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_bandit_camp": {
+      "id": 20040489,
+      "name": "Music: Bandit Camp",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_sunburn": {
+      "id": 20040490,
+      "name": "Music: Sunburn",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_competition": {
+      "id": 20040491,
+      "name": "Music: Competition",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_everywhere": {
+      "id": 20040492,
+      "name": "Music: Everywhere",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_exposed": {
+      "id": 20040493,
+      "name": "Music: Exposed",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_well_of_voyage": {
+      "id": 20040494,
+      "name": "Music: Well Of Voyage",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_righteousness": {
+      "id": 20040495,
+      "name": "Music: Righteousness",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_shadowland": {
+      "id": 20040496,
+      "name": "Music: Shadowland",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_lair": {
+      "id": 20040497,
+      "name": "Music: Lair",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_deadlands": {
+      "id": 20040498,
+      "name": "Music: Deadlands",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_rellekka": {
+      "id": 20040499,
+      "name": "Music: Rellekka",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_saga": {
+      "id": 20040500,
+      "name": "Music: Saga",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_borderland": {
+      "id": 20040501,
+      "name": "Music: Borderland",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_legend": {
+      "id": 20040502,
+      "name": "Music: Legend",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_warrior": {
+      "id": 20040503,
+      "name": "Music: Warrior",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_lighthouse": {
+      "id": 20040504,
+      "name": "Music: Lighthouse",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_out_of_the_deep": {
+      "id": 20040505,
+      "name": "Music: Out Of The Deep",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_the_navigator": {
+      "id": 20040506,
+      "name": "Music: The Navigator",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_wildwood": {
+      "id": 20040507,
+      "name": "Music: Wildwood",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_barbarianism": {
+      "id": 20040508,
+      "name": "Music: Barbarianism",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_complication": {
+      "id": 20040509,
+      "name": "Music: Complication",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_down_to_earth": {
+      "id": 20040510,
+      "name": "Music: Down To Earth",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_courage": {
+      "id": 20040511,
+      "name": "Music: Courage",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_superstition": {
+      "id": 20040512,
+      "name": "Music: Superstition",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_pirates_of_peril": {
+      "id": 20040513,
+      "name": "Music: Pirates Of Peril",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_dangerous_road": {
+      "id": 20040514,
+      "name": "Music: Dangerous Road",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_faithless": {
+      "id": 20040515,
+      "name": "Music: Faithless",
+      "kind": "music",
+      "fillerOnly": true
+    },
+    "music_tiptoe": {
+      "id": 20040516,
+      "name": "Music: Tiptoe",
+      "kind": "music",
+      "fillerOnly": true
+    }
+  },
+  "items": {
+    "Progressive Melee": {
+      "id": 20045000,
+      "grant": "progressive_melee",
+      "count": 1,
+      "copies": 7
+    },
+    "Progressive Armour": {
+      "id": 20045001,
+      "grant": "progressive_armour",
+      "count": 1,
+      "copies": 7
+    },
+    "Progressive Ranged": {
+      "id": 20045002,
+      "grant": "progressive_ranged",
+      "count": 1,
+      "copies": 7
+    },
+    "Progressive Magic": {
+      "id": 20045003,
+      "grant": "progressive_magic",
+      "count": 1,
+      "copies": 7
+    },
+    "Progressive Pickaxe": {
+      "id": 20045004,
+      "grant": "progressive_pickaxe",
+      "count": 1,
+      "copies": 5
+    },
+    "Progressive Axe": {
+      "id": 20045005,
+      "grant": "progressive_axe",
+      "count": 1,
+      "copies": 6
+    },
+    "Progressive Attack Cap": {
+      "id": 20045006,
+      "grant": "progressive_attack",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Defence Cap": {
+      "id": 20045007,
+      "grant": "progressive_defence",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Strength Cap": {
+      "id": 20045008,
+      "grant": "progressive_strength",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Ranged Cap": {
+      "id": 20045009,
+      "grant": "progressive_ranged",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Prayer Cap": {
+      "id": 20045010,
+      "grant": "progressive_prayer",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Magic Cap": {
+      "id": 20045011,
+      "grant": "progressive_magic",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Cooking Cap": {
+      "id": 20045012,
+      "grant": "progressive_cooking",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Woodcutting Cap": {
+      "id": 20045013,
+      "grant": "progressive_woodcutting",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Fletching Cap": {
+      "id": 20045014,
+      "grant": "progressive_fletching",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Fishing Cap": {
+      "id": 20045015,
+      "grant": "progressive_fishing",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Firemaking Cap": {
+      "id": 20045016,
+      "grant": "progressive_firemaking",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Crafting Cap": {
+      "id": 20045017,
+      "grant": "progressive_crafting",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Smithing Cap": {
+      "id": 20045018,
+      "grant": "progressive_smithing",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Mining Cap": {
+      "id": 20045019,
+      "grant": "progressive_mining",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Herblore Cap": {
+      "id": 20045020,
+      "grant": "progressive_herblore",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Agility Cap": {
+      "id": 20045021,
+      "grant": "progressive_agility",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Thieving Cap": {
+      "id": 20045022,
+      "grant": "progressive_thieving",
+      "count": 2,
+      "copies": 4
+    },
+    "Progressive Runecraft Cap": {
+      "id": 20045023,
+      "grant": "progressive_runecraft",
+      "count": 2,
+      "copies": 4
+    },
+    "Quest Unlock: Fight Arena": {
+      "id": 20045024,
+      "grant": "quest_arena",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Merlin's Crystal": {
+      "id": 20045025,
+      "grant": "quest_arthur",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Witch's House": {
+      "id": 20045026,
+      "grant": "quest_ball",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Biohazard": {
+      "id": 20045027,
+      "grant": "quest_biohazard",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Shield of Arrav": {
+      "id": 20045028,
+      "grant": "quest_blackarmgang",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Black Knights' Fortress": {
+      "id": 20045029,
+      "grant": "quest_blackknight",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Big Chompy Bird Hunting": {
+      "id": 20045030,
+      "grant": "quest_chompybird",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Clock Tower": {
+      "id": 20045031,
+      "grant": "quest_cog",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Cook's Assistant": {
+      "id": 20045032,
+      "grant": "quest_cook",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Family Crest": {
+      "id": 20045033,
+      "grant": "quest_crest",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Death Plateau": {
+      "id": 20045034,
+      "grant": "quest_death",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Demon Slayer": {
+      "id": 20045035,
+      "grant": "quest_demon",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Tourist Trap": {
+      "id": 20045036,
+      "grant": "quest_desertrescue",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Doric's Quest": {
+      "id": 20045037,
+      "grant": "quest_doric",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Druidic Ritual": {
+      "id": 20045038,
+      "grant": "quest_druid",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Nature Spirit": {
+      "id": 20045039,
+      "grant": "quest_druidspirit",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Monk's Friend": {
+      "id": 20045040,
+      "grant": "quest_drunkmonk",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Eadgar's Ruse": {
+      "id": 20045041,
+      "grant": "quest_eadgar",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Elemental Workshop": {
+      "id": 20045042,
+      "grant": "quest_elemental_workshop",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Plague City": {
+      "id": 20045043,
+      "grant": "quest_elena",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Fishing Contest": {
+      "id": 20045044,
+      "grant": "quest_fishingcompo",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Gertrude's Cat": {
+      "id": 20045045,
+      "grant": "quest_fluffs",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Goblin Diplomacy": {
+      "id": 20045046,
+      "grant": "quest_gobdip",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Holy Grail": {
+      "id": 20045047,
+      "grant": "quest_grail",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: The Grand Tree": {
+      "id": 20045048,
+      "grant": "quest_grandtree",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Ernest the Chicken": {
+      "id": 20045049,
+      "grant": "quest_haunted",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Hazeel Cult": {
+      "id": 20045050,
+      "grant": "quest_hazeelcult",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Heroes' Quest": {
+      "id": 20045051,
+      "grant": "quest_hero",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Witch's Potion": {
+      "id": 20045052,
+      "grant": "quest_hetty",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Pirate's Treasure": {
+      "id": 20045053,
+      "grant": "quest_hunt",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Temple of Ikov": {
+      "id": 20045054,
+      "grant": "quest_ikov",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Imp Catcher": {
+      "id": 20045055,
+      "grant": "quest_imp",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: The Digsite": {
+      "id": 20045056,
+      "grant": "quest_itexam",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Observatory Quest": {
+      "id": 20045057,
+      "grant": "quest_itgronigen",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Watchtower": {
+      "id": 20045058,
+      "grant": "quest_itwatchtower",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Jungle Potion": {
+      "id": 20045059,
+      "grant": "quest_junglepotion",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Legends' Quest": {
+      "id": 20045060,
+      "grant": "quest_legends",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Dwarf Cannon": {
+      "id": 20045061,
+      "grant": "quest_mcannon",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Shades of Mort'ton": {
+      "id": 20045062,
+      "grant": "quest_mortton",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Murder Mystery": {
+      "id": 20045063,
+      "grant": "quest_murder",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Restless Ghost": {
+      "id": 20045064,
+      "grant": "quest_priest",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Priest in Peril": {
+      "id": 20045065,
+      "grant": "quest_priestperil",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Prince Ali Rescue": {
+      "id": 20045066,
+      "grant": "quest_prince",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Regicide": {
+      "id": 20045067,
+      "grant": "quest_regicide",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Romeo & Juliet": {
+      "id": 20045068,
+      "grant": "quest_romeojuliet",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Rune Mysteries": {
+      "id": 20045069,
+      "grant": "quest_runemysteries",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Scorpion Catcher": {
+      "id": 20045070,
+      "grant": "quest_scorpcatcher",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Sea Slug": {
+      "id": 20045071,
+      "grant": "quest_seaslug",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Sheep Shearer": {
+      "id": 20045072,
+      "grant": "quest_sheep",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Sheep Herder": {
+      "id": 20045073,
+      "grant": "quest_sheepherder",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Knight's Sword": {
+      "id": 20045074,
+      "grant": "quest_squire",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Tai Bwo Wannai Trio": {
+      "id": 20045075,
+      "grant": "quest_tbwt",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Tribal Totem": {
+      "id": 20045076,
+      "grant": "quest_totem",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Tree Gnome Village": {
+      "id": 20045077,
+      "grant": "quest_tree",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Troll Stronghold": {
+      "id": 20045078,
+      "grant": "quest_troll",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Underground Pass": {
+      "id": 20045079,
+      "grant": "quest_upass",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Vampire Slayer": {
+      "id": 20045080,
+      "grant": "quest_vampire",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Trials of the Fremmenik": {
+      "id": 20045081,
+      "grant": "quest_viking",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Waterfall Quest": {
+      "id": 20045082,
+      "grant": "quest_waterfall",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Lost City": {
+      "id": 20045083,
+      "grant": "quest_zanaris",
+      "count": 1,
+      "copies": 1
+    },
+    "Quest Unlock: Shilo Village": {
+      "id": 20045084,
+      "grant": "quest_zombiequeen",
+      "count": 1,
+      "copies": 1
+    },
+    "Mystery Reward": {
+      "id": 20045085,
+      "copies": 0,
+      "filler": true
+    }
+  },
+  "goalChecks": {
+    "barcrawl": [
+      "barcrawl_bar_1",
+      "barcrawl_bar_2",
+      "barcrawl_bar_3",
+      "barcrawl_bar_4",
+      "barcrawl_bar_5",
+      "barcrawl_bar_6",
+      "barcrawl_bar_7",
+      "barcrawl_bar_8",
+      "barcrawl_bar_9",
+      "barcrawl_bar_10"
+    ],
+    "dragon": [
+      "quest_dragon"
+    ],
+    "kbd": [
+      "kbd_slain"
+    ]
+  },
+  "goals": [
+    {
+      "id": "barcrawl",
+      "name": "Alfred Grimhand's Barcrawl",
+      "regions": [
+        "karamja"
+      ],
+      "items": [
+        "barcrawl_card (given by the Barbarian Outpost guard)"
+      ],
+      "notes": "Script-verified win condition: getbit_range(%barcrawl, 3, 12) = 1023 (quest_barcrawl.rs2:13), i.e. all 10 bar bits set. The 10 bars (quest_barcrawl.constant): Blue Moon Inn + Jolly Boar Inn (Varrock), Rising Sun (Falador), Flying Horse Inn (Ardougne East), Forester's Arms (Seers' Village), Rusty Anchor (Port Sarim), Dragon Inn (Yanille), Blurberry's Bar (Tree Gnome Village), Dead Man's Chest (Brimhaven, Karamja) and Karamja Spirits (Zambo's, Karamja). No skill or QP requirement - purely a travel checklist. Two of the ten bars are on Karamja, both behind the 30gp Port Sarim boat fare, which per the travel-simplification convention is trivially reachable from sphere 0 (any starting gold or a single low-value drop covers it) and is only NOTED, not modeled as a hard gate."
+    },
+    {
+      "id": "dragon_slayer",
+      "name": "Kill Elvarg (Dragon Slayer)",
+      "quests": [
+        "dragon"
+      ],
+      "notes": "Reduces to completing the 'dragon' quest entry in quests.json (32 QP to start, no skill gate, Elvarg kill on Crandor). Kept as a separate goal id from the quest id because in the AP-phase mapping this becomes a distinct yaml goal option, not just a location."
+    },
+    {
+      "id": "kbd",
+      "name": "Kill the King Black Dragon",
+      "skills": {
+        "attack": 50,
+        "strength": 50,
+        "defence": 50,
+        "hitpoints": 50
+      },
+      "regions": [
+        "wilderness_deep"
+      ],
+      "notes": "JUDGMENT CALL - not a vanilla script-enforced requirement. King Black Dragon's own kill hook (areas/area_wilderness/scripts/king_black_dragon.rs2) has no coded level or quest gate; Dragon Slayer completion is explicitly NOT required (the design brief calls this out). His lair sits deep in the Wilderness past the Lava Maze, reachable by walking under the travel-simplification model (no formal region lock), so the engine instead encodes a minimum combat readiness floor - 40 Attack/Strength/Defence/Hitpoints - as a stand-in for 'can plausibly survive a multi-headed, poison-capable, dragonfire-breathing boss alone in deep Wilderness'. This is deliberately conservative and easy to relitigate: raise or lower the thresholds here, or swap them for a progressive_melee gear-tier check (ap_unlock_count('progressive_melee') >= N), without touching the engine code - see docs/progression-sim.md 'KBD gate: the judgment call' for the reasoning and how to change it. An antidragonbreathshield is recommended in narration but not required numerically. 2026-07-16: floor raised 40 -> 50 to sit on the new quest combat-floor curve (kill level 120+ -> 50; KBD is 239) so the endgame goal is never logically shallower than Legends/Fight Arena."
+    }
+  ],
+  "quests": [
+    {
+      "id": "dragon",
+      "name": "Dragon Slayer",
+      "qp": 2,
+      "requiredQp": 32,
+      "skills": {
+        "attack": 40,
+        "strength": 40,
+        "defence": 40,
+        "hitpoints": 40
+      },
+      "quests": [],
+      "items": [
+        "3 map pieces (Melzar's Maze chest, Wormbrain the goblin, Dwarven Mines chest)",
+        "a ship (bought in Port Sarim) + Captain Ned, OR the Karamja-Crandor secret passage once found",
+        "antidragonbreathshield strongly recommended (sold by Oziach) - mitigates Elvarg's dragonfire but is not script-enforced as a hard block"
+      ],
+      "kills": [
+        "Elvarg (level 83 dragon, Crandor)"
+      ],
+      "regions": [
+        "crandor"
+      ],
+      "notes": "Script-verified gate: dragon_journal.rs2:7 `if (%qp < 32)` blocks starting at the Champions' Guild - no quest or skill prerequisites, purely a QP threshold. This is THE central computation for the whole quest web: 62 other quests sum to 133 QP (quest.constant), so 32 is trivially reachable well before the endgame quests. Elvarg fight has no scripted level gate either - survivability is a judgment call for the player, not the engine. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of Elvarg (level 83; ai_queue3 in quest_dragon/scripts/elvarg.rs2 queues dragon_complete; Melzar's Maze lesser demon is 82). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "arena",
+      "name": "Fight Arena",
+      "qp": 2,
+      "skills": {
+        "attack": 50,
+        "strength": 50,
+        "defence": 50,
+        "hitpoints": 50
+      },
+      "quests": [],
+      "notes": "No skill/quest prerequisites found (full script grep clean). AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 50 atk/str/def/hp for the mandatory kill of Bouncer (level 137; ai_queue3 in quest_arena/scripts/bouncer.rs2 advances %fightarena; General Khazard (112) is escapable, Bouncer is not). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "arthur",
+      "name": "Merlin's Crystal",
+      "qp": 6,
+      "skills": {
+        "attack": 25,
+        "strength": 25,
+        "defence": 25,
+        "hitpoints": 25
+      },
+      "quests": [],
+      "items": [
+        "Excalibur pieces fetched during the quest (do NOT hand out excalibur as a filler reward before this quest - arthur_journal.rs2:55 checks inv_total(inv, excalibur) and would let this sequence-skip)"
+      ],
+      "notes": "No skill/quest prerequisites found. Feeds Heroes' Quest. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 25 atk/str/def/hp for the mandatory kill of Sir Mordred (level 39; ai_queue3 in quest_arthur/scripts/sir_mordred.rs2). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "ball",
+      "name": "Witch's House",
+      "qp": 4,
+      "skills": {
+        "attack": 30,
+        "strength": 30,
+        "defence": 30,
+        "hitpoints": 30
+      },
+      "quests": [],
+      "notes": "No skill/quest prerequisites (the stat(hitpoints) hits in-script are damage-percent calculations, not level gates). AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 30 atk/str/def/hp for the mandatory kill of the witch's experiment (wolf form) (level 53; shapeshifter forms 19/30/42/53 in quest_ball/scripts/witches_experiement.rs2). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "biohazard",
+      "name": "Biohazard",
+      "qp": 3,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found. Feeds Underground Pass. (Differs from OSRS canon, where Biohazard requires Plague City - not enforced in this script set.)",
+      "verified": "script"
+    },
+    {
+      "id": "blackarmgang",
+      "name": "Shield of Arrav",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "notes": "Single quest id represents BOTH resolution paths (Black Arm Gang or Phoenix Gang) - quest_blackarmgang.rs2 tracks %blackarmgang and %phoenixgang as alternate completion varps and Heroes' Quest accepts either (see hero.questsAny). No skill prerequisites for either path.",
+      "verified": "script"
+    },
+    {
+      "id": "blackknight",
+      "name": "Black Knights' Fortress",
+      "qp": 3,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found.",
+      "verified": "script"
+    },
+    {
+      "id": "chompybird",
+      "name": "Big Chompy Bird Hunting",
+      "qp": 2,
+      "skills": {
+        "fletching": 5,
+        "cooking": 30,
+        "ranged": 30
+      },
+      "quests": [],
+      "items": [
+        "ogre_bow (quest reward)"
+      ],
+      "notes": "chompybird_journal.rs2 gates completion on fletching>=5 (ogre bow ammo), cooking>=30 (chompy meat), ranged>=30 (hunting with the bow).",
+      "verified": "script"
+    },
+    {
+      "id": "cog",
+      "name": "Clock Tower",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found.",
+      "verified": "script"
+    },
+    {
+      "id": "cook",
+      "name": "Cook's Assistant",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found. Classic sphere-0 starter quest.",
+      "verified": "script"
+    },
+    {
+      "id": "crest",
+      "name": "Family Crest",
+      "qp": 1,
+      "skills": {
+        "attack": 50,
+        "strength": 50,
+        "defence": 50,
+        "hitpoints": 50
+      },
+      "quests": [],
+      "items": [
+        "one of the Family Crest gauntlets (cooking/goldsmithing/chaos) - vanilla forces a single choice per account"
+      ],
+      "notes": "No hard skill prerequisites found - mining/smithing/crafting are used to CHOOSE which gauntlet to make, not to gate completion. Feeds Legends' Quest. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 50 atk/str/def/hp for the mandatory kill of Chronozon (level 170; ai_queue3 in quest_crest/scripts/crest_chronozon.rs2 sets varp + drops crest piece). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "death",
+      "name": "Death Plateau",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found.",
+      "verified": "script"
+    },
+    {
+      "id": "demon",
+      "name": "Demon Slayer",
+      "qp": 3,
+      "skills": {
+        "attack": 25,
+        "strength": 25,
+        "defence": 25,
+        "hitpoints": 25
+      },
+      "quests": [],
+      "items": [
+        "silverlight (quest reward)"
+      ],
+      "kills": [
+        "Delrith (via the Incantation)"
+      ],
+      "notes": "No skill/quest prerequisites found. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 25 atk/str/def/hp for the mandatory kill of Delrith (level 27; ai_queue3 in quest_demon/scripts/delrith.rs2 (Silverlight weakens him but the fight is mandatory)). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "desertrescue",
+      "name": "Tourist Trap",
+      "qp": 2,
+      "skills": {
+        "smithing": 20,
+        "fletching": 10,
+        "attack": 30,
+        "strength": 30,
+        "defence": 30,
+        "hitpoints": 30
+      },
+      "quests": [],
+      "notes": "desertrescue_journal.rs2 + quest_desertrescue.rs2 gate the punish-rock/dart-making steps on smithing>=20 and fletching>=10. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 30 atk/str/def/hp for the mandatory kill of the Mercenary Captain (level 47; ai_queue3 in quest_desertrescue/scripts/mercenary_captain.rs2 drops the key item). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "doric",
+      "name": "Doric's Quest",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found.",
+      "verified": "script"
+    },
+    {
+      "id": "druid",
+      "name": "Druidic Ritual",
+      "qp": 4,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found.",
+      "verified": "script"
+    },
+    {
+      "id": "druidspirit",
+      "name": "Nature Spirit",
+      "qp": 2,
+      "skills": {
+        "crafting": 18,
+        "attack": 25,
+        "strength": 25,
+        "defence": 25,
+        "hitpoints": 25
+      },
+      "quests": [
+        "priest",
+        "priestperil"
+      ],
+      "notes": "crafting>=18 is script-verified (druidspirit_journal.rs2:37, for repairing the urn). The Priest/Priest in Peril prerequisite is NOT a coded varp gate in this script set (era knowledge only, matching OSRS canon) - marking the quest chain as knowledge-tagged inside an otherwise script-verified entry. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 25 atk/str/def/hp for the mandatory kill of ghasts (level 30; ai_queue3 in quest_druidspirit/scripts/ghast.rs2 advances the quest). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "knowledge"
+    },
+    {
+      "id": "drunkmonk",
+      "name": "Monk's Friend",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found.",
+      "verified": "script"
+    },
+    {
+      "id": "eadgar",
+      "name": "Eadgar's Ruse",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "notes": "Full-directory grep found no coded %troll/%druid prerequisite varp checks, so no quest chain is modeled here even though OSRS canon lists Troll Stronghold as a requirement - this content set does not script-enforce it.",
+      "verified": "script"
+    },
+    {
+      "id": "elemental_workshop",
+      "name": "Elemental Workshop",
+      "qp": 1,
+      "skills": {
+        "mining": 20,
+        "smithing": 20,
+        "crafting": 20,
+        "attack": 25,
+        "strength": 25,
+        "defence": 25,
+        "hitpoints": 25
+      },
+      "quests": [],
+      "notes": "elemental_workshop_journal.rs2 + quest_elemental_workshop.rs2 gate on mining>=20, smithing>=20, crafting>=20. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 25 atk/str/def/hp for the mandatory kill of an elemental (level 35; ai_queue3 handlers in quest_elemental_workshop drop the elemental metal). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "elena",
+      "name": "Plague City",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found.",
+      "verified": "script"
+    },
+    {
+      "id": "fishingcompo",
+      "name": "Fishing Contest",
+      "qp": 1,
+      "skills": {
+        "fishing": 10
+      },
+      "quests": [],
+      "notes": "fishingcompo_journal.rs2 + hemenster_fishing.rs2 gate on fishing>=10.",
+      "verified": "script"
+    },
+    {
+      "id": "fluffs",
+      "name": "Gertrude's Cat",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found. Silent completion (null reward/message in send_quest_complete - the check/reward path still fires via the shared proc).",
+      "verified": "script"
+    },
+    {
+      "id": "gobdip",
+      "name": "Goblin Diplomacy",
+      "qp": 5,
+      "skills": {},
+      "quests": [],
+      "regions": [
+        "karamja"
+      ],
+      "notes": "No skill/quest prerequisites found. Set on Karamja (goblin generals) - trivially reachable via the 30gp Port Sarim boat, noted per the travel-simplification convention.",
+      "verified": "script"
+    },
+    {
+      "id": "grail",
+      "name": "Holy Grail",
+      "qp": 2,
+      "skills": {
+        "attack": 50,
+        "strength": 50,
+        "defence": 50,
+        "hitpoints": 50
+      },
+      "quests": [],
+      "notes": "No skill/quest prerequisites found (in particular, no %arthur reference - differs from later OSRS canon where Holy Grail requires Merlin's Crystal). AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 50 atk/str/def/hp for the mandatory kill of the Black Knight Titan (level 120; ai_queue3 in quest_grail/scripts/black_knight_titan.rs2). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "grandtree",
+      "name": "The Grand Tree",
+      "qp": 5,
+      "skills": {
+        "agility": 25,
+        "attack": 50,
+        "strength": 50,
+        "defence": 50,
+        "hitpoints": 50
+      },
+      "quests": [],
+      "notes": "grandtree_journal.rs2 + quest_grandtree.rs2 gate on agility>=25 (the tree-climbing obstacle course). AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 50 atk/str/def/hp for the mandatory kill of a black demon (level 172; ai_queue3 in quest_grandtree/scripts/grandtree_black_demon.rs2 sets varp). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "haunted",
+      "name": "Ernest the Chicken",
+      "qp": 4,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found.",
+      "verified": "script"
+    },
+    {
+      "id": "hazeelcult",
+      "name": "Hazeel Cult",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found.",
+      "verified": "script"
+    },
+    {
+      "id": "hero",
+      "name": "Heroes' Quest",
+      "qp": 1,
+      "requiredQp": 55,
+      "skills": {
+        "attack": 40,
+        "strength": 40,
+        "defence": 40,
+        "hitpoints": 40
+      },
+      "quests": [
+        "zanaris",
+        "dragon",
+        "arthur"
+      ],
+      "questsAny": [
+        [
+          "blackarmgang"
+        ]
+      ],
+      "notes": "Script-verified at quest_hero.rs2:1-6 (has_hero_quest_requirements proc): %qp>=55 AND Lost City complete AND Dragon Slayer complete AND Merlin's Crystal complete AND (Shield of Arrav complete via either faction). The questsAny entry is a formality here since blackarmgang already folds both factions into one id (see that entry's notes) - kept in the schema/engine as a real OR-group mechanism for future entries. Feeds Legends' Quest. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of the Ice Queen (level 111; ice gloves (Ice Queen drop) are required for the Entrana firebird feather). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "hetty",
+      "name": "Witch's Potion",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found.",
+      "verified": "script"
+    },
+    {
+      "id": "horror",
+      "name": "Horror from the Deep",
+      "qp": 2,
+      "skills": {
+        "attack": 40,
+        "strength": 40,
+        "defence": 40,
+        "hitpoints": 40
+      },
+      "quests": [],
+      "notes": "The prayer>=50 checks in horror_godbook.rs2 gate blessing an unholy symbol (a bonus/reward-track feature), NOT the main quest completion path (send_quest_complete at horror.rs2:497 has no stat check upstream) - deliberately left out of the hard skills gate and noted instead. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of the Dagannoth Mother (level 100; ai_queue3 varp writes in quest_horror/scripts/horror_dagannoth.rs2 (jr form vislevel 100; mother's config debugname not level-resolved, era level ~100)). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "hunt",
+      "name": "Pirate's Treasure",
+      "qp": 2,
+      "skills": {},
+      "quests": [],
+      "regions": [
+        "karamja"
+      ],
+      "notes": "No skill/quest prerequisites found. Set on Karamja.",
+      "verified": "script"
+    },
+    {
+      "id": "ikov",
+      "name": "Temple of Ikov",
+      "qp": 1,
+      "skills": {
+        "attack": 40,
+        "strength": 40,
+        "defence": 40,
+        "hitpoints": 40
+      },
+      "quests": [],
+      "notes": "thieving>=42 in ikov_dungeon.rs2 is an OPTIONAL trap-disarm shortcut (ikov_traplever), not a hard block - the Fire Warrior can be fought instead. Deliberately left out of the hard skills gate. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of the Fire Warrior of Lesarkus (level 84; ai_queue3 in quest_ikov/scripts/fire_warrior_of_leskarus.rs2 (level from era knowledge; config debugname not level-resolved)). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "imp",
+      "name": "Imp Catcher",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "items": [
+        "amulet_of_accuracy (quest reward)"
+      ],
+      "notes": "No skill/quest prerequisites found. Classic sphere-0 starter quest.",
+      "verified": "script"
+    },
+    {
+      "id": "itexam",
+      "name": "The Digsite",
+      "qp": 2,
+      "skills": {
+        "agility": 10,
+        "herblore": 10,
+        "thieving": 25
+      },
+      "quests": [],
+      "notes": "itexam_journal.rs2 gates on agility>=10, herblore>=10, thieving>=25 (matches area_digsite.rs2/digsite_workman.rs2/itexam_chemistry.rs2 in-scene checks).",
+      "verified": "script"
+    },
+    {
+      "id": "itgronigen",
+      "name": "Observatory Quest",
+      "qp": 2,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found. Silent completion (null reward/message).",
+      "verified": "script"
+    },
+    {
+      "id": "itwatchtower",
+      "name": "Watchtower",
+      "qp": 4,
+      "skills": {
+        "magic": 14,
+        "mining": 40,
+        "herblore": 14,
+        "thieving": 15,
+        "agility": 25,
+        "attack": 30,
+        "strength": 30,
+        "defence": 30,
+        "hitpoints": 30
+      },
+      "quests": [],
+      "notes": "itwatchtower_journal.rs2 + ogre_potion.rs2/ogre_shaman.rs2/quest_itwatchtower.rs2 gate on magic>=14, mining>=40, herblore>=14, thieving>=15, agility>=25. Highest single-quest mining requirement outside the endgame chain. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 30 atk/str/def/hp for the mandatory kill of Gorad (level 68; ai_queue3 in quest_itwatchtower/scripts/gorad.rs2 drops his tooth). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "junglepotion",
+      "name": "Jungle Potion",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "regions": [
+        "karamja"
+      ],
+      "notes": "No skill/quest prerequisites found. Set on Karamja (Tai Bwo Wannai).",
+      "verified": "script"
+    },
+    {
+      "id": "legends",
+      "name": "Legends' Quest",
+      "qp": 4,
+      "requiredQp": 107,
+      "skills": {
+        "magic": 56,
+        "mining": 52,
+        "agility": 50,
+        "crafting": 50,
+        "smithing": 50,
+        "strength": 50,
+        "thieving": 50,
+        "woodcutting": 50,
+        "herblore": 45,
+        "prayer": 42,
+        "attack": 50,
+        "defence": 50,
+        "hitpoints": 50
+      },
+      "quests": [
+        "crest",
+        "hero",
+        "zombiequeen",
+        "upass",
+        "waterfall"
+      ],
+      "regions": [
+        "karamja"
+      ],
+      "notes": "Script-verified at legends_guard.rs2:50-53 (quest chain: crest+hero+zombiequeen+upass+waterfall all complete, AND %qp>=107) and legends_journal.rs2/quest_legends.rs2 (the ten skill gates, all hard `if (stat(x) < N) return/block` checks scattered through the Kharazi Jungle dungeon). The single most skill-demanding quest in the set - deliberately the capstone this simulator uses to prove skill-cap unlocks matter. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 50 atk/str/def/hp for the mandatory kill of Nezikchened (level 187; ai_queue3 in quest_legends/scripts/nezikchened.rs2; the three Viyeldi warriors are 92-106). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "mcannon",
+      "name": "Dwarf Cannon",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found.",
+      "verified": "script"
+    },
+    {
+      "id": "mortton",
+      "name": "Shades of Mort'ton",
+      "qp": 3,
+      "skills": {
+        "crafting": 12
+      },
+      "quests": [],
+      "notes": "quest_mortton.rs2:76 gates on crafting>=12 (shade key/urn work).",
+      "verified": "script"
+    },
+    {
+      "id": "murder",
+      "name": "Murder Mystery",
+      "qp": 3,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found.",
+      "verified": "script"
+    },
+    {
+      "id": "priest",
+      "name": "Restless Ghost",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "items": [
+        "amulet_of_ghostspeak (quest reward)"
+      ],
+      "notes": "No skill/quest prerequisites found. Classic sphere-0 starter quest.",
+      "verified": "script"
+    },
+    {
+      "id": "priestperil",
+      "name": "Priest in Peril",
+      "qp": 1,
+      "skills": {
+        "attack": 25,
+        "strength": 25,
+        "defence": 25,
+        "hitpoints": 25
+      },
+      "quests": [],
+      "notes": "No skill/quest prerequisites found (evil_monks.rs2's stat_base<=stat checks are anti-boost combat guards, not level gates). Opens Morytania/Canifis access. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 25 atk/str/def/hp for the mandatory kill of the temple monks (level 30; ai_queue3 in quest_priestperil/scripts/evil_monks.rs2 drops the golden key). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "prince",
+      "name": "Prince Ali Rescue",
+      "qp": 3,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found.",
+      "verified": "script"
+    },
+    {
+      "id": "regicide",
+      "name": "Regicide",
+      "qp": 3,
+      "skills": {
+        "agility": 56,
+        "crafting": 10,
+        "attack": 40,
+        "strength": 40,
+        "defence": 40,
+        "hitpoints": 40
+      },
+      "quests": [
+        "upass"
+      ],
+      "notes": "Script-verified: regicide_kings_messenger.rs2:2 `if(%upass = ^upass_complete ...)` gates the quest start on Underground Pass complete. quest_regicide.rs2 has two agility checks (45 for an early obstacle, 56 for a later one - the higher value is the binding requirement) and crafting>=10 (poison-antidote work). AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of a Tyras guard (level 110; ai_queue3 in quest_regicide/scripts/tyras_guard.rs2 sets varp + drop). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "romeojuliet",
+      "name": "Romeo & Juliet",
+      "qp": 5,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found.",
+      "verified": "script"
+    },
+    {
+      "id": "runemysteries",
+      "name": "Rune Mysteries",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found. Classic sphere-0 starter quest, gateway to Runecrafting.",
+      "verified": "script"
+    },
+    {
+      "id": "scorpcatcher",
+      "name": "Scorpion Catcher",
+      "qp": 1,
+      "skills": {
+        "prayer": 31
+      },
+      "quests": [],
+      "notes": "scorpcatcher_journal.rs2:9 gates on prayer>=31.",
+      "verified": "script"
+    },
+    {
+      "id": "seaslug",
+      "name": "Sea Slug",
+      "qp": 1,
+      "skills": {
+        "firemaking": 30
+      },
+      "quests": [],
+      "notes": "quest_seaslug.rs2:40 gates on firemaking>=30 (signal fire).",
+      "verified": "script"
+    },
+    {
+      "id": "sheep",
+      "name": "Sheep Shearer",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found. Classic sphere-0 starter quest.",
+      "verified": "script"
+    },
+    {
+      "id": "sheepherder",
+      "name": "Sheep Herder",
+      "qp": 4,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found.",
+      "verified": "script"
+    },
+    {
+      "id": "squire",
+      "name": "Knight's Sword",
+      "qp": 1,
+      "skills": {
+        "mining": 10
+      },
+      "quests": [],
+      "notes": "squire_journal.rs2:7 gates on mining>=10 (Blurite ore).",
+      "verified": "script"
+    },
+    {
+      "id": "tbwt",
+      "name": "Tai Bwo Wannai Trio",
+      "qp": 2,
+      "skills": {
+        "firemaking": 30,
+        "cooking": 30
+      },
+      "quests": [],
+      "regions": [
+        "karamja"
+      ],
+      "notes": "tbwt_jogre_bones.rs2 gates on firemaking>=30 and cooking>=30 (karambwan prep). Set on Karamja.",
+      "verified": "script"
+    },
+    {
+      "id": "totem",
+      "name": "Tribal Totem",
+      "qp": 1,
+      "skills": {
+        "thieving": 21
+      },
+      "quests": [],
+      "regions": [
+        "karamja"
+      ],
+      "notes": "totem_journal.rs2 + quest_totem.rs2 gate on thieving>=21. Set on Karamja.",
+      "verified": "script"
+    },
+    {
+      "id": "tree",
+      "name": "Tree Gnome Village",
+      "qp": 2,
+      "skills": {
+        "attack": 40,
+        "strength": 40,
+        "defence": 40,
+        "hitpoints": 40
+      },
+      "quests": [],
+      "items": [
+        "gnome_amulet (quest reward)"
+      ],
+      "notes": "No skill/quest prerequisites found. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of the Khazard Warlord (level 112; ai_queue3 in quest_tree/scripts/khazard_warlord.rs2). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "troll",
+      "name": "Troll Stronghold",
+      "qp": 1,
+      "skills": {
+        "agility": 15,
+        "attack": 40,
+        "strength": 40,
+        "defence": 40,
+        "hitpoints": 40
+      },
+      "quests": [],
+      "notes": "quest_troll.rs2 gates several obstacles on agility>=15. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of the troll champion Dad (level 101; ai_queue3 in quest_troll/scripts/troll_champion.rs2 sets varp). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "upass",
+      "name": "Underground Pass",
+      "qp": 5,
+      "skills": {
+        "thieving": 50,
+        "attack": 40,
+        "strength": 40,
+        "defence": 40,
+        "hitpoints": 40
+      },
+      "quests": [
+        "biohazard"
+      ],
+      "notes": "Script-verified: quest_upass.rs2:81 `if(%biohazard < ^biohazard_complete)` gates the quest start on Biohazard complete. thieving>=50 gates a pickpocket obstacle (quest_upass.rs2:248). Feeds Regicide and Legends' Quest. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of the demons Doomion/Holthion/Othainian (level 91; ai_queue3 handlers drop the amulets; Kalrag (89) and three paladins (62) also mandatory). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "vampire",
+      "name": "Vampire Slayer",
+      "qp": 3,
+      "skills": {
+        "attack": 25,
+        "strength": 25,
+        "defence": 25,
+        "hitpoints": 25
+      },
+      "quests": [],
+      "items": [
+        "stake (quest reward)"
+      ],
+      "kills": [
+        "Count Draynor"
+      ],
+      "notes": "No skill/quest prerequisites found. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 25 atk/str/def/hp for the mandatory kill of Count Draynor (level 34; ai_queue4 death hook in quest_vampire/scripts/count_draynor.rs2). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "viking",
+      "name": "Trials of the Fremmenik",
+      "qp": 3,
+      "skills": {
+        "woodcutting": 40,
+        "crafting": 40,
+        "fletching": 25,
+        "attack": 30,
+        "strength": 30,
+        "defence": 30,
+        "hitpoints": 30
+      },
+      "quests": [],
+      "items": [
+        "viking_helmet (quest reward, also a wield-gate item)"
+      ],
+      "notes": "viking_olaf.rs2 gates the boat-repair minigame on woodcutting>=40, crafting>=40, fletching>=25. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 30 atk/str/def/hp for the mandatory kill of the Draugen / Koschei the Deathless (level 69; ai_queue3 in quest_viking scripts (viking_draugen vislevel 69)). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "waterfall",
+      "name": "Waterfall Quest",
+      "qp": 1,
+      "skills": {},
+      "quests": [],
+      "notes": "No skill/quest prerequisites found. Feeds Legends' Quest.",
+      "verified": "script"
+    },
+    {
+      "id": "zanaris",
+      "name": "Lost City",
+      "qp": 3,
+      "skills": {
+        "woodcutting": 36,
+        "crafting": 31,
+        "attack": 40,
+        "strength": 40,
+        "defence": 40,
+        "hitpoints": 40
+      },
+      "quests": [],
+      "regions": [
+        "zanaris"
+      ],
+      "items": [
+        "dramen_staff (the quest's own completion mechanic - NEVER hand this out as a filler reward, it would delete the quest's fetch step)"
+      ],
+      "notes": "quest_zanaris.rs2:37,78 + zanaris_journal.rs2 gate on woodcutting>=36 (dramen branch) and crafting>=31 (lever mechanism). Opens Zanaris (fairy realm, reached via the dramen tree once the staff is crafted) and the Fairy Ring network in later revisions - not relevant to rev 274. Feeds Heroes' Quest. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of the Tree Spirit (level 101; ai_queue3 in quest_zanaris/scripts/tree_spirit.rs2 sets %zanaris). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    },
+    {
+      "id": "zombiequeen",
+      "name": "Shilo Village",
+      "qp": 2,
+      "skills": {
+        "agility": 32,
+        "crafting": 9,
+        "attack": 40,
+        "strength": 40,
+        "defence": 40,
+        "hitpoints": 40
+      },
+      "quests": [],
+      "notes": "quest_zombiequeen.rs2:390 gates on agility>=32 (rope swing). The crafting gate (line 789-793) is tool-dependent: chisel needs only crafting>=9, spade needs 29, default 19 - modeled at the lowest reachable value (9) since any of the three tools completes the same step. Feeds Legends' Quest. AP combat floor (JUDGMENT CALL, same convention as the KBD goal): 40 atk/str/def/hp for the mandatory kill of Nazastarool (level 93; ai_queue3 in quest_zombiequeen/scripts/nazastarool.rs2 (three forms; level from era knowledge)). Curve: kill<15 none, 15-39 -> 25, 40-79 -> 30, 80-119 -> 40, 120+ -> 50. Not enforced in-game - logic-only, so the sim/validator/placement treat the quest as needing survivable combat caps first.",
+      "verified": "script"
+    }
+  ],
+  "questGates": [
+    "arena",
+    "arthur",
+    "ball",
+    "biohazard",
+    "blackarmgang",
+    "blackknight",
+    "chompybird",
+    "cog",
+    "cook",
+    "crest",
+    "death",
+    "demon",
+    "desertrescue",
+    "doric",
+    "druid",
+    "druidspirit",
+    "drunkmonk",
+    "eadgar",
+    "elemental_workshop",
+    "elena",
+    "fishingcompo",
+    "fluffs",
+    "gobdip",
+    "grail",
+    "grandtree",
+    "haunted",
+    "hazeelcult",
+    "hero",
+    "hetty",
+    "hunt",
+    "ikov",
+    "imp",
+    "itexam",
+    "itgronigen",
+    "itwatchtower",
+    "junglepotion",
+    "legends",
+    "mcannon",
+    "mortton",
+    "murder",
+    "priest",
+    "priestperil",
+    "prince",
+    "regicide",
+    "romeojuliet",
+    "runemysteries",
+    "scorpcatcher",
+    "seaslug",
+    "sheep",
+    "sheepherder",
+    "squire",
+    "tbwt",
+    "totem",
+    "tree",
+    "troll",
+    "upass",
+    "vampire",
+    "viking",
+    "waterfall",
+    "zanaris",
+    "zombiequeen"
+  ]
+}

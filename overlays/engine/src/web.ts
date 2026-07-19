@@ -18,8 +18,9 @@ import { createDefaultWorldConfig, loadWorldConfig, normalizeWorldConfig, saveWo
 import OnDemand from '#/engine/OnDemand.js';
 import { tryParseInt } from '#/util/TryParse.js';
 import ObjType from '#/cache/config/ObjType.js';
+import { initApClient } from '#/engine/ApClient.js';
 import { getDropOverrideCount } from '#/engine/ApDropOverrides.js';
-import { AXE_TIERS, GEAR_FAMILY_LABELS, GEAR_TIER_LEVELS, PICKAXE_TIERS, getUnlockCount, questGateLabel } from '#/engine/ApUnlockOverrides.js';
+import { AXE_TIERS, GEAR_FAMILY_LABELS, GEAR_TIER_LEVELS, GEAR_TIER_NAMES, GEAR_TIER_STARTERS, PICKAXE_TIERS, getUnlockCount, questGateLabel } from '#/engine/ApUnlockOverrides.js';
 import { getEntranceOverrideCount } from '#/engine/ApEntranceOverrides.js';
 import { getGatherOverrideCount } from '#/engine/ApGatherOverrides.js';
 import { getProcessOverrideCount } from '#/engine/ApProcessOverrides.js';
@@ -298,11 +299,14 @@ function buildUnlocksPanel(): unknown {
     const gear = Object.entries(GEAR_FAMILY_LABELS).map(([key, label]) => {
         const count = getUnlockCount(key);
         const tier = Math.min(count, GEAR_TIER_LEVELS.length);
+        // grade names are family-specific (GEAR_TIER_NAMES) - "bronze" means
+        // nothing to a mage.
+        const grade = tier === 0 ? null : GEAR_TIER_NAMES[key]?.[tier - 1];
         return {
             label,
             count,
             max: GEAR_TIER_LEVELS.length,
-            detail: tier === 0 ? 'starter (bronze-grade) only' : `tier ${tier} - lv ${GEAR_TIER_LEVELS[tier - 1]}+ equipment`
+            detail: tier === 0 ? `starter (${GEAR_TIER_STARTERS[key] ?? 'level-1 gear'})` : `${grade ? `${grade} - ` : ''}lv ${GEAR_TIER_LEVELS[tier - 1]}+`
         };
     });
 
@@ -631,6 +635,12 @@ async function writeResponse(res: ServerResponse, response: Response): Promise<v
 }
 
 export async function startWeb(): Promise<void> {
+    // Archipelago multiworld client (docs/archipelago-integration.md). Lives here
+    // because startWeb() runs exactly once at boot on the main thread and web.ts is
+    // already an overlay - no additional vanilla file needs hooking. No-op unless
+    // data/config/ap-archipelago.json enables it.
+    initApClient();
+
     const server = http.createServer(async (req, res) => {
         try {
             const response = await handleWebRequest(createRequest(req, Environment.web.port));

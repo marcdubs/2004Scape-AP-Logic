@@ -15,6 +15,7 @@ import path from 'path';
 
 import VarBitType from '#/cache/config/VarBitType.js';
 import VarPlayerType from '#/cache/config/VarPlayerType.js';
+import * as ApClient from '#/engine/ApClient.js';
 import { getApOption } from '#/engine/ApOptions.js';
 import * as ApUnlockOverrides from '#/engine/ApUnlockOverrides.js';
 import { recordDiscovery } from '#/engine/ApTracker.js';
@@ -343,10 +344,25 @@ function fireCheck(player: Player, checkId: string): void {
         fired.add(checkId);
         schedulePersist();
 
+        const script = ScriptProvider.getByName('[queue,ap_check_fired]');
+
+        // Real-Archipelago mode (docs/archipelago-integration.md): the check is
+        // reported to the AP server, which owns what item lives there - the local
+        // placement table is never consulted and no local reward rolls. is_unlock=2
+        // tells [queue,ap_check_fired] to announce "sent to Archipelago" only.
+        // Items for US come back asynchronously via ApClient's ReceivedItems path.
+        if (ApClient.isApModeActive()) {
+            ApClient.onCheckFired(checkId);
+            recordDiscovery('checks', checkId, 'sent to Archipelago');
+            if (script) {
+                player.enqueueScript(script, PlayerQueueType.ENGINE, 0, [checkId, '', 2]);
+            }
+            return;
+        }
+
         const outcome = resolvePlacement(player, checkId);
         recordDiscovery('checks', checkId, outcome.isUnlock ? outcome.display : 'filler');
 
-        const script = ScriptProvider.getByName('[queue,ap_check_fired]');
         if (!script) {
             // content not built/deployed yet - state is still recorded above so
             // nothing is lost once the script exists on a later boot.

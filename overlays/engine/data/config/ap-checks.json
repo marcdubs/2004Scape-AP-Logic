@@ -1,5 +1,6 @@
 {
     "watches": [
+        { "varp": "ap_kbd_killed", "mode": "gte", "value": 1, "check": "kbd_slain" },
         { "varp": "barcrawl", "mode": "bit", "value": 3, "check": "barcrawl_bar_1" },
         { "varp": "barcrawl", "mode": "bit", "value": 4, "check": "barcrawl_bar_2" },
         { "varp": "barcrawl", "mode": "bit", "value": 5, "check": "barcrawl_bar_3" },

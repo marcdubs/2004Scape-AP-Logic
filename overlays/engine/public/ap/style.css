@@ -1,14 +1,25 @@
+/* OSRS / old-RuneScape-website inspired theme (problems.txt 2026-07-19: "make it
+   look more like OSRS, like the OG website"). Palette cribbed from the era: near
+   black backdrop, dark-brown stone panels, orange (#ff981f) headings and gold
+   (#ffb83f) accents, parchment body text, Verdana at small sizes. No external
+   assets beyond the two staticons sheets - all texture is CSS gradients. */
+
 :root {
-    --bg: #14151a;
-    --panel: #1c1e26;
-    --panel-alt: #23252f;
-    --border: #33353f;
-    --text: #e6e6ea;
-    --text-dim: #9598a6;
-    --accent: #4fd1c5;
-    --accent-dim: #2f7a72;
+    --bg: #120f0a;
+    --bg-texture: radial-gradient(ellipse at 50% -10%, #241d12 0%, #120f0a 62%);
+    --panel: #262019;
+    --panel-alt: #322a1f;
+    --border: #4e4130;
+    --border-dark: #000;
+    --text: #e2dbc8;
+    --text-dim: #a89a7e;
+    --accent: #ff981f;      /* OSRS orange */
+    --accent-dim: #6e4a15;
+    --gold: #ffb83f;
     --warn: #e0a95a;
-    --link: #7ec8ff;
+    --link: #ffb83f;
+    --good: #7fd63c;
+    --bad: #e05a5a;
 }
 
 * {
@@ -19,34 +30,40 @@ html, body {
     margin: 0;
     padding: 0;
     height: 100%;
-    background: var(--bg);
+    background: var(--bg) ;
+    background-image: var(--bg-texture);
+    background-attachment: fixed;
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: Verdana, Geneva, 'DejaVu Sans', Arial, sans-serif;
+    font-size: 13px;
 }
 
-h1, h2 {
+h1, h2, h3 {
     margin: 0;
-    font-weight: 600;
+    font-weight: 700;
+    color: var(--accent);
+    text-shadow: 1px 1px 0 #000;
 }
 
 h1 {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     letter-spacing: 0.02em;
     white-space: nowrap;
 }
 
 h2 {
-    font-size: 1.15rem;
+    font-size: 1.1rem;
     margin-bottom: 0.25rem;
 }
 
 .topbar {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
-    padding: 0.6rem 1rem;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
+    gap: 1.25rem;
+    padding: 0.55rem 1rem;
+    background: linear-gradient(#312818, #221b10);
+    border-bottom: 2px solid var(--border);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
     position: sticky;
     top: 0;
     z-index: 10;
@@ -55,29 +72,35 @@ h2 {
 
 .tabs {
     display: flex;
-    gap: 0.25rem;
+    gap: 0.3rem;
     flex: 1;
     flex-wrap: wrap;
 }
 
+/* stone-button tabs */
 .tab-btn {
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--text-dim);
-    padding: 0.4rem 0.8rem;
-    border-radius: 6px;
+    background: linear-gradient(#4e4433, #372e20);
+    border: 1px solid var(--border-dark);
+    outline: 1px solid var(--border);
+    outline-offset: -2px;
+    color: var(--gold);
+    padding: 0.35rem 0.8rem;
+    border-radius: 3px;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    text-shadow: 1px 1px 0 #000;
 }
 
 .tab-btn:hover {
-    color: var(--text);
-    border-color: var(--border);
+    background: linear-gradient(#5d5240, #453a29);
+    color: #ffd76e;
 }
 
 .tab-btn.active {
-    background: var(--accent-dim);
-    color: #fff;
+    background: linear-gradient(#241d12, #322a1f);
+    color: var(--accent);
+    box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.8);
 }
 
 .topbar-right {
@@ -88,37 +111,35 @@ h2 {
 }
 
 .status {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--text-dim);
 }
 
 .status.ok::before {
     content: '\25cf ';
-    color: var(--accent);
+    color: var(--good);
 }
 
 .status.err::before {
     content: '\25cf ';
-    color: #e05a5a;
+    color: var(--bad);
 }
 
 .spoiler-link {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--warn);
     text-decoration: none;
     border: 1px solid var(--warn);
     padding: 0.25rem 0.6rem;
-    border-radius: 6px;
+    border-radius: 3px;
+    text-shadow: 1px 1px 0 #000;
 }
 
-.spoiler-link:hover {
-    background: var(--warn);
-    color: #14151a;
-}
-
+.spoiler-link:hover,
 .spoiler-link.on {
     background: var(--warn);
-    color: #14151a;
+    color: #14110a;
+    text-shadow: none;
 }
 
 main#app {
@@ -137,14 +158,15 @@ main#app {
 
 .tab-desc {
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     margin: 0.25rem 0 0.75rem;
 }
 
 .counter {
     color: var(--text-dim);
     font-weight: 400;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    text-shadow: none;
 }
 
 /* ---- map tab ---- */
@@ -163,37 +185,41 @@ main#app {
 }
 
 .layer-btn {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    padding: 0.35rem 0.75rem;
-    border-radius: 6px;
+    background: linear-gradient(#4e4433, #372e20);
+    border: 1px solid var(--border-dark);
+    outline: 1px solid var(--border);
+    outline-offset: -2px;
+    color: var(--gold);
+    padding: 0.3rem 0.75rem;
+    border-radius: 3px;
     cursor: pointer;
-    font-size: 0.85rem;
+    font-family: inherit;
+    font-size: 0.82rem;
+    text-shadow: 1px 1px 0 #000;
 }
 
 .layer-btn.active {
-    background: var(--accent-dim);
-    color: #fff;
-    border-color: var(--accent-dim);
+    background: linear-gradient(#241d12, #322a1f);
+    color: var(--accent);
+    box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.8);
 }
 
 .map-counters {
     color: var(--text-dim);
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     display: flex;
     gap: 1rem;
     flex-wrap: wrap;
 }
 
 .map-counters b {
-    color: var(--text);
+    color: var(--gold);
 }
 
 .map-hint {
     margin-left: auto;
     color: var(--text-dim);
-    font-size: 0.78rem;
+    font-size: 0.75rem;
 }
 
 .map-viewport {
@@ -202,9 +228,10 @@ main#app {
     height: 72vh;
     min-height: 420px;
     overflow: hidden;
-    background: #0a0a0d;
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    background: #060504;
+    border: 2px solid var(--border);
+    outline: 1px solid var(--border-dark);
+    border-radius: 4px;
     cursor: grab;
 }
 
@@ -236,12 +263,12 @@ main#app {
 
 .marker {
     fill: var(--accent);
-    stroke: #0a0a0d;
+    stroke: #000;
     stroke-width: 1.5;
 }
 
 .marker.dest {
-    fill: var(--warn);
+    fill: var(--gold);
 }
 
 .marker.cross {
@@ -256,10 +283,10 @@ main#app {
 }
 
 .marker-label {
-    fill: var(--text);
+    fill: #ffe9b3;
     font-size: 11px;
     paint-order: stroke;
-    stroke: #0a0a0d;
+    stroke: #000;
     stroke-width: 3px;
     font-family: inherit;
 }
@@ -284,16 +311,23 @@ main#app {
     100% { transform: scale(3); opacity: 0; }
 }
 
+/* in normal flow the empty states are just dim parchment text; only inside the
+   map viewport do they float centered over the canvas */
 .empty-state {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    margin: 0.5rem 0;
+}
+
+.map-viewport .empty-state {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    color: var(--text-dim);
-    font-size: 0.95rem;
     text-align: center;
     max-width: 20rem;
     pointer-events: none;
+    margin: 0;
 }
 
 /* ---- entrances list tab ---- */
@@ -307,18 +341,19 @@ main#app {
 }
 
 .entrance-search {
-    background: var(--panel);
+    background: #1a150e;
     border: 1px solid var(--border);
     color: var(--text);
     padding: 0.4rem 0.6rem;
-    border-radius: 6px;
-    font-size: 0.85rem;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 0.82rem;
     min-width: 240px;
 }
 
 .entrance-search:focus {
     outline: none;
-    border-color: var(--accent-dim);
+    border-color: var(--accent);
 }
 
 .connection-group {
@@ -327,42 +362,48 @@ main#app {
 
 .connection-group h3 {
     margin: 0 0 0.4rem;
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 0.78rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--text-dim);
+    letter-spacing: 0.04em;
+    color: var(--gold);
 }
 
 .discovery-table tbody tr.clickable {
     cursor: pointer;
 }
 
-/* ---- discovery tables ---- */
+/* ---- discovery tables (parchment-on-stone) ---- */
 
 .discovery-table {
     width: 100%;
     border-collapse: collapse;
     background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    border: 2px solid var(--border);
+    outline: 1px solid var(--border-dark);
+    border-radius: 4px;
     overflow: hidden;
 }
 
 .discovery-table th, .discovery-table td {
     text-align: left;
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--border);
-    font-size: 0.9rem;
+    padding: 0.45rem 0.75rem;
+    border-bottom: 1px solid #3a3124;
+    font-size: 0.85rem;
 }
 
 .discovery-table th {
-    background: var(--panel-alt);
-    color: var(--text-dim);
-    font-weight: 600;
-    font-size: 0.8rem;
+    background: linear-gradient(#3d3323, #2c2418);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.75rem;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.04em;
+    text-shadow: 1px 1px 0 #000;
+}
+
+.discovery-table tbody tr:nth-child(even) {
+    background: #2b241b;
 }
 
 .discovery-table tbody tr:last-child td {
@@ -384,7 +425,29 @@ main#app {
 .discovery-table .spoiler-row td:last-child::after {
     content: ' (undiscovered)';
     color: var(--warn);
-    font-size: 0.75rem;
+    font-size: 0.72rem;
+}
+
+/* ---- stat icons (vanilla stats-tab sprite sheets) ---- */
+
+.stat-icon {
+    display: inline-block;
+    width: 25px;
+    height: 25px;
+    background-image: url(staticons.png);
+    background-repeat: no-repeat;
+    vertical-align: middle;
+    margin-right: 8px;
+    image-rendering: pixelated;
+    filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.7));
+}
+
+.stat-icon.sheet2 {
+    background-image: url(staticons2.png);
+}
+
+.icon-cell {
+    white-space: nowrap;
 }
 
 /* ---- Unlocks tab ---- */
@@ -398,10 +461,28 @@ main#app {
 
 .unlocks-heading {
     margin: 1.1rem 0 0.4rem;
-    font-size: 0.95rem;
-    color: var(--text-dim);
+    font-size: 0.9rem;
+    color: var(--accent);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+}
+
+.toggle-label {
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: var(--text-dim);
+    text-transform: none;
+    letter-spacing: normal;
+    text-shadow: none;
+    margin-left: 0.6rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.toggle-label input {
+    vertical-align: middle;
+    margin-right: 0.25rem;
+    accent-color: var(--accent);
 }
 
 .unlock-locked td:last-child {
@@ -410,5 +491,5 @@ main#app {
 
 .unlock-open td:last-child,
 .unlock-maxed td:last-child {
-    color: var(--accent);
+    color: var(--good);
 }

@@ -2654,3 +2654,71 @@ problems.txt round ("teleporting to bankers puts the player inside the bank"):
   region 6480/6484 unreachable under this entrance shuffle) - benign: infeasible
   quests' checks are excluded from the catalog at GenerateSeed time, so its
   placed "Quest unlock: Clock Tower" item is effectively filler this seed.
+
+## Session addendum (2026-07-19b): tracker polish + Archipelago v1 (problems.txt round)
+
+Two problems.txt items: tracker fixes/theming, and "actually make this work with
+Archipelago". Both built; NOTHING in-game or against a real AP server tested yet
+(offline e2e only, see below).
+
+Tracker (problems.txt #1):
+- **Per-family gear grades**: `GEAR_TIER_NAMES`/`GEAR_TIER_STARTERS` in
+  ApUnlockOverrides (exported; used by web.ts's unlocks panel AND describeUnlock
+  announcements). Derived by surveying every wield gate in tier*.rs2 - e.g. magic's
+  seven tiers are Basic staves/Basic staves/Wizard boots/Battlestaves/Mystic &
+  splitbark/Iban's staff/Iban's staff (tiers that add nothing repeat the previous
+  best; ap_gear_locked buckets 45-50 -> tier 6, 60-70 -> tier 7).
+- **Stat icons**: `content/sprites/staticons(.2).png` are plain 150x75 PNGs, 6x3
+  grid of 25x25 cells, magenta (#ff00ff) = transparency key. Cell order follows the
+  stats-tab COLUMN layout in stats.if: col1 = attack..magic (0-5), col2 =
+  hitpoints/agility/herblore/thieving/crafting/fletching (6-11), col3 =
+  mining/smithing/fishing/cooking/firemaking/woodcutting (12-17); runecraft is
+  staticons2 index 0. Copies with keyed transparency live in public/ap/; app.js
+  STAT_ICONS maps skill -> [sheet, index].
+- Locked quests hidden by default ("Show locked" checkbox); OSRS-theme rewrite of
+  style.css (stone-gradient buttons, #ff981f headings, parchment text, CSS-only).
+  `.empty-state` absolute positioning is now scoped to `.map-viewport` - it was
+  viewport-centering flow content elsewhere.
+
+Archipelago v1 (problems.txt #2) - design doc docs/archipelago-integration.md:
+- **Three artifacts**: `tools/ap/ExportApWorldData.ts` (shared datapackage,
+  append-only ids, base 20040000 locations / 20045000 items; run in engine, copy
+  output to BOTH overlays/engine/data/config/ap-archipelago-data.json and
+  apworld/rs2004scape/data/rs2004_data.json), `apworld/rs2004scape/` (Python world:
+  quest completions = AP events, QP summed in rule lambdas, caps as "Progressive
+  <Skill> Cap" items granting +2 count = +20 levels, fillerOnly locations
+  EXCLUDED, music locations option-gated), `src/engine/ApClient.ts` (ws client;
+  boot via initApClient() in startWeb - web.ts is already an overlay and runs once
+  on the main thread).
+- **fireCheck routing**: AP mode active -> ApClient.onCheckFired + enqueue
+  [queue,ap_check_fired] with is_unlock=2 (announce-only, NO local reward roll,
+  placement table never consulted). Received items -> grantUnlock + queued
+  [queue,ap_remote_item] announce, drained by a 600ms timer to the first online
+  player (dynamic World import inside the timer - a STATIC World import in
+  ApClient would close a cycle through Player -> ApChecks -> ApClient; the
+  type-only-Player rule held).
+- **kbd_slain**: new watch on %ap_kbd_killed in ap-checks.json - a goal-only
+  check (no AP location; locationIdsFor silently skips unknowns) so the client
+  can detect the KBD goal. In solo mode it harmlessly pays a filler reward once.
+- **Resync**: sentChecks (ap-session.json) unioned with ApChecks' fired ledger,
+  full LocationChecks on every (re)connect; ReceivedItems index bookkeeping with
+  Sync+resend on gaps; slot_data.questGates written into ap-placements.json
+  (refuses if real solo placements exist).
+- **Verified offline**: engine typecheck clean, pack build 1:59 clean (both queue
+  scripts registered), worker import-order repro clean, apworld stub-harness
+  (fake BaseClasses) fixpoint test - 287 locations/287 pool items with music off,
+  sphere-0 = 86, gated quests blocked without their unlock item, all reachable
+  with full inventory, victory rules fire - and a REAL end-to-end ApClient test
+  against a fake `ws` AP server in a scratch cwd (handshake, Connect fields,
+  resync LocationChecks, StatusUpdate 30 on kbd goal, grantUnlock applied,
+  session/pending persisted). Scratch-cwd trick matters: ApClient/-Unlock paths
+  are relative, so chdir sandboxes every write away from the live seed.
+- **Env**: esbuild ping-pong hit again (user had booted Windows); the documented
+  npm-install pair + harmless ENOTEMPTY. `npx tsx -e` with top-level await needs
+  `--input-type=module` (cjs eval rejects it).
+- **NOT DONE / next**: no test against a real Archipelago server or generation run
+  (the apworld has never been through ArchipelagoGenerate - expect API friction
+  there first: Region/Location constructor drift across AP versions), PrintJSON
+  chat forwarding, music_checks slot option not honored engine-side (server
+  ap-options.json must be set to match manually), xpRate slot option, DeathLink.
+  AP_VERSION is {0,6,0} in ApClient - bump alongside real testing.

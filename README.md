@@ -644,3 +644,25 @@ whenever you want a fully clean regeneration (e.g. after a tool's own logic chan
 persist across reseeds indefinitely) or when reseeding everything for a fresh test.
 `--seed` sets a shared default for all three tools; the per-tool `--*-seed` flags
 override it individually.
+
+## Archipelago integration (v1)
+
+Real archipelago.gg multiworld support - full design in
+[docs/archipelago-integration.md](docs/archipelago-integration.md), apworld
+packaging/usage in [apworld/README.md](apworld/README.md). The moving parts:
+
+- `apworld/rs2004scape/` - the Python generation-side world (items, locations,
+  travel-agnostic rules ported from PlacementEngine). Zip it as
+  `rs2004scape.apworld` for an Archipelago install.
+- `overlays/engine/tools/ap/ExportApWorldData.ts` - generates the shared
+  datapackage (`ap-archipelago-data.json` / `rs2004_data.json`); ids are
+  append-only.
+- `overlays/engine/src/engine/ApClient.ts` - the runtime AP WebSocket client.
+  Enabled by `data/config/ap-archipelago.json` (`{"enabled": true, "host": ...,
+  "port": 38281, "slot": "..."}`); inert without it. Fired checks go out as
+  LocationChecks, received items apply through grantUnlock and announce in-game
+  via `[queue,ap_remote_item]`, the slot goal reports via StatusUpdate.
+
+In AP mode the local GenerateSeed placement fill must NOT be active - the AP
+server owns all placements (ap-placements.json carries only slot_data's quest
+gates). Solo placement mode is unchanged when ap-archipelago.json is absent.

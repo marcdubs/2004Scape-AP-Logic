@@ -228,6 +228,29 @@ export const GEAR_TIER_LEVELS = [5, 10, 20, 30, 40, 45, 60];
 export const PICKAXE_TIERS = ['iron', 'steel', 'mithril', 'adamant', 'rune'];
 export const AXE_TIERS = ['iron', 'steel', 'black', 'mithril', 'adamant', 'rune'];
 
+// Best-available gear GRADE per family per tier (index 0 = tier 1), derived by
+// surveying every wield gate in content/scripts/levelrequire/scripts/tier*.rs2
+// (tier index -> level threshold per GEAR_TIER_LEVELS; ap_gear_locked buckets
+// 45-50 into tier 6 and 60-70 into tier 7). Families do NOT share grade names -
+// "bronze" means nothing to a mage - so the tracker/announcements pick from the
+// row for the actual family. Tiers that add nothing new for a family repeat the
+// previous best (melee has no 45-50 gear; magic has nothing at 5/10 or 60-70).
+export const GEAR_TIER_NAMES: Record<string, string[]> = {
+    progressive_melee: ['Steel', 'Black', 'Mithril', 'Adamant', 'Rune', 'Rune', 'Dragon'],
+    progressive_armour: ['Steel', 'Black', 'Mithril', 'Adamant', 'Rune', 'Viking helms & granite', 'Dragon'],
+    progressive_ranged: ["Steel darts & oak bows", "Black darts & knives", "Studded, willow & mithril", "Maple & adamant", "Green d'hide, yew & rune", "Magic bows & blue d'hide", "Red & black d'hide"],
+    progressive_magic: ['Basic staves', 'Basic staves', 'Wizard boots', 'Battlestaves', 'Mystic & splitbark', "Iban's staff", "Iban's staff"]
+};
+
+// What tier 0 (nothing received yet) leaves each family with - the always-free
+// level-1 gear from tier1.rs2.
+export const GEAR_TIER_STARTERS: Record<string, string> = {
+    progressive_melee: 'bronze & iron only',
+    progressive_armour: 'bronze & iron only',
+    progressive_ranged: 'leather, plain bows, bronze & iron darts',
+    progressive_magic: 'basic elemental staves'
+};
+
 function capitalize(s: string): string {
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -324,7 +347,8 @@ export function describeUnlock(name: string, newCount: number): string {
     if (gearLabel) {
         const tier = Math.min(Math.max(newCount, 1), GEAR_TIER_LEVELS.length);
         const lvl = GEAR_TIER_LEVELS[tier - 1];
-        parts.push(`tier ${tier} (unlocks lv ${lvl}+ ${gearLabel.toLowerCase()} equipment)`);
+        const grade = GEAR_TIER_NAMES[name]?.[tier - 1];
+        parts.push(`tier ${tier} (${grade ? `${grade} - ` : ''}lv ${lvl}+ ${gearLabel.toLowerCase()} equipment)`);
     }
 
     if (name === 'progressive_pickaxe' || name === 'progressive_axe') {

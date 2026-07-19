@@ -109,12 +109,14 @@
                     <thead><tr><th>Tool</th><th>Copies</th><th>Best usable</th></tr></thead>
                     <tbody></tbody>
                 </table>
-                <h3 class="unlocks-heading">Quest gates <span class="counter" id="unlocks-quests-counter"></span></h3>
+                <h3 class="unlocks-heading">Quest gates <span class="counter" id="unlocks-quests-counter"></span>
+                    <label class="toggle-label"><input type="checkbox" id="unlocks-show-locked"> Show locked</label></h3>
                 <table class="discovery-table" id="unlocks-quests-table">
                     <thead><tr><th>Quest</th><th></th><th>Status</th></tr></thead>
                     <tbody></tbody>
                 </table>
                 <div class="empty-state" id="unlocks-quests-empty" hidden>This seed has no quest gates (rolled before family D existed).</div>
+                <div class="empty-state" id="unlocks-quests-alllocked" hidden>No quests unlocked yet &mdash; tick &ldquo;Show locked&rdquo; to list what this seed gates.</div>
             </div>
             <div>
                 <h3 class="unlocks-heading">Skill caps</h3>

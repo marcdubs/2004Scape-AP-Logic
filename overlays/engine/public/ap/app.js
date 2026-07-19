@@ -425,6 +425,13 @@
         input.addEventListener('input', renderEntrancesTab);
     }
 
+    function initShowLockedToggle() {
+        var box = document.getElementById('unlocks-show-locked');
+        if (box) {
+            box.addEventListener('change', renderUnlocksTab);
+        }
+    }
+
     // ---- render: map ----
 
     var mapDrag = { active: false, startX: 0, startY: 0, tx: 0, ty: 0, scale: 1 };
@@ -666,6 +673,58 @@
     // ---- render: unlocks (current received-item state from ap-unlocks.json - never
     // reveals where unplaced items are hidden, see buildUnlocksPanel in web.ts) ----
 
+    // skill name -> [sheet, index] into the vanilla stats-tab sprite sheets
+    // (staticons.png / staticons2.png, 6x3 grid of 25x25 cells, copied from
+    // content/sprites with the magenta key made transparent). Index order verified
+    // against stats.if's component layout: tab column 1 = icons 0-5, column 2 =
+    // 6-11, column 3 = 12-17; runecraft is staticons2 index 0.
+    var STAT_ICONS = {
+        attack: [0, 0], strength: [0, 1], defence: [0, 2], ranged: [0, 3], prayer: [0, 4], magic: [0, 5],
+        hitpoints: [0, 6], agility: [0, 7], herblore: [0, 8], thieving: [0, 9], crafting: [0, 10], fletching: [0, 11],
+        mining: [0, 12], smithing: [0, 13], fishing: [0, 14], cooking: [0, 15], firemaking: [0, 16], woodcutting: [0, 17],
+        runecraft: [1, 0]
+    };
+
+    function statIcon(skill) {
+        var def = STAT_ICONS[skill];
+        var span = document.createElement('span');
+        span.className = 'stat-icon' + (def && def[0] === 1 ? ' sheet2' : '');
+        if (def) {
+            var i = def[1];
+            span.style.backgroundPosition = (-(i % 6) * 25) + 'px ' + (-Math.floor(i / 6) * 25) + 'px';
+        }
+        span.title = skill;
+        return span;
+    }
+
+    // first table cell with a stat icon in front of the text
+    function iconCell(skill, text) {
+        var td = document.createElement('td');
+        td.className = 'icon-cell';
+        if (skill) {
+            td.appendChild(statIcon(skill));
+        }
+        td.appendChild(document.createTextNode(text));
+        return td;
+    }
+
+    function makeIconRow(skill, a, arrow, b) {
+        var tr = document.createElement('tr');
+        tr.appendChild(iconCell(skill, a));
+        var tdArrow = document.createElement('td');
+        tdArrow.className = 'arrow';
+        tdArrow.textContent = arrow;
+        var tdB = document.createElement('td');
+        tdB.textContent = b;
+        tr.appendChild(tdArrow);
+        tr.appendChild(tdB);
+        return tr;
+    }
+
+    // gear/tool rows reuse the closest stat's icon
+    var GEAR_FAMILY_ICONS = { Melee: 'attack', Armour: 'defence', Ranged: 'ranged', Magic: 'magic' };
+    var TOOL_ICONS = { Pickaxe: 'mining', Axe: 'woodcutting' };
+
     function fillUnlockTable(tableId, rows, rowBuilder) {
         var tbody = document.getElementById(tableId).querySelector('tbody');
         tbody.textContent = '';
@@ -691,14 +750,14 @@
         }
 
         fillUnlockTable('unlocks-gear-table', unlocks.gear || [], function (g) {
-            return makeRow(g.label, g.count + ' / ' + g.max, g.detail);
+            return makeIconRow(GEAR_FAMILY_ICONS[g.label], g.label, g.count + ' / ' + g.max, g.detail);
         });
         fillUnlockTable('unlocks-tools-table', unlocks.tools || [], function (t) {
-            return makeRow(t.label, t.count + ' / ' + t.max, t.detail);
+            return makeIconRow(TOOL_ICONS[t.label], t.label, t.count + ' / ' + t.max, t.detail);
         });
         fillUnlockTable('unlocks-caps-table', unlocks.caps || [], function (c) {
             var name = c.skill.charAt(0).toUpperCase() + c.skill.slice(1);
-            var tr = makeRow(name, '', String(c.cap));
+            var tr = makeIconRow(c.skill, name, '', String(c.cap));
             if (c.cap >= 99) {
                 tr.className = 'unlock-maxed';
             }
@@ -711,7 +770,15 @@
         }).length;
         document.getElementById('unlocks-quests-counter').textContent = quests.length ? '(' + unlockedQuests + ' / ' + quests.length + ' unlocked)' : '';
         document.getElementById('unlocks-quests-empty').hidden = quests.length > 0;
-        fillUnlockTable('unlocks-quests-table', quests, function (q) {
+
+        // Locked quests are hidden by default (the list is long and mostly noise
+        // early on) - the "Show locked" checkbox opts back in to the full list.
+        var showLockedBox = document.getElementById('unlocks-show-locked');
+        var showLocked = !!(showLockedBox && showLockedBox.checked);
+        var visibleQuests = showLocked ? quests : quests.filter(function (q) { return q.unlocked; });
+        document.getElementById('unlocks-quests-alllocked').hidden = !(quests.length > 0 && visibleQuests.length === 0);
+        document.getElementById('unlocks-quests-table').style.display = quests.length > 0 && visibleQuests.length === 0 ? 'none' : '';
+        fillUnlockTable('unlocks-quests-table', visibleQuests, function (q) {
             var tr = makeRow(q.label, '', q.unlocked ? 'open' : 'LOCKED');
             tr.className = q.unlocked ? 'unlock-open' : 'unlock-locked';
             return tr;
@@ -737,6 +804,7 @@
         initSpoilerToggle();
         initMapControls();
         initEntranceSearch();
+        initShowLockedToggle();
         fetchMeta();
         fetchTracker();
         setInterval(fetchTracker, POLL_MS);
