@@ -2797,3 +2797,24 @@ JSON. Facts:
   checklist: open tracker -> Archipelago tab, Test connection against
   localhost:38281, Save & Connect, watch status flip to connected).
 - Engine/web-only change: restart picks it up, NO pack rebuild needed.
+
+## Addendum (2026-07-19 open-source prep session)
+
+Repo groomed for public release:
+
+- **LICENSE added (MIT)** with an explicit note that `overlays/` files derived
+  from Lost City sources remain (c) Lost City (also MIT - both `Server/` and
+  `Server/content/` upstream carry MIT licenses, checked directly).
+- **`.gitattributes` added: `* -text`** - git must never EOL-normalize this
+  repo. Contributors with `core.autocrlf=true` would otherwise corrupt the
+  CRLF-sensitive `.rs2`/config round-trips the parser regression depends on.
+  If a future file genuinely needs different treatment, add a narrower rule
+  BELOW the `* -text` line, don't remove it.
+- **`docs/archipelago-ideas.md` (the original six-idea brainstorm) is removed**
+  (user deleted it; refs cleaned up in docs + code comments). "#N" citations
+  that survive in prose refer to it - it's in git history before f0ee158.
+- `problems.txt` is a local scratch TODO list, now gitignored - its live items
+  (tracker polish: per-skill grade icons, hide locked quests, stat icons, OSRS
+  theming) belong in GitHub issues once public.
+- README gained a "License & credits" closing section (Lost City, Archipelago,
+  Jagex non-affiliation disclaimer).
