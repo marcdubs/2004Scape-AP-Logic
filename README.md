@@ -40,26 +40,36 @@ skip Tutorial Island), `xpRate`.
 ### 2. One-time: Archipelago server setup
 
 The archipelago.gg website can't generate for custom worlds, so self-host.
-Clone anywhere you like (shown for a POSIX shell; on Windows use `python`
-instead of `python3` and `venv\Scripts\` instead of `venv/bin/` - or run it
-under WSL):
+Clone anywhere you like, then follow the guide for your OS.
+
+**macOS / Linux (or WSL):**
 
 ```
 git clone --depth 1 https://github.com/ArchipelagoMW/Archipelago.git
-cd Archipelago && python3 -m venv venv
+cd Archipelago
+python3 -m venv venv
 ./venv/bin/pip install "setuptools>=75,<81"
 ./venv/bin/pip install -r requirements.txt
 mkdir -p custom_worlds Players
 ```
 
-Install the 2004Scape world and a player YAML:
+**Windows (PowerShell or cmd):**
 
 ```
-cd <this repo>/apworld && python3 build.py          # packages rs2004scape.apworld
-cp rs2004scape.apworld <Archipelago checkout>/custom_worlds/
+git clone --depth 1 https://github.com/ArchipelagoMW/Archipelago.git
+cd Archipelago
+python -m venv venv
+.\venv\Scripts\pip install "setuptools>=75,<81"
+.\venv\Scripts\pip install -r requirements.txt
+mkdir custom_worlds
+mkdir Players
 ```
 
-`<Archipelago checkout>/Players/<Insert Username>.yaml`:
+Then install the 2004Scape world: run `python build.py` (macOS/Linux:
+`python3 build.py`) inside `<this repo>/apworld` and copy the resulting
+`rs2004scape.apworld` into `<Archipelago checkout>/custom_worlds/`.
+
+Finally create a player YAML, `<Archipelago checkout>/Players/<Insert Username>.yaml`:
 
 ```yaml
 name: <Insert Username>
@@ -68,6 +78,12 @@ game: 2004Scape
   goal: dragon_slayer      # or barcrawl / kbd
   music_checks: false      # 230 extra "first visit to each music region" checks
 ```
+
+`name:` is your **slot name** in the multiworld - it's how the game server
+identifies itself to Archipelago and how other players see you. It does NOT
+need to match your in-game character name: the whole game server plays as this
+one slot (checks, received items, and unlock state are server-wide), so you can
+log in with any account.
 
 ### 3. Per run: roll a randomized seed
 
@@ -87,14 +103,24 @@ zeroed unlock state, and cleared check/tracker ledgers.
 
 ### 4. Per run: generate + host the multiworld
 
-From the Archipelago checkout (the middle command just pulls the
-`.archipelago` multidata out of the generated zip - any unzip tool works):
+From the Archipelago checkout. Generation writes `output/AP_<id>.zip`; open it
+with any unzip tool and pull the `AP_<id>.archipelago` file out next to it,
+then host that file.
+
+**macOS / Linux (or WSL):**
 
 ```
 ./venv/bin/python Generate.py --player_files_path Players --outputpath output
-python3 -c "import zipfile,glob; z=sorted(glob.glob('output/AP_*.zip'))[-1]; \
-  zipfile.ZipFile(z).extract([n for n in zipfile.ZipFile(z).namelist() if n.endswith('.archipelago')][0], 'output')"
+unzip -o output/AP_<id>.zip -d output "*.archipelago"
 ./venv/bin/python MultiServer.py --host 0.0.0.0 --port 38281 output/AP_<id>.archipelago
+```
+
+**Windows (PowerShell or cmd):**
+
+```
+.\venv\Scripts\python Generate.py --player_files_path Players --outputpath output
+tar -xf output\AP_<id>.zip -C output AP_<id>.archipelago
+.\venv\Scripts\python MultiServer.py --host 0.0.0.0 --port 38281 output\AP_<id>.archipelago
 ```
 
 Leave that terminal running. Server state lives in `output/AP_<id>.apsave` next
