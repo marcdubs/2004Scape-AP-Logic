@@ -4,8 +4,8 @@ import path from 'path';
 import { BACKUP_ROOT, SCRIPTS_ROOT, readNpcSource } from '../npc/NpcDripParser.js';
 
 // Parses content/scripts/drop tables/scripts/*.rs2 for weighted loot-drop cascades. See
-// docs/archipelago-ideas.md #2 ("NPC drop randomization") and the "Domain knowledge:
-// drop randomization" section of docs/lessons-learned.md for the full design reasoning.
+// the "Domain knowledge: drop randomization" section of docs/lessons-learned.md for the
+// full design reasoning.
 //
 // The shape (confirmed by reading ~20 of the 73 files before writing any parsing code,
 // same "check the data first" discipline as drip/shops): each `[ai_queue3,name]` /

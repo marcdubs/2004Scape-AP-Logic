@@ -26,7 +26,7 @@ import { derangement, mulberry32, shuffle } from '../shared/Prng.js';
 // the monster drop-table corpus (content/scripts/drop tables/scripts/*.rs2), plus a
 // separate derangement of the death_drop guaranteed-item npc param. Pure config/script
 // mutation, same class of change as drip/shops (not the runtime-override pattern) -
-// reseeding needs a content pack rebuild. See docs/archipelago-ideas.md #2 and the
+// reseeding needs a content pack rebuild. See the
 // "Domain knowledge: drop randomization" section of docs/lessons-learned.md.
 //
 // Three swap modes, picked with --mode (the user explicitly wants this to eventually be

@@ -1,0 +1,4 @@
+# No EOL normalization anywhere: overlay .rs2/config files must round-trip
+# byte-identical (some are CRLF, and the entrance parser regression check
+# compares exact bytes). Keep every file exactly as committed.
+* -text

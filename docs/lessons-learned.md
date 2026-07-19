@@ -2,7 +2,8 @@
 
 Written at the end of the session (2026-07-13) that built the entrance randomizer,
 for future agents/sessions picking this project up. Read this before touching
-anything. The companion design doc is [archipelago-ideas.md](archipelago-ideas.md).
+anything. (References to "archipelago-ideas.md #N" throughout this doc and code
+comments cite the original design brainstorm, since removed - see git history.)
 
 ## The project, in one paragraph
 

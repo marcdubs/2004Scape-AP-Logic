@@ -3,8 +3,7 @@ import path from 'path';
 
 // Parses content/scripts/**/*.npc config files for cosmetic model# lines. Not a
 // general .npc parser - it only looks for `[block]` headers (to tag each occurrence
-// with its owning npc debugname) and `model<N>=<value>` lines. See
-// docs/archipelago-ideas.md #3 ("NPC drip randomization").
+// with its owning npc debugname) and `model<N>=<value>` lines.
 //
 // A model value is only a shuffle candidate if it matches the composable human body
 // part naming convention (`man_<part>_<detail>` / `woman_<part>_<detail>`, e.g.

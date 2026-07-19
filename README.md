@@ -154,8 +154,8 @@ and [apworld/README.md](apworld/README.md).
 
 ## Layout
 
-- `docs/` - design notes ([archipelago-ideas.md](docs/archipelago-ideas.md)) and
-  process/domain knowledge ([lessons-learned.md](docs/lessons-learned.md)).
+- `docs/` - design docs and process/domain knowledge
+  ([lessons-learned.md](docs/lessons-learned.md) is the entry point).
 - `overlays/<target>/...` - files to be copied on top of the matching directory in the
   `Server` checkout. `overlays/engine/tools/map/ExportEntrances.ts` deploys to
   `Server/engine/tools/map/ExportEntrances.ts`, and so on. Directory name under
@@ -439,8 +439,8 @@ cd Server/engine && npx tsx tools/pack/Build.ts
 
 `--mismatched-titles` deranges only the `owned_shop` field, leaving each NPC's own
 title/pricing in place - a shopkeeper's personality/prices no longer match what
-they're actually selling (chaos/comedy variant, per archipelago-ideas.md #4's own
-suggestion). Default carries the whole bundle so the shop still makes internal sense
+they're actually selling (chaos/comedy variant, from the original design
+brainstorm). Default carries the whole bundle so the shop still makes internal sense
 at its new location.
 
 **Known risk, not yet mitigated**: since players may rely on specific shops for quest
@@ -738,7 +738,7 @@ metal-tier knives, `nails`) still hands out 5 of whatever it got swapped to; sam
 ## Infinite run energy
 
 A permanent world-config toggle, not a per-seed randomizer - same class of change as the
-existing `xpRate`/`NODE_XPRATE` XP multiplier (see docs/archipelago-ideas.md #5), and
+existing `xpRate`/`NODE_XPRATE` XP multiplier, and
 intended to become an Archipelago slot option the same way. Unlike entrance/drop/drip/
 shop randomization, there's nothing to reseed: it's a boolean on or off.
 
@@ -807,3 +807,15 @@ packaging/usage in [apworld/README.md](apworld/README.md). The moving parts:
 In AP mode the local GenerateSeed placement fill must NOT be active - the AP
 server owns all placements (ap-placements.json carries only slot_data's quest
 gates). Solo placement mode is unchanged when ap-archipelago.json is absent.
+
+## License & credits
+
+MIT - see [LICENSE](LICENSE). Files under `overlays/` that are modified copies
+of vanilla [Lost City](https://github.com/LostCityRS) sources remain (c) Lost
+City, also MIT.
+
+- [Lost City / 2004scape](https://2004.lostcity.rs/) - the game server this
+  builds on. This repo distributes no game assets; it overlays a checkout you
+  set up yourself.
+- [Archipelago](https://archipelago.gg/) - the multiworld randomizer framework.
+- Not affiliated with or endorsed by Jagex. RuneScape is a trademark of Jagex Ltd.

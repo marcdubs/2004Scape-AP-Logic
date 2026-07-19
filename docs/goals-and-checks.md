@@ -127,8 +127,8 @@ call to a new `~ap_quest_complete` proc at the end. That proc:
   time), so this ships once in the overlay — no per-seed mutation, one pack
   rebuild when the tables change.
 - **Delivery:** try `inv_add(inv, ...)`; on full inventory fall back to
-  `inv_add(bank, ...)` with a "sent to your bank" message — this is
-  archipelago-ideas.md #6's pattern, already used by e.g. `quest_legends.rs2`.
+  `inv_add(bank, ...)` with a "sent to your bank" message — a pattern
+  already used by e.g. `quest_legends.rs2`.
   Never drop rewards on the ground.
 
 **Test commands:** `::apreward` (bare = fully random roll; `::apreward armour 40`

@@ -209,7 +209,7 @@ while ($row ! null) {
 return($chosen_item, $chosen_qty);
 
 // Delivery: inventory first, bank fallback on a full inventory, never the
-// ground (archipelago-ideas.md #6's pattern, already used by e.g.
+// ground (a pattern already used by e.g.
 // quest_legends.rs2). Requires protected access when the bank branch is hit -
 // callers that don't already have it (debugproc test commands) must acquire
 // it first via the usual if_close/p_finduid dance.

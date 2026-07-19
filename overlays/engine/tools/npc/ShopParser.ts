@@ -3,8 +3,7 @@ import path from 'path';
 
 import { SCRIPTS_ROOT, readNpcSource } from './NpcDripParser.js';
 
-// Parses content/scripts/**/*.npc for shopkeeper param bundles. See
-// docs/archipelago-ideas.md #4 ("Shop location randomization").
+// Parses content/scripts/**/*.npc for shopkeeper param bundles.
 //
 // A shopkeeper NPC points at its stock via `param=owned_shop,<inv name>`
 // (content/scripts/shop/scripts/shop.rs2's ~openshop_activenpc reads it, along with

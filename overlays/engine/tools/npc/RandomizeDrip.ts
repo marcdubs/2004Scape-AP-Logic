@@ -24,9 +24,9 @@ import { mulberry32 } from '../shared/Prng.js';
 
 // Shuffles NPC cosmetics (outfits/hair/etc) by reassigning model# values within matching
 // slot pools across every .npc config in the content tree. Pure config mutation - no
-// engine or script changes, no gameplay coupling (see docs/archipelago-ideas.md #3,
-// which explicitly calls this the easiest of the six ideas and recommends exactly this
-// approach instead of the runtime-override pattern used for entrances). Unlike the
+// engine or script changes, no gameplay coupling (the original design sketch called
+// this the easiest of the six ideas and recommended exactly this approach instead of
+// the runtime-override pattern used for entrances). Unlike the
 // entrance randomizer, reseeding here DOES require a content pack rebuild
 // (npx tsx tools/pack/Build.ts) since model# is compiled into npc.dat, not read at
 // runtime.

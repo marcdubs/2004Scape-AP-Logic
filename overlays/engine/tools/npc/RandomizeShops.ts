@@ -9,7 +9,7 @@ import { derangement, mulberry32 } from '../shared/Prng.js';
 
 // Shopsanity: shuffles which NPC has which shop. Pure config mutation on the .npc
 // files (same class of change as RandomizeDrip.ts, not the runtime-override pattern
-// used for entrances) - see docs/archipelago-ideas.md #4, whose own sketch calls this
+// used for entrances) - the original design sketch called this
 // "pure data mutation... no engine or script changes required". A runtime override
 // would need to intercept every code path that can open a shop (the generic
 // ~openshop_activenpc proc, PLUS several bespoke per-NPC scripts), several of which

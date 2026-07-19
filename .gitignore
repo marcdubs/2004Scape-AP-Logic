@@ -3,3 +3,4 @@ node_modules/
 __pycache__/
 *.pyc
 apworld/rs2004scape.apworld
+problems.txt
