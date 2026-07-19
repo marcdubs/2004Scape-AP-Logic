@@ -216,5 +216,6 @@ class RS2004World(World):
         }[self.options.goal.value]
         return {
             "goal": goal_key,
+            "musicChecks": bool(self.options.music_checks.value),
             "questGates": sorted(GATED_QUEST_IDS)
         }

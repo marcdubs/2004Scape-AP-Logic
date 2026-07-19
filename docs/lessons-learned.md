@@ -2719,6 +2719,14 @@ Archipelago v1 (problems.txt #2) - design doc docs/archipelago-integration.md:
 - **NOT DONE / next**: no test against a real Archipelago server or generation run
   (the apworld has never been through ArchipelagoGenerate - expect API friction
   there first: Region/Location constructor drift across AP versions), PrintJSON
-  chat forwarding, music_checks slot option not honored engine-side (server
-  ap-options.json must be set to match manually), xpRate slot option, DeathLink.
+  chat forwarding, xpRate slot option, DeathLink.
   AP_VERSION is {0,6,0} in ApClient - bump alongside real testing.
+- **Slot options flow through slot_data, never hand-edited files** (user called
+  out the v1 gap same session): apworld fill_slot_data now carries musicChecks;
+  ApClient adopts it via new ApOptions.setApOption (merge-write + cache drop)
+  plus ApChecks.resetWatchCache (exported; called via DYNAMIC import from
+  ApClient because ApChecks statically imports ApClient - same cycle-avoidance
+  pattern as the World import in the delivery timer). The reset matters because
+  players can log in (building the watch table lazily) before the socket
+  connects. Pattern for any future slot option: put it in fill_slot_data, adopt
+  it in applySlotData, invalidate whatever engine cache consumed it.

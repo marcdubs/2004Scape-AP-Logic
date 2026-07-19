@@ -19,8 +19,8 @@ class Goal(Choice):
 
 class MusicChecks(Toggle):
     """Include the 230 music-track discovery checks (first visit to each music
-    region) as filler locations. The game server's ap-options.json musicChecks
-    toggle should match this setting."""
+    region) as filler locations. The game server adopts this automatically on
+    connect (via slot_data)."""
 
     display_name = "Music Checks"
     default = 0

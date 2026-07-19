@@ -142,11 +142,15 @@ as strong as what GenerateSeed enforces locally today.
   `[queue,ap_remote_item]` shell for filler delivery.
 - **Goal**: on every fired check, test the goal condition from `slot_data.goal`;
   when satisfied send `StatusUpdate 30` (idempotent flag in ap-session.json).
-- **slot_data**: `{goal, questGates: [...]}`. On `Connected`, the client writes
-  `questGates` into `data/config/ap-placements.json` (placements object empty -
-  AP mode has no local placements) so ApQuestGates/quest-tab hiding work
-  unchanged. Written only when absent or different; ApQuestGates reads lazily
-  so a first-boot connect activates gates without restart.
+- **slot_data**: `{goal, musicChecks, questGates: [...]}`. On `Connected`, the
+  client writes `questGates` into `data/config/ap-placements.json` (placements
+  object empty - AP mode has no local placements) so ApQuestGates/quest-tab
+  hiding work unchanged, and adopts `musicChecks` via
+  `ApOptions.setApOption` + an ApChecks watch-cache reset - options are
+  configured on the AP YAML/website side and the game server follows on
+  connect, no hand-edited ap-options.json. Written only when different;
+  ApQuestGates reads lazily so a first-boot connect activates gates without
+  restart.
 
 ## Mode interlock
 
@@ -177,11 +181,10 @@ ap-archipelago.json, boot.
 
 ## Roadmap / not in v1
 
-- **Slot options beyond `goal`**: pool granularity (`groups` mode), musicChecks
-  (currently: locations exist in the datapackage but a no-music server just
-  never sends them - fine for solo-ish runs, wasteful in big multiworlds;
-  proper fix is `exclude_locations`/option-driven location creation in the
-  apworld), xpRate as a slot option feeding NODE_XPRATE.
+- **Slot options beyond `goal`/`music_checks`**: pool granularity (`groups`
+  mode), xpRate as a slot option feeding NODE_XPRATE. (`music_checks` is fully
+  wired: the apworld skips creating music locations when off AND the client
+  adopts the toggle from slot_data so the engine's watch set matches.)
 - **LocationScouts** on connect -> tracker could show what OTHER players' items
   sit on our undiscovered checks in spoiler mode.
 - **PrintJSON handling** -> in-game chat line when our found item goes to

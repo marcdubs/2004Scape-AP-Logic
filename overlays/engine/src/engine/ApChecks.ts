@@ -375,6 +375,15 @@ function fireCheck(player: Player, checkId: string): void {
     }
 }
 
+// Drops the lazily-built watch table so the next onVarpSet rebuilds it with the
+// CURRENT ap-options.json state. Called (via dynamic import - ApChecks imports
+// ApClient, so a static back-edge would be a cycle) by ApClient after slot_data
+// changes an option like musicChecks: the AP YAML is authoritative for option
+// state in AP mode, and the watch set must follow without a restart.
+export function resetWatchCache(): void {
+    watchesByVarp = null;
+}
+
 // ---------------------------------------------------------------------------
 // Public hooks (frozen signatures - called from Player.ts)
 // ---------------------------------------------------------------------------

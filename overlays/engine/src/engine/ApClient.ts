@@ -25,6 +25,7 @@ import { randomUUID } from 'crypto';
 
 import WebSocket from 'ws';
 
+import { setApOption } from '#/engine/ApOptions.js';
 import * as ApUnlockOverrides from '#/engine/ApUnlockOverrides.js';
 import type Player from '#/engine/entity/Player.js';
 import { PlayerQueueType } from '#/engine/entity/PlayerQueueRequest.js';
@@ -265,6 +266,18 @@ function applySlotData(slotData: Record<string, unknown> | undefined): void {
 
     if (typeof slotData.goal === 'string' && data?.goalChecks?.[slotData.goal]) {
         goal = slotData.goal;
+    }
+
+    // Option toggles configured on the AP YAML/website side are authoritative in
+    // AP mode - adopt them here so the server needs no hand-edited ap-options.json.
+    // The watch table may already have been built (lazily, on the first varp write -
+    // players can log in before the socket connects), so drop it for a rebuild; the
+    // dynamic import avoids an ApClient -> ApChecks static cycle.
+    if (typeof slotData.musicChecks === 'boolean') {
+        setApOption('musicChecks', slotData.musicChecks);
+        void import('#/engine/ApChecks.js')
+            .then(m => m.resetWatchCache())
+            .catch(err => printWarning(`AP client: failed to reset watch cache (${err instanceof Error ? err.message : err})`));
     }
 
     const gates = Array.isArray(slotData.questGates) ? slotData.questGates.filter((g): g is string => typeof g === 'string') : null;
