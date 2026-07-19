@@ -220,7 +220,7 @@ keys default true; missing file = all enabled). rs2 reads it through the
 `musicChecks`, `addonBankBox`, `addonTreeCompass`, `addonTeleportingFocus`,
 `addonNpcTeleport`.
 
-**Addon items** (problems.txt requests; `ap_addons.obj`/`ap_addons.rs2`): a new
+**Addon items** (`ap_addons.obj`/`ap_addons.rs2`): a new
 `addons` reward-roll slot (1-in-16) delivers the first enabled-and-unowned item
 on a fixed ladder — Bank Box → Tree Compass → Teleporting Focus → Greater
 Teleporting Focus (only once the basic focus is owned) → NPC Teleport; all

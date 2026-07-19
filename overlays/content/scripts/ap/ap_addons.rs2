@@ -20,9 +20,8 @@
 // vanilla ^*_tree teleport destinations (area_gnome/configs/
 // spirit_tree.constant - constants are global across files in this dialect).
 // Deliberately BYPASSES the vanilla %treequest/%grandtree talk-gates: the
-// compass itself is the AP unlock for this travel network (problems.txt:
-// "might allow for access to more locations so could be part of the game
-// logic"). Standard item-teleport gating otherwise: 20-wilderness cap (spell
+// compass itself is the AP unlock for this travel network (and so can be
+// part of the game logic). Standard item-teleport gating otherwise: 20-wilderness cap (spell
 // threshold, stricter than glory's 30) + ~pre_tele_checks zone blocks.
 // ------------------------------------------------------------------
 [opheld1,ap_tree_compass]

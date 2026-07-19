@@ -1,5 +1,4 @@
-// Archipelago "NPC Teleport" addon (problems.txt 2026-07-17, reworked
-// 2026-07-18): the registry of NPCs the player has spoken to WHILE CARRYING
+// Archipelago "NPC Teleport" addon: the registry of NPCs the player has spoken to WHILE CARRYING
 // the ap_npc_teleport writ, exposed to rs2 as a RECENCY-ORDERED list (index 0
 // = most recently talked to) behind the writ's Teleport/Last ops
 // (ap_addons.rs2). The old ::apnpctp fuzzy-search command is gone - the cheat
@@ -10,7 +9,7 @@
 // chokepoint for talk interactions; per-NPC rs2 edits are not viable since
 // nearly every talkable NPC has its own dedicated opnpc1 script.
 //
-// Location semantics (problems.txt 2026-07-19): the PLAYER's own tile at
+// Location semantics: the PLAYER's own tile at
 // talk time is recorded, never the npc's position - the npc's spawn-home is
 // frequently inside its own furniture (bankers stand behind the impassable
 // bank counter), so teleporting to it strands the player. The player's talk

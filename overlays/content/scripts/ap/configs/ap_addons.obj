@@ -1,5 +1,5 @@
-// AP addon reward items (problems.txt 2026-07-17, docs/checks-and-unlocks.md
-// "Addon items"). Each is gated by an ap-options.json toggle at REWARD-ROLL
+// AP addon reward items (docs/checks-and-unlocks.md "Addon items").
+// Each is gated by an ap-options.json toggle at REWARD-ROLL
 // time (ap_try_addon_reward in ap_rewards.rs2) - an already-delivered item
 // keeps working if its option is later disabled (fail-open usage, consistent
 // with every other AP toggle). Visual assets are borrowed from vanilla objs:

@@ -53,13 +53,13 @@ if (compare($category, "addons") = 0) {
 }
 ~ap_deliver_reward(~ap_roll_reward($category, ~ap_level_for_category($category)));
 
-// The addon drop ladder (problems.txt 2026-07-17): first enabled-and-not-yet-
+// The addon drop ladder: first enabled-and-not-yet-
 // owned item in a fixed power-curve order is delivered. Ownership = inventory
 // OR bank (these are untradeable and not equippable, so those are the only two
 // places one can live); a dropped/destroyed addon therefore becomes rollable
 // again, which is the desired self-healing behavior. The Greater focus only
-// rolls once the basic focus is owned ("upgraded to store 2 locations" -
-// problems.txt), and both keep working side by side (slot 1 is shared).
+// rolls once the basic focus is owned (an upgrade that stores 2 locations),
+// and both keep working side by side (slot 1 is shared).
 // ap_option consults data/config/ap-options.json engine-side.
 [proc,ap_try_addon_reward]()(boolean)
 if (ap_option("addonBankBox") = 1 & ~ap_addon_owned(ap_bank_box) = false) {

@@ -1,7 +1,7 @@
 # Leagues relics for rev 274 — researched proposal
 
 Status: **researched 2026-07-17 (web survey of OSRS wiki), awaiting user decisions.**
-Surveyed Demonic Pacts (per problems.txt), Trailblazer Reloaded, Raging Echoes, and
+Surveyed Demonic Pacts, Trailblazer Reloaded, Raging Echoes, and
 Twisted League (~70 relics); Shattered Relics' fragment system doesn't translate to
 a curated list and was excluded. Near-duplicate relics across leagues are merged.
 Each entry: what it becomes in rev 274, effort (easy = config/script tweak on

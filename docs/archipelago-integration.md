@@ -1,6 +1,5 @@
 # Archipelago integration (real multiworld support)
 
-Written 2026-07-19 (problems.txt: "actually make this work with Archipelago").
 This is the investigation + v1 design + build record for connecting the 2004scape
 server to a real archipelago.gg multiworld. Prior art everything here builds on:
 `docs/placement-mode.md` (the local solo-AP fill), `docs/checks-and-unlocks.md`
