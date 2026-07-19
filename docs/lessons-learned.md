@@ -2818,3 +2818,27 @@ Repo groomed for public release:
   theming) belong in GitHub issues once public.
 - README gained a "License & credits" closing section (Lost City, Archipelago,
   Jagex non-affiliation disclaimer).
+
+## Addendum (2026-07-19, archipelago-core-prep branch): apworld hardening
+
+Toward AP core-merge standards (see docs/adding games.md + apquest in an AP
+checkout as the reference implementation):
+
+- `RS2004Web(WebWorld)` + `web =` attr wired to `docs/en_2004Scape.md` (game
+  info) and `docs/setup_en.md` (Tutorial) - AP's standard webhost format, file
+  names must match `{lang}_{GameName}.md` exactly.
+- `item_name_groups` / `location_name_groups` (data-driven from ITEMS/LOCATIONS
+  kinds) - usable in YAMLs (`exclude_locations: [Music Tracks]`).
+- `raise Exception` -> `Options.OptionError` for the pool-exceeds-locations
+  guard (AP treats OptionError as a user-facing YAML error).
+- `test/` on AP's WorldTestBase framework. Run from an AP checkout: copy
+  `rs2004scape/` into `worlds/`, move the custom_worlds apworld ASIDE (duplicate
+  game name fails loading), `venv pip install pytest` (not in AP requirements),
+  `python -m pytest worlds/rs2004scape/test -q`. 35 tests + 1711 subtests, ~4s:
+  datapackage invariants, per-goal fill/reachability (WorldTestBase default
+  tests), quest-gate logic (fresh CollectionState + collect(prevent_sweep=True)
+  + sweep_for_advancements, NOT assertAccessDependency - its default mode
+  asserts every OTHER location stays reachable, wrong for quest chains).
+- world_version 0.2.0. Verified against AP checkout @ 2cde25f (py3.12):
+  world tests green, Generate.py green both unpacked and from the built
+  apworld. build.py includes docs/+test/ automatically (walks all subdirs).

@@ -6,14 +6,33 @@ The Archipelago generation-side package for 2004scape. Full design:
 ## Layout
 
 - `rs2004scape/__init__.py` - the `World` subclass (locations, items, rules,
-  slot_data).
+  slot_data) plus the `WebWorld` (webhost docs/tutorial wiring, item and
+  location name groups).
 - `rs2004scape/options.py` - YAML options (`goal`, `music_checks`).
+- `rs2004scape/docs/` - webhost pages in AP's standard format: `en_2004Scape.md`
+  (game info) and `setup_en.md` (setup tutorial, referenced by the `WebWorld`).
+- `rs2004scape/test/` - unit tests on AP's world test framework: datapackage
+  invariants, per-goal fill/reachability, and quest-gate item logic.
 - `rs2004scape/data/rs2004_data.json` - GENERATED datapackage (ids, catalogs,
   quest requirements). Regenerate with
   `cd ../Server/engine && npx tsx tools/ap/ExportApWorldData.ts`, then copy the
   output here AND to `overlays/engine/data/config/ap-archipelago-data.json`
   (the engine client reads the same file). Ids are append-only - never
   hand-edit.
+
+## Running the tests
+
+The tests use Archipelago's world test framework, so they run from inside an
+Archipelago source checkout:
+
+```
+cp -r rs2004scape /path/to/Archipelago/worlds/
+cd /path/to/Archipelago && python -m pytest worlds/rs2004scape/test -q
+rm -rf /path/to/Archipelago/worlds/rs2004scape   # clean up when done
+```
+
+If that checkout also has `custom_worlds/rs2004scape.apworld` installed, move
+it aside first - two copies of the same game name fail world loading.
 
 ## Packaging
 

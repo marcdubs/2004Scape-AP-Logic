@@ -20,8 +20,9 @@
 import json
 import pkgutil
 
-from BaseClasses import Item, ItemClassification, Location, LocationProgressType, Region
-from worlds.AutoWorld import World
+from BaseClasses import Item, ItemClassification, Location, LocationProgressType, Region, Tutorial
+from Options import OptionError
+from worlds.AutoWorld import WebWorld, World
 from worlds.generic.Rules import set_rule
 
 from .options import Goal, RS2004Options
@@ -66,6 +67,19 @@ class RS2004Location(Location):
     game = GAME_NAME
 
 
+class RS2004Web(WebWorld):
+    theme = "grass"
+    bug_report_page = "https://github.com/marcdubs/2004Scape-AP-Logic/issues"
+    tutorials = [Tutorial(
+        "Multiworld Setup Guide",
+        "A guide to setting up the 2004Scape game server and connecting it to an Archipelago multiworld.",
+        "English",
+        "setup_en.md",
+        "setup/en",
+        ["Marcus Dubreuil"],
+    )]
+
+
 class RS2004World(World):
     """2004-era RuneScape (2004scape / LostCityRS rev 274), randomized: progressive
     gear and tool tiers, skill level caps, quest gates, and a world full of
@@ -74,9 +88,36 @@ class RS2004World(World):
     game = GAME_NAME
     options_dataclass = RS2004Options
     options: RS2004Options
+    web = RS2004Web()
 
     item_name_to_id = {name: d["id"] for name, d in ITEMS.items()}
     location_name_to_id = {loc["name"]: loc["id"] for loc in LOCATIONS.values()}
+
+    item_name_groups = {
+        "Skill Caps": set(CAP_ITEM_BY_SKILL.values()),
+        "Quest Unlocks": set(QUEST_UNLOCK_ITEM_BY_ID.values()),
+        "Gear and Tools": {
+            name for name, d in ITEMS.items()
+            if name not in set(CAP_ITEM_BY_SKILL.values())
+            and name not in set(QUEST_UNLOCK_ITEM_BY_ID.values())
+            and not d.get("filler")
+        },
+    }
+
+    _KIND_GROUP = {
+        "quest": "Quests",
+        "ds": "Dragon Slayer Stages",
+        "barcrawl": "Barcrawl Bars",
+        "level": "Level Milestones",
+        "activity": "Activities",
+        "first_xp": "First XP",
+        "first_kill": "First Kills",
+        "music": "Music Tracks",
+    }
+    location_name_groups = {}
+    for _loc in LOCATIONS.values():
+        location_name_groups.setdefault(_KIND_GROUP[_loc["kind"]], set()).add(_loc["name"])
+    del _loc
 
     # ------------------------------------------------------------------
     # rules (ports of PlacementEngine.reachableFromState semantics)
@@ -201,7 +242,7 @@ class RS2004World(World):
         while len(pool) < real_locations:
             pool.append(self.create_item(FILLER_NAME))
         if len(pool) > real_locations:
-            raise Exception(f"2004Scape: item pool ({len(pool)}) exceeds locations ({real_locations}) - enable more checks (music_checks)")
+            raise OptionError(f"2004Scape: item pool ({len(pool)}) exceeds locations ({real_locations}) - enable more checks (music_checks)")
 
         self.multiworld.itempool += pool
 
