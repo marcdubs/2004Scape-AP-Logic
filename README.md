@@ -1,9 +1,9 @@
 # 2004Scape-AP-Logic
 
-Archipelago randomizer logic and tooling for [2004scape](https://github.com/LostCityRS) (Server/Engine-TS/Content), targeting **LostCity revision 274**.
+Archipelago randomizer logic and tooling for [2004scape](https://github.com/LostCityRS) (Server/Engine-TS/Content), targeting **[LostCity](https://github.com/LostCityRS) revision 274**.
 
-This repo does **not** fork LostCityRS. `Server`, `engine`, `content`, `webclient`, and
-`javaclient` stay plain, unmodified LostCityRS checkouts (a sibling directory, set up
+This repo does **not** fork [LostCityRS](https://github.com/LostCityRS). `Server`, `engine`, `content`, `webclient`, and
+`javaclient` stay plain, unmodified [LostCityRS](https://github.com/LostCityRS) checkouts (a sibling directory, set up
 the normal way via `Server/start.sh`). Everything Archipelago-specific lives here
 instead, and gets deployed on top via `scripts/install.js`.
 
@@ -20,8 +20,8 @@ boot the game server, open the tracker, connect, play. Steps 1-2 are one-time.
 
 ### 1. One-time: game-server setup
 
-Prereqs: the `Server/` LostCityRS checkout as a **sibling** of this repo (set up
-the normal LostCityRS way), Node 20+, and Python 3.10+ for the Archipelago
+Prereqs: the `Server/` [LostCityRS](https://github.com/LostCityRS) checkout as a **sibling** of this repo (set up
+the normal [LostCityRS](https://github.com/LostCityRS) way), Node 20+, and Python 3.10+ for the Archipelago
 server. Use **revision 274** for the checkout - it's the only revision this
 project has been tested against; other revisions may work, but you use them at
 your own risk. Any OS works; the game server and the Archipelago server can be the
@@ -820,7 +820,7 @@ MIT - see [LICENSE](LICENSE). Files under `overlays/` that are modified copies
 of vanilla [Lost City](https://github.com/LostCityRS) sources remain (c) Lost
 City, also MIT.
 
-- [Lost City / 2004scape](https://2004.lostcity.rs/) - the game server this
+- [Lost City / 2004scape](https://github.com/LostCityRS) ([2004.lostcity.rs](https://2004.lostcity.rs/)) - the game server this
   builds on. This repo distributes no game assets; it overlays a checkout you
   set up yourself.
 - [Archipelago](https://archipelago.gg/) - the multiworld randomizer framework.
