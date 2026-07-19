@@ -75,6 +75,20 @@ class QuestUnlocks(DefaultOnToggle):
     display_name = "Quest Unlocks"
 
 
+class Relics(OptionSet):
+    """Which relic reward items are allowed to roll from "Mystery Reward"
+    filler. A relic keeps working once delivered; unticking one only stops it
+    from rolling.
+    bank_box: open your bank from anywhere.
+    tree_compass: teleport to the four spirit tree sites.
+    teleporting_focus: rune-free teleports (and its Greater upgrade).
+    npc_teleport: teleport to a previously-met NPC."""
+
+    display_name = "Relics"
+    valid_keys = frozenset({"bank_box", "tree_compass", "teleporting_focus", "npc_teleport"})
+    default = frozenset({"bank_box", "tree_compass", "teleporting_focus", "npc_teleport"})
+
+
 class MusicChecks(Toggle):
     """Include the 230 music-track discovery checks (first visit to each music
     region) as filler locations. The game server adopts this automatically on
@@ -93,4 +107,5 @@ class RS2004Options(PerGameCommonOptions):
     skill_caps: SkillCaps
     quest_unlocks: QuestUnlocks
     progressive_quests: ProgressiveQuests
+    relics: Relics
     music_checks: MusicChecks

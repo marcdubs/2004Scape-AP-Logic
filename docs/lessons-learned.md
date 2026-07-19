@@ -2893,3 +2893,16 @@ category:
   cmdline contains "WebHost.py" kills your own shell (exit 144) before later
   parts run - pkill/pgrep -f match the invoking command too.
 - 80 tests + 4551 subtests green; engine tsc clean; world_version 0.4.0.
+
+## Addendum (2026-07-19, archipelago-core-prep branch): Relics slot option
+
+The four addon reward items (Bank Box / Tree Compass / Teleporting Focus /
+NPC Teleport) are exposed to Archipelago as the `relics` OptionSet (renders as
+checkboxes on the options page, default all on). Pure slot_data plumbing - the
+relics never enter the item pool or logic; they roll from Mystery Reward
+filler. applySlotData maps relic names -> the existing addon* ap-options.json
+keys (bank_box -> addonBankBox etc.), and setApOption(key, relics.has(name))
+is called for ALL four every connect so unticking one actively disables it.
+Usage of an already-delivered relic is deliberately never gated
+(ap_addons.rs2). docs/relics-proposal.md's Leagues-style relics would extend
+this same option when built. world_version 0.5.0; 91 tests + 4906 subtests.

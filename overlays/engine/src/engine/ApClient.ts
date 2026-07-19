@@ -298,6 +298,22 @@ function applySlotData(slotData: Record<string, unknown> | undefined): void {
         }
     }
 
+    // relics: which addon reward items may roll from Mystery Reward filler.
+    // Absence from the list disables the roll; already-delivered items keep
+    // working (ap_addons.rs2 usage is deliberately not option-gated).
+    if (Array.isArray(slotData.relics)) {
+        const relics = new Set(slotData.relics.filter((r): r is string => typeof r === 'string'));
+        const relicOptionKeys: Record<string, string> = {
+            bank_box: 'addonBankBox',
+            tree_compass: 'addonTreeCompass',
+            teleporting_focus: 'addonTeleportingFocus',
+            npc_teleport: 'addonNpcTeleport'
+        };
+        for (const [relic, optionKey] of Object.entries(relicOptionKeys)) {
+            setApOption(optionKey, relics.has(relic));
+        }
+    }
+
     const gates = Array.isArray(slotData.questGates) ? slotData.questGates.filter((g): g is string => typeof g === 'string') : null;
     if (!gates) {
         return;

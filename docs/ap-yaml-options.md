@@ -72,6 +72,24 @@ report as maxed; `quest_unlocks: false` also empties the quest-gate list).
 Turning families off shrinks the progression pool (filler pads the difference),
 so leave at least one meaningful family on unless you want a pure-filler world.
 
+### `relics`
+
+Which relic reward items are allowed to roll from `Mystery Reward` filler.
+Default: all four. A relic keeps working once delivered - removing one from the
+list only stops it *rolling*. The game server adopts this on connect (the
+`addon*` keys in `ap-options.json`).
+
+```yaml
+  relics: ["bank_box", "tree_compass", "teleporting_focus", "npc_teleport"]
+```
+
+| relic | what it does |
+|---|---|
+| `bank_box` | open your bank from anywhere |
+| `tree_compass` | teleport to the four spirit tree sites (bypasses the vanilla talk-gates - the compass IS the unlock) |
+| `teleporting_focus` | rune-free teleports; a Greater upgrade can roll later |
+| `npc_teleport` | teleport to a previously-met NPC |
+
 ### `music_checks`
 
 `false` (default) / `true`. Adds 230 "first visit to each music-track region"

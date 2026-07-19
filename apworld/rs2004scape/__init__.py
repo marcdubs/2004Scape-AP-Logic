@@ -325,6 +325,7 @@ class RS2004World(World):
             "toolProgression": bool(self.options.tool_progression.value),
             "skillCaps": bool(self.options.skill_caps.value),
             "progressiveQuests": quest_unlocks and bool(self.options.progressive_quests.value),
+            "relics": sorted(self.options.relics.value),
             "musicChecks": bool(self.options.music_checks.value),
             # no quest unlock items -> no gates: the server leaves every quest open
             "questGates": sorted(GATED_QUEST_IDS) if quest_unlocks else []
