@@ -11,6 +11,105 @@ instead, and gets deployed on top via `scripts/install.js`.
 first - it captures the architecture decisions, the rs2/engine recipes, the
 environment gotchas, and where the project is heading.
 
+## Quick start (for humans): set up, connect, play
+
+The short version of a full evening: roll a seed, host an Archipelago server,
+boot the game server, open the tracker, connect, play. Steps 1-2 are one-time.
+
+### 1. One-time: game-server setup
+
+Prereqs: the `Server/` LostCityRS checkout as a **sibling** of this repo (set up
+the normal LostCityRS way), Node 20+, and - for the Archipelago server - WSL (or
+any Linux/mac shell) with Python 3.10+.
+
+```
+node scripts/install.js                             # deploy this repo's overlays -> ../Server
+cd ../Server/engine && npx tsx tools/pack/Build.ts  # one content pack build (~2 min)
+```
+
+If `tsx` dies with an esbuild platform error (happens when switching between
+Windows and WSL): `cd ../Server/engine && npm install && npm install --no-save --force @esbuild/win32-x64`.
+
+Optional flags in `Server/engine/data/config/world.json`: `web.port` (tracker/
+client port, examples below assume 8080), `apSkipTutorial: true` (new accounts
+skip Tutorial Island), `xpRate`.
+
+### 2. One-time: Archipelago server setup (WSL)
+
+The archipelago.gg website can't generate for custom worlds, so self-host:
+
+```
+cd ~ && git clone --depth 1 https://github.com/ArchipelagoMW/Archipelago.git
+cd Archipelago && python3 -m venv venv
+./venv/bin/pip install "setuptools>=75,<81"
+./venv/bin/pip install -r requirements.txt
+mkdir -p custom_worlds Players
+```
+
+Install the 2004Scape world and a player YAML:
+
+```
+cd <this repo>/apworld && python3 build.py          # packages rs2004scape.apworld
+cp rs2004scape.apworld ~/Archipelago/custom_worlds/
+```
+
+`~/Archipelago/Players/Marcus.yaml`:
+
+```yaml
+name: Marcus
+game: 2004Scape
+2004Scape:
+  goal: dragon_slayer      # or barcrawl / kbd
+  music_checks: false      # 230 extra "first visit to each music region" checks
+```
+
+### 3. Per run: roll a randomized seed
+
+```
+bash scripts/new-run.sh        # from this repo (Windows: scripts\new-run.bat)
+```
+
+Every stage (entrances, drops, gathering, processing, spawn, placement...) is a
+documented knob inside the script. It ends with a validated entrance table, a
+zeroed unlock state, and cleared check/tracker ledgers.
+
+- **Solo run (no AP server)**: you're done - the script's GenerateSeed stage
+  placed items locally. Skip step 4, boot and play.
+- **Archipelago run**: delete `Server/engine/data/config/ap-placements.json`
+  afterwards - the AP multiworld owns item placements, and the game client
+  rebuilds that file with just the seed's quest gates when it connects.
+
+### 4. Per run: generate + host the multiworld
+
+```
+cd ~/Archipelago
+./venv/bin/python Generate.py --player_files_path Players --outputpath output
+python3 -c "import zipfile,glob; z=sorted(glob.glob('output/AP_*.zip'))[-1]; \
+  zipfile.ZipFile(z).extract([n for n in zipfile.ZipFile(z).namelist() if n.endswith('.archipelago')][0], 'output')"
+./venv/bin/python MultiServer.py --host 0.0.0.0 --port 38281 output/AP_<id>.archipelago
+```
+
+Leave that terminal running. Server state lives in `output/AP_<id>.apsave` next
+to the multidata - delete it to reset the run, regenerate for a new seed.
+
+### 5. Boot the game server and play
+
+1. On Windows: start the game server as usual (`cd Server/engine && npx tsx src/app.ts`,
+   wait for `World ready`).
+2. **Tracker**: open http://localhost:8080/ap/ - map, discoveries, unlocks.
+3. **Connect to Archipelago**: tracker -> **Archipelago** tab -> host
+   `localhost`, port `38281`, slot name from your YAML (`Marcus`) -> **Test
+   connection** (expect "2004Scape slot hosted ✓") -> **Save & Connect**. The
+   status panel flips to *connected*; no restart needed. (Headless equivalent:
+   write `Server/engine/data/config/ap-archipelago.json` by hand.)
+4. **Game client**: http://localhost:8080/rs2.cgi - play. Checks announce in
+   chat as you complete them, received items apply immediately (gear tiers,
+   skill caps, quest unlocks) and are announced in-game, and reaching your goal
+   reports victory to the multiworld automatically.
+
+Full details: [docs/archipelago-integration.md](docs/archipelago-integration.md)
+and [apworld/README.md](apworld/README.md).
+
 ## Layout
 
 - `docs/` - design notes ([archipelago-ideas.md](docs/archipelago-ideas.md)) and
