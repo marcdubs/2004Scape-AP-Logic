@@ -85,6 +85,11 @@ need to match your in-game character name: the whole game server plays as this
 one slot (checks, received items, and unlock state are server-wide), so you can
 log in with any account.
 
+Every YAML option - the 2004Scape ones, the standard Archipelago ones
+(`start_inventory`, `exclude_locations`, hints, plando...), and the full
+item/location name lists they take - is documented in
+[docs/ap-yaml-options.md](docs/ap-yaml-options.md).
+
 ### 3. Per run: roll a randomized seed
 
 ```

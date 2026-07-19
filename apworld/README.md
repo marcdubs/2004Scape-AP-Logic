@@ -35,6 +35,9 @@ game: 2004Scape
   music_checks: false
 ```
 
+Full YAML option reference (including the standard AP options and item/location
+name lists): [../docs/ap-yaml-options.md](../docs/ap-yaml-options.md).
+
 ## Game-server side
 
 `data/config/ap-archipelago.json` in Server/engine:
