@@ -124,3 +124,62 @@ Notes for this world specifically:
 
 The authoritative machine-readable list (names + ids) is
 [apworld/rs2004scape/data/rs2004_data.json](../apworld/rs2004scape/data/rs2004_data.json).
+
+## Game-server tweaks (outside the YAML)
+
+A few settings that shape the run live on the game server rather than in the
+player YAML (making them proper YAML slot options is on the roadmap in
+[archipelago-integration.md](archipelago-integration.md)). All of these are in
+`Server/engine/data/config/world.json` under `"node"` and need a server
+restart (env-var overrides `NODE_XPRATE` etc. also exist):
+
+### `xpRate` - the XP multiplier (the big one)
+
+2004-era RuneScape at `1` is *slow* - a single mid-level milestone check like
+`Level 60 Woodcutting` is hours of grinding. Since level milestones, first-XP
+checks, and every skill-gated quest pace your check flow, `xpRate` is
+effectively this game's "how often do I send items to everyone else" dial.
+
+**Recommendation: scale it to the other games in the multiworld.** In a synced
+multiworld session, other players' games typically produce a check every few
+minutes; a 1x RuneScape grind starves the whole group of whatever progression
+sits on your locations. Rough guide:
+
+| setting | feels like |
+|---|---|
+| `1` | authentic 2004 - solo marathons only, expect to be the multiworld's bottleneck |
+| `5`-`10` | long campaign pace - multi-evening multiworlds with patient friends |
+| `25`-`50` | evening-scale multiworld pace - milestones fall at roughly board-game cadence |
+
+Two interactions worth knowing: XP past a still-locked skill cap is **banked,
+not lost** - it auto-applies the moment the cap item arrives, so a high
+`xpRate` makes cap unlocks feel instant rather than wasting grind. And combat
+floors in the logic (e.g. the KBD goal) only check received *caps*, so raising
+`xpRate` never breaks logic - it just shortens the distance between receiving
+a cap and actually reaching it.
+
+### Other `world.json` flags
+
+- `apSkipTutorial: true` - new accounts skip Tutorial Island with the starter
+  kit and a random look. Strongly recommended for AP runs (the tutorial is
+  outside logic and just delays sphere 0).
+- `infiniteRun: true` - never run out of run energy. Pure QoL; the logic
+  ignores travel cost either way.
+- `web.port` - tracker/game-client port.
+
+### Reward-pool addons (`Server/engine/data/config/ap-options.json`)
+
+Boolean toggles for the custom QoL items that `Mystery Reward` can roll:
+`addonBankBox` (portable bank), `addonTreeCompass` (4-destination teleport),
+`addonTeleportingFocus` (store/rub location teleports), `addonNpcTeleport`
+(teleport-to-last-talked-NPC writ). All default `true`; turn one off if you'd
+rather not see it this run. (`musicChecks` also lives in this file but is
+overridden by the YAML's `music_checks` on connect - the YAML wins.)
+
+### Seed-roll knobs (`scripts/new-run.sh`)
+
+The world randomization itself - entrance shuffle (incl. `--mixed`), drop
+randomization mode (`tiered`/`chaos`/`mimic`), gathering/processing shuffles,
+random spawn (`city`/`chunk`) - is configured per run at the top of
+`new-run.sh`, with every tool's full parameter list documented next to its
+knob. These change the *world*; the YAML changes the *item game* on top of it.

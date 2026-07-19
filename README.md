@@ -35,7 +35,9 @@ then additionally `npm install --no-save --force @esbuild/<the-other-platform>`
 
 Optional flags in `Server/engine/data/config/world.json`: `web.port` (tracker/
 client port, examples below assume 8080), `apSkipTutorial: true` (new accounts
-skip Tutorial Island), `xpRate`.
+skip Tutorial Island), `xpRate` (the XP multiplier - worth raising to match
+your multiworld's pace; see the "Game-server tweaks" section of
+[docs/ap-yaml-options.md](docs/ap-yaml-options.md) for recommendations).
 
 ### 2. One-time: Archipelago server setup
 
