@@ -98,9 +98,9 @@ class RS2004Web(WebWorld):
 
 
 class RS2004World(World):
-    """2004-era RuneScape (2004scape / LostCityRS rev 274), randomized: progressive
-    gear and tool tiers, skill level caps, quest gates, and a world full of
-    shuffled entrances, drops, shops and recipes on the game-server side."""
+    """2004scape - the open-source Lost City game server (rev 274) - randomized:
+    progressive gear and tool tiers, skill level caps, quest gates, and a world
+    full of shuffled entrances, drops, shops and recipes on the game-server side."""
 
     game = GAME_NAME
     options_dataclass = RS2004Options

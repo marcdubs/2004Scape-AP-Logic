@@ -223,14 +223,14 @@ restart (env-var overrides `NODE_XPRATE` etc. also exist):
 
 ### `xpRate` - the XP multiplier (the big one)
 
-2004-era RuneScape at `1` is *slow* - a single mid-level milestone check like
+The 2004-era game at `1` is *slow* - a single mid-level milestone check like
 `Level 60 Woodcutting` is hours of grinding. Since level milestones, first-XP
 checks, and every skill-gated quest pace your check flow, `xpRate` is
 effectively this game's "how often do I send items to everyone else" dial.
 
 **Recommendation: scale it to the other games in the multiworld.** In a synced
 multiworld session, other players' games typically produce a check every few
-minutes; a 1x RuneScape grind starves the whole group of whatever progression
+minutes; a 1x-era grind starves the whole group of whatever progression
 sits on your locations. Rough guide:
 
 | setting | feels like |

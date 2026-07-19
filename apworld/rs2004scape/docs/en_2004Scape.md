@@ -8,8 +8,8 @@ setup guide.)
 
 ## What is 2004Scape?
 
-2004Scape is November-2004-era RuneScape, as recreated by the open-source
-[Lost City](https://github.com/LostCityRS) project (revision 274). It is a self-hosted game server, playable in a
+2004Scape is the open-source [Lost City](https://github.com/LostCityRS) game server (revision 274), a community
+recreation of a November-2004-era MMORPG. It is self-hosted and playable in a
 browser. This world connects the **game server itself** to Archipelago: the server fires checks as you play and
 applies received items live, so no client mod or download patch is involved.
 
