@@ -4,6 +4,11 @@ REM new-run.bat - roll a complete fresh Archipelago run, end to end.
 REM
 REM   scripts\new-run.bat              (from the 2004Scape-AP-Logic repo, on Windows)
 REM
+REM NOTE: on AP connect the server writes data\config\ap-seed-options.json from
+REM the multiworld YAML's seed options. new-run.sh auto-adopts it; this .bat does
+REM NOT (batch JSON parsing) - either run the .sh via WSL/git-bash, or read that
+REM file and set the knobs below to match by hand.
+REM
 REM Edit the variables below and re-run. Every stage is independently toggleable and
 REM every tool's FULL parameter list is documented next to its knob. Stage order
 REM matters and is already correct: content mutation (with the one pack rebuild)

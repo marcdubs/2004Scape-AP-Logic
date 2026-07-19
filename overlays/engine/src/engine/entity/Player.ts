@@ -1,5 +1,6 @@
 import { PlayerInfoProt, Visibility } from '#/network/rsbuf/index.js';
 import { CollisionFlag, CollisionType } from '#/engine/routefinder/index.js';
+import { getApOption } from '#/engine/ApOptions.js';
 
 import Component from '#/cache/config/Component.js';
 import FontType from '#/cache/config/FontType.js';
@@ -705,10 +706,12 @@ export default class Player extends PathingEntity {
         if (this.delayed) {
             return;
         }
-        if (Environment.node.infiniteRun) {
+        if (Environment.node.infiniteRun || getApOption('infiniteRun')) {
             // custom - AP always-run slot option: pin energy at max every tick,
             // skipping drain/regen entirely so the 0-energy "force back to walk"
-            // branch below never triggers.
+            // branch below never triggers. Either the world.json flag or the
+            // Archipelago infinite_run slot option (adopted into ap-options.json
+            // on connect) enables it; the ApOptions default is false.
             this.runenergy = 10000;
             return;
         }

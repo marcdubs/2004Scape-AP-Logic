@@ -75,6 +75,87 @@ class QuestUnlocks(DefaultOnToggle):
     display_name = "Quest Unlocks"
 
 
+class EntranceRandomization(Choice):
+    """Shuffle ladder/stair/trapdoor destinations. on: connector and
+    floor-shift pools shuffle separately; mixed: one chaos pool.
+    (seed option*: all options marked this way are adopted by the game server
+    on connect and applied the next time it rolls a seed - scripts/new-run -
+    not live mid-run.)"""
+
+    display_name = "Entrance Randomization"
+    option_off = 0
+    option_on = 1
+    option_mixed = 2
+    default = 1
+
+
+class NpcDrip(DefaultOnToggle):
+    """Shuffle NPC outfits/cosmetics (seed option*)."""
+
+    display_name = "NPC Drip Randomization"
+
+
+class ShopRandomization(DefaultOnToggle):
+    """Shuffle which NPC has which shop (seed option*)."""
+
+    display_name = "Shop Randomization"
+
+
+class DropRandomization(Choice):
+    """Monster drop randomization (seed option*). tiered: items move within
+    their rarity band; chaos: any item anywhere; mimic: each monster runs
+    another monster's ENTIRE loot table."""
+
+    display_name = "Drop Randomization"
+    option_off = 0
+    option_tiered = 1
+    option_chaos = 2
+    option_mimic = 3
+    default = 3
+
+
+class GatheringRandomization(Choice):
+    """What mining/fishing/woodcutting actually yield (seed option*).
+    shuffle: bijective - everything stays obtainable; chaos: independent
+    resampling, duplicates allowed."""
+
+    display_name = "Gathering Randomization"
+    option_off = 0
+    option_shuffle = 1
+    option_chaos = 2
+    default = 1
+
+
+class ProcessingRandomization(Choice):
+    """What cooking/smithing/crafting/fletching produce (seed option*).
+    Same shuffle/chaos semantics as gathering."""
+
+    display_name = "Processing Randomization"
+    option_off = 0
+    option_shuffle = 1
+    option_chaos = 2
+    default = 1
+
+
+class SpawnRandomization(Choice):
+    """Random home/respawn point (seed option*). city: one of 7 spellbook
+    landmarks; chunk: a random mainland map square."""
+
+    display_name = "Spawn Randomization"
+    option_off = 0
+    option_city = 1
+    option_chunk = 2
+    default = 1
+
+
+class InfiniteRun(Toggle):
+    """Run energy never depletes. Applies live on connect (server-side
+    toggle, no reseed needed)."""
+
+    display_name = "Infinite Run"
+    default = 0
+
+
 class Relics(OptionSet):
     """Which relic reward items are allowed to roll from "Mystery Reward"
     filler. A relic keeps working once delivered; unticking one only stops it
@@ -109,3 +190,11 @@ class RS2004Options(PerGameCommonOptions):
     progressive_quests: ProgressiveQuests
     relics: Relics
     music_checks: MusicChecks
+    entrance_randomization: EntranceRandomization
+    npc_drip: NpcDrip
+    shop_randomization: ShopRandomization
+    drop_randomization: DropRandomization
+    gathering_randomization: GatheringRandomization
+    processing_randomization: ProcessingRandomization
+    spawn_randomization: SpawnRandomization
+    infinite_run: InfiniteRun

@@ -327,6 +327,18 @@ class RS2004World(World):
             "progressiveQuests": quest_unlocks and bool(self.options.progressive_quests.value),
             "relics": sorted(self.options.relics.value),
             "musicChecks": bool(self.options.music_checks.value),
+            "infiniteRun": bool(self.options.infinite_run.value),
+            # seed knobs: the game server adopts these on connect and applies
+            # them the next time it rolls a seed (scripts/new-run)
+            "seedOptions": {
+                "entrances": self.options.entrance_randomization.current_key,
+                "npcDrip": bool(self.options.npc_drip.value),
+                "shops": bool(self.options.shop_randomization.value),
+                "drops": self.options.drop_randomization.current_key,
+                "gathering": self.options.gathering_randomization.current_key,
+                "processing": self.options.processing_randomization.current_key,
+                "spawn": self.options.spawn_randomization.current_key,
+            },
             # no quest unlock items -> no gates: the server leaves every quest open
             "questGates": sorted(GATED_QUEST_IDS) if quest_unlocks else []
         }

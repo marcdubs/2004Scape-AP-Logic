@@ -2906,3 +2906,28 @@ is called for ALL four every connect so unticking one actively disables it.
 Usage of an already-delivered relic is deliberately never gated
 (ap_addons.rs2). docs/relics-proposal.md's Leagues-style relics would extend
 this same option when built. world_version 0.5.0; 91 tests + 4906 subtests.
+
+## Addendum (2026-07-19, archipelago-core-prep branch): full seed-knob coverage in AP options
+
+Every documented server-side randomizer is now a YAML/options-page option:
+entrance_randomization (on/off/mixed), npc_drip, shop_randomization,
+drop_randomization (mimic/off/tiered/chaos), gathering_randomization,
+processing_randomization (shuffle/off/chaos), spawn_randomization
+(city/off/chunk), plus infinite_run (live) - defaults mirror new-run.sh's.
+
+- Seed knobs CANNOT apply live (pack rebuilds): slot_data carries a
+  `seedOptions` object; applySlotData persists it verbatim to
+  data/config/ap-seed-options.json; new-run.sh eval-adopts it (node heredoc
+  emits VAR= lines; 'off' values emit RUN_*=0 plus rm of the runtime JSON so
+  off really reverts to vanilla). File wins over script knobs;
+  AP_SEED_OPTIONS=ignore opts out; new-run.bat does NOT adopt (header note).
+- infinite_run: setApOption('infiniteRun') + Player.updateEnergy checks
+  `Environment.node.infiniteRun || getApOption('infiniteRun')`. CRITICAL:
+  getApOption fails open to TRUE for unknown keys - any default-off option
+  MUST be added to ApOptions DEFAULTS explicitly.
+- Choice option -> slot_data string: use `.current_key` (gives the option_*
+  name), not .value.
+- pkill/pgrep -f self-match gotcha, round 2: the [W]ebHost.py bracket trick
+  only protects the pattern occurrence - a LATER `nohup ... WebHost.py` in the
+  same compound command still matches. Kill and start in separate commands.
+- 102 tests + 5261 subtests green; engine tsc clean; world_version 0.6.0.

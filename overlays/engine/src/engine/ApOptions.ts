@@ -28,7 +28,10 @@ const DEFAULTS: Record<string, boolean> = {
     // (ApUnlockOverrides.getUnlockCount reports 99 for its keys).
     gearProgression: true,
     toolProgression: true,
-    skillCaps: true
+    skillCaps: true,
+    // live slot options that default OFF - must be listed here because
+    // getApOption fails open to true for unknown keys.
+    infiniteRun: false
 };
 
 let cache: Record<string, boolean> | null = null;

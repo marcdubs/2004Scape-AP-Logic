@@ -90,6 +90,32 @@ list only stops it *rolling*. The game server adopts this on connect (the
 | `teleporting_focus` | rune-free teleports; a Greater upgrade can roll later |
 | `npc_teleport` | teleport to a previously-met NPC |
 
+### Seed randomizer options (adopted at the next seed roll)
+
+Every server-side randomizer is configurable from the YAML. These can't apply
+live (several need a content pack rebuild): on connect the server writes them
+to `data/config/ap-seed-options.json`, and `scripts/new-run.sh` adopts that
+file - overriding its own knobs - the next time you roll a seed. Flow: connect
+once, then run `new-run`. `AP_SEED_OPTIONS=ignore bash scripts/new-run.sh`
+falls back to the script knobs (`new-run.bat` doesn't auto-adopt - see its
+header note).
+
+| option | values (default first) | controls |
+|---|---|---|
+| `entrance_randomization` | `on` / `off` / `mixed` | ladder/stair/trapdoor shuffle; `mixed` merges both gate pools |
+| `npc_drip` | `true` / `false` | NPC outfit/cosmetic shuffle |
+| `shop_randomization` | `true` / `false` | which NPC has which shop |
+| `drop_randomization` | `mimic` / `off` / `tiered` / `chaos` | monster loot: rarity-banded, full chaos, or whole-table mimicry |
+| `gathering_randomization` | `shuffle` / `off` / `chaos` | what mining/fishing/woodcutting yield |
+| `processing_randomization` | `shuffle` / `off` / `chaos` | what cooking/smithing/crafting/fletching produce |
+| `spawn_randomization` | `city` / `off` / `chunk` | home/respawn point: spellbook landmark or random map square |
+
+### `infinite_run`
+
+`false` (default) / `true`. Run energy never depletes. Unlike the seed options
+above this applies **live** on connect (same effect as the server operator's
+`infiniteRun` world.json flag - either source enables it).
+
 ### `music_checks`
 
 `false` (default) / `true`. Adds 230 "first visit to each music-track region"

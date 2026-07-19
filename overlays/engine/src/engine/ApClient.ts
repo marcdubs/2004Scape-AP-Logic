@@ -298,6 +298,23 @@ function applySlotData(slotData: Record<string, unknown> | undefined): void {
         }
     }
 
+    // infinite run applies live (Player.updateEnergy consults ApOptions each tick)
+    if (typeof slotData.infiniteRun === 'boolean') {
+        setApOption('infiniteRun', slotData.infiniteRun);
+    }
+
+    // seed knobs (entrances/drip/shops/drops/gathering/processing/spawn):
+    // persisted for scripts/new-run to adopt on the NEXT seed roll - they can't
+    // apply live (several need a content pack rebuild).
+    if (slotData.seedOptions && typeof slotData.seedOptions === 'object' && !Array.isArray(slotData.seedOptions)) {
+        try {
+            fs.writeFileSync('data/config/ap-seed-options.json', JSON.stringify(slotData.seedOptions, null, 2) + '\n', 'utf8');
+            printInfo('AP client: wrote ap-seed-options.json (applied on the next seed roll via scripts/new-run)');
+        } catch (err) {
+            printWarning(`AP client: failed to write ap-seed-options.json (${err instanceof Error ? err.message : err})`);
+        }
+    }
+
     // relics: which addon reward items may roll from Mystery Reward filler.
     // Absence from the list disables the roll; already-delivered items keep
     // working (ap_addons.rs2 usage is deliberately not option-gated).
