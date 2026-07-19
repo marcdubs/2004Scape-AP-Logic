@@ -2730,3 +2730,39 @@ Archipelago v1 (problems.txt #2) - design doc docs/archipelago-integration.md:
   players can log in (building the watch table lazily) before the socket
   connects. Pattern for any future slot option: put it in fill_slot_data, adopt
   it in applySlotData, invalidate whatever engine cache consumed it.
+
+## Session addendum (2026-07-19c): real Archipelago server stood up, apworld PROVEN
+
+User asked for a real AP server. Installed + generated + hosted + round-tripped;
+the apworld's first contact with real Archipelago surfaced only packaging
+friction, zero API drift. Facts:
+
+- **Install**: source checkout (main, 0.6.8) at WSL `~/Archipelago` (home fs, not
+  /mnt/c - AP is big and pip is chatty). venv + minimal deps is enough for
+  headless Generate/MultiServer (colorama websockets==13.1 PyYAML jellyfish
+  jinja2 schema bsdiff4 platformdirs certifi cython cymem orjson
+  typing_extensions pathspec + setuptools<81) - kivy/kivymd are GUI-only, but
+  ModuleUpdate.py checks EVERY worlds/*/requirements.txt interactively (EOFError
+  under a non-tty) - pre-installing all requirement files silences it.
+- **Generation worked first try**: 2004Scape v0.0.0 registered next to the 89
+  bundled worlds, 287 items filled (music off), playthrough calculated in 0.2s.
+  Spoiler (--spoiler 2) shows real sphere structure (cap items + quest gates
+  chaining). Generate.py --seed N is reproducible; the multidata is inside
+  output/AP_<id>.zip.
+- **.apworld packaging needs the container fields**: a plain zip triggers
+  "Invalid or missing manifest ... will stop working with 0.7.0". The world
+  folder carries archipelago.json (game/world_version/minimum_ap_version/
+  authors) and the PACKAGER must inject version/compatible_version (= 7,
+  worlds/Files.py container_version). apworld/build.py does both; the docs'
+  "Build APWorlds" launcher component is the official equivalent.
+- **Round-trip PROVEN against the live server** (scratch-cwd ApClient harness,
+  slot Marcus): resync on connect, slot_data adopted (61 questGates written,
+  musicChecks:false -> ap-options.json), fired barcrawl_bar_2/3 came back as
+  the exact items AP's fill placed there (Progressive Armour tier 1, Quest
+  Unlock: Demon Slayer) and grantUnlock applied them. First assertion FAILURE
+  was instructive: asserting against a spoiler from a DIFFERENT generation -
+  always read the spoiler of the multidata actually being hosted.
+- **Server ops**: MultiServer.py --host 0.0.0.0 --port 38281 <multidata>; state
+  persists in <multidata-dir>/AP_<id>.apsave (delete = fresh run); Windows game
+  server connects via localhost:38281 (WSL2 forwarding). Currently RUNNING in
+  the background with a fresh save; runbook in apworld/README.md.
