@@ -2842,3 +2842,31 @@ checkout as the reference implementation):
 - world_version 0.2.0. Verified against AP checkout @ 2cde25f (py3.12):
   world tests green, Generate.py green both unpacked and from the built
   apworld. build.py includes docs/+test/ automatically (walks all subdirs).
+
+## Addendum (2026-07-19, archipelago-core-prep branch): multi-goal, heroes/legends goals, progressive quests
+
+- **Goals `heroes` / `legends`** (goalChecks keys; quest ids are `hero` and
+  `legends`): pure data additions - goalChecks maps them to the existing
+  `quest_hero`/`quest_legends` completion checks, goals.json gained sim
+  entries, apworld Goal choice gained option_heroes/option_legends.
+- **Multi-goal**: apworld `extra_goals` OptionSet; slot_data now carries
+  `goals: [...]` (all must complete) alongside the legacy single `goal` key
+  (old servers read that, new server prefers the array). ApClient's checkGoal
+  requires every goal's check set. Victory rule = all(_goal_rule(key)).
+- **Progressive quests** (`progressive_quests: true`): one `Progressive Quest
+  Unlock` item (id 20045086, grant `progressive_quest`, 61 copies) replaces
+  the per-quest unlocks 1:1. The unlock ORDER is the difficulty matrix in
+  ExportApWorldData.ts: hand-curated length tier (1-5) * 25 + maxSkill*1.5 +
+  skillSum*0.15 + requiredQp*0.5 + prereqDepth*15 + qp*3, sorted, then a
+  fix-up pass guarantees gated prereqs precede dependents. Exported as
+  `questUnlockOrder` in the datapackage (shared contract - apworld rules count
+  copies against QUEST_ORDER_INDEX; ApClient resolves copy N -> grantUnlock
+  on the REAL `quest_<id>` key so gates/tracker/quest-tab work unchanged, and
+  `progressive_quest` itself is just a counter key in ap-unlocks.json).
+  The order is deterministic per build, NOT seeded - reroll-safe.
+- Verified: engine tsc clean; 58 tests + 3131 subtests green in AP checkout;
+  Generate.py green with goal legends + extra_goals [kbd, barcrawl] +
+  progressive_quests + music_checks (61 progressive copies in spoiler).
+- NOT done: solo GenerateSeed placement mode ignores progressive_quests and
+  multi-goal (AP-only options for now); tracker Unlocks tab shows the raw
+  progressive_quest counter only via its quest_<id> effects.

@@ -68,6 +68,8 @@ interface ApDataFile {
     locations: Record<string, { id: number; name: string }>;
     items: Record<string, ExportedItem>;
     goalChecks: Record<string, string[]>;
+    /** Difficulty-ordered gated quest ids - the Nth "Progressive Quest Unlock" copy unlocks entry N-1. */
+    questUnlockOrder?: string[];
 }
 
 interface PendingDelivery {
@@ -93,7 +95,7 @@ let sentChecks = new Set<string>();
 
 let ws: WebSocket | null = null;
 let connected = false; // Connected packet received
-let goal = 'dragon';
+let goals: string[] = ['dragon']; // victory requires EVERY listed goal's checks
 let lastError: string | null = null; // most recent connection problem, for the tracker's setup page
 let reconnectAttempt = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -243,15 +245,15 @@ function checkGoal(): void {
     if (session.goalSent || !connected) {
         return;
     }
-    const required = data?.goalChecks?.[goal];
-    if (!required || required.length === 0) {
+    const requiredSets = goals.map(g => data?.goalChecks?.[g]);
+    if (requiredSets.length === 0 || requiredSets.some(set => !set || set.length === 0)) {
         return;
     }
-    if (required.every(id => sentChecks.has(id))) {
+    if (requiredSets.every(set => set!.every(id => sentChecks.has(id)))) {
         send([{ cmd: 'StatusUpdate', status: 30 }]);
         session.goalSent = true;
         schedulePersist();
-        printInfo(`AP client: GOAL COMPLETE (${goal}) - sent StatusUpdate`);
+        printInfo(`AP client: GOAL COMPLETE (${goals.join(' + ')}) - sent StatusUpdate`);
         queueDelivery({ display: 'Goal complete! Victory reported to Archipelago.', filler: false });
     }
 }
@@ -265,8 +267,15 @@ function applySlotData(slotData: Record<string, unknown> | undefined): void {
         return;
     }
 
-    if (typeof slotData.goal === 'string' && data?.goalChecks?.[slotData.goal]) {
-        goal = slotData.goal;
+    // "goals" (array, all must be completed) is preferred; single "goal" is the
+    // pre-multi-goal fallback for older apworld builds.
+    if (Array.isArray(slotData.goals)) {
+        const known = slotData.goals.filter((g): g is string => typeof g === 'string' && !!data?.goalChecks?.[g]);
+        if (known.length > 0) {
+            goals = known;
+        }
+    } else if (typeof slotData.goal === 'string' && data?.goalChecks?.[slotData.goal]) {
+        goals = [slotData.goal];
     }
 
     // Option toggles configured on the AP YAML/website side are authoritative in
@@ -323,6 +332,25 @@ function applyReceivedItem(networkItem: { item?: number }): void {
 
     if (entry.def.filler || !entry.def.grant) {
         queueDelivery({ display: entry.name, filler: true });
+        return;
+    }
+
+    // Progressive quest unlock: the item's own counter picks WHICH quest from the
+    // difficulty-ordered list, then the real quest_<id> gate key gets the grant so
+    // every downstream consumer (gates, tracker, quest tab) works unchanged.
+    if (entry.def.grant === 'progressive_quest') {
+        const order = data?.questUnlockOrder ?? [];
+        const progressCount = ApUnlockOverrides.grantUnlock('progressive_quest', 1);
+        const questId = progressCount > 0 ? order[progressCount - 1] : undefined;
+        if (questId === undefined) {
+            printWarning(`AP client: Progressive Quest Unlock #${progressCount} has no quest in questUnlockOrder (${order.length} entries) - announced only`);
+            queueDelivery({ display: entry.name, filler: false });
+            return;
+        }
+        const gateKey = `quest_${questId}`;
+        const gateCount = ApUnlockOverrides.grantUnlock(gateKey, 1);
+        const display = gateCount > 0 ? ApUnlockOverrides.describeUnlock(gateKey, gateCount) : entry.name;
+        queueDelivery({ display, filler: false, grant: gateKey });
         return;
     }
 
@@ -611,7 +639,7 @@ export function getApStatus(): Record<string, unknown> {
         host: config?.host ?? null,
         port: config?.port ?? null,
         slot: config?.slot ?? null,
-        goal: isApModeActive() ? goal : null,
+        goal: isApModeActive() ? goals.join(' + ') : null,
         sentChecks: sentChecks.size,
         receivedItems: session.receivedCount,
         pendingDeliveries: session.pending.length,

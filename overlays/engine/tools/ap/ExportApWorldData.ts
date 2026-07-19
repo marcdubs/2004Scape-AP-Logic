@@ -72,6 +72,92 @@ function loadGoals(): Goal[] {
     return (JSON.parse(raw) as { goals: Goal[] }).goals;
 }
 
+// ---- quest difficulty matrix (progressive quests mode) ----
+//
+// Hand-curated LENGTH tier (1 = a few minutes ... 5 = multi-hour master quest),
+// combined below with computed stat/prereq/QP components into one difficulty
+// score. The score orders the "Progressive Quest Unlock" reveal sequence:
+// receiving your Nth copy unlocks the Nth quest in this order, so short/easy
+// quests surface first and the long masters (Underground Pass, Regicide,
+// Heroes', Legends') land last. Tiers are judgment calls - relitigate freely;
+// the computed components keep the order sane even where a tier is off by one.
+const QUEST_LENGTH_TIER: Record<string, number> = {
+    // 1 - trivial errands
+    cook: 1, sheep: 1, doric: 1, imp: 1, hetty: 1, runemysteries: 1, drunkmonk: 1,
+    hazeelcult: 1, fishingcompo: 1, junglepotion: 1, totem: 1, scorpcatcher: 1,
+    seaslug: 1, priest: 1, death: 1, cog: 1, gobdip: 1, romeojuliet: 1,
+    // 3 - solid mid-length members quests
+    eadgar: 3, mortton: 3, tbwt: 3, desertrescue: 3, zombiequeen: 3, druidspirit: 3,
+    ikov: 3, waterfall: 3, zanaris: 3, grandtree: 3,
+    // 4 - long quests
+    viking: 4, itwatchtower: 4, crest: 4, dragon: 4, hero: 4,
+    // 5 - the multi-hour masters
+    upass: 5, regicide: 5, legends: 5
+    // everything else defaults to tier 2 (standard short quest)
+};
+const DEFAULT_LENGTH_TIER = 2;
+
+function prereqIdsOf(q: QuestReq): string[] {
+    const ids = [...(q.quests ?? [])];
+    for (const group of q.questsAny ?? []) {
+        ids.push(...group);
+    }
+    return ids;
+}
+
+function prereqDepth(id: string, byId: Map<string, QuestReq>, memo: Map<string, number>): number {
+    const known = memo.get(id);
+    if (known !== undefined) {
+        return known;
+    }
+    memo.set(id, 0); // cycle guard
+    const q = byId.get(id);
+    const depth = q === undefined ? 0 : Math.max(0, ...prereqIdsOf(q).map(p => 1 + prereqDepth(p, byId, memo)));
+    memo.set(id, depth);
+    return depth;
+}
+
+function difficultyScore(q: QuestReq, byId: Map<string, QuestReq>, depthMemo: Map<string, number>): number {
+    const levels = Object.values(q.skills ?? {});
+    const maxSkill = Math.max(0, ...levels);
+    const skillSum = levels.reduce((a, b) => a + b, 0);
+    const tier = QUEST_LENGTH_TIER[q.id] ?? DEFAULT_LENGTH_TIER;
+    const depth = prereqDepth(q.id, byId, depthMemo);
+    return Math.round((tier * 25 + maxSkill * 1.5 + skillSum * 0.15 + (q.requiredQp ?? 0) * 0.5 + depth * 15 + (q.qp ?? 0) * 3) * 10) / 10;
+}
+
+// Difficulty-ordered gated-quest list. Sorted by score (id tiebreak for
+// determinism), then a fix-up pass guarantees every gated prereq precedes its
+// dependents - not needed for AP logic correctness (rules count copies), but it
+// keeps the reveal order from handing out an unlock that's unusable until a
+// later copy arrives.
+function buildQuestUnlockOrder(quests: QuestReq[]): string[] {
+    const byId = new Map(quests.map(q => [q.id, q]));
+    const depthMemo = new Map<string, number>();
+    const gated = new Set(QUEST_GATE_IDS);
+    const order = [...QUEST_GATE_IDS].sort((a, b) => {
+        const scoreA = difficultyScore(byId.get(a)!, byId, depthMemo);
+        const scoreB = difficultyScore(byId.get(b)!, byId, depthMemo);
+        return scoreA !== scoreB ? scoreA - scoreB : a.localeCompare(b);
+    });
+    for (let pass = 0; pass < order.length; pass++) {
+        let moved = false;
+        for (let i = 0; i < order.length; i++) {
+            const prereqs = prereqIdsOf(byId.get(order[i])!).filter(p => gated.has(p));
+            const latest = Math.max(-1, ...prereqs.map(p => order.indexOf(p)));
+            if (latest > i) {
+                const [q] = order.splice(i, 1);
+                order.splice(latest, 0, q); // latest shifted left by the removal
+                moved = true;
+            }
+        }
+        if (!moved) {
+            break;
+        }
+    }
+    return order;
+}
+
 function capitalize(s: string): string {
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -168,13 +254,21 @@ function main(): void {
     for (const questId of QUEST_GATE_IDS) {
         addItem(`Quest Unlock: ${questNames.get(questId) ?? prettify(questId)}`, { grant: questGateKey(questId), count: 1, copies: 1 });
     }
+    // progressive_quests mode: replaces the per-quest unlocks 1:1 (same total
+    // copies); the Nth copy unlocks questUnlockOrder[N-1]. ApClient resolves the
+    // indirection at grant time; the apworld's rules count copies.
+    addItem('Progressive Quest Unlock', { grant: 'progressive_quest', count: 1, copies: QUEST_GATE_IDS.length });
     addItem('Mystery Reward', { copies: 0, filler: true }); // copies computed at generation (locations - progression)
+
+    const questUnlockOrder = buildQuestUnlockOrder(quests);
 
     // ---- goal conditions (check ids the client tests for StatusUpdate 30) ----
     const goalChecks: Record<string, string[]> = {
         barcrawl: Array.from({ length: 10 }, (_, i) => `barcrawl_bar_${i + 1}`),
         dragon: ['quest_dragon'],
-        kbd: ['kbd_slain']
+        kbd: ['kbd_slain'],
+        heroes: ['quest_hero'],
+        legends: ['quest_legends']
     };
 
     const out = {
@@ -188,7 +282,8 @@ function main(): void {
         goalChecks,
         goals,
         quests,
-        questGates: QUEST_GATE_IDS
+        questGates: QUEST_GATE_IDS,
+        questUnlockOrder
     };
 
     fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });

@@ -30,6 +30,30 @@ condition is met in-game.
 | `dragon_slayer` (default) | completing Dragon Slayer (kill Elvarg) | 32 QP to start the quest |
 | `barcrawl` | signing all 10 bars of Alfred Grimhand's Barcrawl | nothing - a sphere-0 travel checklist |
 | `kbd` | slaying the King Black Dragon | 50 Attack/Strength/Defence caps received (i.e. 2 cap copies each) |
+| `heroes` | completing Heroes' Quest | 55 QP + its Shield of Arrav / Lost City / Merlin's Crystal / Dragon Slayer prereq chain |
+| `legends` | completing Legends' Quest | 107 QP + its five-quest prereq chain and ten 42-56 skill caps |
+
+### `extra_goals`
+
+A list of additional goals that must ALL also be completed (on top of `goal`)
+before the server reports victory. Same five values as `goal`. Example - "kill
+the KBD *and* finish Legends' Quest":
+
+```yaml
+  goal: kbd
+  extra_goals: ["legends"]
+```
+
+### `progressive_quests`
+
+`false` (default) / `true`. Replaces the 61 individual `Quest Unlock: <name>`
+items with 61 copies of one **`Progressive Quest Unlock`** item. Your Nth copy
+unlocks the Nth quest in a difficulty-ordered list - trivial errands (Clock
+Tower, Cook's Assistant...) surface first, the long masters (Family Crest,
+Heroes' Quest, Underground Pass, Regicide, Legends' Quest) come last, and a
+prerequisite always unlocks before anything that needs it. The order is fixed
+per apworld build (it's a curated difficulty matrix, not seeded); the exact
+sequence is `questUnlockOrder` in `rs2004scape/data/rs2004_data.json`.
 
 ### `music_checks`
 
@@ -99,6 +123,9 @@ Notes for this world specifically:
   Ikov, The Digsite, The Grand Tree, Tourist Trap, Tree Gnome Village, Trials
   of the Fremmenik, Tribal Totem, Troll Stronghold, Underground Pass, Vampire
   Slayer, Watchtower, Waterfall Quest, Witch's House, Witch's Potion.
+- **`Progressive Quest Unlock`** (61 copies, only with
+  `progressive_quests: true` - replaces every `Quest Unlock: <name>` above;
+  copy N unlocks the Nth quest in the difficulty order).
   (Dragon Slayer and Horror from the Deep are never gated.)
 - **Filler**: `Mystery Reward` - rolls the in-game random reward
   (runes/gear/supplies/cash/caskets/addons) when received.

@@ -50,6 +50,20 @@ for _name, _def in ITEMS.items():
         QUEST_UNLOCK_ITEM_BY_ID[_def["grant"][len("quest_"):]] = _name
 
 FILLER_NAME = "Mystery Reward"
+PROGRESSIVE_QUEST_NAME = "Progressive Quest Unlock"
+
+# difficulty-ordered gated quests; copy N of the progressive item unlocks entry N-1
+QUEST_ORDER = DATA["questUnlockOrder"]
+QUEST_ORDER_INDEX = {qid: i for i, qid in enumerate(QUEST_ORDER)}
+
+# option value / OptionSet key -> slot_data goal key (the goalChecks vocabulary)
+GOAL_KEY_BY_NAME = {
+    "dragon_slayer": "dragon",
+    "barcrawl": "barcrawl",
+    "kbd": "kbd",
+    "heroes": "heroes",
+    "legends": "legends",
+}
 
 
 def cap_copies_needed(level: int) -> int:
@@ -95,11 +109,12 @@ class RS2004World(World):
 
     item_name_groups = {
         "Skill Caps": set(CAP_ITEM_BY_SKILL.values()),
-        "Quest Unlocks": set(QUEST_UNLOCK_ITEM_BY_ID.values()),
+        "Quest Unlocks": set(QUEST_UNLOCK_ITEM_BY_ID.values()) | {PROGRESSIVE_QUEST_NAME},
         "Gear and Tools": {
             name for name, d in ITEMS.items()
             if name not in set(CAP_ITEM_BY_SKILL.values())
             and name not in set(QUEST_UNLOCK_ITEM_BY_ID.values())
+            and name != PROGRESSIVE_QUEST_NAME
             and not d.get("filler")
         },
     }
@@ -143,9 +158,14 @@ class RS2004World(World):
         quest = QUESTS[qid]
 
         if qid in GATED_QUEST_IDS:
-            unlock = QUEST_UNLOCK_ITEM_BY_ID.get(qid)
-            if unlock is not None and not state.has(unlock, self.player):
-                return False
+            if self.options.progressive_quests:
+                need = QUEST_ORDER_INDEX[qid] + 1
+                if not state.has(PROGRESSIVE_QUEST_NAME, self.player, need):
+                    return False
+            else:
+                unlock = QUEST_UNLOCK_ITEM_BY_ID.get(qid)
+                if unlock is not None and not state.has(unlock, self.player):
+                    return False
 
         for skill, level in (quest.get("skills") or {}).items():
             if not self._has_cap(state, skill, level):
@@ -213,19 +233,41 @@ class RS2004World(World):
             set_rule(event, lambda state, q=qid: self._quest_rule(state, q))
             gielinor.locations.append(event)
 
-        # victory event per goal
+        # victory event: EVERY configured goal (goal + extra_goals) must hold
         victory = RS2004Location(self.player, "Event: Victory", None, gielinor)
         victory.place_locked_item(RS2004Item("Victory", ItemClassification.progression, None, self.player))
-        goal_value = self.options.goal.value
-        if goal_value == Goal.option_dragon_slayer:
-            set_rule(victory, lambda state: state.has("Completed: dragon", self.player))
-        elif goal_value == Goal.option_barcrawl:
-            set_rule(victory, lambda state: True)  # the bars are a sphere-0 travel checklist
-        else:  # kbd
-            set_rule(victory, lambda state: all(self._has_cap(state, s, 50) for s in ("attack", "strength", "defence")))
+        goal_keys = self._goal_keys()
+        set_rule(victory, lambda state: all(self._goal_rule(state, key) for key in goal_keys))
         gielinor.locations.append(victory)
 
         self.multiworld.completion_condition[self.player] = lambda state: state.has("Victory", self.player)
+
+    def _goal_keys(self) -> list:
+        primary = {
+            Goal.option_dragon_slayer: "dragon",
+            Goal.option_barcrawl: "barcrawl",
+            Goal.option_kbd: "kbd",
+            Goal.option_heroes: "heroes",
+            Goal.option_legends: "legends",
+        }[self.options.goal.value]
+        keys = [primary]
+        for name in sorted(self.options.extra_goals.value):
+            key = GOAL_KEY_BY_NAME[name]
+            if key not in keys:
+                keys.append(key)
+        return keys
+
+    def _goal_rule(self, state, key: str) -> bool:
+        if key == "dragon":
+            return state.has("Completed: dragon", self.player)
+        if key == "barcrawl":
+            return True  # the bars are a sphere-0 travel checklist
+        if key == "kbd":
+            return all(self._has_cap(state, s, 50) for s in ("attack", "strength", "defence"))
+        if key == "heroes":
+            return state.has("Completed: hero", self.player)
+        # legends
+        return state.has("Completed: legends", self.player)
 
     def create_item(self, name: str) -> RS2004Item:
         item_def = ITEMS[name]
@@ -233,8 +275,16 @@ class RS2004World(World):
         return RS2004Item(name, classification, item_def["id"], self.player)
 
     def create_items(self) -> None:
+        # progressive mode swaps the per-quest unlocks for an equal number of
+        # copies of the progressive item; classic mode skips the progressive item
+        per_quest_unlocks = set(QUEST_UNLOCK_ITEM_BY_ID.values())
+        progressive = bool(self.options.progressive_quests)
         pool = []
         for name, item_def in ITEMS.items():
+            if progressive and name in per_quest_unlocks:
+                continue
+            if not progressive and name == PROGRESSIVE_QUEST_NAME:
+                continue
             for _ in range(item_def.get("copies", 0)):
                 pool.append(self.create_item(name))
 
@@ -250,13 +300,11 @@ class RS2004World(World):
         return FILLER_NAME
 
     def fill_slot_data(self) -> dict:
-        goal_key = {
-            Goal.option_dragon_slayer: "dragon",
-            Goal.option_barcrawl: "barcrawl",
-            Goal.option_kbd: "kbd"
-        }[self.options.goal.value]
+        goal_keys = self._goal_keys()
         return {
-            "goal": goal_key,
+            "goal": goal_keys[0],  # pre-multi-goal servers read this
+            "goals": goal_keys,
+            "progressiveQuests": bool(self.options.progressive_quests.value),
             "musicChecks": bool(self.options.music_checks.value),
             "questGates": sorted(GATED_QUEST_IDS)
         }

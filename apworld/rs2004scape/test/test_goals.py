@@ -21,6 +21,23 @@ class TestKbdGoal(GoalTestMixin, RS2004TestBase):
     options = {"goal": "kbd"}
 
 
+class TestHeroesGoal(GoalTestMixin, RS2004TestBase):
+    options = {"goal": "heroes"}
+
+
+class TestLegendsGoal(GoalTestMixin, RS2004TestBase):
+    options = {"goal": "legends"}
+
+
+class TestMultiGoal(GoalTestMixin, RS2004TestBase):
+    options = {"goal": "kbd", "extra_goals": ["legends", "barcrawl"]}
+
+    def test_slot_data_lists_all_goals(self) -> None:
+        slot_data = self.world.fill_slot_data()
+        self.assertEqual(slot_data["goal"], "kbd")
+        self.assertEqual(set(slot_data["goals"]), {"kbd", "legends", "barcrawl"})
+
+
 class TestMusicChecks(GoalTestMixin, RS2004TestBase):
     options = {"music_checks": True}
 

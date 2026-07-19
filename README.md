@@ -79,7 +79,9 @@ Finally create a player YAML, `<Archipelago checkout>/Players/<Insert Username>.
 name: <Insert Username>
 game: 2004Scape
 2004Scape:
-  goal: dragon_slayer      # or barcrawl / kbd
+  goal: dragon_slayer      # or barcrawl / kbd / heroes / legends
+  extra_goals: []          # e.g. ["kbd"] - ALL listed goals also required for victory
+  progressive_quests: false # one difficulty-ordered "Progressive Quest Unlock" item instead of 61 named ones
   music_checks: false      # 230 extra "first visit to each music region" checks
 ```
 

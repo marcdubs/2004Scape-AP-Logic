@@ -24,7 +24,9 @@ Progression is rebuilt around Archipelago items:
   20 each, up to 99 (Hitpoints is never capped).
 - **Gear and tool tiers**: "Progressive Melee", "Progressive Armour", "Progressive Ranged", and "Progressive Magic"
   gate which equipment tiers you may use; "Progressive Pickaxe" and "Progressive Axe" gate your tools.
-- **Quest gates**: most quests cannot be started until you receive that quest's "Quest Unlock" item.
+- **Quest gates**: most quests cannot be started until you receive that quest's "Quest Unlock" item. With the
+  `progressive_quests` option, those are replaced by copies of a single "Progressive Quest Unlock" item that reveals
+  quests in difficulty order - short errands first, the long master quests last.
 
 On top of that, the game server can randomize the world itself per seed - entrances, monster drop tables (including a
 "mimic" mode where monsters run each other's entire loot tables), shop locations, gathering and processing outputs,
@@ -37,6 +39,11 @@ Chosen per slot:
 - **Dragon Slayer**: complete the Dragon Slayer quest (defeat Elvarg on Crandor).
 - **Barcrawl**: complete all ten bars of Alfred Grimhand's Barcrawl.
 - **King Black Dragon**: slay the King Black Dragon in the deep Wilderness.
+- **Heroes' Quest**: complete Heroes' Quest (55 QP and a long prerequisite chain).
+- **Legends' Quest**: complete Legends' Quest (107 QP - effectively "finish the quest game").
+
+The `extra_goals` option can require several of these at once - victory is only reported when every configured goal
+is done.
 
 ## What items and locations get shuffled?
 

@@ -3757,6 +3757,12 @@
       "count": 1,
       "copies": 1
     },
+    "Progressive Quest Unlock": {
+      "id": 20045086,
+      "grant": "progressive_quest",
+      "count": 1,
+      "copies": 61
+    },
     "Mystery Reward": {
       "id": 20045085,
       "copies": 0,
@@ -3781,6 +3787,12 @@
     ],
     "kbd": [
       "kbd_slain"
+    ],
+    "heroes": [
+      "quest_hero"
+    ],
+    "legends": [
+      "quest_legends"
     ]
   },
   "goals": [
@@ -3816,6 +3828,22 @@
         "wilderness_deep"
       ],
       "notes": "JUDGMENT CALL - not a vanilla script-enforced requirement. King Black Dragon's own kill hook (areas/area_wilderness/scripts/king_black_dragon.rs2) has no coded level or quest gate; Dragon Slayer completion is explicitly NOT required (the design brief calls this out). His lair sits deep in the Wilderness past the Lava Maze, reachable by walking under the travel-simplification model (no formal region lock), so the engine instead encodes a minimum combat readiness floor - 40 Attack/Strength/Defence/Hitpoints - as a stand-in for 'can plausibly survive a multi-headed, poison-capable, dragonfire-breathing boss alone in deep Wilderness'. This is deliberately conservative and easy to relitigate: raise or lower the thresholds here, or swap them for a progressive_melee gear-tier check (ap_unlock_count('progressive_melee') >= N), without touching the engine code - see docs/progression-sim.md 'KBD gate: the judgment call' for the reasoning and how to change it. An antidragonbreathshield is recommended in narration but not required numerically. 2026-07-16: floor raised 40 -> 50 to sit on the new quest combat-floor curve (kill level 120+ -> 50; KBD is 239) so the endgame goal is never logically shallower than Legends/Fight Arena."
+    },
+    {
+      "id": "heroes",
+      "name": "Heroes' Quest",
+      "quests": [
+        "hero"
+      ],
+      "notes": "Reduces to completing the 'hero' quest entry in quests.json (55 QP to start; Shield of Arrav, Lost City, Merlin's Crystal and Dragon Slayer prereqs; 40s combat floor). Kept as a separate goal id because in the AP-phase mapping this is a distinct yaml goal option, mirroring dragon_slayer's pattern."
+    },
+    {
+      "id": "legends",
+      "name": "Legends' Quest",
+      "quests": [
+        "legends"
+      ],
+      "notes": "Reduces to completing the 'legends' quest entry in quests.json (107 QP to start; Family Crest, Heroes' Quest, Shilo Village, Underground Pass and Waterfall Quest prereqs; ten 42-56 skill requirements). The longest-horizon goal available - effectively 'finish the quest game'. Same quest-reduction pattern as dragon_slayer/heroes."
     }
   ],
   "quests": [
@@ -4722,5 +4750,68 @@
     "waterfall",
     "zanaris",
     "zombiequeen"
+  ],
+  "questUnlockOrder": [
+    "cog",
+    "cook",
+    "death",
+    "doric",
+    "drunkmonk",
+    "hazeelcult",
+    "hetty",
+    "imp",
+    "junglepotion",
+    "priest",
+    "runemysteries",
+    "sheep",
+    "gobdip",
+    "romeojuliet",
+    "fishingcompo",
+    "blackarmgang",
+    "elena",
+    "fluffs",
+    "mcannon",
+    "hunt",
+    "itgronigen",
+    "biohazard",
+    "blackknight",
+    "murder",
+    "prince",
+    "druid",
+    "haunted",
+    "sheepherder",
+    "totem",
+    "squire",
+    "seaslug",
+    "eadgar",
+    "waterfall",
+    "scorpcatcher",
+    "itexam",
+    "mortton",
+    "priestperil",
+    "chompybird",
+    "demon",
+    "vampire",
+    "elemental_workshop",
+    "arthur",
+    "ball",
+    "tbwt",
+    "troll",
+    "tree",
+    "desertrescue",
+    "druidspirit",
+    "arena",
+    "grail",
+    "ikov",
+    "zombiequeen",
+    "zanaris",
+    "grandtree",
+    "viking",
+    "itwatchtower",
+    "crest",
+    "hero",
+    "upass",
+    "regicide",
+    "legends"
   ]
 }
