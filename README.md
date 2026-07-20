@@ -116,7 +116,7 @@ Every YAML option - the 2004Scape ones, the standard Archipelago ones
 item/location name lists they take - is documented in
 [docs/ap-yaml-options.md](docs/ap-yaml-options.md).
 
-### 3. Per run: roll a randomized seed
+### 3. Per run (solo, no AP server): roll a randomized seed and play
 
 ```
 bash scripts/new-run.sh        # from this repo (Windows: scripts\new-run.bat)
@@ -124,15 +124,16 @@ bash scripts/new-run.sh        # from this repo (Windows: scripts\new-run.bat)
 
 Every stage (entrances, drops, gathering, processing, spawn, placement...) is a
 documented knob inside the script. It ends with a validated entrance table, a
-zeroed unlock state, and cleared check/tracker ledgers.
+zeroed unlock state, and cleared check/tracker ledgers. The GenerateSeed stage
+placed items locally, so that's the whole setup: skip steps 4-5, boot the
+server, and play.
 
-- **Solo run (no AP server)**: you're done - the script's GenerateSeed stage
-  placed items locally. Skip step 4, boot and play.
-- **Archipelago run**: delete `Server/engine/data/config/ap-placements.json`
-  afterwards - the AP multiworld owns item placements, and the game client
-  rebuilds that file with just the seed's quest gates when it connects.
+**Archipelago run? Don't roll yet.** The seed roll must happen AFTER the game
+server has connected to the multiworld (step 5) - connecting is what delivers
+your YAML's randomization options to the server. Rolling first silently uses
+the script's own default knobs instead of what the YAML asked for.
 
-### 4. Per run: generate + host the multiworld
+### 4. Per run (Archipelago): generate + host the multiworld
 
 From the Archipelago checkout. Generation writes `output/AP_<id>.zip`; open it
 with any unzip tool and pull the `AP_<id>.archipelago` file out next to it,
@@ -157,21 +158,37 @@ tar -xf output\AP_<id>.zip -C output AP_<id>.archipelago
 Leave that terminal running. Server state lives in `output/AP_<id>.apsave` next
 to the multidata - delete it to reset the run, regenerate for a new seed.
 
-### 5. Boot the game server and play
+### 5. Per run (Archipelago): connect, THEN roll the seed, then play
 
 1. Start the game server as usual (`cd Server/engine && npx tsx src/app.ts`,
    wait for `World ready`).
-2. **Tracker**: open http://localhost:8080/ap/ - map, discoveries, unlocks.
-3. **Connect to Archipelago**: tracker -> **Archipelago** tab -> host
-   `localhost` (or wherever the AP server runs; a WSL-hosted server is
-   `localhost` from Windows), port `38281`, slot name from your YAML -> **Test
-   connection** (expect "2004Scape slot hosted ✓") -> **Save & Connect**. The
-   status panel flips to *connected*; no restart needed. (Headless equivalent:
-   write `Server/engine/data/config/ap-archipelago.json` by hand.)
-4. **Game client**: http://localhost:8080/rs2.cgi - play. Checks announce in
-   chat as you complete them, received items apply immediately (gear tiers,
-   skill caps, quest unlocks) and are announced in-game, and reaching your goal
-   reports victory to the multiworld automatically.
+2. **Connect to Archipelago**: open the tracker at http://localhost:8080/ap/ ->
+   **Archipelago** tab -> host `localhost` (or wherever the AP server runs; a
+   WSL-hosted server is `localhost` from Windows), port `38281`, slot name from
+   your YAML -> **Test connection** (expect "2004Scape slot hosted ✓") ->
+   **Save & Connect**. The status panel flips to *connected*. (Headless
+   equivalent: write `Server/engine/data/config/ap-archipelago.json` by hand.)
+   On connect the server adopts the room's live options (goal + extra goals,
+   music checks, item-family toggles, relics, infinite run), rebuilds
+   `ap-placements.json` with just the seed's quest gates (the multiworld owns
+   item placements), and writes your YAML's randomization options to
+   `data/config/ap-seed-options.json` for the seed roll to pick up.
+3. **Roll the world**: `bash scripts/new-run.sh` - it auto-adopts
+   `ap-seed-options.json`, overriding its own knobs, so the world matches what
+   the YAML asked for. (`new-run.bat` can NOT auto-adopt - on Windows run the
+   `.sh` via WSL or git-bash, or copy the values into the .bat's knobs by
+   hand.) Then **restart the game server**; it reconnects to the room on boot.
+4. **Game client**: http://localhost:8080/rs2.cgi - play. The tracker shows
+   map, discoveries, and unlocks as you go. Checks announce in chat as you
+   complete them, received items apply immediately (gear tiers, skill caps,
+   quest unlocks) and are announced in-game, and reaching your goal (plus any
+   extra goals) reports victory to the multiworld automatically.
+
+Note: `npx tsx tools/sim/SimulateProgression.ts` only means something for SOLO
+runs - in AP mode `ap-placements.json` has no local placements, so the sim
+reports everything unreachable. The AP-mode sanity check is
+`npx tsx tools/logic/ValidateSeed.ts` (the spatial layer); item-layer
+soundness is Archipelago's own generation.
 
 Full details: [docs/archipelago-integration.md](docs/archipelago-integration.md)
 and [apworld/README.md](apworld/README.md).

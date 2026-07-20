@@ -144,7 +144,7 @@ echo
 echo "================================================================"
 echo "New run rolled (seed $SEED). Now:"
 echo "  1. RESTART the Windows server."
-echo "  2. Walkthrough: npx tsx tools/sim/SimulateProgression.ts --verbosity 2"
+echo "  2. Walkthrough: npx tsx tools/sim/SimulateProgression.ts --verbosity 2   (solo runs only - AP runs have no local placements)"
 echo "  3. Sanity:      npx tsx tools/logic/ValidateSeed.ts"
 echo "  4. Tracker:     http://localhost:8080/ap/   (?spoiler=1 to see everything)"
 echo "  5. Testing aids: tools/ap/SetUnlock.ts <name> <count> | --clear"
