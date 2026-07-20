@@ -32,10 +32,24 @@ node scripts/install.js                             # deploy this repo's overlay
 cd ../Server/engine && npx tsx tools/pack/Build.ts  # one content pack build (~2 min)
 ```
 
-If `tsx` dies with an esbuild platform error (can happen when the same checkout
-is used from two OSes, e.g. Windows + WSL): `cd ../Server/engine && npm install`,
-then additionally `npm install --no-save --force @esbuild/<the-other-platform>`
-(e.g. `@esbuild/win32-x64`) if you keep switching back and forth.
+`install.js` also sets `build.verify: false` (and `verifyFolder`/`verifyPack`)
+in `Server/engine/data/config/world.json` - AP content adds objs/varps, so the
+packed cache can never match the vanilla checksums and the engine's
+`BUILD_VERIFY` safety check would fail the build with a "checksum mismatch!"
+error. Your other `world.json` settings are preserved.
+
+Troubleshooting the pack build:
+
+- **A build failed once and now fails differently** (e.g. "Invalid property
+  value" on an `ap_*` config): the aborted run left stale generated registries
+  and mtime stamps behind. Run `npx tsx tools/pack/Clean.ts` in
+  `Server/engine`, then build again (the post-clean build does a full ~2 min
+  crawl).
+- **`tsx` dies with an esbuild platform error** (can happen when the same
+  checkout is used from two OSes, e.g. Windows + WSL):
+  `cd ../Server/engine && npm install`, then additionally
+  `npm install --no-save --force @esbuild/<the-other-platform>`
+  (e.g. `@esbuild/win32-x64`) if you keep switching back and forth.
 
 Optional flags in `Server/engine/data/config/world.json`: `web.port` (tracker/
 client port, examples below assume 8080), `apSkipTutorial: true` (new accounts

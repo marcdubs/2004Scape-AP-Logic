@@ -39,6 +39,34 @@ function copyRecursive(src, dest, serverRoot) {
     console.log(`  ${path.relative(REPO_ROOT, src)} -> ${path.relative(serverRoot, dest)}`);
 }
 
+// AP content adds objs/varps, so the packed cache can never match the vanilla
+// rev-274 checksums - the engine's BUILD_VERIFY safety check must be off or
+// every fresh install dies with ".obj checksum mismatch!". world.json is
+// runtime state (deep-merged over engine defaults, so a partial file is fine);
+// only the three verify flags are touched, everything else is preserved.
+function disableBuildVerify(serverRoot) {
+    const configPath = path.join(serverRoot, 'engine', 'data', 'config', 'world.json');
+    let config = {};
+    if (fs.existsSync(configPath)) {
+        try {
+            config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        } catch (err) {
+            console.warn(`could not parse ${configPath} (${err.message}) - leaving it alone; set build.verify=false yourself`);
+            return;
+        }
+    }
+    const build = (config.build ??= {});
+    if (build.verify === false && build.verifyFolder === false && build.verifyPack === false) {
+        return;
+    }
+    build.verify = false;
+    build.verifyFolder = false;
+    build.verifyPack = false;
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 4) + '\n');
+    console.log(`set build.verify/verifyFolder/verifyPack=false in ${path.relative(serverRoot, configPath)} (AP content never matches vanilla checksums)`);
+}
+
 function main() {
     const serverRoot = parseServerRoot();
 
@@ -67,6 +95,8 @@ function main() {
         console.log(`installing overlays/${target.name}/ -> ${path.relative(REPO_ROOT, destRoot)}/`);
         copyRecursive(srcRoot, destRoot, serverRoot);
     }
+
+    disableBuildVerify(serverRoot);
 }
 
 main();
