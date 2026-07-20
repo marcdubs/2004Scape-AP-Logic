@@ -303,6 +303,11 @@ function applySlotData(slotData: Record<string, unknown> | undefined): void {
         setApOption('infiniteRun', slotData.infiniteRun);
     }
 
+    // progressive XP rate applies live too (Player.addXp consults ApOptions per gain)
+    if (typeof slotData.progressiveXpRate === 'boolean') {
+        setApOption('progressiveXpRate', slotData.progressiveXpRate);
+    }
+
     // seed knobs (entrances/drip/shops/drops/gathering/processing/spawn):
     // persisted for scripts/new-run to adopt on the NEXT seed roll - they can't
     // apply live (several need a content pack rebuild).

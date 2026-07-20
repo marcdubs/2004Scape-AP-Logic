@@ -69,7 +69,7 @@ function ensureWorldConfig(serverRoot) {
     };
 
     seed('web', 'port', 8080); // tracker/client port; all docs examples assume 8080
-    seed('node', 'xpRate', 1); // XP multiplier - worth raising to match the multiworld's pace
+    seed('node', 'xpRate', 1); // flat XP multiplier - only applies when progressiveXpRate is off in ap-options.json (progressive 5x-320x level scaling is the default)
     seed('node', 'infiniteRun', false);
     seed('node', 'apSkipTutorial', true); // new accounts skip Tutorial Island
 

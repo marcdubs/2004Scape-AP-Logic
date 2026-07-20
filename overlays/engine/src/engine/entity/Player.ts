@@ -1,6 +1,6 @@
 import { PlayerInfoProt, Visibility } from '#/network/rsbuf/index.js';
 import { CollisionFlag, CollisionType } from '#/engine/routefinder/index.js';
-import { getApOption } from '#/engine/ApOptions.js';
+import { apXpMultiplier, getApOption } from '#/engine/ApOptions.js';
 
 import Component from '#/cache/config/Component.js';
 import FontType from '#/cache/config/FontType.js';
@@ -1859,7 +1859,9 @@ export default class Player extends PathingEntity {
             return;
         }
 
-        const multi = allowMulti ? Environment.node.xpRate : 1;
+        // AP: progressive XP rate (default on) scales the multiplier with this
+        // stat's current level; off = vanilla flat world xpRate.
+        const multi = allowMulti ? apXpMultiplier(this.baseLevels[stat]) : 1;
         // AP: progressive skill caps may truncate the gain (pure passthrough until an
         // unlock table caps this stat); first-XP state feeds the AP check emitter below.
         // Truncated overflow is banked per-skill (ap_xpbank_<skill> varp) rather than

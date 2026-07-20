@@ -7,6 +7,7 @@ class TestSeedOptionsDefaults(RS2004TestBase):
     def test_defaults(self) -> None:
         slot_data = self.world.fill_slot_data()
         self.assertFalse(slot_data["infiniteRun"])
+        self.assertTrue(slot_data["progressiveXpRate"])
         self.assertEqual(slot_data["seedOptions"], {
             "entrances": "on",
             "npcDrip": True,
@@ -28,11 +29,13 @@ class TestSeedOptionsCustom(RS2004TestBase):
         "gathering_randomization": "chaos",
         "spawn_randomization": "chunk",
         "infinite_run": True,
+        "progressive_xp_rate": False,
     }
 
     def test_custom_values(self) -> None:
         slot_data = self.world.fill_slot_data()
         self.assertTrue(slot_data["infiniteRun"])
+        self.assertFalse(slot_data["progressiveXpRate"])
         seed = slot_data["seedOptions"]
         self.assertEqual(seed["entrances"], "mixed")
         self.assertFalse(seed["npcDrip"])

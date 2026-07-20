@@ -3060,3 +3060,25 @@ roll, engine typecheck + pack build (1:43) clean, apworld tests updated
 (test_seed_options) + py_compile clean. NOTE: existing runs only get shuffled
 teleports on their next new-run roll - the feature rides RegenerateAll, and
 mid-run adoption would silently diverge from the seed's spoiler anyway.
+
+## Addendum (2026-07-21): progressive XP rate (problems.txt round)
+
+Player feedback: flat xpRate needs constant mid-run hand-raising. Replaced
+with progressiveXpRate (ap-options.json, default ON for solo and AP): the
+multiplier is a function of the trained stat's CURRENT base level, computed
+per-gain in Player.addXp via ApOptions.apXpMultiplier - 5x at 1, doubling
+every 15 levels (10x@15, 20x@30, 40x@45, 80x@60, 160x@75, 320x@90+). The
+player's original proposal was doubling every 10, but the XP curve itself
+doubles every ~7 levels, so a 10-level doubling tracks it closely enough
+that levels 30+ cost ~1-4 actions each and capped-skill banked XP would
+auto-complete whole +20 cap brackets; /15 keeps 98->99 at ~77 actions
+(user picked this over /10, +50%/10, and constant-effort options). While
+on it REPLACES the flat world.json xpRate (no surprise multiplication for
+users who already raised xpRate); off = vanilla flat behavior. Wired as a
+LIVE slot option exactly like infiniteRun (slot_data.progressiveXpRate ->
+setApOption on connect - not a seedOptions knob, no reseed needed).
+AP_STAT_ADVANCE_RAW reward XP still bypasses all multipliers (absolute
+amounts). Solo servers toggle it in data/config/ap-options.json. The sim's
+own loadApOptions deliberately NOT extended - the option has no placement
+relevance (that loader only mirrors placement-affecting keys, per its
+header). Engine-only change: restart, no pack rebuild.

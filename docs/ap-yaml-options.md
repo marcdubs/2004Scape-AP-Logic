@@ -125,6 +125,19 @@ quests", just re-run for a fresh seed.
 above this applies **live** on connect (same effect as the server operator's
 `infiniteRun` world.json flag - either source enables it).
 
+### `progressive_xp_rate`
+
+`true` (default) / `false`. XP rate scales with the trained skill's level: 5x
+at level 1, doubling every 15 levels (10x at 15, 20x at 30, 40x at 45, 80x at
+60, 160x at 75, 320x at 90+). While on it **replaces** the server's flat
+`xpRate`; turning it off restores flat-rate behavior. Applies **live** on
+connect, no reseed needed. Strongly recommended on - late-game 2004Scape
+levels are far too slow for a multiworld at any flat rate that isn't absurd
+at level 1. The 15-level doubling deliberately trails the XP curve's own
+~7-level doubling so high levels stay meaningful (level 98->99 is still a few
+minutes of play, not one action). (AP reward XP is unaffected - those amounts
+are always absolute.)
+
 ### `music_checks`
 
 `false` (default) / `true`. Adds 230 "first visit to each music-track region"

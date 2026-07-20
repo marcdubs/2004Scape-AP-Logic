@@ -328,6 +328,7 @@ class RS2004World(World):
             "relics": sorted(self.options.relics.value),
             "musicChecks": bool(self.options.music_checks.value),
             "infiniteRun": bool(self.options.infinite_run.value),
+            "progressiveXpRate": bool(self.options.progressive_xp_rate.value),
             # seed knobs: the game server adopts these on connect and applies
             # them the next time it rolls a seed (scripts/new-run)
             "seedOptions": {

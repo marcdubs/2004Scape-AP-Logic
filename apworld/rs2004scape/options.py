@@ -166,6 +166,17 @@ class InfiniteRun(Toggle):
     default = 0
 
 
+class ProgressiveXpRate(DefaultOnToggle):
+    """XP rate scales with the trained skill's level: 5x at level 1,
+    doubling every 15 levels (10x at 15, 20x at 30, 40x at 45, 80x at 60,
+    160x at 75, 320x at 90+). Replaces the server's flat xpRate while on.
+    Applies live on connect (server-side toggle, no reseed needed).
+    Strongly recommended - keeps late-game skill pacing in step with the
+    multiworld."""
+
+    display_name = "Progressive XP Rate Multiplier"
+
+
 class Relics(OptionSet):
     """Which relic reward items are allowed to roll from "Mystery Reward"
     filler. A relic keeps working once delivered; unticking one only stops it
@@ -209,3 +220,4 @@ class RS2004Options(PerGameCommonOptions):
     processing_randomization: ProcessingRandomization
     spawn_randomization: SpawnRandomization
     infinite_run: InfiniteRun
+    progressive_xp_rate: ProgressiveXpRate
