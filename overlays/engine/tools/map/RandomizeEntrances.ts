@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { printInfo, printWarning } from '#/util/Logger.js';
+import { printError, printInfo, printWarning } from '#/util/Logger.js';
 
 import { resolveApproachDestinations } from './ApproachResolver.js';
 import { CONTENT_ROOT, ENTRANCE_DIR, type CoordLiteral, type Entrance, parseFile, parseZanarisDoorText, type Requirement, resolveSameTileRelative } from './EntranceParser.js';
@@ -323,7 +323,7 @@ function parseArgs() {
     const args = process.argv.slice(2);
     const seedIdx = args.indexOf('--seed');
     const seed = seedIdx !== -1 ? parseInt(args[seedIdx + 1], 10) : Math.floor(Math.random() * 0xffffffff);
-    return { seed, dryRun: args.includes('--dry-run'), rewrite: args.includes('--rewrite'), mixed: args.includes('--mixed'), noValidate: args.includes('--no-validate') };
+    return { seed, dryRun: args.includes('--dry-run'), rewrite: args.includes('--rewrite'), mixed: args.includes('--mixed'), noValidate: args.includes('--no-validate'), requirePerfect: args.includes('--require-perfect') };
 }
 
 // Runs tools/logic/ValidateSeed.ts against the just-written table (exit 0 = every
@@ -737,7 +737,7 @@ function main() {
         process.exit(1);
     }
 
-    const { seed: startSeed, dryRun, rewrite, mixed, noValidate } = parseArgs();
+    const { seed: startSeed, dryRun, rewrite, mixed, noValidate, requirePerfect } = parseArgs();
 
     // Phase 1 (skipped for --dry-run/--no-validate, which keep legacy behavior):
     // write + spatially grade STRICT_QUEST_ATTEMPTS candidate tables. A table that
@@ -747,25 +747,43 @@ function main() {
     // candidate even reaches the goals, phase 2 falls back to the legacy
     // reroll-until-goals-ok loop over the remaining budget.
     if (!dryRun && !noValidate) {
+        // --require-perfect (AP runs, wired via seed-options-to-env.cjs): a stranded
+        // quest is acceptable in SOLO mode (GenerateSeed's feasibility exclusion turns
+        // its checks into filler) but NEVER in an AP run - the multiworld's fill was
+        // computed travel-agnostically before this table existed, so a stranded
+        // quest's checks may hold real progression (ours or another player's) that
+        // could then never be sent. Spend the whole reroll budget hunting a perfect
+        // table and hard-fail rather than accept a stranded one.
+        const perfectBudget = requirePerfect ? MAX_REROLL_ATTEMPTS : STRICT_QUEST_ATTEMPTS;
         let best: { seed: number; strandedQuests: number } | null = null;
-        for (let attempt = 0; attempt < STRICT_QUEST_ATTEMPTS; attempt++) {
+        let gradingUnavailable = false;
+        for (let attempt = 0; attempt < perfectBudget; attempt++) {
             const seed = (startSeed + attempt) >>> 0;
             runAttempt(seed, dryRun, rewrite, mixed, true);
             const quality = spatialQuality();
             if (quality === null) {
                 printWarning('spatial grading unavailable (region graph / validator error) - falling back to the legacy goals-only reroll loop');
                 best = null;
+                gradingUnavailable = true;
                 break;
             }
             if (quality.goalsOk && quality.strandedQuests === 0) {
-                printInfo(`seed ${seed} strands NOTHING - all 63 quests spatially completable (attempt ${attempt + 1}/${STRICT_QUEST_ATTEMPTS})`);
+                printInfo(`seed ${seed} strands NOTHING - all 63 quests spatially completable (attempt ${attempt + 1}/${perfectBudget})`);
                 printInfo('restart the server to load the new entrance layout (no content rebuild needed)');
                 return;
             }
-            printInfo(`seed ${seed}: ${quality.goalsOk ? `${quality.strandedQuests} quest(s) stranded` : 'GOALS unreachable'} (attempt ${attempt + 1}/${STRICT_QUEST_ATTEMPTS})`);
+            printInfo(`seed ${seed}: ${quality.goalsOk ? `${quality.strandedQuests} quest(s) stranded` : 'GOALS unreachable'} (attempt ${attempt + 1}/${perfectBudget})`);
             if (quality.goalsOk && (best === null || quality.strandedQuests < best.strandedQuests)) {
                 best = { seed, strandedQuests: quality.strandedQuests };
             }
+        }
+        if (requirePerfect) {
+            if (gradingUnavailable) {
+                printError('--require-perfect: spatial grading is unavailable, so a zero-stranded table cannot be verified. Build the region graph (npx tsx tools/logic/BuildRegionGraph.ts) and re-run.');
+            } else {
+                printError(`--require-perfect: no table stranding zero quests in ${perfectBudget} attempt(s) from seed ${startSeed}. NOT accepting a stranded table - Archipelago's fill assumes every quest is reachable, and stranded checks could hold other players' progression. Re-run with a different --seed.`);
+            }
+            process.exit(1);
         }
         if (best !== null) {
             runAttempt(best.seed, dryRun, rewrite, mixed, true);

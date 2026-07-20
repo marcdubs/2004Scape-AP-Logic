@@ -37,8 +37,14 @@ const del = name => {
 if (o.entrances === 'off') {
     set('RUN_ENTRANCES', 0);
     del('ap-entrances.json');
-} else if (o.entrances === 'mixed') {
-    prepend('ENTRANCE_EXTRA', '--mixed');
+} else {
+    if (o.entrances === 'mixed') {
+        prepend('ENTRANCE_EXTRA', '--mixed');
+    }
+    // Adopting this file means an AP run: a stranded quest's checks may hold the
+    // multiworld's progression, so the entrance roll must not accept stranded
+    // tables (solo runs may - GenerateSeed just makes those checks filler).
+    prepend('ENTRANCE_EXTRA', '--require-perfect');
 }
 if (o.npcDrip === false) prepend('REGENERATE_EXTRA', '--skip-drip');
 if (o.shops === false) prepend('REGENERATE_EXTRA', '--skip-shops');

@@ -2984,3 +2984,20 @@ entrances can safely touch it. Follow-up if Morytania content ever matters
 for AP: curate Mort Myre + Canifis in ap-gated-areas.json with
 `{varp: "druidspirit"/"priestperil", gte: <stage>}` requires and drop the
 blanket exclusion.
+
+## Addendum (2026-07-20): stranded entrance tables are solo-only
+
+"no perfect table in 5 attempt(s) - accepted the least-stranded candidate"
+is SAFE in solo mode (GenerateSeed's feasibility exclusion turns the stranded
+quests' checks into filler) but was silently unsound in AP mode: the
+multiworld's fill is travel-agnostic and computed before the entrance table
+exists, so a stranded quest's checks may hold real progression (ours or
+another player's) that can then never be sent - exactly the contract
+archipelago-integration.md says the server must uphold ("an AP-mode server
+must run an entrance table that validates fully green"). Fix:
+RandomizeEntrances --require-perfect spends the whole 20-attempt budget
+hunting a zero-stranded table and hard-fails instead of accepting a stranded
+one; seed-options-to-env.cjs auto-adds the flag whenever ap-seed-options.json
+is adopted (adoption == AP run). Verified: seed 4242 would have shipped a
+stranded table at the old 5-attempt cutoff, --require-perfect kept rolling
+and found perfect at attempt 13.

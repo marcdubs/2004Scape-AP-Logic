@@ -86,8 +86,11 @@ SPAWN_MODE=city           # city (7 spellbook landmarks) | chunk (random mainlan
 SPAWN_EXTRA=""            # chunk mode: "--include-far-west" opens mapX<40 back up
 
 # RandomizeEntrances.ts - ladder/stair/trapdoor shuffle + gated entrances.
-#   all params: [--seed <n>] [--mixed] [--dry-run] [--no-validate]
-#   (validation rerolls seed+1 automatically, budget 20; --rewrite is legacy, avoid)
+#   all params: [--seed <n>] [--mixed] [--dry-run] [--no-validate] [--require-perfect]
+#   (validation rerolls seed+1 automatically, budget 20; --rewrite is legacy, avoid.
+#    --require-perfect refuses tables that strand ANY quest - auto-added for AP runs
+#    by the seed-options adoption below, since stranded checks may hold multiworld
+#    progression; solo runs may accept stranded tables, those checks become filler)
 ENTRANCE_EXTRA=""         # e.g. "--mixed" to pool cross-map + floor-shift together
 
 # GenerateSeed.ts - AP placement (checks contain the unlocks). Writes

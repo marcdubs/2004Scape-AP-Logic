@@ -101,6 +101,13 @@ connect once, then run `new-run`. To fall back to the script knobs instead:
 `AP_SEED_OPTIONS=ignore bash scripts/new-run.sh` (Windows:
 `set AP_SEED_OPTIONS=ignore` first), or delete the file.
 
+Adoption also adds `--require-perfect` to the entrance roll: an AP run must
+never accept an entrance table that strands a quest (solo runs may - their
+stranded checks just become filler), because the multiworld's fill was
+computed before the table existed and a stranded check may hold another
+player's progression. If the roll fails with "no table stranding zero
+quests", just re-run for a fresh seed.
+
 | option | values (default first) | controls |
 |---|---|---|
 | `entrance_randomization` | `on` / `off` / `mixed` | ladder/stair/trapdoor shuffle; `mixed` merges both gate pools |

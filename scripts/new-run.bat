@@ -103,8 +103,11 @@ set SPAWN_EXTRA=
 REM chunk mode: "--include-far-west" opens mapX<40 back up
 
 REM RandomizeEntrances.ts - ladder/stair/trapdoor shuffle + gated entrances.
-REM   all params: [--seed <n>] [--mixed] [--dry-run] [--no-validate]
-REM   (validation rerolls seed+1 automatically, budget 20; --rewrite is legacy, avoid)
+REM   all params: [--seed <n>] [--mixed] [--dry-run] [--no-validate] [--require-perfect]
+REM   (validation rerolls seed+1 automatically, budget 20; --rewrite is legacy, avoid.
+REM    --require-perfect refuses tables that strand ANY quest - auto-added for AP runs
+REM    by the seed-options adoption below, since stranded checks may hold multiworld
+REM    progression; solo runs may accept stranded tables, those checks become filler)
 set ENTRANCE_EXTRA=
 REM e.g. "--mixed" to pool cross-map + floor-shift together
 
