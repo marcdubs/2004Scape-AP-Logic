@@ -175,8 +175,11 @@ to the multidata - delete it to reset the run, regenerate for a new seed.
    `data/config/ap-seed-options.json` for the seed roll to pick up.
 3. **Roll the world**: `bash scripts/new-run.sh` (Windows:
    `scripts\new-run.bat`) - both auto-adopt `ap-seed-options.json`, overriding
-   their own knobs, so the world matches what the YAML asked for. Then
-   **restart the game server**; it reconnects to the room on boot.
+   their own knobs, so the world matches what the YAML asked for. The roll
+   also removes the local `ap-placements.json` automatically (the multiworld
+   owns item placements; the server rewrites the file with the room's quest
+   gates when it reconnects). Then **restart the game server**; it reconnects
+   to the room on boot.
 4. **Game client**: http://localhost:8080/rs2.cgi - play. The tracker shows
    map, discoveries, and unlocks as you go. Checks announce in chat as you
    complete them, received items apply immediately (gear tiers, skill caps,

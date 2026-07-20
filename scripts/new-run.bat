@@ -127,10 +127,12 @@ REM multiworld YAML's seed options. When that file exists it OVERRIDES the knobs
 REM above - flow: connect once, then re-run this script. The helper emits
 REM `set "K=V"` lines (with !VAR! delayed expansion for appends) executed below.
 
+set ADOPTED=0
 if /i "%AP_SEED_OPTIONS%"=="ignore" goto :seedopts_done
 if not exist "data\config\ap-seed-options.json" goto :seedopts_done
 echo ==^> adopting data\config\ap-seed-options.json (set AP_SEED_OPTIONS=ignore to skip)
 for /f "usebackq delims=" %%L in (`node "%~dp0seed-options-to-env.cjs" "data\config\ap-seed-options.json" --bat`) do %%L
+set ADOPTED=1
 :seedopts_done
 
 REM ================================ stages =====================================
@@ -183,6 +185,15 @@ if "%RUN_PLACEMENT%"=="1" (
     echo.
     echo ==^> npx tsx tools/ap/GenerateSeed.ts --seed %SEED% --pool %POOL% %PLACEMENT_EXTRA%
     call npx tsx tools/ap/GenerateSeed.ts --seed %SEED% --pool %POOL% %PLACEMENT_EXTRA% || goto :error
+)
+
+REM AP run (seed options adopted): the multiworld owns item placements, and
+REM ApClient refuses to overwrite a file holding a real (solo) fill - GenerateSeed
+REM above still ran for its reset + validation duties, but its local placements
+REM must go. The server rewrites the file with the room's quest gates on reconnect.
+if "%ADOPTED%"=="1" (
+    if exist "data\config\ap-placements.json" del /q "data\config\ap-placements.json"
+    echo ==^> AP run: removed local ap-placements.json - multiworld owns placements; quest gates re-sync on connect
 )
 
 echo.

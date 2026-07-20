@@ -108,9 +108,11 @@ PLACEMENT_EXTRA=""        # e.g. "--max-progression-level 50"
 # once, then re-run this script to roll the seed the multiworld asked for.
 # Set AP_SEED_OPTIONS=ignore (or delete the file) to use the script knobs.
 SEED_OPTS_FILE="data/config/ap-seed-options.json"
+ADOPTED=0
 if [ "${AP_SEED_OPTIONS:-}" != "ignore" ] && [ -f "$SEED_OPTS_FILE" ]; then
   echo "==> adopting $SEED_OPTS_FILE (AP_SEED_OPTIONS=ignore to skip)"
   eval "$(node "$SCRIPT_DIR/seed-options-to-env.cjs" "$SEED_OPTS_FILE")"
+  ADOPTED=1
 fi
 
 # ================================ stages =====================================
@@ -126,6 +128,15 @@ run() { echo; echo "==> npx tsx $*"; npx tsx "$@"; }
 [ "$REFRESH_WORLDMAP_PNG" = 1 ] && run tools/map/RenderWorldmapPng.ts
 [ "$VERBOSE" = 1 ]       && PLACEMENT_EXTRA="--spoiler $PLACEMENT_EXTRA"
 [ "$RUN_PLACEMENT" = 1 ] && run tools/ap/GenerateSeed.ts --seed "$SEED" --pool "$POOL" $PLACEMENT_EXTRA
+
+# AP run (seed options adopted): the multiworld owns item placements, and ApClient
+# refuses to overwrite a file holding a real (solo) fill - GenerateSeed above still
+# ran for its reset + validation duties, but its local placements must go. The
+# server rewrites the file with just the room's quest gates on reconnect.
+if [ "$ADOPTED" = 1 ]; then
+  rm -f data/config/ap-placements.json
+  echo "==> AP run: removed local ap-placements.json (multiworld owns placements; quest gates re-sync on connect)"
+fi
 
 echo
 echo "================================================================"
