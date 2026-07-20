@@ -3001,3 +3001,23 @@ one; seed-options-to-env.cjs auto-adds the flag whenever ap-seed-options.json
 is adopted (adoption == AP run). Verified: seed 4242 would have shipped a
 stranded table at the old 5-attempt cutoff, --require-perfect kept rolling
 and found perfect at attempt 13.
+
+## Addendum (2026-07-20): standable-but-inescapable nudge tiles
+
+A live seed nudged a player to 0_42_53_13_17 - a tile that passes
+isMapBlocked (standable) but is boxed in behind a ladder next to a bookcase:
+every step off it is denied by wall/loc flags between tiles, which
+isMapBlocked (tile-only WALK_BLOCKED check) cannot see. Player could stand
+but not move - a true soft-lock. Fix in AP_ENTRANCE_OVERRIDE
+(overlays/engine/.../ServerOps.ts): new hasWalkableExit(nx, nz) helper -
+canTravel(level, nx, nz, dx, dz, 1, 0, CollisionType.NORMAL) over the 8
+neighbor offsets; canTravel is the engine's real step validator and respects
+inter-tile wall flags. Applied in two places: (1) the direct-return path now
+requires the unblocked destination tile to also have a walkable exit, else
+it falls into the nudge loop; (2) every nudge tier except the last-resort
+fallback requires hasWalkableExit on the candidate, with a new relaxation
+tier (walkable exit but cannot operate the far loc) before the fallback.
+Log labels now say "blocked" vs "inescapable" so future reports
+distinguish the two failure modes. Engine-only change: restart, no pack
+rebuild. Nudges are computed at redirect time (not stored in
+ap-entrances.json), so existing seeds are fixed by the restart alone.

@@ -1,9 +1,9 @@
-import { LocLayer, LocAngle } from '#/engine/routefinder/index.js';
+import { CollisionType, LocLayer, LocAngle } from '#/engine/routefinder/index.js';
 
 import SpotanimType from '#/cache/config/SpotanimType.js';
 import { CoordGrid } from '#/engine/CoordGrid.js';
 import { MapFindSquareType } from '#/engine/entity/MapFindSquareType.js';
-import { isIndoors, isLineOfSight, isLineOfWalk, isMapBlocked, reachedLoc } from '#/engine/GameMap.js';
+import { canTravel, isIndoors, isLineOfSight, isLineOfWalk, isMapBlocked, reachedLoc } from '#/engine/GameMap.js';
 import LocType from '#/cache/config/LocType.js';
 import { ScriptOpcode } from '#/engine/script/ScriptOpcode.js';
 import { CommandHandlers } from '#/engine/script/ScriptRunner.js';
@@ -462,7 +462,22 @@ const ServerOps: CommandHandlers = {
                 `AP entrance: ${state.activePlayer?.username ?? '?'} op ${op} at ${CoordGrid.formatString(src.level, src.x, src.z)} -> ${CoordGrid.formatString(dst.level, dst.x, dst.z)}${nudge}`
             );
         };
-        if (!isMapBlocked(pos.x, pos.z, pos.level)) {
+        const neighbors: ReadonlyArray<[number, number]> = [
+            [0, 1],
+            [0, -1],
+            [1, 0],
+            [-1, 0],
+            [1, 1],
+            [1, -1],
+            [-1, 1],
+            [-1, -1]
+        ];
+        // A tile can be standable yet inescapable (boxed in behind a ladder by
+        // walls/furniture: isMapBlocked only checks the tile itself, not the wall
+        // flags between it and its neighbors). Require at least one legal step off
+        // the tile so a teleport can never soft-lock the player in place.
+        const hasWalkableExit = (nx: number, nz: number): boolean => neighbors.some(([dx, dz]) => canTravel(pos.level, nx, nz, dx, dz, 1, 0, CollisionType.NORMAL));
+        if (!isMapBlocked(pos.x, pos.z, pos.level) && hasWalkableExit(pos.x, pos.z)) {
             logRedirect(override, '');
             state.pushInt(override);
             return;
@@ -483,27 +498,21 @@ const ServerOps: CommandHandlers = {
             return reachedLoc(pos.level, nx, nz, pos.x, pos.z, targetLoc.width, targetLoc.length, 1, targetLoc.angle, targetLoc.shape, targetForceApproach);
         };
 
-        // Prefer a neighbor that (a) isn't itself blocked, (b) can actually reach/operate
-        // the destination loc from there, and (c) matches the intended tile's indoor/
-        // outdoor state (so we don't step off a roofed floor onto an unroofed ledge and
-        // end up floating in the sky - reachedLoc alone doesn't catch that, since it only
-        // checks line of sight, not whether there's a floor). If no neighbor satisfies all
-        // of that, relax a constraint at a time rather than stranding the player.
+        // Prefer a neighbor that (a) isn't itself blocked, (b) has at least one walkable
+        // exit of its own (standable-but-inescapable tiles soft-lock the player), (c) can
+        // actually reach/operate the destination loc from there, and (d) matches the
+        // intended tile's indoor/outdoor state (so we don't step off a roofed floor onto
+        // an unroofed ledge and end up floating in the sky - reachedLoc alone doesn't
+        // catch that, since it only checks line of sight, not whether there's a floor).
+        // If no neighbor satisfies all of that, relax a constraint at a time rather than
+        // stranding the player.
         const wantIndoors = isIndoors(pos.x, pos.z, pos.level);
-        const neighbors: ReadonlyArray<[number, number]> = [
-            [0, 1],
-            [0, -1],
-            [1, 0],
-            [-1, 0],
-            [1, 1],
-            [1, -1],
-            [-1, 1],
-            [-1, -1]
-        ];
+        const why = isMapBlocked(pos.x, pos.z, pos.level) ? 'blocked' : 'inescapable';
         const tiers: { label: string; ok: (nx: number, nz: number) => boolean }[] = [
-            { label: ' (nudged off blocked tile)', ok: (nx, nz) => canOperateFrom(nx, nz) && isIndoors(nx, nz, pos.level) === wantIndoors },
-            { label: ' (nudged off blocked tile, relaxed: indoor/outdoor mismatch)', ok: (nx, nz) => canOperateFrom(nx, nz) },
-            { label: ' (nudged off blocked tile, fallback: no safe neighbor found)', ok: () => true }
+            { label: ` (nudged off ${why} tile)`, ok: (nx, nz) => hasWalkableExit(nx, nz) && canOperateFrom(nx, nz) && isIndoors(nx, nz, pos.level) === wantIndoors },
+            { label: ` (nudged off ${why} tile, relaxed: indoor/outdoor mismatch)`, ok: (nx, nz) => hasWalkableExit(nx, nz) && canOperateFrom(nx, nz) },
+            { label: ` (nudged off ${why} tile, relaxed: cannot operate far loc)`, ok: (nx, nz) => hasWalkableExit(nx, nz) },
+            { label: ` (nudged off ${why} tile, fallback: no safe neighbor found)`, ok: () => true }
         ];
         for (const tier of tiers) {
             for (const [dx, dz] of neighbors) {
@@ -518,7 +527,7 @@ const ServerOps: CommandHandlers = {
                 return;
             }
         }
-        logRedirect(override, ' (WARNING: destination tile is blocked, no free neighbor found)');
+        logRedirect(override, ` (WARNING: destination tile is ${why}, no free neighbor found)`);
         state.pushInt(override);
     },
 
