@@ -41,6 +41,12 @@ REM pin it to re-roll the exact same run: `set SEED=12345` in the console first
 REM (or hardcode a number here). RANDOM*32768+RANDOM = uniform 0..2^30-1.
 if not defined SEED set /a SEED=%RANDOM% * 32768 + %RANDOM%
 
+REM Spoiler-free by default: the placement stage only prints counts. Run
+REM `scripts\new-run.bat --verbose` (or `set VERBOSE=1` first) to print the
+REM goal list and the full sphere-by-sphere walkthrough.
+if not defined VERBOSE set VERBOSE=0
+if "%~1"=="--verbose" set VERBOSE=1
+
 REM --- stage toggles: 1 = run, 0 = skip (skipped stages keep their current state) ---
 set RUN_CONTENT=1
 REM drip + shops + drops via RegenerateAll (INCLUDES the ~1:30 pack rebuild)
@@ -105,7 +111,7 @@ REM e.g. "--mixed" to pool cross-map + floor-shift together
 REM GenerateSeed.ts - AP placement (checks contain the unlocks). Writes
 REM ap-placements.json + a locked starting ap-unlocks.json, CLEARS fired checks +
 REM tracker (a placement seed IS a new run), and refuses to ship an unbeatable seed.
-REM   all params: [--seed N] [--pool per-skill|groups] [--dry-run]
+REM   all params: [--seed N] [--pool per-skill|groups] [--dry-run] [--spoiler]
 REM               [--max-progression-level N] [--retry-budget N] [--config-dir <dir>]
 set POOL=per-skill
 REM per-skill (72 "+20 <Skill> cap" items) | groups (32 chunky items)
@@ -155,6 +161,8 @@ if "%REFRESH_WORLDMAP_PNG%"=="1" (
     echo ==^> npx tsx tools/map/RenderWorldmapPng.ts
     call npx tsx tools/map/RenderWorldmapPng.ts || goto :error
 )
+
+if "%VERBOSE%"=="1" set PLACEMENT_EXTRA=--spoiler %PLACEMENT_EXTRA%
 
 if "%RUN_PLACEMENT%"=="1" (
     echo.

@@ -34,6 +34,14 @@ cd "$ENGINE_DIR"
 # (or hardcode a number here). RANDOM*32768+RANDOM = uniform 0..2^30-1.
 SEED="${SEED:-$((RANDOM * 32768 + RANDOM))}"
 
+# Spoiler-free by default: the placement stage only prints counts. Pass
+# --verbose (or VERBOSE=1) to print the goal list and the full sphere-by-sphere
+# walkthrough. (GenerateSeed.ts --dry-run always prints it - nothing committed.)
+VERBOSE="${VERBOSE:-0}"
+for arg in "$@"; do
+  [ "$arg" = "--verbose" ] && VERBOSE=1
+done
+
 # --- stage toggles: 1 = run, 0 = skip (skipped stages keep their current state) ---
 RUN_CONTENT=1             # drip + shops + drops via RegenerateAll (INCLUDES the ~1:30 pack rebuild)
 RUN_GATHER=1              # gathering swap table (runtime JSON, restart only)
@@ -84,7 +92,7 @@ ENTRANCE_EXTRA=""         # e.g. "--mixed" to pool cross-map + floor-shift toget
 # GenerateSeed.ts - AP placement (checks contain the unlocks). Writes
 # ap-placements.json + a locked starting ap-unlocks.json, CLEARS fired checks +
 # tracker (a placement seed IS a new run), and refuses to ship an unbeatable seed.
-#   all params: [--seed N] [--pool per-skill|groups] [--dry-run]
+#   all params: [--seed N] [--pool per-skill|groups] [--dry-run] [--spoiler]
 #               [--max-progression-level N] [--retry-budget N] [--config-dir <dir>]
 POOL=per-skill            # per-skill (72 "+20 <Skill> cap" items) | groups (32 chunky items)
 PLACEMENT_EXTRA=""        # e.g. "--max-progression-level 50"
@@ -129,6 +137,7 @@ run() { echo; echo "==> npx tsx $*"; npx tsx "$@"; }
 [ "$RUN_ENTRANCES" = 1 ] && run tools/map/RandomizeEntrances.ts --seed "$SEED" $ENTRANCE_EXTRA
 [ "$REFRESH_REGION_GRAPH" = 1 ] && run tools/logic/BuildRegionGraph.ts
 [ "$REFRESH_WORLDMAP_PNG" = 1 ] && run tools/map/RenderWorldmapPng.ts
+[ "$VERBOSE" = 1 ]       && PLACEMENT_EXTRA="--spoiler $PLACEMENT_EXTRA"
 [ "$RUN_PLACEMENT" = 1 ] && run tools/ap/GenerateSeed.ts --seed "$SEED" --pool "$POOL" $PLACEMENT_EXTRA
 
 echo

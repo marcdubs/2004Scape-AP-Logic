@@ -8,7 +8,7 @@
 // data/config directory.
 //
 // Usage (run from Server/engine):
-//   npx tsx tools/ap/GenerateSeed.ts [--seed N] [--pool per-skill|groups] [--dry-run]
+//   npx tsx tools/ap/GenerateSeed.ts [--seed N] [--pool per-skill|groups] [--dry-run] [--spoiler]
 //       [--max-progression-level N] [--retry-budget N] [--config-dir data/config]
 //
 // Deterministic per --seed: the same seed + pool always produces byte-identical
@@ -53,6 +53,7 @@ interface Args {
     seed: number;
     pool: PoolMode;
     dryRun: boolean;
+    spoiler: boolean;
     maxProgressionLevel: number;
     retryBudget: number;
     configDir: string;
@@ -62,6 +63,7 @@ function parseArgs(argv: string[]): Args {
     let seed = Math.floor(Math.random() * 0xffffffff);
     let pool: PoolMode = 'per-skill';
     let dryRun = false;
+    let spoiler = false;
     let maxProgressionLevel = 60;
     let retryBudget = 20;
     let configDir = path.join('data', 'config');
@@ -81,6 +83,8 @@ function parseArgs(argv: string[]): Args {
             pool = v;
         } else if (arg === '--dry-run') {
             dryRun = true;
+        } else if (arg === '--spoiler') {
+            spoiler = true;
         } else if (arg === '--max-progression-level') {
             maxProgressionLevel = Number(argv[++i]);
         } else if (arg === '--retry-budget') {
@@ -88,14 +92,14 @@ function parseArgs(argv: string[]): Args {
         } else if (arg === '--config-dir') {
             configDir = argv[++i];
         } else if (arg === '--help' || arg === '-h') {
-            console.log('Usage: npx tsx tools/ap/GenerateSeed.ts [--seed N] [--pool per-skill|groups] [--dry-run] [--max-progression-level N] [--retry-budget N] [--config-dir data/config]');
+            console.log('Usage: npx tsx tools/ap/GenerateSeed.ts [--seed N] [--pool per-skill|groups] [--dry-run] [--spoiler] [--max-progression-level N] [--retry-budget N] [--config-dir data/config]');
             process.exit(0);
         } else {
             throw new Error(`Unrecognized argument: ${arg}`);
         }
     }
 
-    return { seed, pool, dryRun, maxProgressionLevel, retryBudget, configDir };
+    return { seed, pool, dryRun, spoiler, maxProgressionLevel, retryBudget, configDir };
 }
 
 // ---------------------------------------------------------------------------
@@ -395,28 +399,37 @@ function generateOnce(seed: number, pool: PoolMode, quests: QuestReq[], goals: G
     return { placements, spoiler };
 }
 
-function printSpoilerSummary(seed: number, pool: PoolMode, placements: Map<string, PlacementRecord>, spoiler: PlacementSimResult, itemPoolSize: number, locationCount: number): void {
+function printSpoilerSummary(seed: number, pool: PoolMode, placements: Map<string, PlacementRecord>, spoiler: PlacementSimResult, itemPoolSize: number, locationCount: number, showSpoiler: boolean): void {
     const progressionPlaced = [...placements.values()].filter(r => r.item !== 'filler').length;
     const fillerPlaced = placements.size - progressionPlaced;
+    const goalsReached = spoiler.goalStatus.filter(g => g.reached).length;
 
-    console.log('=== Placement-mode seed spoiler ===');
+    console.log(showSpoiler ? '=== Placement-mode seed spoiler ===' : '=== Placement-mode seed summary ===');
     console.log(`Seed: ${seed}  Pool: ${pool}`);
     console.log(`Locations: ${locationCount}  Progression items placed: ${progressionPlaced}/${itemPoolSize}  Filler locations: ${fillerPlaced}`);
     console.log(`Spheres: ${spoiler.spheres.length}`);
-    console.log('');
-    for (const s of spoiler.spheres) {
-        if (s.finds.length === 0) {
-            continue;
+    if (!showSpoiler) {
+        // Goal names and the sphere-by-sphere walkthrough are run spoilers -
+        // only counts by default. Rerun with --spoiler (or --dry-run, which
+        // never commits anything) to print the full walk.
+        console.log(`Goals reached in logic: ${goalsReached}/${spoiler.goalStatus.length}`);
+        console.log('(--spoiler to print the goal list and the full sphere-by-sphere walkthrough)');
+    } else {
+        console.log('');
+        for (const s of spoiler.spheres) {
+            if (s.finds.length === 0) {
+                continue;
+            }
+            console.log(`Sphere ${s.sphere}:`);
+            for (const f of s.finds) {
+                console.log(`  ${f.location} -> ${f.display}`);
+            }
         }
-        console.log(`Sphere ${s.sphere}:`);
-        for (const f of s.finds) {
-            console.log(`  ${f.location} -> ${f.display}`);
+        console.log('');
+        console.log('Goals:');
+        for (const g of spoiler.goalStatus) {
+            console.log(g.reached ? `  [x] ${g.goal.name} - reached at sphere ${g.sphereReached}` : `  [ ] ${g.goal.name} - NOT REACHED`);
         }
-    }
-    console.log('');
-    console.log('Goals:');
-    for (const g of spoiler.goalStatus) {
-        console.log(g.reached ? `  [x] ${g.goal.name} - reached at sphere ${g.sphereReached}` : `  [ ] ${g.goal.name} - NOT REACHED`);
     }
     if (spoiler.unreachedLocations.length > 0) {
         console.log('');
@@ -481,7 +494,7 @@ function main(): void {
         if (args.dryRun) {
             console.log('');
             console.log('--dry-run: not writing to the real config dir. Scratch output (deleted after this run):');
-            printSpoilerSummary(trySeed, args.pool, placements, spoiler, itemPoolSize, locations.length);
+            printSpoilerSummary(trySeed, args.pool, placements, spoiler, itemPoolSize, locations.length, true);
             fs.rmSync(scratchDir, { recursive: true, force: true });
             return;
         }
@@ -504,7 +517,7 @@ function main(): void {
             console.log(`Cleared: ${cleared.join(', ')}`);
         }
         console.log('');
-        printSpoilerSummary(trySeed, args.pool, placements, spoiler, itemPoolSize, locations.length);
+        printSpoilerSummary(trySeed, args.pool, placements, spoiler, itemPoolSize, locations.length, args.spoiler);
         return;
     }
 
