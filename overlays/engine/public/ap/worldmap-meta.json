@@ -1,0 +1,27 @@
+{
+  "pxPerTile": 2,
+  "surface": {
+    "minMapX": 29,
+    "maxMapX": 56,
+    "minMapZ": 20,
+    "maxMapZ": 77,
+    "minAbsX": 1856,
+    "maxAbsX": 3647,
+    "minAbsZ": 1280,
+    "maxAbsZ": 4991,
+    "widthPx": 3584,
+    "heightPx": 7424
+  },
+  "underground": {
+    "minMapX": 36,
+    "maxMapX": 54,
+    "minMapZ": 144,
+    "maxMapZ": 161,
+    "minAbsX": 2304,
+    "maxAbsX": 3519,
+    "minAbsZ": 9216,
+    "maxAbsZ": 10367,
+    "widthPx": 2432,
+    "heightPx": 2304
+  }
+}
