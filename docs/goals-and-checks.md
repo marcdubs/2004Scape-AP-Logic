@@ -184,6 +184,13 @@ restart, no rebuild (after the one-time preamble/command pack rebuild).
 
 ## Feature 4 — Teleport spell destination shuffle
 
+> **IMPLEMENTED (2026-07-21)** as specced below: `tools/map/RandomizeTeleports.ts`
+> (+ `TeleportParser.ts` for the backup/parse helpers), run by `RegenerateAll.ts`
+> between drops and the pack rebuild (`--skip-teleports` / `--teleports-seed` to
+> control), AP option `teleport_randomization` (on by default, adopted via
+> `seedOptions.teleports` -> `--skip-teleports` when false), `::aptele <city>`
+> test command. Spoiler: `tools/map/teleport-seed.json`.
+
 All 7 standard teleports read their landing coord from dbtable field
 `magic_spell_table:tele_coord` (`skill_magic/scripts/spells/teleport.rs2`,
 `~player_teleport_normal(map_findsquare(db_getfield($spell_data, ...)))`). The

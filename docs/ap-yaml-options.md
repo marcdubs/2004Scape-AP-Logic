@@ -113,6 +113,7 @@ quests", just re-run for a fresh seed.
 | `entrance_randomization` | `on` / `off` / `mixed` | ladder/stair/trapdoor shuffle; `mixed` merges both gate pools |
 | `npc_drip` | `true` / `false` | NPC outfit/cosmetic shuffle |
 | `shop_randomization` | `true` / `false` | which NPC has which shop |
+| `teleport_randomization` | `true` / `false` | the 7 spellbook teleports land at each other's destinations (always a vanilla landmark, never wilderness; casting quest-gates stay put) |
 | `drop_randomization` | `mimic` / `off` / `tiered` / `chaos` | monster loot: rarity-banded, full chaos, or whole-table mimicry |
 | `gathering_randomization` | `shuffle` / `off` / `chaos` | what mining/fishing/woodcutting yield |
 | `processing_randomization` | `shuffle` / `off` / `chaos` | what cooking/smithing/crafting/fletching produce |

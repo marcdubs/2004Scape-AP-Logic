@@ -95,6 +95,16 @@ class NpcDrip(DefaultOnToggle):
     display_name = "NPC Drip Randomization"
 
 
+class TeleportRandomization(DefaultOnToggle):
+    """Derange the 7 standard-spellbook teleport destinations among
+    themselves (seed option*): every spell lands at a different city than
+    its name says, but always at one of the 7 vanilla landmarks - never
+    the wilderness. Quest gates on casting (Ardougne/Watchtower/Trollheim)
+    stay on the spell, not the destination."""
+
+    display_name = "Teleport Randomization"
+
+
 class ShopRandomization(DefaultOnToggle):
     """Shuffle which NPC has which shop (seed option*)."""
 
@@ -193,6 +203,7 @@ class RS2004Options(PerGameCommonOptions):
     entrance_randomization: EntranceRandomization
     npc_drip: NpcDrip
     shop_randomization: ShopRandomization
+    teleport_randomization: TeleportRandomization
     drop_randomization: DropRandomization
     gathering_randomization: GatheringRandomization
     processing_randomization: ProcessingRandomization

@@ -141,3 +141,33 @@ if (%ap_kbd_killed = 1) {
 // one tuple return, deliberately - simpler stack contract.
 [command,ap_npctp_name](int $index)(string)
 [command,ap_npctp_coord](int $index)(coord)
+
+// ::aptele <city> - jump to a teleport spell's CURRENT magic_spell_table
+// destination (possibly shuffled by RandomizeTeleports.ts, Feature 4), no
+// runes/level needed - all 7 verifiable in a minute.
+[debugproc,ap_tele](string $spell)
+if (p_finduid(uid) = false) {
+    return;
+}
+def_coord $dest = null;
+if (compare($spell, "varrock") = 0) {
+    $dest = db_getfield(magic_spell_teleport_varrock, magic_spell_table:tele_coord, 0);
+} else if (compare($spell, "lumbridge") = 0) {
+    $dest = db_getfield(magic_spell_teleport_lumbridge, magic_spell_table:tele_coord, 0);
+} else if (compare($spell, "falador") = 0) {
+    $dest = db_getfield(magic_spell_teleport_falador, magic_spell_table:tele_coord, 0);
+} else if (compare($spell, "camelot") = 0) {
+    $dest = db_getfield(magic_spell_teleport_camelot, magic_spell_table:tele_coord, 0);
+} else if (compare($spell, "ardougne") = 0) {
+    $dest = db_getfield(magic_spell_teleport_ardougne, magic_spell_table:tele_coord, 0);
+} else if (compare($spell, "watchtower") = 0) {
+    $dest = db_getfield(magic_spell_teleport_watchtower, magic_spell_table:tele_coord, 0);
+} else if (compare($spell, "trollheim") = 0) {
+    $dest = db_getfield(magic_spell_teleport_trollheim, magic_spell_table:tele_coord, 0);
+}
+if ($dest = null) {
+    mes("usage: ::aptele varrock|lumbridge|falador|camelot|ardougne|watchtower|trollheim");
+    return;
+}
+mes("<$spell> teleport table destination: <tostring(coordy($dest))>_<tostring(calc(coordx($dest) / 64))>_<tostring(calc(coordz($dest) / 64))>_<tostring(calc(coordx($dest) % 64))>_<tostring(calc(coordz($dest) % 64))>");
+p_telejump(map_findsquare($dest, 0, 2, ^map_findsquare_lineofwalk));

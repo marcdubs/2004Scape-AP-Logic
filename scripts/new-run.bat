@@ -49,7 +49,7 @@ if "%~1"=="--verbose" set VERBOSE=1
 
 REM --- stage toggles: 1 = run, 0 = skip (skipped stages keep their current state) ---
 set RUN_CONTENT=1
-REM drip + shops + drops via RegenerateAll (INCLUDES the ~1:30 pack rebuild)
+REM drip + shops + drops + teleports via RegenerateAll (INCLUDES the ~1:30 pack rebuild)
 set RUN_GATHER=1
 REM gathering swap table (runtime JSON, restart only)
 set RUN_PROCESS=1
@@ -67,14 +67,16 @@ REM tracker map images; only after map changes
 
 REM ============================ per-stage knobs ================================
 
-REM RegenerateAll.ts - restores pristine content, reruns drip+shops+drops, rebuilds pack.
+REM RegenerateAll.ts - restores pristine content, reruns drip+shops+drops+teleports, rebuilds pack.
 REM   all params: [--seed <n>] [--drip-seed <n>] [--shops-seed <n>] [--drops-seed <n>]
-REM               [--mode tiered|chaos|mimic] [--skip-drip] [--skip-shops] [--skip-drops]
-REM               [--no-rebuild]
+REM               [--teleports-seed <n>] [--mode tiered|chaos|mimic] [--skip-drip]
+REM               [--skip-shops] [--skip-drops] [--skip-teleports] [--no-rebuild]
 REM   (finer control lives in the individual tools if you ever need it:
 REM    RandomizeDrip.ts  [--seed n] [--dry-run] [--mixed-gender] [--no-weapons] [--exclude a,b]
 REM    RandomizeShops.ts [--seed n] [--dry-run] [--mismatched-titles] [--exclude a,b]
-REM    RandomizeDrops.ts [--seed n] [--dry-run] [--mode tiered|chaos|mimic] [--no-death-drop] [--exclude a,b])
+REM    RandomizeDrops.ts [--seed n] [--dry-run] [--mode tiered|chaos|mimic] [--no-death-drop] [--exclude a,b]
+REM    RandomizeTeleports.ts [--seed n] [--dry-run] - deranges the 7 spellbook
+REM      teleport destinations among themselves; spoiler: tools\map\teleport-seed.json)
 set DROPS_MODE=mimic
 REM tiered | chaos | mimic ("chicken runs the green dragon table")
 set REGENERATE_EXTRA=

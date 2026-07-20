@@ -4,6 +4,7 @@ import { printInfo } from '#/util/Logger.js';
 
 import { BACKUP_ROOT, SCRIPTS_ROOT, ensureNpcBackup, restoreNpcBackup } from './npc/NpcDripParser.js';
 import { DROP_BACKUP_DIR, DROP_SCRIPTS_DIR, ensureDropScriptBackup, restoreDropScriptBackup } from './drops/DropTableParser.js';
+import { TELEPORT_DBROW_PATH, ensureTeleportBackup, restoreTeleportBackup } from './map/TeleportParser.js';
 import { removeMimicArtifacts } from './drops/MimicTransform.js';
 import { execNpxTsx } from './shared/Npx.js';
 
@@ -34,7 +35,7 @@ import { execNpxTsx } from './shared/Npx.js';
 // (`man_torso_backpack`) from BEFORE the armor-set fix existed, and skip-not-restore
 // meant it stayed wrong indefinitely.
 //
-// Usage: npx tsx tools/RegenerateAll.ts [--seed <number>] [--drip-seed <n>] [--shops-seed <n>] [--drops-seed <n>] [--mode tiered|chaos|mimic] [--skip-drip] [--skip-shops] [--skip-drops] [--no-rebuild]
+// Usage: npx tsx tools/RegenerateAll.ts [--seed <number>] [--drip-seed <n>] [--shops-seed <n>] [--drops-seed <n>] [--teleports-seed <n>] [--mode tiered|chaos|mimic] [--skip-drip] [--skip-shops] [--skip-drops] [--skip-teleports] [--no-rebuild]
 
 function parseArgs() {
     const args = process.argv.slice(2);
@@ -53,10 +54,12 @@ function parseArgs() {
         dripSeed: namedSeed('--drip-seed'),
         shopsSeed: namedSeed('--shops-seed'),
         dropsSeed: namedSeed('--drops-seed'),
+        teleportsSeed: namedSeed('--teleports-seed'),
         mode,
         skipDrip: args.includes('--skip-drip'),
         skipShops: args.includes('--skip-shops'),
         skipDrops: args.includes('--skip-drops'),
+        skipTeleports: args.includes('--skip-teleports'),
         rebuild: !args.includes('--no-rebuild')
     };
 }
@@ -67,7 +70,7 @@ function run(scriptPath: string, args: string[]): void {
 }
 
 function main() {
-    const { dripSeed, shopsSeed, dropsSeed, mode, skipDrip, skipShops, skipDrops, rebuild } = parseArgs();
+    const { dripSeed, shopsSeed, dropsSeed, teleportsSeed, mode, skipDrip, skipShops, skipDrops, skipTeleports, rebuild } = parseArgs();
 
     // ensure backups exist (no-op if this isn't the first-ever run), then restore
     // every backed-up file onto its live path - this is the "start completely fresh"
@@ -80,10 +83,14 @@ function main() {
     if (dropBackedUp) {
         printInfo(`created vanilla content backup for ${dropBackedUp} drop-table script file(s) at ${DROP_BACKUP_DIR}`);
     }
+    if (ensureTeleportBackup()) {
+        printInfo(`created vanilla content backup for magic_spells.dbrow (teleport destinations)`);
+    }
 
     const npcRestored = restoreNpcBackup();
     const dropRestored = restoreDropScriptBackup();
-    printInfo(`restored ${npcRestored} .npc file(s) (${SCRIPTS_ROOT}) and ${dropRestored} drop-table script(s) (${DROP_SCRIPTS_DIR}) to pristine vanilla`);
+    restoreTeleportBackup();
+    printInfo(`restored ${npcRestored} .npc file(s) (${SCRIPTS_ROOT}), ${dropRestored} drop-table script(s) (${DROP_SCRIPTS_DIR}), and ${TELEPORT_DBROW_PATH} to pristine vanilla`);
 
     // discoveries from a previous seed are lies once the world reshuffles - the
     // browser tracker (ApTracker.ts / docs/tracker-map.md) must start fogged again.
@@ -123,6 +130,12 @@ function main() {
         run('tools/drops/RandomizeDrops.ts', dropsArgs);
     } else {
         printInfo('drops: skipped (--skip-drops)');
+    }
+
+    if (!skipTeleports) {
+        run('tools/map/RandomizeTeleports.ts', ['--seed', teleportsSeed]);
+    } else {
+        printInfo('teleports: skipped (--skip-teleports) - destinations stay vanilla after the restore above');
     }
 
     if (rebuild) {

@@ -48,6 +48,7 @@ if (o.entrances === 'off') {
 }
 if (o.npcDrip === false) prepend('REGENERATE_EXTRA', '--skip-drip');
 if (o.shops === false) prepend('REGENERATE_EXTRA', '--skip-shops');
+if (o.teleports === false) prepend('REGENERATE_EXTRA', '--skip-teleports');
 if (o.drops === 'off') prepend('REGENERATE_EXTRA', '--skip-drops');
 else if (typeof o.drops === 'string') set('DROPS_MODE', o.drops);
 if (o.gathering === 'off') {

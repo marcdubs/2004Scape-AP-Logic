@@ -3037,3 +3037,26 @@ calculate_items_amount_sold clamps sells to what the player holds, so
 arbitrary X needed no new checks. First content/ overlay in the repo
 (overlays/content/...) - install.js handled it with zero changes, as
 designed. Content change = pack rebuild required.
+
+## Addendum (2026-07-21): Feature 4 built - teleport destination shuffle
+
+Prompted by a player noticing Varrock/Lumbridge teleports never randomized:
+Feature 4 existed only as a goals-and-checks spec (the teleport.rs2 overlay's
+ap_track call made it LOOK wired up, but destinations came straight from the
+vanilla dbrow). Built to spec: TeleportParser.ts (backup/parse/write helpers,
+split from the CLI because tool entry scripts run main() on import - same
+reason NpcDripParser exists) + RandomizeTeleports.ts (derangement of the 7
+tele_coord values, pristine values always read from the content/.ap-backup
+copy so standalone reruns can't compound shuffles). RegenerateAll runs it
+between drops and the pack rebuild; skip semantics = vanilla (the pipeline
+restores the backup unconditionally first, same as drip/shops). AP option
+teleport_randomization (DefaultOnToggle) -> seedOptions.teleports ->
+seed-options-to-env emits --skip-teleports when false. ::aptele <city> jumps
+to a spell's current table destination (dbrow literals work as db_getfield's
+first arg - see wilderness_levels.rs2). Verified: dry-run derangement clean,
+real write byte-diffs to exactly 7 tele_coord lines vs backup (CRLF intact),
+restored pristine after the test so live runs are untouched until their next
+roll, engine typecheck + pack build (1:43) clean, apworld tests updated
+(test_seed_options) + py_compile clean. NOTE: existing runs only get shuffled
+teleports on their next new-run roll - the feature rides RegenerateAll, and
+mid-run adoption would silently diverge from the seed's spoiler anyway.

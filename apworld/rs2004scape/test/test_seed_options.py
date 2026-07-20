@@ -11,6 +11,7 @@ class TestSeedOptionsDefaults(RS2004TestBase):
             "entrances": "on",
             "npcDrip": True,
             "shops": True,
+            "teleports": True,
             "drops": "mimic",
             "gathering": "shuffle",
             "processing": "shuffle",
@@ -22,6 +23,7 @@ class TestSeedOptionsCustom(RS2004TestBase):
     options = {
         "entrance_randomization": "mixed",
         "npc_drip": False,
+        "teleport_randomization": False,
         "drop_randomization": "off",
         "gathering_randomization": "chaos",
         "spawn_randomization": "chunk",
@@ -34,6 +36,7 @@ class TestSeedOptionsCustom(RS2004TestBase):
         seed = slot_data["seedOptions"]
         self.assertEqual(seed["entrances"], "mixed")
         self.assertFalse(seed["npcDrip"])
+        self.assertFalse(seed["teleports"])
         self.assertEqual(seed["drops"], "off")
         self.assertEqual(seed["gathering"], "chaos")
         self.assertEqual(seed["processing"], "shuffle")

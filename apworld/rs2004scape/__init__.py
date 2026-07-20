@@ -334,6 +334,7 @@ class RS2004World(World):
                 "entrances": self.options.entrance_randomization.current_key,
                 "npcDrip": bool(self.options.npc_drip.value),
                 "shops": bool(self.options.shop_randomization.value),
+                "teleports": bool(self.options.teleport_randomization.value),
                 "drops": self.options.drop_randomization.current_key,
                 "gathering": self.options.gathering_randomization.current_key,
                 "processing": self.options.processing_randomization.current_key,

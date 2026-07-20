@@ -44,7 +44,7 @@ for arg in "$@"; do
 done
 
 # --- stage toggles: 1 = run, 0 = skip (skipped stages keep their current state) ---
-RUN_CONTENT=1             # drip + shops + drops via RegenerateAll (INCLUDES the ~1:30 pack rebuild)
+RUN_CONTENT=1             # drip + shops + drops + teleports via RegenerateAll (INCLUDES the ~1:30 pack rebuild)
 RUN_GATHER=1              # gathering swap table (runtime JSON, restart only)
 RUN_PROCESS=1             # processing/recipe swap table (runtime JSON, restart only)
 RUN_SPAWN=1               # random home/respawn point (MUST run before entrances - see note above)
@@ -55,14 +55,16 @@ REFRESH_WORLDMAP_PNG=0    # tracker map images; only after map changes
 
 # ============================ per-stage knobs ================================
 
-# RegenerateAll.ts - restores pristine content, reruns drip+shops+drops, rebuilds pack.
+# RegenerateAll.ts - restores pristine content, reruns drip+shops+drops+teleports, rebuilds pack.
 #   all params: [--seed <n>] [--drip-seed <n>] [--shops-seed <n>] [--drops-seed <n>]
-#               [--mode tiered|chaos|mimic] [--skip-drip] [--skip-shops] [--skip-drops]
-#               [--no-rebuild]
+#               [--teleports-seed <n>] [--mode tiered|chaos|mimic] [--skip-drip]
+#               [--skip-shops] [--skip-drops] [--skip-teleports] [--no-rebuild]
 #   (finer control lives in the individual tools if you ever need it:
 #    RandomizeDrip.ts  [--seed n] [--dry-run] [--mixed-gender] [--no-weapons] [--exclude a,b]
 #    RandomizeShops.ts [--seed n] [--dry-run] [--mismatched-titles] [--exclude a,b]
-#    RandomizeDrops.ts [--seed n] [--dry-run] [--mode tiered|chaos|mimic] [--no-death-drop] [--exclude a,b])
+#    RandomizeDrops.ts [--seed n] [--dry-run] [--mode tiered|chaos|mimic] [--no-death-drop] [--exclude a,b]
+#    RandomizeTeleports.ts [--seed n] [--dry-run] - deranges the 7 spellbook
+#      teleport destinations among themselves; spoiler: tools/map/teleport-seed.json)
 DROPS_MODE=mimic          # tiered | chaos | mimic ("chicken runs the green dragon table")
 REGENERATE_EXTRA=""       # e.g. "--skip-drip" or "--drip-seed 555"
 
