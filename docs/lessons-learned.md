@@ -3021,3 +3021,14 @@ Log labels now say "blocked" vs "inescapable" so future reports
 distinguish the two failure modes. Engine-only change: restart, no pack
 rebuild. Nudges are computed at redirect time (not stored in
 ap-entrances.json), so existing seeds are fixed by the restart alone.
+
+## Addendum (2026-07-20): shop "Buy 100" QOL
+
+All stores (including general stores - generalshop.rs2 has no interface of
+its own) share shop_template.if + shop.rs2, so one option5/inv_button5 pair
+adds a bulk-buy to every shop. The engine supports inv_button5 (bank's
+Withdraw X is the precedent) and buy_item already iterates per-item with
+graceful stops on stock/coins/space, so amount=100 needed no new checks.
+First content/ overlay in the repo (overlays/content/...) - install.js
+handled it with zero changes, as designed. Content change = pack rebuild
+required.
