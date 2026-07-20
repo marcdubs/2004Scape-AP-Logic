@@ -99,7 +99,7 @@ export function createDefaultWorldConfig(): WorldConfig {
             autoSubscribeMembers: true,
             xpRate: 1,
             infiniteRun: false,
-            apSkipTutorial: false,
+            apSkipTutorial: true,
             production: false,
             minimumWealthValueEvent: 10,
             debug: true,

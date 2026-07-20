@@ -51,11 +51,15 @@ Troubleshooting the pack build:
   `npm install --no-save --force @esbuild/<the-other-platform>`
   (e.g. `@esbuild/win32-x64`) if you keep switching back and forth.
 
-Optional flags in `Server/engine/data/config/world.json`: `web.port` (tracker/
-client port, examples below assume 8080), `apSkipTutorial: true` (new accounts
-skip Tutorial Island), `xpRate` (the XP multiplier - worth raising to match
-your multiworld's pace; see the "Game-server tweaks" section of
-[docs/ap-yaml-options.md](docs/ap-yaml-options.md) for recommendations).
+`install.js` also seeds the optional flags into
+`Server/engine/data/config/world.json` at their defaults so they're easy to
+find (values you've already set are never overwritten): `web.port: 8080`
+(tracker/client port, matches the examples below), `apSkipTutorial: true` (new
+accounts skip Tutorial Island - set `false` for the vanilla tutorial),
+`xpRate: 1` (the XP multiplier - worth raising to match your multiworld's
+pace; see the "Game-server tweaks" section of
+[docs/ap-yaml-options.md](docs/ap-yaml-options.md) for recommendations), and
+`infiniteRun: false`.
 
 ### 2. One-time: Archipelago server setup
 

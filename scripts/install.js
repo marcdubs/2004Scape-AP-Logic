@@ -39,12 +39,15 @@ function copyRecursive(src, dest, serverRoot) {
     console.log(`  ${path.relative(REPO_ROOT, src)} -> ${path.relative(serverRoot, dest)}`);
 }
 
-// AP content adds objs/varps, so the packed cache can never match the vanilla
-// rev-274 checksums - the engine's BUILD_VERIFY safety check must be off or
-// every fresh install dies with ".obj checksum mismatch!". world.json is
-// runtime state (deep-merged over engine defaults, so a partial file is fine);
-// only the three verify flags are touched, everything else is preserved.
-function disableBuildVerify(serverRoot) {
+// Seeds engine/data/config/world.json with the AP-relevant knobs so they're
+// discoverable and editable without digging through engine source, and forces
+// the three BUILD_VERIFY flags off - AP content adds objs/varps, so the packed
+// cache can never match the vanilla rev-274 checksums and the checksum safety
+// check would fail every fresh build. world.json deep-merges over the engine
+// defaults, so a partial file is fine. Values you have already set are never
+// overwritten (only missing keys are added); the verify flags are the one
+// exception and are always forced to false.
+function ensureWorldConfig(serverRoot) {
     const configPath = path.join(serverRoot, 'engine', 'data', 'config', 'world.json');
     let config = {};
     if (fs.existsSync(configPath)) {
@@ -55,16 +58,35 @@ function disableBuildVerify(serverRoot) {
             return;
         }
     }
+
+    const changed = [];
+    const seed = (section, key, value) => {
+        const obj = (config[section] ??= {});
+        if (!(key in obj)) {
+            obj[key] = value;
+            changed.push(`${section}.${key}=${value}`);
+        }
+    };
+
+    seed('web', 'port', 8080); // tracker/client port; all docs examples assume 8080
+    seed('node', 'xpRate', 1); // XP multiplier - worth raising to match the multiworld's pace
+    seed('node', 'infiniteRun', false);
+    seed('node', 'apSkipTutorial', true); // new accounts skip Tutorial Island
+
     const build = (config.build ??= {});
-    if (build.verify === false && build.verifyFolder === false && build.verifyPack === false) {
+    for (const key of ['verify', 'verifyFolder', 'verifyPack']) {
+        if (build[key] !== false) {
+            build[key] = false;
+            changed.push(`build.${key}=false`);
+        }
+    }
+
+    if (changed.length === 0) {
         return;
     }
-    build.verify = false;
-    build.verifyFolder = false;
-    build.verifyPack = false;
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(configPath, JSON.stringify(config, null, 4) + '\n');
-    console.log(`set build.verify/verifyFolder/verifyPack=false in ${path.relative(serverRoot, configPath)} (AP content never matches vanilla checksums)`);
+    console.log(`world.json (${path.relative(serverRoot, configPath)}): set ${changed.join(', ')}`);
 }
 
 function main() {
@@ -96,7 +118,7 @@ function main() {
         copyRecursive(srcRoot, destRoot, serverRoot);
     }
 
-    disableBuildVerify(serverRoot);
+    ensureWorldConfig(serverRoot);
 }
 
 main();
