@@ -2958,3 +2958,29 @@ engine file / content file):
   install.
 - Use `git diff --name-only -z` + `while IFS= read -r -d ''` for the loop -
   "drop tables" has a space and breaks awk-based parsing.
+
+## Addendum (2026-07-20): Mort Myre chunk-spawn softlock
+
+First real-run softlock: chunk-mode spawn placed a player inside Mort Myre
+swamp. The metal gate (quest_druidspirit.rs2 `open_mortmyre_gate`) refuses
+passage in BOTH directions until Nature Spirit is started, the swamp/Mort'ton
+pocket has zero shuffleable entrance endpoints, and Morytania's outer access
+(Priest in Peril's temple passage) is quest-gated too - no escape. Neither
+gate is curated in ap-gated-areas.json (launch list = the 7 guilds only), so
+the region graph flood-fills straight through both quest doors and
+ValidateSeed sees the swamp as mainland - validation green, player stuck.
+
+Fix: RandomizeSpawn chunk mode excludes mapX >= 53 (everything east of the
+River Salve), same conservative-allowlist pattern as the Karamja/far-west
+exclusions. City mode was already safe (5 mainland landmarks).
+
+The general lesson stacks with the earlier Trollheim one: chunk/city spawn
+uses offline heuristics, NOT the region graph, and the region graph itself
+trusts ap-gated-areas.json to know about quest-gated pockets. Any area whose
+only exits are script-gated (check the loc/gate scripts for stage checks in
+BOTH travel directions) must either be excluded from the spawn pool or
+properly curated as a gated area (+ region graph rebuild) before spawns or
+entrances can safely touch it. Follow-up if Morytania content ever matters
+for AP: curate Mort Myre + Canifis in ap-gated-areas.json with
+`{varp: "druidspirit"/"priestperil", gte: <stage>}` requires and drop the
+blanket exclusion.

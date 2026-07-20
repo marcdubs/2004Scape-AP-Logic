@@ -206,6 +206,22 @@ const KARAMJA_MAPZ_MAX = 49;
 // guidance. Revisit with --include-far-west once someone has walked the results.
 const CORE_MAPX_MIN = 40;
 
+// Morytania (everything east of the River Salve, mapX >= 53): vanilla access is
+// Priest in Peril's temple passage, and Mort Myre swamp behind it adds a second
+// quest gate - the metal gate refuses passage in BOTH directions until Nature
+// Spirit is started (quest_druidspirit.rs2 open_mortmyre_gate: "Mort Myre is a
+// dangerous Ghast infested swamp..."). The swamp/Mort'ton pocket contains no
+// shuffleable entrance endpoints at all, so a chunk spawn there has no escape:
+// observed 2026-07-20, a player spawned inside Mort Myre was hard-softlocked at
+// the gate. The region graph currently flood-fills straight through both quest
+// doors (neither area is curated in ap-gated-areas.json), so ValidateSeed can't
+// catch it either - exclude the whole east-of-Salve block from the pool, same
+// conservative-allowlist bias as the Karamja/far-west exclusions above. If
+// Morytania spawns are ever wanted: curate Mort Myre + Canifis as gated areas,
+// rebuild the region graph, and replace this blanket exclusion with real
+// validation.
+const MORYTANIA_MAPX_MIN = 53;
+
 // "does this mapsquare look like authored, walkable land" signal: bare ocean/empty
 // squares have few or no LOC placements and no NPCs. The runtime map_findsquare call
 // at every use site (death.rs2, ::apspawn) is the final safety net regardless - this
@@ -255,6 +271,9 @@ function enumerateChunkCandidates(includeIslands: boolean, includeFarWest: boole
         }
         if (!includeFarWest && mapX < CORE_MAPX_MIN) {
             continue; // south-west cluster, likely Karamja-adjacent - see caveat above
+        }
+        if (mapX >= MORYTANIA_MAPX_MIN) {
+            continue; // east of the River Salve - quest-gated with no escape, see Morytania caveat above
         }
         if (mapX >= WILDERNESS_MAPX_MIN && mapX <= WILDERNESS_MAPX_MAX && mapZ >= WILDERNESS_MAPZ_MIN) {
             continue; // wilderness
