@@ -24,7 +24,8 @@
 # skip Tutorial Island - that's a world flag, not a seed artifact.
 
 set -euo pipefail
-ENGINE_DIR="$(cd "$(dirname "$0")/../../Server/engine" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ENGINE_DIR="$(cd "$SCRIPT_DIR/../../Server/engine" && pwd)"
 cd "$ENGINE_DIR"
 
 # ============================== master knobs =================================
@@ -106,24 +107,7 @@ PLACEMENT_EXTRA=""        # e.g. "--max-progression-level 50"
 SEED_OPTS_FILE="data/config/ap-seed-options.json"
 if [ "${AP_SEED_OPTIONS:-}" != "ignore" ] && [ -f "$SEED_OPTS_FILE" ]; then
   echo "==> adopting $SEED_OPTS_FILE (AP_SEED_OPTIONS=ignore to skip)"
-  eval "$(node - "$SEED_OPTS_FILE" <<'NODE'
-const o = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));
-const out = [];
-if (o.entrances === 'off') out.push('RUN_ENTRANCES=0', 'rm -f data/config/ap-entrances.json');
-else if (o.entrances === 'mixed') out.push('ENTRANCE_EXTRA="--mixed $ENTRANCE_EXTRA"');
-if (o.npcDrip === false) out.push('REGENERATE_EXTRA="--skip-drip $REGENERATE_EXTRA"');
-if (o.shops === false) out.push('REGENERATE_EXTRA="--skip-shops $REGENERATE_EXTRA"');
-if (o.drops === 'off') out.push('REGENERATE_EXTRA="--skip-drops $REGENERATE_EXTRA"');
-else if (typeof o.drops === 'string') out.push('DROPS_MODE=' + o.drops);
-if (o.gathering === 'off') out.push('RUN_GATHER=0', 'rm -f data/config/ap-gather.json');
-else if (typeof o.gathering === 'string') out.push('GATHER_MODE=' + o.gathering);
-if (o.processing === 'off') out.push('RUN_PROCESS=0', 'rm -f data/config/ap-process.json');
-else if (typeof o.processing === 'string') out.push('PROCESS_MODE=' + o.processing);
-if (o.spawn === 'off') out.push('RUN_SPAWN=0', 'rm -f data/config/ap-spawn.json');
-else if (typeof o.spawn === 'string') out.push('SPAWN_MODE=' + o.spawn);
-console.log(out.join('\n'));
-NODE
-)"
+  eval "$(node "$SCRIPT_DIR/seed-options-to-env.cjs" "$SEED_OPTS_FILE")"
 fi
 
 # ================================ stages =====================================

@@ -95,10 +95,11 @@ list only stops it *rolling*. The game server adopts this on connect (the
 Every server-side randomizer is configurable from the YAML. These can't apply
 live (several need a content pack rebuild): on connect the server writes them
 to `data/config/ap-seed-options.json`, and `scripts/new-run.sh` adopts that
-file - overriding its own knobs - the next time you roll a seed. Flow: connect
-once, then run `new-run`. `AP_SEED_OPTIONS=ignore bash scripts/new-run.sh`
-falls back to the script knobs (`new-run.bat` doesn't auto-adopt - see its
-header note).
+file - overriding its own knobs - the next time you roll a seed (both
+`new-run.sh` and `new-run.bat`, via `scripts/seed-options-to-env.cjs`). Flow:
+connect once, then run `new-run`. To fall back to the script knobs instead:
+`AP_SEED_OPTIONS=ignore bash scripts/new-run.sh` (Windows:
+`set AP_SEED_OPTIONS=ignore` first), or delete the file.
 
 | option | values (default first) | controls |
 |---|---|---|

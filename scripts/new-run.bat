@@ -5,9 +5,9 @@ REM
 REM   scripts\new-run.bat              (from the 2004Scape-AP-Logic repo, on Windows)
 REM
 REM NOTE: on AP connect the server writes data\config\ap-seed-options.json from
-REM the multiworld YAML's seed options. new-run.sh auto-adopts it; this .bat does
-REM NOT (batch JSON parsing) - either run the .sh via WSL/git-bash, or read that
-REM file and set the knobs below to match by hand.
+REM the multiworld YAML's seed options. When that file exists it OVERRIDES the
+REM knobs below (via scripts\seed-options-to-env.cjs, same as new-run.sh).
+REM `set AP_SEED_OPTIONS=ignore` first (or delete the file) to use the knobs.
 REM
 REM Edit the variables below and re-run. Every stage is independently toggleable and
 REM every tool's FULL parameter list is documented next to its knob. Stage order
@@ -117,6 +117,18 @@ set POOL=per-skill
 REM per-skill (72 "+20 <Skill> cap" items) | groups (32 chunky items)
 set PLACEMENT_EXTRA=
 REM e.g. "--max-progression-level 50"
+
+REM ================ Archipelago slot options (auto-adoption) ===================
+REM On AP connect the server writes data\config\ap-seed-options.json from the
+REM multiworld YAML's seed options. When that file exists it OVERRIDES the knobs
+REM above - flow: connect once, then re-run this script. The helper emits
+REM `set "K=V"` lines (with !VAR! delayed expansion for appends) executed below.
+
+if /i "%AP_SEED_OPTIONS%"=="ignore" goto :seedopts_done
+if not exist "data\config\ap-seed-options.json" goto :seedopts_done
+echo ==^> adopting data\config\ap-seed-options.json (set AP_SEED_OPTIONS=ignore to skip)
+for /f "usebackq delims=" %%L in (`node "%~dp0seed-options-to-env.cjs" "data\config\ap-seed-options.json" --bat`) do %%L
+:seedopts_done
 
 REM ================================ stages =====================================
 
