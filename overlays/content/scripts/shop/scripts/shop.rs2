@@ -163,14 +163,23 @@ return ($sell_amount);
 [inv_button2,shop_template_side:inv] @shop_request(inv, last_slot, 1);
 [inv_button3,shop_template_side:inv] @shop_request(inv, last_slot, 5);
 [inv_button4,shop_template_side:inv] @shop_request(inv, last_slot, 10);
+[inv_button5,shop_template_side:inv] @shop_request_x(inv, last_slot);
 
 // Buy buttons
 [inv_button2,shop_template:inv] @shop_request(%shop, last_slot, 1);
 [inv_button3,shop_template:inv] @shop_request(%shop, last_slot, 5);
 [inv_button4,shop_template:inv] @shop_request(%shop, last_slot, 10);
-// AP QOL: bulk buy - same request path as the vanilla buttons, buy_item
-// already stops gracefully on stock/coins/space, so 100 needs no extra checks
-[inv_button5,shop_template:inv] @shop_request(%shop, last_slot, 100);
+[inv_button5,shop_template:inv] @shop_request_x(%shop, last_slot);
+
+// AP QOL: Buy X / Sell X - prompt for an amount (bank Withdraw X pattern) and
+// reuse the vanilla request path, which already stops gracefully on
+// stock/coins/space and clamps sells to what the player holds.
+[label,shop_request_x](inv $shop_inv, int $slot)
+p_countdialog;
+if (last_int <= 0) {
+    return;
+}
+@shop_request($shop_inv, $slot, last_int);
 
 // verify a request to buy or sell from a shop, and then perform the transaction if all passed
 [label,shop_request](inv $shop_inv, int $slot, int $amount)

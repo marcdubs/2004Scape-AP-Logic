@@ -3022,13 +3022,18 @@ distinguish the two failure modes. Engine-only change: restart, no pack
 rebuild. Nudges are computed at redirect time (not stored in
 ap-entrances.json), so existing seeds are fixed by the restart alone.
 
-## Addendum (2026-07-20): shop "Buy 100" QOL
+## Addendum (2026-07-20): shop "Buy X" / "Sell X" QOL
 
 All stores (including general stores - generalshop.rs2 has no interface of
-its own) share shop_template.if + shop.rs2, so one option5/inv_button5 pair
-adds a bulk-buy to every shop. The engine supports inv_button5 (bank's
-Withdraw X is the precedent) and buy_item already iterates per-item with
-graceful stops on stock/coins/space, so amount=100 needed no new checks.
-First content/ overlay in the repo (overlays/content/...) - install.js
-handled it with zero changes, as designed. Content change = pack rebuild
-required.
+its own) share shop_template.if + shop_template_side.if + shop.rs2, so one
+option5/inv_button5 pair per side covers every shop. Started as fixed
+"Buy 100" but the interface cache format hard-caps inv components at 5
+options (PackShared.ts packs exactly option1-5), and Value + 1/5/10 already
+use four - so fixed 100/250 tiers can't fit. Final design: option5 is
+"Buy X"/"Sell X" via p_countdialog (bank Withdraw X pattern: label takes
+the slot, prompts, jumps into the vanilla shop_request path). buy_item
+iterates per-item with graceful stops on stock/coins/space and
+calculate_items_amount_sold clamps sells to what the player holds, so
+arbitrary X needed no new checks. First content/ overlay in the repo
+(overlays/content/...) - install.js handled it with zero changes, as
+designed. Content change = pack rebuild required.
