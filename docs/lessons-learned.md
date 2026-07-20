@@ -2932,27 +2932,3 @@ processing_randomization (shuffle/off/chaos), spawn_randomization
   same compound command still matches. Kill and start in separate commands.
 - 102 tests + 5261 subtests green; engine tsc clean; world_version 0.6.0.
 
-## Addendum (2026-07-20): marchipelago - hosted AP server image (separate repo)
-
-Sibling repo `../marchipelago` (github.com/marcdubs/marchipelago) ships
-`ghcr.io/marcdubs/marchipelago` - an Archipelago WebHost/MultiServer Docker
-image with `worlds/rs2004scape.apworld` baked in, plus a PTDL_v2 Pterodactyl/
-Calagopus egg (`egg-marchipelago.json`). Built by GitHub Actions on push to
-main; tag vX.Y.Z for semver image tags.
-
-- The image pins Archipelago to AP_REF (Dockerfile ARG) = the exact commit the
-  apworld test suite was validated against (2cde25f, 0.6.8-dev). Bump AP_REF
-  only after re-running the 102-test suite against that ref.
-- After any apworld change here: `cd apworld && python3 build.py`, copy
-  `rs2004scape.apworld` over `../marchipelago/worlds/`, commit + push there -
-  CI republishes `:latest`. (Build is deterministic; 0.6.0 build = 34559 bytes.)
-- Key AP internals that made the container clean: WebHost.py reads config.yaml
-  from CWD; PONY sqlite filename and UPLOAD_FOLDER are cwd-relative too - so
-  running with cwd=/home/container (the panel volume) persists everything.
-  GAME_PORTS config (list of "start-end" strings / 0-for-ephemeral) constrains
-  room ports to panel allocations; waitress's "Serving on" line is the egg's
-  startup-done marker.
-- Yolks STARTUP contract: {{VAR}} -> ${VAR} via sed, expansion happens at
-  `eval` time (echo -e does NOT expand - don't "test" it with echo alone).
-- zsh gotcha: `status` is a read-only zsh variable - don't use it as a shell
-  var name in Bash-tool loops.
