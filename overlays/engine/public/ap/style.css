@@ -336,9 +336,13 @@ main#app {
 
 .info-verb {
     flex: 0 0 auto;
-    color: var(--text-dim);
     font-size: 0.76rem;
+    color: var(--text-dim);
 }
+
+.info-verb.dir-up { color: var(--good); }
+.info-verb.dir-down { color: var(--warn); }
+.info-verb.dir-updown { color: var(--text-dim); }
 
 .info-arrow {
     color: var(--accent);
@@ -408,10 +412,14 @@ main#app {
 }
 
 /* base pins: one per map spot. No connecting lines are drawn until a pin is
-   selected (see .sel-line), which keeps the default view readable at any zoom. */
+   selected (see .sel-line), which keeps the default view readable at any zoom.
+   --pin-r / --pin-sw / --pin-badge / --ring-r / --sel-sw are set per-zoom by
+   applyMapTransform() so markers keep a roughly constant SIZE on screen (and
+   shrink a little zoomed in) instead of ballooning with the map. */
 .site-pin {
+    r: var(--pin-r, 4);
     stroke: #000;
-    stroke-width: 1.2;
+    stroke-width: var(--pin-sw, 1.1);
 }
 
 .site-pin.known {
@@ -427,40 +435,38 @@ main#app {
 .site-pin.unexplored {
     fill: #201a12;
     stroke: #9a865e;
-    stroke-width: 1.4;
-}
-
-.site-pin.selected {
-    stroke: #fff;
-    stroke-width: 2;
 }
 
 .site-badge {
     fill: #fff;
-    font-size: 5px;
+    font-size: var(--pin-badge, 5px);
     font-weight: 700;
+    text-anchor: middle;
+    dominant-baseline: central;
     paint-order: stroke;
     stroke: #000;
-    stroke-width: 1.4px;
+    stroke-width: 1.2px;
     font-family: inherit;
     pointer-events: none;
 }
 
 .site-ring {
+    r: var(--ring-r, 8);
     fill: none;
     stroke: #fff;
-    stroke-width: 1.4;
+    stroke-width: var(--sel-sw, 1.4);
     opacity: 0.9;
 }
 
 .sel-line {
-    stroke-width: 1.6;
+    stroke-width: var(--sel-sw, 1.6);
     stroke-dasharray: 4 3;
     opacity: 0.95;
 }
 
 .sel-dest {
-    stroke-width: 1.2;
+    r: var(--pin-r, 4);
+    stroke-width: var(--pin-sw, 1.1);
 }
 
 .pan-pulse {

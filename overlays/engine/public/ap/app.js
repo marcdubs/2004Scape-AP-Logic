@@ -434,13 +434,33 @@
     // fighting the viewport's pointer capture - see handleMapClick.
     var currentPins = [];
 
-    function initMapControls() {
-        var viewport = document.getElementById('map-viewport');
+    // Applies the current pan/zoom to the world, and rescales the SVG markers so they
+    // stay roughly a fixed SIZE on screen (and shrink a little once zoomed in) instead
+    // of ballooning with the map - that's what lets a cluster of nearby ladders stay
+    // legible at high zoom. Done via CSS custom properties on the overlay so one write
+    // restyles every pin, rather than touching hundreds of elements per wheel tick.
+    function applyMapTransform() {
         var world = document.getElementById('map-world');
-
-        function applyTransform() {
+        if (world) {
             world.style.transform = 'translate(' + mapDrag.tx + 'px,' + mapDrag.ty + 'px) scale(' + mapDrag.scale + ')';
         }
+        var overlay = document.getElementById('map-overlay');
+        if (!overlay) {
+            return;
+        }
+        var scale = mapDrag.scale || 1;
+        var screenR = scale >= 3 ? 2.5 : 4;         // px on screen; a touch smaller zoomed in
+        overlay.style.setProperty('--pin-r', (screenR / scale).toFixed(3));
+        overlay.style.setProperty('--pin-sw', (1.1 / scale).toFixed(3));
+        overlay.style.setProperty('--pin-badge', (7 / scale).toFixed(3) + 'px');
+        overlay.style.setProperty('--ring-r', ((screenR + 4) / scale).toFixed(3));
+        overlay.style.setProperty('--sel-sw', (1.6 / scale).toFixed(3));
+    }
+
+    function initMapControls() {
+        var viewport = document.getElementById('map-viewport');
+
+        var applyTransform = applyMapTransform;
 
         viewport.addEventListener('pointerdown', function (e) {
             mapDrag.active = true;
@@ -679,6 +699,7 @@
         selGroup.innerHTML = '';
         renderSelectionOverlay(selGroup, sites, bounds, pxPerTile);
         renderSitePanel(sites);
+        applyMapTransform(); // set the initial --pin-r etc. for the current zoom
     }
 
     // ---- base layer: one pin per site, no connecting lines (those are drawn only for
@@ -698,7 +719,9 @@
 
             var count = site.entrances.length + site.teleports.length;
             if (count > 1) {
-                var badge = svgEl('text', { class: 'site-badge', x: p.x, y: p.y + 3.2, 'text-anchor': 'middle' });
+                // y offset comes from CSS dominant-baseline so it stays centered as the
+                // font-size var changes with zoom
+                var badge = svgEl('text', { class: 'site-badge', x: p.x, y: p.y });
                 badge.textContent = String(count);
                 pinGroup.appendChild(badge);
             }
@@ -731,13 +754,24 @@
 
     // ---- map: pin selection (click a pin -> list its stacked entrances/levels) ----
 
-    function opVerb(op) {
-        // opcodes come straight from the loc's option list; 1 is the common climb-up
-        // slot and 2 the climb-down, but seeds vary, so keep this a soft hint only.
-        if (op === '1') { return 'climb-up'; }
-        if (op === '2') { return 'climb-down'; }
-        if (op === '') { return 'entrance'; }
-        return 'option ' + op;
+    // Physical up/down of an entrance, inferred from the plane stack at its site - NOT
+    // from the op number (op 1 is used for both up and down ladders) and NOT from the
+    // destination (it's been shuffled to somewhere unrelated). At a shared building
+    // tile the lowest floor can only go up and the highest can only go down; a middle
+    // floor with ladders both above and below is genuinely ambiguous, so we say so
+    // rather than guess. A lone entrance (a door/cave with nothing stacked) gets no
+    // direction claim at all.
+    function directionFor(site, entrance) {
+        var hasAbove = false;
+        var hasBelow = false;
+        site.entrances.forEach(function (other) {
+            if (other.level > entrance.level) { hasAbove = true; }
+            if (other.level < entrance.level) { hasBelow = true; }
+        });
+        if (hasAbove && !hasBelow) { return { arrow: '▲', text: 'up' }; }
+        if (hasBelow && !hasAbove) { return { arrow: '▼', text: 'down' }; }
+        if (hasAbove && hasBelow) { return { arrow: '↕', text: 'up/down' }; }
+        return null;
     }
 
     function siteTitle(site) {
@@ -771,13 +805,16 @@
 
             var lvl = document.createElement('span');
             lvl.className = 'info-lvl';
-            lvl.textContent = 'lvl ' + e.level;
+            lvl.textContent = 'floor ' + e.level;
             row.appendChild(lvl);
 
-            var verb = document.createElement('span');
-            verb.className = 'info-verb';
-            verb.textContent = opVerb(e.op);
-            row.appendChild(verb);
+            var dir = directionFor(site, e);
+            if (dir) {
+                var verb = document.createElement('span');
+                verb.className = 'info-verb dir-' + dir.text.replace('/', '');
+                verb.textContent = dir.arrow + ' ' + dir.text;
+                row.appendChild(verb);
+            }
 
             var arrow = document.createElement('span');
             arrow.className = 'info-arrow';
@@ -904,7 +941,6 @@
         });
 
         var viewport = document.getElementById('map-viewport');
-        var world = document.getElementById('map-world');
         var bounds = meta[coord.layer];
         var pxPerTile = meta.pxPerTile || 2;
         var p = coordToPixel(coord, bounds, pxPerTile);
@@ -912,7 +948,7 @@
         mapDrag.scale = Math.max(mapDrag.scale, 2);
         mapDrag.tx = viewport.clientWidth / 2 - p.x * mapDrag.scale;
         mapDrag.ty = viewport.clientHeight / 2 - p.y * mapDrag.scale;
-        world.style.transform = 'translate(' + mapDrag.tx + 'px,' + mapDrag.ty + 'px) scale(' + mapDrag.scale + ')';
+        applyMapTransform();
 
         renderMap();
         showPanPulse(viewport);
