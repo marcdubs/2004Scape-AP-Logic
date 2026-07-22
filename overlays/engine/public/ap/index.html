@@ -33,21 +33,32 @@
                 <button class="layer-btn" data-layer="underground">Underground</button>
             </div>
             <div class="map-counters" id="map-counters"></div>
-            <div class="map-hint">drag to pan &middot; scroll to zoom</div>
+            <div class="map-hint">drag to pan &middot; scroll to zoom &middot; click a pin</div>
+        </div>
+        <div class="map-legend">
+            <span class="legend-item"><span class="legend-dot known"></span>explored</span>
+            <span class="legend-item"><span class="legend-dot unexplored"></span>not yet explored</span>
+            <span class="legend-item"><span class="legend-dot teleport"></span>teleport landing</span>
+            <span class="legend-item"><span class="legend-dot multi"></span>multiple here</span>
         </div>
         <div class="map-viewport" id="map-viewport">
             <div class="map-world" id="map-world">
                 <img id="map-image" class="map-image" alt="world map" draggable="false">
                 <svg id="map-overlay" class="map-overlay" xmlns="http://www.w3.org/2000/svg"></svg>
             </div>
-            <div id="map-empty" class="empty-state" hidden>Nothing discovered yet on this layer. Go find some shuffled entrances!</div>
+            <div id="map-info" class="map-info" hidden>
+                <button type="button" id="map-info-close" class="map-info-close" aria-label="close">&times;</button>
+                <h3 id="map-info-title"></h3>
+                <div id="map-info-body"></div>
+            </div>
+            <div id="map-empty" class="empty-state" hidden>No shuffled entrances on this layer.</div>
             <div id="map-loading" class="empty-state">Loading map&hellip;</div>
         </div>
     </section>
 
     <section id="tab-entrances" class="tab-panel">
         <h2>Entrances <span class="counter" id="entrances-counter"></span></h2>
-        <p class="tab-desc">Every shuffled ladder/staircase/door connection you've actually used, as a readable list &mdash; the map draws the same data as pins and dashed lines, which gets hard to read once a few dozen are discovered. Click a row to jump to it on the map.</p>
+        <p class="tab-desc">Every shuffled ladder/staircase/door connection you've actually used, as a readable list. The map shows the same connections as pins &mdash; click a pin (or a row here) to draw its links. Click a row to jump to it on the map.</p>
         <div class="entrance-toolbar">
             <input type="search" id="entrances-search" class="entrance-search" placeholder="Filter by place name&hellip;">
         </div>

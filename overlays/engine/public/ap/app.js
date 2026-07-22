@@ -14,7 +14,8 @@
     var state = {
         data: null,
         meta: null,
-        layer: 'surface'
+        layer: 'surface',
+        selectedSite: null
     };
 
     // ---- coord string parsing ----
@@ -46,14 +47,6 @@
             absZ: absZ,
             layer: mapZ >= 100 ? 'underground' : 'surface'
         };
-    }
-
-    function parseEntranceKey(key) {
-        var idx = key.lastIndexOf(':');
-        if (idx === -1) {
-            return { coord: parseCoord(key), op: null };
-        }
-        return { coord: parseCoord(key.slice(0, idx)), op: key.slice(idx + 1) };
     }
 
     function coordToPixel(coord, bounds, pxPerTile) {
@@ -434,7 +427,12 @@
 
     // ---- render: map ----
 
-    var mapDrag = { active: false, startX: 0, startY: 0, tx: 0, ty: 0, scale: 1 };
+    var mapDrag = { active: false, moved: false, downX: 0, downY: 0, startX: 0, startY: 0, tx: 0, ty: 0, scale: 1 };
+
+    // sites drawn on the CURRENT layer, with their pixel positions, so a pointer
+    // "click" (a pointerup that didn't drag) can hit-test against them without
+    // fighting the viewport's pointer capture - see handleMapClick.
+    var currentPins = [];
 
     function initMapControls() {
         var viewport = document.getElementById('map-viewport');
@@ -446,6 +444,9 @@
 
         viewport.addEventListener('pointerdown', function (e) {
             mapDrag.active = true;
+            mapDrag.moved = false;
+            mapDrag.downX = e.clientX;
+            mapDrag.downY = e.clientY;
             mapDrag.startX = e.clientX - mapDrag.tx;
             mapDrag.startY = e.clientY - mapDrag.ty;
             viewport.classList.add('dragging');
@@ -456,21 +457,36 @@
             if (!mapDrag.active) {
                 return;
             }
+            if (Math.abs(e.clientX - mapDrag.downX) > 4 || Math.abs(e.clientY - mapDrag.downY) > 4) {
+                mapDrag.moved = true;
+            }
             mapDrag.tx = e.clientX - mapDrag.startX;
             mapDrag.ty = e.clientY - mapDrag.startY;
             applyTransform();
         });
 
         function endDrag(e) {
+            var wasActive = mapDrag.active;
             mapDrag.active = false;
             viewport.classList.remove('dragging');
             if (e && e.pointerId !== undefined) {
                 try { viewport.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
             }
+            // a press that never moved is a click - hit-test it against the pins
+            if (wasActive && !mapDrag.moved && e && e.type === 'pointerup') {
+                handleMapClick(e);
+            }
         }
 
         viewport.addEventListener('pointerup', endDrag);
         viewport.addEventListener('pointercancel', endDrag);
+
+        var closeBtn = document.getElementById('map-info-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function () {
+                selectSite(null);
+            });
+        }
 
         viewport.addEventListener('wheel', function (e) {
             e.preventDefault();
@@ -494,6 +510,8 @@
                 document.querySelectorAll('.layer-btn').forEach(function (b) { b.classList.remove('active'); });
                 btn.classList.add('active');
                 state.layer = btn.dataset.layer;
+                // a selection on the other layer would be invisible - drop it
+                state.selectedSite = null;
                 // reset the view for the new layer's image
                 mapDrag.tx = 0;
                 mapDrag.ty = 0;
@@ -513,6 +531,91 @@
         }
         return el;
     }
+
+    // Group every shuffled entrance (and teleport landing) by its map pixel, keyed by
+    // "absX_absZ". A single map spot can stack several plane levels and several ops
+    // (spiral-staircase up + down, trapdoors on different floors) - they all land on
+    // the same pixel, so grouping here is what lets a click "separate out the multiple
+    // levels available" instead of piling identical pins on top of each other.
+    var sitesCache = { sig: null, sites: null };
+
+    function trackerSignature(data) {
+        var entrances = (data.discoveries && data.discoveries.entrances) || {};
+        var teleports = (data.discoveries && data.discoveries.teleports) || {};
+        var sources = data.entranceSources || [];
+        return sources.length + '|' + Object.keys(entrances).length + '|' + Object.keys(teleports).length;
+    }
+
+    function buildSites(data) {
+        var sig = trackerSignature(data);
+        if (sitesCache.sig === sig && sitesCache.sites) {
+            return sitesCache.sites;
+        }
+
+        var sites = {};
+        function siteFor(coord) {
+            var k = coord.absX + '_' + coord.absZ;
+            if (!sites[k]) {
+                sites[k] = { key: k, absX: coord.absX, absZ: coord.absZ, layer: coord.layer, entrances: [], teleports: [] };
+            }
+            return sites[k];
+        }
+
+        var discovered = (data.discoveries && data.discoveries.entrances) || {};
+        var sources = data.entranceSources || [];
+
+        // fall back to just the discovered set if the server predates entranceSources
+        var sourceKeys = sources.length ? sources : Object.keys(discovered);
+
+        sourceKeys.forEach(function (rawKey) {
+            var idx = rawKey.lastIndexOf(':');
+            var srcRaw = idx === -1 ? rawKey : rawKey.slice(0, idx);
+            var op = idx === -1 ? '' : rawKey.slice(idx + 1);
+            var coord = parseCoord(srcRaw);
+            if (!coord) {
+                return;
+            }
+            var destRaw = discovered[rawKey] || null;
+            siteFor(coord).entrances.push({
+                srcRaw: srcRaw,
+                op: op,
+                level: coord.level,
+                coord: coord,
+                destRaw: destRaw,
+                dest: destRaw ? parseCoord(destRaw) : null
+            });
+        });
+
+        var teleports = (data.discoveries && data.discoveries.teleports) || {};
+        Object.keys(teleports).forEach(function (spell) {
+            var coord = parseCoord(teleports[spell]);
+            if (!coord) {
+                return;
+            }
+            siteFor(coord).teleports.push({ spell: spell, coord: coord });
+        });
+
+        // keep each site's entrance list in a stable, readable order (by level, then op)
+        Object.keys(sites).forEach(function (k) {
+            sites[k].entrances.sort(function (a, b) {
+                return (a.level - b.level) || a.op.localeCompare(b.op);
+            });
+        });
+
+        sitesCache = { sig: sig, sites: sites };
+        return sites;
+    }
+
+    function siteIsExplored(site) {
+        return site.teleports.length > 0 || site.entrances.some(function (e) { return !!e.destRaw; });
+    }
+
+    var SEL_PALETTE = ['#ff981f', '#5ad0d0', '#d05ad0', '#7fd63c', '#ffe14d', '#ff6f5a'];
+
+    // the pin layer only needs rebuilding when the layer or the discovered data
+    // changes - not on every 5s poll. Selection is drawn as a separate, cheap group,
+    // so clicking a pin never re-touches the (potentially hundreds of) base pins.
+    var lastPinKey = null;
 
     function renderMap() {
         var data = state.data;
@@ -542,76 +645,218 @@
         overlay.setAttribute('width', bounds.widthPx);
         overlay.setAttribute('height', bounds.heightPx);
         overlay.setAttribute('viewBox', '0 0 ' + bounds.widthPx + ' ' + bounds.heightPx);
-        overlay.innerHTML = '';
+
+        var pinGroup = document.getElementById('map-pins');
+        var selGroup = document.getElementById('map-sel');
+        if (!pinGroup) {
+            pinGroup = svgEl('g', { id: 'map-pins' });
+            selGroup = svgEl('g', { id: 'map-sel' });
+            overlay.appendChild(pinGroup);
+            overlay.appendChild(selGroup);
+        }
 
         if (!data) {
             return;
         }
 
-        var entrances = (data.discoveries && data.discoveries.entrances) || {};
-        var teleports = (data.discoveries && data.discoveries.teleports) || {};
+        var sites = buildSites(data);
+        var pinKey = state.layer + '::' + trackerSignature(data);
 
-        var markerCount = 0;
+        if (pinKey !== lastPinKey) {
+            lastPinKey = pinKey;
+            rebuildPins(pinGroup, sites, bounds, pxPerTile);
+            var counters = document.getElementById('map-counters');
+            var discoveredEntrances = (data.discoveries && data.discoveries.entrances) || {};
+            var discoveredTeleports = (data.discoveries && data.discoveries.teleports) || {};
+            var entranceTotal = (data.totals && data.totals.entrances) || 0;
+            var teleportTotal = (data.totals && data.totals.teleports) || 0;
+            counters.innerHTML =
+                '<span>Entrances: <b>' + Object.keys(discoveredEntrances).length + ' / ' + entranceTotal + '</b></span>' +
+                '<span>Teleports: <b>' + Object.keys(discoveredTeleports).length + ' / ' + teleportTotal + '</b></span>';
+            emptyEl.hidden = currentPins.length > 0;
+        }
 
-        Object.keys(entrances).forEach(function (key) {
-            var parsedKey = parseEntranceKey(key);
-            var srcCoord = parsedKey.coord;
-            var dstCoord = parseCoord(entrances[key]);
-            if (!srcCoord || !dstCoord) {
+        selGroup.innerHTML = '';
+        renderSelectionOverlay(selGroup, sites, bounds, pxPerTile);
+        renderSitePanel(sites);
+    }
+
+    // ---- base layer: one pin per site, no connecting lines (those are drawn only for
+    // the selected site, keeping the default view legible at any zoom) ----
+    function rebuildPins(pinGroup, sites, bounds, pxPerTile) {
+        pinGroup.innerHTML = '';
+        currentPins = [];
+        Object.keys(sites).forEach(function (k) {
+            var site = sites[k];
+            if (site.layer !== state.layer) {
                 return;
             }
+            var p = coordToPixel(site, bounds, pxPerTile);
+            var teleOnly = site.entrances.length === 0 && site.teleports.length > 0;
+            var cls = 'site-pin ' + (teleOnly ? 'teleport' : (siteIsExplored(site) ? 'known' : 'unexplored'));
+            pinGroup.appendChild(svgEl('circle', { class: cls, cx: p.x, cy: p.y, r: 4 }));
 
-            var srcOnLayer = srcCoord.layer === state.layer;
-            var dstOnLayer = dstCoord.layer === state.layer;
-            if (!srcOnLayer && !dstOnLayer) {
+            var count = site.entrances.length + site.teleports.length;
+            if (count > 1) {
+                var badge = svgEl('text', { class: 'site-badge', x: p.x, y: p.y + 3.2, 'text-anchor': 'middle' });
+                badge.textContent = String(count);
+                pinGroup.appendChild(badge);
+            }
+
+            currentPins.push({ key: k, x: p.x, y: p.y });
+        });
+    }
+
+    // Lines + destination dots for the selected site only. Cross-layer destinations
+    // can't be drawn on this image, so they're left to the info panel's jump links.
+    function renderSelectionOverlay(group, sites, bounds, pxPerTile) {
+        var key = state.selectedSite;
+        if (!key || !sites[key] || sites[key].layer !== state.layer) {
+            return;
+        }
+        var site = sites[key];
+        var origin = coordToPixel(site, bounds, pxPerTile);
+        group.appendChild(svgEl('circle', { class: 'site-ring', cx: origin.x, cy: origin.y, r: 8 }));
+
+        site.entrances.forEach(function (e, i) {
+            if (!e.dest || e.dest.layer !== state.layer) {
                 return;
             }
+            var color = SEL_PALETTE[i % SEL_PALETTE.length];
+            var pd = coordToPixel(e.dest, bounds, pxPerTile);
+            group.appendChild(svgEl('line', { class: 'sel-line', x1: origin.x, y1: origin.y, x2: pd.x, y2: pd.y, stroke: color }));
+            group.appendChild(svgEl('circle', { class: 'sel-dest', cx: pd.x, cy: pd.y, r: 4, fill: color, stroke: '#000' }));
+        });
+    }
 
-            if (srcOnLayer && dstOnLayer) {
-                var p1 = coordToPixel(srcCoord, bounds, pxPerTile);
-                var p2 = coordToPixel(dstCoord, bounds, pxPerTile);
-                overlay.appendChild(svgEl('line', { class: 'marker-line', x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y }));
-                overlay.appendChild(svgEl('circle', { class: 'marker', cx: p1.x, cy: p1.y, r: 4 }));
-                overlay.appendChild(svgEl('circle', { class: 'marker dest', cx: p2.x, cy: p2.y, r: 4 }));
-                markerCount += 2;
-            } else if (srcOnLayer) {
-                var ps = coordToPixel(srcCoord, bounds, pxPerTile);
-                overlay.appendChild(svgEl('circle', { class: 'marker cross', cx: ps.x, cy: ps.y, r: 5 }));
-                var lbl = svgEl('text', { class: 'marker-label', x: ps.x + 7, y: ps.y + 4 });
-                lbl.textContent = '→ ' + dstCoord.layer;
-                overlay.appendChild(lbl);
-                markerCount += 1;
-            } else if (dstOnLayer) {
-                var pd = coordToPixel(dstCoord, bounds, pxPerTile);
-                overlay.appendChild(svgEl('circle', { class: 'marker cross', cx: pd.x, cy: pd.y, r: 5 }));
-                var lbl2 = svgEl('text', { class: 'marker-label', x: pd.x + 7, y: pd.y + 4 });
-                lbl2.textContent = '← ' + srcCoord.layer;
-                overlay.appendChild(lbl2);
-                markerCount += 1;
+    // ---- map: pin selection (click a pin -> list its stacked entrances/levels) ----
+
+    function opVerb(op) {
+        // opcodes come straight from the loc's option list; 1 is the common climb-up
+        // slot and 2 the climb-down, but seeds vary, so keep this a soft hint only.
+        if (op === '1') { return 'climb-up'; }
+        if (op === '2') { return 'climb-down'; }
+        if (op === '') { return 'entrance'; }
+        return 'option ' + op;
+    }
+
+    function siteTitle(site) {
+        for (var i = 0; i < site.entrances.length; i++) {
+            var name = (state.data && state.data.names && state.data.names.places) || {};
+            if (name[site.entrances[i].srcRaw]) {
+                return name[site.entrances[i].srcRaw];
             }
+        }
+        var lbl = site.layer === 'underground' ? 'Underground ' : '';
+        return lbl + 'tile (' + site.absX + ', ' + site.absZ + ')';
+    }
+
+    function renderSitePanel(sites) {
+        var panel = document.getElementById('map-info');
+        var key = state.selectedSite;
+        if (!key || !sites || !sites[key]) {
+            panel.hidden = true;
+            return;
+        }
+        var site = sites[key];
+        panel.hidden = false;
+        document.getElementById('map-info-title').textContent = siteTitle(site);
+
+        var body = document.getElementById('map-info-body');
+        body.innerHTML = '';
+
+        site.entrances.forEach(function (e, i) {
+            var row = document.createElement('div');
+            row.className = 'info-row';
+
+            var lvl = document.createElement('span');
+            lvl.className = 'info-lvl';
+            lvl.textContent = 'lvl ' + e.level;
+            row.appendChild(lvl);
+
+            var verb = document.createElement('span');
+            verb.className = 'info-verb';
+            verb.textContent = opVerb(e.op);
+            row.appendChild(verb);
+
+            var arrow = document.createElement('span');
+            arrow.className = 'info-arrow';
+            arrow.textContent = '→';
+            row.appendChild(arrow);
+
+            var dest = document.createElement('span');
+            if (e.dest) {
+                dest.className = 'info-dest';
+                var swatch = document.createElement('span');
+                swatch.className = 'info-swatch';
+                swatch.style.background = (e.dest.layer === state.layer) ? SEL_PALETTE[i % SEL_PALETTE.length] : '#7a6a4a';
+                dest.appendChild(swatch);
+                dest.appendChild(document.createTextNode(labelForRaw(e.destRaw)));
+                if (e.dest.layer !== state.layer) {
+                    dest.appendChild(document.createTextNode('  '));
+                    var jump = document.createElement('a');
+                    jump.className = 'info-jump';
+                    jump.href = '#';
+                    jump.textContent = '(jump)';
+                    jump.addEventListener('click', function (ev) {
+                        ev.preventDefault();
+                        panToRaw(e.destRaw);
+                    });
+                    dest.appendChild(jump);
+                }
+            } else {
+                dest.className = 'info-dest unexplored';
+                dest.textContent = 'not yet explored';
+            }
+            row.appendChild(dest);
+            body.appendChild(row);
         });
 
-        Object.keys(teleports).forEach(function (spell) {
-            var coord = parseCoord(teleports[spell]);
-            if (!coord || coord.layer !== state.layer) {
-                return;
-            }
-            var p = coordToPixel(coord, bounds, pxPerTile);
-            overlay.appendChild(svgEl('circle', { class: 'marker dest', cx: p.x, cy: p.y, r: 5 }));
-            var lbl = svgEl('text', { class: 'marker-label', x: p.x + 7, y: p.y + 4 });
-            lbl.textContent = spell;
-            overlay.appendChild(lbl);
-            markerCount += 1;
+        site.teleports.forEach(function (t) {
+            var row = document.createElement('div');
+            row.className = 'info-row';
+            var tag = document.createElement('span');
+            tag.className = 'info-lvl tele';
+            tag.textContent = 'teleport';
+            row.appendChild(tag);
+            var name = document.createElement('span');
+            name.className = 'info-dest';
+            name.textContent = t.spell + ' lands here';
+            row.appendChild(name);
+            body.appendChild(row);
         });
+    }
 
-        emptyEl.hidden = markerCount > 0;
+    // Translate a pointerup into a site selection by hit-testing the pins in world
+    // space (the viewport captures the pointer, so native SVG clicks never fire).
+    function handleMapClick(e) {
+        if (!currentPins.length) {
+            selectSite(null);
+            return;
+        }
+        var viewport = document.getElementById('map-viewport');
+        var rect = viewport.getBoundingClientRect();
+        var worldX = (e.clientX - rect.left - mapDrag.tx) / mapDrag.scale;
+        var worldY = (e.clientY - rect.top - mapDrag.ty) / mapDrag.scale;
+        var radius = 9 / mapDrag.scale; // ~9 screen px, generous for small pins
 
-        var counters = document.getElementById('map-counters');
-        var entranceTotal = (data.totals && data.totals.entrances) || 0;
-        var teleportTotal = (data.totals && data.totals.teleports) || 0;
-        counters.innerHTML =
-            '<span>Entrances: <b>' + Object.keys(entrances).length + ' / ' + entranceTotal + '</b></span>' +
-            '<span>Teleports: <b>' + Object.keys(teleports).length + ' / ' + teleportTotal + '</b></span>';
+        var best = null;
+        var bestDist = radius * radius;
+        currentPins.forEach(function (pin) {
+            var dx = pin.x - worldX;
+            var dy = pin.y - worldY;
+            var d = dx * dx + dy * dy;
+            if (d <= bestDist) {
+                bestDist = d;
+                best = pin.key;
+            }
+        });
+        selectSite(best);
+    }
+
+    function selectSite(key) {
+        state.selectedSite = key;
+        renderMap();
     }
 
     // ---- map: pan-to-connection (entrances list -> map click-through) ----
@@ -647,6 +892,9 @@
                 b.classList.toggle('active', b.dataset.layer === coord.layer);
             });
         }
+
+        // select the site at that spot so its stacked entrances (and their lines) show
+        state.selectedSite = coord.absX + '_' + coord.absZ;
 
         document.querySelectorAll('.tab-btn').forEach(function (b) {
             b.classList.toggle('active', b.dataset.tab === 'map');

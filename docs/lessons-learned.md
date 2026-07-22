@@ -3082,3 +3082,27 @@ amounts). Solo servers toggle it in data/config/ap-options.json. The sim's
 own loadApOptions deliberately NOT extended - the option has no placement
 relevance (that loader only mirrors placement-affecting keys, per its
 header). Engine-only change: restart, no pack rebuild.
+
+## Addendum (2026-07-22): tracker map redesign (problems.txt #3)
+
+Player feedback: the map was laggy/overwhelming - it redrew every discovered
+connection's line+endpoints+label on every 5s poll. Rebuilt around pins +
+on-demand selection (all in public/ap/, engine-only, no pack rebuild):
+- buildSites() groups every entrance source AND teleport landing by map pixel
+  (absX_absZ). Stacked plane-levels/ops at one spot become ONE pin with a count
+  badge; clicking "separates out the multiple levels" in the info panel instead
+  of overlapping identical pins.
+- No connecting lines until a pin is selected. Selection is a separate cheap <g>;
+  the pin layer (hundreds of circles) only rebuilds when layer/discovered-data
+  signature changes (lastPinKey), so polling stops churning the DOM.
+- Click = manual hit-test in world space (handleMapClick), because the viewport
+  owns pointer capture for pan/drag so native SVG clicks never fire. pointerup
+  with <4px movement = click; .map-overlay stays pointer-events:none.
+- "Show unexplored entrances": new web.ts field `entranceSources` from
+  getEntranceSources() in ApEntranceOverrides.ts - the override-table KEYS only
+  (source coord+op), drawn as hollow pins. Reveals an entrance EXISTS at a spot
+  (player sees it in-game anyway) but never the destination - that stays gated
+  behind actually using it. Not spoiler-mode-gated; it's normal-mode data. Source
+  place names added to names.places too (loadEntranceNames only ever names the
+  source location, never its dest, so no leak). Full detail in docs/tracker-map.md
+  "Map interaction". Typecheck clean; hand testing (browser) left to user.

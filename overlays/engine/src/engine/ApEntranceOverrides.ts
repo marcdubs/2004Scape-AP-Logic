@@ -83,3 +83,22 @@ export function getEntranceOverrideCount(): number {
     }
     return overrides.size;
 }
+
+// Source coordinates of every shuffled entrance, in the same
+// "level_mapX_mapZ_localX_localZ:op" human form the tracker uses elsewhere. Feeds the
+// map's "unexplored entrance" pins: it reveals only that a shuffled entrance EXISTS at
+// a spot (which the player sees physically in-game the moment they walk up to it),
+// never where it now leads - the destination stays hidden until the entrance is used.
+export function getEntranceSources(): string[] {
+    if (overrides === null) {
+        overrides = load();
+    }
+    const out: string[] = [];
+    for (const key of overrides.keys()) {
+        const sep = key.lastIndexOf(':');
+        const packed = Number(key.slice(0, sep));
+        const op = key.slice(sep + 1);
+        out.push(`${stringFromPacked(packed)}:${op}`);
+    }
+    return out;
+}

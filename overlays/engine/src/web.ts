@@ -21,7 +21,7 @@ import ObjType from '#/cache/config/ObjType.js';
 import { getApStatus, initApClient, probeServer, reconfigure } from '#/engine/ApClient.js';
 import { getDropOverrideCount } from '#/engine/ApDropOverrides.js';
 import { AXE_TIERS, GEAR_FAMILY_LABELS, GEAR_TIER_LEVELS, GEAR_TIER_NAMES, GEAR_TIER_STARTERS, PICKAXE_TIERS, getUnlockCount, questGateLabel } from '#/engine/ApUnlockOverrides.js';
-import { getEntranceOverrideCount } from '#/engine/ApEntranceOverrides.js';
+import { getEntranceOverrideCount, getEntranceSources } from '#/engine/ApEntranceOverrides.js';
 import { getGatherOverrideCount } from '#/engine/ApGatherOverrides.js';
 import { getProcessOverrideCount } from '#/engine/ApProcessOverrides.js';
 import { getTrackerState } from '#/engine/ApTracker.js';
@@ -431,6 +431,16 @@ function buildApTrackerResponse(spoilerMode: boolean): unknown {
         collectEntranceCoords(spoiler.entrances, entranceCoords);
     }
 
+    // the map draws a pin at every shuffled entrance source (discovered or not), so
+    // name those source coords too - loadEntranceNames only ever describes the source
+    // location itself ("Staircase at ...", never its destination), so this leaks no
+    // more than the coordinate the pin already shows.
+    const entranceSources = getEntranceSources();
+    for (const key of entranceSources) {
+        const sep = key.lastIndexOf(':');
+        entranceCoords.add(sep === -1 ? key : key.slice(0, sep));
+    }
+
     const entranceNames = loadEntranceNames();
     const places: Record<string, string> = {};
     for (const raw of entranceCoords) {
@@ -442,6 +452,7 @@ function buildApTrackerResponse(spoilerMode: boolean): unknown {
 
     return {
         discoveries,
+        entranceSources,
         unlocks: buildUnlocksPanel(),
         names: { items, dropSlots, dropUnits, places },
         totals: {

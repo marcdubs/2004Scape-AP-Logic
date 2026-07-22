@@ -222,6 +222,152 @@ main#app {
     font-size: 0.75rem;
 }
 
+.map-legend {
+    display: flex;
+    gap: 1.1rem;
+    flex-wrap: wrap;
+    margin: 0.1rem 0 0.5rem;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+}
+
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid #000;
+    box-shadow: 0 0 0 1px #000;
+}
+
+.legend-dot.known { background: var(--accent); }
+.legend-dot.teleport { background: var(--gold); }
+.legend-dot.unexplored { background: #201a12; border-color: #9a865e; }
+.legend-dot.multi {
+    background: var(--accent);
+    position: relative;
+}
+.legend-dot.multi::after {
+    content: '2';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 0 2px #000, 0 0 2px #000;
+}
+
+/* click-a-pin info panel, floating over the top-left of the map canvas */
+.map-info {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    max-width: min(24rem, calc(100% - 20px));
+    max-height: calc(100% - 20px);
+    overflow: auto;
+    z-index: 6;
+    background: rgba(24, 20, 14, 0.96);
+    border: 2px solid var(--border);
+    outline: 1px solid var(--border-dark);
+    border-radius: 4px;
+    padding: 0.6rem 0.75rem 0.7rem;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+}
+
+.map-info h3 {
+    font-size: 0.9rem;
+    margin: 0 1.4rem 0.5rem 0;
+    color: var(--accent);
+}
+
+.map-info-close {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 4px;
+}
+
+.map-info-close:hover {
+    color: var(--text);
+}
+
+.info-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.28rem 0;
+    border-top: 1px solid var(--border-dark);
+    font-size: 0.82rem;
+}
+
+.info-row:first-child {
+    border-top: none;
+}
+
+.info-lvl {
+    flex: 0 0 auto;
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.05rem 0.35rem;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+}
+
+.info-lvl.tele {
+    color: var(--gold);
+    border-color: var(--accent-dim);
+}
+
+.info-verb {
+    flex: 0 0 auto;
+    color: var(--text-dim);
+    font-size: 0.76rem;
+}
+
+.info-arrow {
+    color: var(--accent);
+}
+
+.info-dest {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--text);
+}
+
+.info-dest.unexplored {
+    color: var(--text-dim);
+    font-style: italic;
+}
+
+.info-swatch {
+    width: 9px;
+    height: 9px;
+    border-radius: 2px;
+    border: 1px solid #000;
+    flex: 0 0 auto;
+}
+
+.info-jump {
+    color: var(--link);
+}
+
 .map-viewport {
     position: relative;
     width: 100%;
@@ -261,34 +407,60 @@ main#app {
     overflow: visible;
 }
 
-.marker {
-    fill: var(--accent);
+/* base pins: one per map spot. No connecting lines are drawn until a pin is
+   selected (see .sel-line), which keeps the default view readable at any zoom. */
+.site-pin {
     stroke: #000;
-    stroke-width: 1.5;
+    stroke-width: 1.2;
 }
 
-.marker.dest {
+.site-pin.known {
+    fill: var(--accent);
+}
+
+.site-pin.teleport {
     fill: var(--gold);
 }
 
-.marker.cross {
-    fill: #d05ad0;
+/* not yet explored: hollow, dim - it says "a shuffled entrance is here" without
+   claiming to know where it goes */
+.site-pin.unexplored {
+    fill: #201a12;
+    stroke: #9a865e;
+    stroke-width: 1.4;
 }
 
-.marker-line {
-    stroke: var(--accent);
-    stroke-width: 1.5;
-    stroke-dasharray: 4 3;
-    opacity: 0.85;
+.site-pin.selected {
+    stroke: #fff;
+    stroke-width: 2;
 }
 
-.marker-label {
-    fill: #ffe9b3;
-    font-size: 11px;
+.site-badge {
+    fill: #fff;
+    font-size: 5px;
+    font-weight: 700;
     paint-order: stroke;
     stroke: #000;
-    stroke-width: 3px;
+    stroke-width: 1.4px;
     font-family: inherit;
+    pointer-events: none;
+}
+
+.site-ring {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 1.4;
+    opacity: 0.9;
+}
+
+.sel-line {
+    stroke-width: 1.6;
+    stroke-dasharray: 4 3;
+    opacity: 0.95;
+}
+
+.sel-dest {
+    stroke-width: 1.2;
 }
 
 .pan-pulse {

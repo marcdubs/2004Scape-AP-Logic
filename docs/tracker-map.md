@@ -93,10 +93,12 @@ few-thousand-pixel image, one file is fine.
 
 ## What the page shows (all progressively revealed)
 
-- **Map tab**: markers for every *discovered* shuffled entrance with lines to
-  their landing spots (paired gates get two-way arrows); home-spawn flag;
-  optional "N shuffled entrances undiscovered" counter as the hunt motivator
-  (count comes from the override table size — not a spoiler, just a total).
+- **Map tab** (redesigned — see "Map interaction" below): one pin per map spot,
+  no connecting lines until a pin is selected. Explored spots are solid, *not-yet-
+  explored* shuffled entrances are hollow (their existence is shown, never their
+  destination), teleport landings are gold, and a spot stacking several entrances/
+  levels shows a count badge. Home-spawn flag; discovered/total counters per
+  category (totals come from the override table size — not a spoiler).
 - **Gathering tab**: "Normal tree → Raw mackerel", one row per discovered swap,
   vanilla-vs-now with item icons if we're feeling fancy (obj icons are
   extractable from the cache later; text first).
@@ -109,6 +111,34 @@ few-thousand-pixel image, one file is fine.
   `~ap_check_fired` proposed there can call `recordDiscovery('checks', ...)`
   too, making this page the pre-AP progress tracker and, later, the local
   companion to the real AP multiworld tracker.
+
+## Map interaction (2026-07 redesign)
+
+The original map drew every discovered connection's line + endpoints + label on
+every 5s poll. Once a few dozen entrances were found it became a laggy tangle, so
+the map was rebuilt around **pins + on-demand selection**:
+
+- **Sites**, not raw entrances, are the unit. `buildSites()` (app.js) groups every
+  shuffled entrance source *and* teleport landing by map pixel (`absX_absZ`). A
+  single spot commonly stacks several plane levels and several loc ops (spiral
+  staircase up + down, trapdoors on different floors) — grouping is what lets a
+  click "separate out the multiple levels available" instead of piling identical
+  pins.
+- **No lines by default.** Only the *selected* site draws its links (each stacked
+  entrance gets its own palette color, matched by a swatch in the info panel).
+- **Click-to-select** is done by manual hit-test (`handleMapClick`) in world
+  space, because the viewport owns the pointer capture for pan/drag, so native SVG
+  clicks never fire. A pointerup that didn't move >4px is treated as a click.
+- **Unexplored entrances are shown** as hollow pins. This needs the source coords,
+  so `web.ts` now returns `entranceSources` (from `getEntranceSources()` in
+  `ApEntranceOverrides.ts`) — the override-table *keys* only. It reveals that a
+  shuffled entrance exists at a spot (which the player sees in-game the moment they
+  walk up to it) but never where it leads; the destination stays gated behind
+  actually using it. Source-coord place names are added to `names.places` too
+  (`loadEntranceNames` only ever describes the source location, never its dest).
+- **Performance:** the pin layer (potentially hundreds of circles) is rebuilt only
+  when the layer or discovered-data signature changes (`lastPinKey`); selection is
+  a separate, cheap `<g>` redrawn on click. Polling no longer churns the DOM.
 
 ## Seed lifecycle & testing
 
