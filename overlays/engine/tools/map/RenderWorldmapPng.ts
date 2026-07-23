@@ -98,8 +98,9 @@ function parseWorldmap(jag: Jagfile): WorldmapData {
         }
     }
 
-    // underlay.dat: per square (mx, mz) then 64*64 underlay ids, in the applet's
-    // x-outer / z-high-to-low byte order (MapView.loadUnderlay).
+    // underlay.dat: per square (mx, mz) then 64*64 underlay ids in Worldmap.ts's write
+    // order - localX outer (0..63), localZ inner (0..63, ascending). The north-up image
+    // flip is applied later in renderLayer, so tiles are stored at their true local z.
     const underlay = jag.read('underlay.dat');
     if (underlay) {
         while (underlay.available > 0) {
@@ -108,7 +109,7 @@ function parseWorldmap(jag: Jagfile): WorldmapData {
             const sq = getSquare(squares, mx, mz);
             for (let lx = 0; lx < SQUARE; lx++) {
                 for (let k = 0; k < SQUARE; k++) {
-                    const lz = SQUARE - 1 - k;
+                    const lz = k; // stream byte order is local z ascending; north-up flip happens at render time
                     sq.underlay[lx * SQUARE + lz] = underlay.g1();
                 }
             }
@@ -125,7 +126,7 @@ function parseWorldmap(jag: Jagfile): WorldmapData {
             const sq = getSquare(squares, mx, mz);
             for (let lx = 0; lx < SQUARE; lx++) {
                 for (let k = 0; k < SQUARE; k++) {
-                    const lz = SQUARE - 1 - k;
+                    const lz = k; // stream byte order is local z ascending; north-up flip happens at render time
                     const opcode = overlay.g1();
                     if (opcode !== 0) {
                         sq.overlayShapeRot[lx * SQUARE + lz] = overlay.g1();
@@ -147,7 +148,7 @@ function parseWorldmap(jag: Jagfile): WorldmapData {
             const sq = getSquare(squares, mx, mz);
             for (let lx = 0; lx < SQUARE; lx++) {
                 for (let k = 0; k < SQUARE; k++) {
-                    const lz = SQUARE - 1 - k;
+                    const lz = k; // stream byte order is local z ascending; north-up flip happens at render time
                     for (;;) {
                         const opcode = loc.g1();
                         if (opcode === 0) {
