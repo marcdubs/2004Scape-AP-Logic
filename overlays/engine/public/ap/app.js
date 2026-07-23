@@ -435,10 +435,13 @@
     var currentPins = [];
 
     // Applies the current pan/zoom to the world, and rescales the SVG markers so they
-    // stay roughly a fixed SIZE on screen (and shrink a little once zoomed in) instead
-    // of ballooning with the map - that's what lets a cluster of nearby ladders stay
-    // legible at high zoom. Done via CSS custom properties on the overlay so one write
-    // restyles every pin, rather than touching hundreds of elements per wheel tick.
+    // stay a FIXED size on screen at every zoom level (constant screen px, not constant
+    // map px) - dividing each dimension by the current scale exactly cancels the CSS
+    // transform's scale, so a pin is the same number of screen pixels zoomed all the way
+    // in or out. Zooming in spreads the map apart underneath the pins, which is what
+    // separates a cluster of nearby ladders without shrinking the pins or their numbers.
+    // Done via CSS custom properties on the overlay so one write restyles every pin,
+    // rather than touching hundreds of elements per wheel tick.
     function applyMapTransform() {
         var world = document.getElementById('map-world');
         if (world) {
@@ -449,10 +452,10 @@
             return;
         }
         var scale = mapDrag.scale || 1;
-        var screenR = scale >= 3 ? 2.5 : 4;         // px on screen; a touch smaller zoomed in
+        var screenR = 4.5;                           // constant px on screen at any zoom
         overlay.style.setProperty('--pin-r', (screenR / scale).toFixed(3));
         overlay.style.setProperty('--pin-sw', (1.1 / scale).toFixed(3));
-        overlay.style.setProperty('--pin-badge', (7 / scale).toFixed(3) + 'px');
+        overlay.style.setProperty('--pin-badge', (8.5 / scale).toFixed(3) + 'px');
         overlay.style.setProperty('--ring-r', ((screenR + 4) / scale).toFixed(3));
         overlay.style.setProperty('--sel-sw', (1.6 / scale).toFixed(3));
     }
@@ -636,6 +639,7 @@
     // changes - not on every 5s poll. Selection is drawn as a separate, cheap group,
     // so clicking a pin never re-touches the (potentially hundreds of) base pins.
     var lastPinKey = null;
+    var lastLabelKey = null;
 
     function renderMap() {
         var data = state.data;
@@ -666,13 +670,24 @@
         overlay.setAttribute('height', bounds.heightPx);
         overlay.setAttribute('viewBox', '0 0 ' + bounds.widthPx + ' ' + bounds.heightPx);
 
+        var labelGroup = document.getElementById('map-labels');
         var pinGroup = document.getElementById('map-pins');
         var selGroup = document.getElementById('map-sel');
         if (!pinGroup) {
+            // draw order (bottom -> top): place-name labels, then pins, then selection
+            labelGroup = svgEl('g', { id: 'map-labels' });
             pinGroup = svgEl('g', { id: 'map-pins' });
             selGroup = svgEl('g', { id: 'map-sel' });
+            overlay.appendChild(labelGroup);
             overlay.appendChild(pinGroup);
             overlay.appendChild(selGroup);
+        }
+
+        // Place-name labels come from static meta (worldmap-meta.json), so rebuild them
+        // only when the layer changes, not on every 5s poll.
+        if (lastLabelKey !== state.layer) {
+            lastLabelKey = state.layer;
+            rebuildLabels(labelGroup, bounds, pxPerTile);
         }
 
         if (!data) {
@@ -730,6 +745,42 @@
         });
     }
 
+    // Authentic 2004 world-map place names (Lumbridge, Varrock, ...) shipped in
+    // worldmap-meta.json as absolute-tile coords + a size tier. Drawn as SVG text in
+    // map space so they scale with the map like real map lettering (they are map
+    // furniture, unlike the constant-screen-size pins). '/' is a line break.
+    function rebuildLabels(labelGroup, bounds, pxPerTile) {
+        labelGroup.innerHTML = '';
+        var labels = (state.meta && state.meta.labels) || [];
+        // size tier -> font-size in map px (map is ~2px/tile); region names largest.
+        var SIZE_PX = [11, 16, 24];
+        labels.forEach(function (lbl) {
+            // only labels that fall inside this layer's bounds (all vanilla labels are
+            // surface, so underground shows none)
+            if (lbl.x < bounds.minAbsX || lbl.x > bounds.maxAbsX || lbl.z < bounds.minAbsZ || lbl.z > bounds.maxAbsZ) {
+                return;
+            }
+            var px = (lbl.x - bounds.minAbsX) * pxPerTile;
+            var py = (bounds.maxAbsZ - lbl.z) * pxPerTile;
+            var fontPx = SIZE_PX[lbl.size] || SIZE_PX[0];
+            var lines = String(lbl.text).split('/');
+            var text = svgEl('text', {
+                class: 'map-label map-label-' + (lbl.size || 0),
+                x: px,
+                y: py,
+                'font-size': fontPx
+            });
+            // vertically center a multi-line label on its anchor point
+            var startDy = -((lines.length - 1) * fontPx) / 2;
+            lines.forEach(function (line, li) {
+                var tspan = svgEl('tspan', { x: px, dy: (li === 0 ? startDy : fontPx) });
+                tspan.textContent = line;
+                text.appendChild(tspan);
+            });
+            labelGroup.appendChild(text);
+        });
+    }
+
     // Lines + destination dots for the selected site only. Cross-layer destinations
     // can't be drawn on this image, so they're left to the info panel's jump links.
     function renderSelectionOverlay(group, sites, bounds, pxPerTile) {
@@ -774,6 +825,20 @@
         return null;
     }
 
+    // "floor 0" reads oddly for a ground-level door; use building-storey wording
+    // (Ground Floor, 1st Floor, 2nd Floor, ...) matching how a player thinks of it.
+    function floorName(level) {
+        if (level <= 0) { return 'Ground Floor'; }
+        var suffix = 'th';
+        var mod100 = level % 100;
+        if (mod100 < 11 || mod100 > 13) {
+            if (level % 10 === 1) { suffix = 'st'; }
+            else if (level % 10 === 2) { suffix = 'nd'; }
+            else if (level % 10 === 3) { suffix = 'rd'; }
+        }
+        return level + suffix + ' Floor';
+    }
+
     function siteTitle(site) {
         for (var i = 0; i < site.entrances.length; i++) {
             var name = (state.data && state.data.names && state.data.names.places) || {};
@@ -805,7 +870,7 @@
 
             var lvl = document.createElement('span');
             lvl.className = 'info-lvl';
-            lvl.textContent = 'floor ' + e.level;
+            lvl.textContent = floorName(e.level);
             row.appendChild(lvl);
 
             var dir = directionFor(site, e);

@@ -3106,3 +3106,40 @@ on-demand selection (all in public/ap/, engine-only, no pack rebuild):
   place names added to names.places too (loadEntranceNames only ever names the
   source location, never its dest, so no leak). Full detail in docs/tracker-map.md
   "Map interaction". Typecheck clean; hand testing (browser) left to user.
+
+## Addendum (2026-07-23): authentic worldmap render + pin/label polish
+
+Follow-ups to the tracker-map redesign (all in overlays; only the PNG bake needs a
+tool run, the rest are `public/ap/` refresh or `install.js`):
+
+- **Pins now hold constant SCREEN size at every zoom** (not constant map size).
+  `applyMapTransform()` divides `--pin-r`/`--pin-badge`/etc. by `mapDrag.scale`, exactly
+  cancelling the CSS transform's scale, so a pin is the same screen px zoomed all the way
+  in or out; zooming spreads the map apart *underneath* fixed-size pins to separate
+  clustered ladders. (Earlier attempt shrank pins when zoomed - user wanted the opposite.)
+- **Floor wording**: `floorName(level)` → "Ground Floor / 1st Floor / 2nd Floor ..."
+  instead of "floor 0/1/2" in the site panel.
+- **Authentic map background** — `RenderWorldmapPng.ts` REWRITTEN to bake the real 2004
+  world map by porting MapView's own render routines headless (getRgb + blend +
+  renderWorldMap wall pass + drawOverlayShape) over `data/pack/mapview/worldmap.jag`.
+  No applet/GameShell, just the pixel routine. Output = shaded terrain + coastlines +
+  building/wall outlines. Bounds/pxPerTile identical to the old flat render, so pins
+  still align. Full detail in docs/tracker-map.md "Authentic map render". Key facts for
+  next time:
+  - worldmap.jag's underlay/overlay/loc `.dat` streams contain EVERY mapsquare (incl.
+    mapZ>=100 underground) keyed by mx/mz - the applet just windows surface out. So both
+    layers bake from the one jag; MapView's fixed mapOrigin/mapWidth window is NOT a
+    limit on what's in the data.
+  - Engine has a JAG READER (`Jagfile.load(path).read(name)` → Packet) - used it directly
+    instead of maps-server.zip, so the tool is decoupled from FloType/the artifact store.
+  - Blend uses JS `>>` (int32 coercion) deliberately - replicate exactly to match client.
+  - Pad the per-layer arrays (PAD=16 tiles) so the blend's ±5/±10 neighbour reads at the
+    map edge don't fall off-array.
+  - Labels are NOT baked (would need bitmap-font depack); emitted to worldmap-meta.json
+    as `labels[]` (absolute-tile coords + size tier, `/`=linebreak) and drawn by the SPA
+    as SVG `<text>` (`rebuildLabels`) that scales with the map. Mapscene/mapfunction
+    icons skipped for now (would need Pix8/Pix32 sprite depack) - possible follow-up.
+- **esbuild-in-WSL gotcha extended**: the CLAUDE.md fix names `@esbuild/win32-x64`, but
+  running a tsx tool FROM WSL needs the **linux** binary - the shared node_modules only
+  had win32. Fix that worked: `npm install --no-save --force @esbuild/linux-x64` (after
+  `rm -rf node_modules/@esbuild/.win32-x64-*` to clear a stale rename temp).

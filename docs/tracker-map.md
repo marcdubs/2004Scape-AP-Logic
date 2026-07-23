@@ -140,6 +140,38 @@ the map was rebuilt around **pins + on-demand selection**:
   when the layer or discovered-data signature changes (`lastPinKey`); selection is
   a separate, cheap `<g>` redrawn on click. Polling no longer churns the DOM.
 
+## Authentic map render (2026-07 rewrite)
+
+The v1 background was a flat flo-mapcolor fill (terrain only, no buildings/labels) and
+read as "weird/generated". `RenderWorldmapPng.ts` was rewritten to bake the **authentic
+2004 world map** by reusing the webclient's own renderer, headless:
+
+- **Source is `engine/data/pack/mapview/worldmap.jag`** (built by `Worldmap.ts`) — the
+  exact data the in-client world-map applet reads. Its `.dat` streams carry *every*
+  mapsquare keyed by its own `mx/mz` (the applet just windows the surface ones out), so
+  both layers bake from it; underground is still just `mapZ >= 100` bucketing.
+- **The pixels come from MapView's routines, not a re-derivation.** `getRgb` +
+  `getBlendedGroundColour` (the directional HSL terrain shading), `renderWorldMap`'s
+  per-tile fill + wall pass, and `drawOverlayShape` (diagonal coastline/path tiles) are
+  ported verbatim into the tool and run into a raw pixel buffer at 2px/tile. Output:
+  shaded terrain, real coastlines, and building/wall outlines (grey walls, red doors).
+  This is the render *routine* only — none of MapView's GameShell/applet/input loop.
+- **No applet embed, no live canvas.** The tracker keeps the flat-PNG + SVG-pin
+  architecture; the bake just replaces the PNG content. Bounds/`pxPerTile` are
+  byte-identical to v1, so existing pin coords line up unchanged.
+- **Mapscene/mapfunction icons are skipped** for now (they'd need sprite depack from the
+  jag) — a possible follow-up. Walls + overlay shapes + blend already deliver the look.
+- **Place-name labels ship as data, not pixels.** `labels.dat` (absolute-tile coords +
+  size tier, `/` = line break) is emitted into `worldmap-meta.json` as `labels[]`; the
+  SPA draws them as SVG `<text>` in map space (`rebuildLabels`), so they scale with the
+  map like real map lettering and stay crisp — no bitmap-font port needed. Region names
+  (size 2) render gold/uppercase, towns (1) and POIs (0) white.
+
+Regenerate with `npx tsx tools/map/RenderWorldmapPng.ts` (run in `../Server/engine`);
+it reads the built jag, so it only needs re-running when map content changes. Copy the
+three outputs (`worldmap-surface.png`, `worldmap-underground.png`, `worldmap-meta.json`)
+back into `overlays/engine/public/ap/` so `install.js` deploys them.
+
 ## Seed lifecycle & testing
 
 - The tracker JSON carries each randomizer's seed stamp; reseed tools (and

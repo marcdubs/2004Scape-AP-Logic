@@ -2,175 +2,773 @@ import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
 
-import FloType from '#/cache/config/FloType.js';
+import Jagfile from '#/io/Jagfile.js';
 import Packet from '#/io/Packet.js';
-import Environment from '#/util/Environment.js';
 import { printInfo, printWarning } from '#/util/Logger.js';
-import { openArtifactStore } from '#tools/pack/ArtifactCache.js';
 
 // Renders the whole world into two flat PNGs (surface + underground) for the browser
 // discovery tracker map (2004Scape-AP-Logic docs/tracker-map.md, "the map itself").
 // One-time/regenerate-on-content-rebuild tool - it never needs to run per-seed
 // (terrain doesn't change between randomizer seeds), only when map data changes.
 //
-// Rendering source: option (a) from tracker-map.md - reuses the exact
-// underlay/overlay extraction loop `engine/tools/pack/map/Worldmap.ts` uses to build
-// worldmap.jag, reading the same `data/pack/.cache/maps-server.zip` artifact store
-// (present after any `tools/pack/Build.ts` run). Colors come straight from each
-// underlay/overlay's own FloType.rgb ("flo mapcolors") - no heuristic palette needed,
-// this data already carries real designed colors (grass green, water blue, path
-// brown, etc). Overlay wins over underlay when both are present on a tile (overlay is
-// the "drawn on top" layer - paths/water over grass), matching the client's own
-// z-order. Locs (walls/buildings) are intentionally NOT rendered - this is a terrain
-// map for marker overlay, not a full minimap; keeping it terrain-only means the
-// browser SPA's marker/line layer stays legible on top of it.
+// Rendering source (2026-07 rewrite): this now bakes the AUTHENTIC 2004 world map by
+// reusing the webclient's own renderer. `engine/data/pack/mapview/worldmap.jag` (built
+// by tools/pack/map/Worldmap.ts) is the exact data the in-client world map applet
+// reads: per-tile underlay ids (for the directional ground blend), overlay colours +
+// shapes (coastlines / paths / water edges), and loc walls (building/wall outlines).
+// `webclient/src/mapview/MapView.ts` turns that data into pixels via a handful of pure
+// routines - getBlendedGroundColour + getRgb (the HSL ground shading), renderWorldMap
+// (the per-tile fill + wall pass) and drawOverlayShape (the diagonal overlay tiles).
+// Those routines are ported verbatim below and run headless into a raw pixel buffer,
+// so the output is the real world-map look (shaded terrain, coastlines, wall outlines)
+// WITHOUT dragging in MapView's interactive applet (GameShell, input, pan/zoom UI).
+//
+// Place-name labels (labels.dat) are NOT baked into the PNG (that would need the jag's
+// bitmap fonts); instead they're emitted into worldmap-meta.json as {text, x, z, size}
+// in absolute tile coords, and the tracker SPA draws them as crisp SVG text that scales
+// with the map - see docs/tracker-map.md.
 //
 // The "underground" layer is not a separate Z/plane of the SAME mapsquare - it's a
-// disjoint set of mapsquares at mapZ+100 (see lessons-learned.md "Domain knowledge:
-// entrances" - the +100-mapsquare convention), so splitting surface/underground is
-// just bucketing whole mapsquares by mapZ, not touching plane/level.
+// disjoint set of mapsquares at mapZ+100 (see lessons-learned.md "the +100-mapsquare
+// convention"). worldmap.jag's data streams carry every mapsquare keyed by its own
+// mx/mz (the applet just windows the surface ones out), so splitting surface vs
+// underground here is only a matter of bucketing whole mapsquares by mapZ >= 100.
 
 const PX_PER_TILE = 2;
-const SQUARE_TILES = 64;
-
-// distinguishes "no map data here" (ocean gaps, unregistered squares) from any real
-// terrain color - all FloType.rgb values in this content set are lighter/more
-// saturated than this near-black.
-const VOID_RGB = 0x0d0d10;
+const SQUARE = 64;
+// tile padding around each layer's tight bounds, so the ground-blend's +-5/+-10 tile
+// neighbour reads at the map edge don't fall off the array (they just read void/id 0,
+// exactly as the applet's ocean padding does).
+const PAD = 16;
+// background for tiles with no map data (ocean gaps, unregistered squares). The applet
+// renders those as black; a near-black navy reads a touch nicer under the SVG markers.
+const VOID_RGB = 0x0a0a0e;
 
 const OUT_DIR = 'public/ap';
+const JAG_PATH = 'data/pack/mapview/worldmap.jag';
 
-interface SquareColors {
+// ---- parsed worldmap.jag data ----
+
+interface Square {
     mapX: number;
     mapZ: number;
-    // 64*64*3 bytes, row-major by localZ*64+localX (RGB per tile)
-    rgb: Uint8Array;
+    // all indexed [localX * 64 + localZ]
+    underlay: Uint8Array; // underlay flo id (0 = none) -> blended via floorcol1
+    overlayRgb: Int32Array; // resolved overlay RGB (0 = none)
+    overlayShapeRot: Uint8Array; // (shape << 2) | rotation
+    wall: Uint8Array; // 1..28 wall/door code (0 = none)
 }
 
-// Most FloType configs carry a real, designed RGB (grass green, cliff grey, ...) -
-// FloType.rgb is used verbatim for those (~86 of 103 in this content set). The
-// remainder are texture-painted floors (water, lava, wood, brick, marble, ...) with
-// FloType.rgb === 0 (the client draws a bitmap texture there instead, which this
-// terrain-only renderer doesn't have) - matched by debugname substring to a small
-// hand-picked substitute so those tiles don't render solid black. This is the
-// "tasteful heuristic" fallback layered on top of real flo mapcolors, not a
-// replacement for them.
-const TEXTURE_COLOR_FALLBACK: [RegExp, number][] = [
-    [/water|fountain/i, 0x3d6d96],
-    [/lava/i, 0xb5451e],
-    [/marble/i, 0xc9c9c4],
-    [/wood/i, 0x8a5a2b],
-    [/brick/i, 0x8a4b3a],
-    [/pebble/i, 0x8f8674],
-    [/stone|cliff_textured/i, 0x6e6e6e],
-    [/elfbrick/i, 0x6b7a4a],
-    [/black/i, 0x1a1a1a]
-];
-const TEXTURE_COLOR_DEFAULT = 0x555555;
-
-let floColorCache: Map<number, number> | null = null;
-
-function resolveFloColor(id: number): number {
-    if (floColorCache === null) {
-        floColorCache = new Map();
-    }
-
-    const cached = floColorCache.get(id);
-    if (cached !== undefined) {
-        return cached;
-    }
-
-    const flo = FloType.get(id);
-    let color: number;
-    if (flo.debugname && /^invisible/i.test(flo.debugname)) {
-        // debug/hidden floors (rgb=0xff00ff in this content set) are never actually
-        // drawn by the real client - rendering them as loud magenta would invent
-        // fake "content" on the map, so treat them the same as no-data.
-        color = VOID_RGB;
-    } else if (flo.rgb !== 0) {
-        color = flo.rgb;
-    } else {
-        const name = flo.debugname ?? '';
-        const match = TEXTURE_COLOR_FALLBACK.find(([re]) => re.test(name));
-        color = match ? match[1] : TEXTURE_COLOR_DEFAULT;
-    }
-
-    floColorCache.set(id, color);
-    return color;
+interface WorldmapData {
+    floorcol1: number[]; // packed HSL per underlay id, for the ground blend
+    floorcol2: number[]; // RGB per overlay opcode
+    squares: Map<string, Square>;
+    labels: { text: string; x: number; z: number; size: number }[];
 }
 
-// Replicates Worldmap.ts's land-data decode loop (lines ~164-213), but only keeps
-// enough to resolve a color per tile instead of re-packing worldmap.jag's format.
-function decodeSquareColors(landData: Uint8Array, baseLevel: number): Uint8Array {
-    const flags: number[][][] = [];
-    const overlayIds: number[][][] = [];
-    const underlayIds: number[][][] = [];
-    for (let level = 0; level < 4; level++) {
-        flags[level] = [];
-        overlayIds[level] = [];
-        underlayIds[level] = [];
-        for (let x = 0; x < SQUARE_TILES; x++) {
-            flags[level][x] = new Array(SQUARE_TILES).fill(0);
-            overlayIds[level][x] = new Array(SQUARE_TILES).fill(-1);
-            underlayIds[level][x] = new Array(SQUARE_TILES).fill(-1);
+function getSquare(map: Map<string, Square>, mx: number, mz: number): Square {
+    const key = mx + '_' + mz;
+    let sq = map.get(key);
+    if (!sq) {
+        sq = {
+            mapX: mx,
+            mapZ: mz,
+            underlay: new Uint8Array(SQUARE * SQUARE),
+            overlayRgb: new Int32Array(SQUARE * SQUARE),
+            overlayShapeRot: new Uint8Array(SQUARE * SQUARE),
+            wall: new Uint8Array(SQUARE * SQUARE)
+        };
+        map.set(key, sq);
+    }
+    return sq;
+}
+
+function parseWorldmap(jag: Jagfile): WorldmapData {
+    const squares = new Map<string, Square>();
+
+    // floorcol.dat: floorcol1 = packed HSL (underlay), floorcol2 = RGB (overlay).
+    const floorcol1: number[] = [0];
+    const floorcol2: number[] = [0];
+    const floorcol = jag.read('floorcol.dat');
+    if (floorcol) {
+        const count = floorcol.g2();
+        for (let i = 0; i < count; i++) {
+            floorcol1[i + 1] = floorcol.g4();
+            floorcol2[i + 1] = floorcol.g4();
         }
     }
 
-    const landBuf = new Packet(landData as Uint8Array);
-    for (let level = 0; level < 4; level++) {
-        for (let x = 0; x < SQUARE_TILES; x++) {
-            for (let z = 0; z < SQUARE_TILES; z++) {
-                while (true) {
-                    const opcode = landBuf.g1();
-                    if (opcode === 0) {
-                        break;
-                    } else if (opcode === 1) {
-                        landBuf.g1();
-                        break;
-                    }
+    // underlay.dat: per square (mx, mz) then 64*64 underlay ids, in the applet's
+    // x-outer / z-high-to-low byte order (MapView.loadUnderlay).
+    const underlay = jag.read('underlay.dat');
+    if (underlay) {
+        while (underlay.available > 0) {
+            const mx = underlay.g1();
+            const mz = underlay.g1();
+            const sq = getSquare(squares, mx, mz);
+            for (let lx = 0; lx < SQUARE; lx++) {
+                for (let k = 0; k < SQUARE; k++) {
+                    const lz = SQUARE - 1 - k;
+                    sq.underlay[lx * SQUARE + lz] = underlay.g1();
+                }
+            }
+        }
+    }
 
-                    if (opcode <= 49) {
-                        overlayIds[level][x][z] = landBuf.g1();
-                    } else if (opcode <= 81) {
-                        flags[level][x][z] = opcode - 49;
-                    } else {
-                        underlayIds[level][x][z] = opcode - 81;
+    // overlay.dat: opcode 0 = no overlay; else a shape/rotation byte follows and the
+    // opcode indexes floorcol2 for the overlay RGB (MapView.loadOverlay).
+    const overlay = jag.read('overlay.dat');
+    if (overlay) {
+        while (overlay.available > 0) {
+            const mx = overlay.g1();
+            const mz = overlay.g1();
+            const sq = getSquare(squares, mx, mz);
+            for (let lx = 0; lx < SQUARE; lx++) {
+                for (let k = 0; k < SQUARE; k++) {
+                    const lz = SQUARE - 1 - k;
+                    const opcode = overlay.g1();
+                    if (opcode !== 0) {
+                        sq.overlayShapeRot[lx * SQUARE + lz] = overlay.g1();
+                        sq.overlayRgb[lx * SQUARE + lz] = floorcol2[opcode];
                     }
                 }
             }
         }
     }
 
-    const rgb = new Uint8Array(SQUARE_TILES * SQUARE_TILES * 3);
-    for (let x = 0; x < SQUARE_TILES; x++) {
-        for (let z = 0; z < SQUARE_TILES; z++) {
-            const bridged = (flags[1][x][z] & 0x2) === 2;
-            const actualLevel = (bridged ? 1 : 0) + baseLevel;
-
-            const overlayId = overlayIds[actualLevel]?.[x]?.[z] ?? -1;
-            const underlayId = underlayIds[actualLevel]?.[x]?.[z] ?? -1;
-
-            let color = -1;
-            if (overlayId !== -1 && FloType.get(overlayId)) {
-                color = resolveFloColor(overlayId);
-            } else if (underlayId !== -1 && FloType.get(underlayId)) {
-                color = resolveFloColor(underlayId);
-            }
-
-            const idx = (z * SQUARE_TILES + x) * 3;
-            if (color === -1) {
-                rgb[idx] = (VOID_RGB >> 16) & 0xff;
-                rgb[idx + 1] = (VOID_RGB >> 8) & 0xff;
-                rgb[idx + 2] = VOID_RGB & 0xff;
-            } else {
-                rgb[idx] = (color >> 16) & 0xff;
-                rgb[idx + 1] = (color >> 8) & 0xff;
-                rgb[idx + 2] = color & 0xff;
+    // loc.dat: per tile a run of opcodes terminated by 0. <29 = wall/door code,
+    // 29..159 = mapscene sprite, >=160 = mapfunction icon (MapView.loadLoc). We only
+    // bake walls into the PNG; scenes/functions are left for a later sprite pass.
+    const loc = jag.read('loc.dat');
+    if (loc) {
+        while (loc.available > 0) {
+            const mx = loc.g1();
+            const mz = loc.g1();
+            const sq = getSquare(squares, mx, mz);
+            for (let lx = 0; lx < SQUARE; lx++) {
+                for (let k = 0; k < SQUARE; k++) {
+                    const lz = SQUARE - 1 - k;
+                    for (;;) {
+                        const opcode = loc.g1();
+                        if (opcode === 0) {
+                            break;
+                        }
+                        if (opcode < 29) {
+                            sq.wall[lx * SQUARE + lz] = opcode;
+                        }
+                        // 29..159 mapscene, >=160 mapfunction: consumed to keep the
+                        // stream aligned, not rendered here.
+                    }
+                }
             }
         }
     }
 
-    return rgb;
+    // labels.dat: count, then per label a newline-terminated string, x, z (absolute
+    // tile coords) and a size tier (0 small POI / 1 town / 2 region).
+    const labels: { text: string; x: number; z: number; size: number }[] = [];
+    const labelPacket = jag.read('labels.dat');
+    if (labelPacket) {
+        const count = labelPacket.g2();
+        for (let i = 0; i < count; i++) {
+            const text = labelPacket.gjstr();
+            const x = labelPacket.g2();
+            const z = labelPacket.g2();
+            const size = labelPacket.g1();
+            labels.push({ text, x, z, size });
+        }
+    }
+
+    return { floorcol1, floorcol2, squares, labels };
+}
+
+// ---- MapView render routines (ported verbatim from webclient/src/mapview/MapView.ts) ----
+
+// MapView.getRgb: HSL -> packed RGB. Kept byte-for-byte so the ground shading matches
+// the in-client world map exactly (including its out-of-range-hue tolerance).
+function getRgb(hue: number, saturation: number, lightness: number): number {
+    let r = lightness;
+    let g = lightness;
+    let b = lightness;
+
+    if (saturation !== 0.0) {
+        let q: number;
+        if (lightness < 0.5) {
+            q = lightness * (saturation + 1.0);
+        } else {
+            q = lightness + saturation - lightness * saturation;
+        }
+
+        const p = lightness * 2.0 - q;
+        let t = hue + 0.3333333333333333;
+        if (t > 1.0) {
+            t--;
+        }
+
+        let d11 = hue - 0.3333333333333333;
+        if (d11 < 0.0) {
+            d11++;
+        }
+
+        if (t * 6.0 < 1.0) {
+            r = p + (q - p) * 6.0 * t;
+        } else if (t * 2.0 < 1.0) {
+            r = q;
+        } else if (t * 3.0 < 2.0) {
+            r = p + (q - p) * (0.6666666666666666 - t) * 6.0;
+        } else {
+            r = p;
+        }
+
+        if (hue * 6.0 < 1.0) {
+            g = p + (q - p) * 6.0 * hue;
+        } else if (hue * 2.0 < 1.0) {
+            g = q;
+        } else if (hue * 3.0 < 2.0) {
+            g = p + (q - p) * (0.6666666666666666 - hue) * 6.0;
+        } else {
+            g = p;
+        }
+
+        if (d11 * 6.0 < 1.0) {
+            b = p + (q - p) * 6.0 * d11;
+        } else if (d11 * 2.0 < 1.0) {
+            b = q;
+        } else if (d11 * 3.0 < 2.0) {
+            b = p + (q - p) * (0.6666666666666666 - d11) * 6.0;
+        } else {
+            b = p;
+        }
+    }
+
+    const intR = (r * 256.0) | 0;
+    const intG = (g * 256.0) | 0;
+    const intB = (b * 256.0) | 0;
+    return (intR << 16) + (intG << 8) + intB;
+}
+
+// MapView.drawOverlayShape: paints one overlay tile as a diagonal/edge split between
+// the underlay colour and the overlay colour (coastlines, path edges, ...). `stride`
+// is the destination row width in pixels; `off` the top-left pixel index.
+function drawOverlayShape(data: Int32Array, off: number, stride: number, underlay: number, overlay: number, width: number, height: number, shape: number, rotation: number): void {
+    const step = stride - width;
+    if (shape == 9) {
+        shape = 1;
+        rotation = (rotation + 1) & 0x3;
+    } else if (shape == 10) {
+        shape = 1;
+        rotation = (rotation + 3) & 0x3;
+    } else if (shape == 11) {
+        shape = 8;
+        rotation = (rotation + 3) & 0x3;
+    }
+
+    if (shape == 1) {
+        if (rotation == 0) {
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x <= y ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 1) {
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x <= y ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 2) {
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x >= y ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 3) {
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x >= y ? overlay : underlay;
+                }
+                off += step;
+            }
+        }
+    } else if (shape == 2) {
+        if (rotation == 0) {
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x <= y >> 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 1) {
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x >= y << 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 2) {
+            for (let y = 0; y < height; y++) {
+                for (let x = width - 1; x >= 0; x--) {
+                    data[off++] = x <= y >> 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 3) {
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = width - 1; x >= 0; x--) {
+                    data[off++] = x >= y << 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        }
+    } else if (shape == 3) {
+        if (rotation == 0) {
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = width - 1; x >= 0; x--) {
+                    data[off++] = x <= y >> 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 1) {
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x >= y << 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 2) {
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x <= y >> 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 3) {
+            for (let y = 0; y < height; y++) {
+                for (let x = width - 1; x >= 0; x--) {
+                    data[off++] = x >= y << 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        }
+    } else if (shape == 4) {
+        if (rotation == 0) {
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x >= y >> 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 1) {
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x <= y << 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 2) {
+            for (let y = 0; y < height; y++) {
+                for (let x = width - 1; x >= 0; x--) {
+                    data[off++] = x >= y >> 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 3) {
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = width - 1; x >= 0; x--) {
+                    data[off++] = x <= y << 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        }
+    } else if (shape == 5) {
+        if (rotation == 0) {
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = width - 1; x >= 0; x--) {
+                    data[off++] = x >= y >> 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 1) {
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x <= y << 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 2) {
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x >= y >> 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 3) {
+            for (let y = 0; y < height; y++) {
+                for (let x = width - 1; x >= 0; x--) {
+                    data[off++] = x <= y << 1 ? overlay : underlay;
+                }
+                off += step;
+            }
+        }
+    } else if (shape == 6) {
+        if (rotation == 0) {
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x <= ((width / 2) | 0) ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 1) {
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = y <= ((height / 2) | 0) ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 2) {
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x >= ((width / 2) | 0) ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 3) {
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = y >= ((height / 2) | 0) ? overlay : underlay;
+                }
+                off += step;
+            }
+        }
+    } else if (shape == 7) {
+        if (rotation == 0) {
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x <= y - ((height / 2) | 0) ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 1) {
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x <= y - ((height / 2) | 0) ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 2) {
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = width - 1; x >= 0; x--) {
+                    data[off++] = x <= y - ((height / 2) | 0) ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 3) {
+            for (let y = 0; y < height; y++) {
+                for (let x = width - 1; x >= 0; x--) {
+                    data[off++] = x <= y - ((height / 2) | 0) ? overlay : underlay;
+                }
+                off += step;
+            }
+        }
+    } else if (shape == 8) {
+        if (rotation == 0) {
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x >= y - ((height / 2) | 0) ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 1) {
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = 0; x < width; x++) {
+                    data[off++] = x >= y - ((height / 2) | 0) ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 2) {
+            for (let y = height - 1; y >= 0; y--) {
+                for (let x = width - 1; x >= 0; x--) {
+                    data[off++] = x >= y - ((height / 2) | 0) ? overlay : underlay;
+                }
+                off += step;
+            }
+        } else if (rotation == 3) {
+            for (let y = 0; y < height; y++) {
+                for (let x = width - 1; x >= 0; x--) {
+                    data[off++] = x >= y - ((height / 2) | 0) ? overlay : underlay;
+                }
+                off += step;
+            }
+        }
+    }
+}
+
+// ---- layer assembly ----
+
+interface LayerBounds {
+    minMapX: number;
+    maxMapX: number;
+    minMapZ: number;
+    maxMapZ: number;
+    minAbsX: number;
+    maxAbsX: number;
+    minAbsZ: number;
+    maxAbsZ: number;
+    widthPx: number;
+    heightPx: number;
+}
+
+function computeBounds(squares: Square[]): LayerBounds {
+    let minMapX = Infinity;
+    let maxMapX = -Infinity;
+    let minMapZ = Infinity;
+    let maxMapZ = -Infinity;
+    for (const sq of squares) {
+        minMapX = Math.min(minMapX, sq.mapX);
+        maxMapX = Math.max(maxMapX, sq.mapX);
+        minMapZ = Math.min(minMapZ, sq.mapZ);
+        maxMapZ = Math.max(maxMapZ, sq.mapZ);
+    }
+
+    const minAbsX = minMapX * SQUARE;
+    const maxAbsX = (maxMapX + 1) * SQUARE - 1;
+    const minAbsZ = minMapZ * SQUARE;
+    const maxAbsZ = (maxMapZ + 1) * SQUARE - 1;
+
+    return {
+        minMapX,
+        maxMapX,
+        minMapZ,
+        maxMapZ,
+        minAbsX,
+        maxAbsX,
+        minAbsZ,
+        maxAbsZ,
+        widthPx: (maxAbsX - minAbsX + 1) * PX_PER_TILE,
+        heightPx: (maxAbsZ - minAbsZ + 1) * PX_PER_TILE
+    };
+}
+
+function hline(pix: Int32Array, pw: number, ph: number, x: number, y: number, len: number, rgb: number): void {
+    if (y < 0 || y >= ph) {
+        return;
+    }
+    let x0 = x;
+    let n = len;
+    if (x0 < 0) {
+        n += x0;
+        x0 = 0;
+    }
+    if (x0 + n > pw) {
+        n = pw - x0;
+    }
+    let off = y * pw + x0;
+    for (let i = 0; i < n; i++) {
+        pix[off++] = rgb;
+    }
+}
+
+function vline(pix: Int32Array, pw: number, ph: number, x: number, y: number, len: number, rgb: number): void {
+    if (x < 0 || x >= pw) {
+        return;
+    }
+    let y0 = y;
+    let n = len;
+    if (y0 < 0) {
+        n += y0;
+        y0 = 0;
+    }
+    if (y0 + n > ph) {
+        n = ph - y0;
+    }
+    let off = y0 * pw + x;
+    for (let i = 0; i < n; i++) {
+        pix[off] = rgb;
+        off += pw;
+    }
+}
+
+// pixelX = (absX - minAbsX) * PX_PER_TILE
+// pixelY = (maxAbsZ - absZ) * PX_PER_TILE   -- flipped so north (high Z) renders at the top
+function renderLayer(squares: Square[], bounds: LayerBounds, wm: WorldmapData): Buffer {
+    const wTiles = bounds.maxAbsX - bounds.minAbsX + 1;
+    const hTiles = bounds.maxAbsZ - bounds.minAbsZ + 1;
+
+    // padded working arrays (array coords: ax = absX - minAbsX + PAD, az flips Z north-up)
+    const aw = wTiles + 2 * PAD;
+    const ah = hTiles + 2 * PAD;
+    const floort1 = new Uint8Array(aw * ah); // underlay id
+    const floort2 = new Int32Array(aw * ah); // overlay RGB (0 = none)
+    const floorsr = new Uint8Array(aw * ah); // overlay (shape<<2)|rotation
+    const locWall = new Uint8Array(aw * ah); // wall/door code
+
+    for (const sq of squares) {
+        const baseX = sq.mapX * SQUARE;
+        const baseZ = sq.mapZ * SQUARE;
+        for (let lx = 0; lx < SQUARE; lx++) {
+            const ax = baseX + lx - bounds.minAbsX + PAD;
+            for (let lz = 0; lz < SQUARE; lz++) {
+                const az = bounds.maxAbsZ - (baseZ + lz) + PAD;
+                const li = lx * SQUARE + lz;
+                const ai = ax * ah + az;
+                floort1[ai] = sq.underlay[li];
+                floort2[ai] = sq.overlayRgb[li];
+                floorsr[ai] = sq.overlayShapeRot[li];
+                locWall[ai] = sq.wall[li];
+            }
+        }
+    }
+
+    // MapView.getBlendedGroundColour: a directional HSL blend of the underlay colours
+    // that gives the terrain its characteristic soft relief shading. `>>` coerces to
+    // int32 exactly as the original, so the output matches the client.
+    const blended = new Int32Array(aw * ah);
+    const average = new Array<number>(ah).fill(0);
+    const { floorcol1 } = wm;
+    for (let x = 5; x < aw - 5; x++) {
+        const eastCol = (x + 5) * ah;
+        const westCol = (x - 5) * ah;
+        for (let z = 0; z < ah; z++) {
+            average[z] += floorcol1[floort1[eastCol + z]] - floorcol1[floort1[westCol + z]];
+        }
+
+        if (x > 10 && x < aw - 10) {
+            let r = 0;
+            let g = 0;
+            let b = 0;
+            for (let z = 5; z < ah - 5; z++) {
+                const north = average[z + 5];
+                const south = average[z - 5];
+                r += (north >> 20) - (south >> 20);
+                g += ((north >> 10) & 0x3ff) - ((south >> 10) & 0x3ff);
+                b += (north & 0x3ff) - (south & 0x3ff);
+                if (b > 0) {
+                    blended[x * ah + z] = getRgb(r / 8533.0, g / 8533.0, b / 8533.0);
+                }
+            }
+        }
+    }
+
+    // ---- rasterize into a packed-RGB pixel buffer at 2px/tile ----
+    const pw = wTiles * PX_PER_TILE;
+    const ph = hTiles * PX_PER_TILE;
+    const pix = new Int32Array(pw * ph).fill(VOID_RGB);
+
+    // ground + overlay pass (MapView.renderWorldMap, the widthRatio=2 case)
+    for (let tx = 0; tx < wTiles; tx++) {
+        const ax = tx + PAD;
+        const px0 = tx * PX_PER_TILE;
+        for (let tz = 0; tz < hTiles; tz++) {
+            const az = tz + PAD;
+            const ai = ax * ah + az;
+            const off = tz * PX_PER_TILE * pw + px0;
+
+            const overlayVal = floort2[ai];
+            if (overlayVal !== 0) {
+                const info = floorsr[ai];
+                const shape = info & 0xfc;
+                if (shape === 0) {
+                    pix[off] = overlayVal;
+                    pix[off + 1] = overlayVal;
+                    pix[off + pw] = overlayVal;
+                    pix[off + pw + 1] = overlayVal;
+                } else {
+                    drawOverlayShape(pix, off, pw, blended[ai], overlayVal, PX_PER_TILE, PX_PER_TILE, shape >> 2, info & 0x3);
+                }
+            } else {
+                const c = blended[ai];
+                if (c !== 0) {
+                    pix[off] = c;
+                    pix[off + 1] = c;
+                    pix[off + pw] = c;
+                    pix[off + pw + 1] = c;
+                }
+            }
+        }
+    }
+
+    // wall pass (MapView.renderWorldMap wall block, lengthX=lengthY=2)
+    for (let tx = 0; tx < wTiles; tx++) {
+        const ax = tx + PAD;
+        const startX = tx * PX_PER_TILE;
+        const edgeX = startX + 1;
+        for (let tz = 0; tz < hTiles; tz++) {
+            const az = tz + PAD;
+            let wall = locWall[ax * ah + az] & 0xff;
+            if (wall === 0) {
+                continue;
+            }
+            const startY = tz * PX_PER_TILE;
+            const edgeY = startY + 1;
+
+            let rgb = 0xcccccc;
+            if ((wall >= 5 && wall <= 8) || (wall >= 13 && wall <= 16) || (wall >= 21 && wall <= 24)) {
+                rgb = 0xcc0000;
+                wall -= 4;
+            }
+            if (wall === 27 || wall === 28) {
+                rgb = 0xcc0000;
+                wall -= 2;
+            }
+
+            if (wall === 1) {
+                vline(pix, pw, ph, startX, startY, PX_PER_TILE, rgb);
+            } else if (wall === 2) {
+                hline(pix, pw, ph, startX, startY, PX_PER_TILE, rgb);
+            } else if (wall === 3) {
+                vline(pix, pw, ph, edgeX, startY, PX_PER_TILE, rgb);
+            } else if (wall === 4) {
+                hline(pix, pw, ph, startX, edgeY, PX_PER_TILE, rgb);
+            } else if (wall === 9) {
+                vline(pix, pw, ph, startX, startY, PX_PER_TILE, 0xffffff);
+                hline(pix, pw, ph, startX, startY, PX_PER_TILE, rgb);
+            } else if (wall === 10) {
+                vline(pix, pw, ph, edgeX, startY, PX_PER_TILE, 0xffffff);
+                hline(pix, pw, ph, startX, startY, PX_PER_TILE, rgb);
+            } else if (wall === 11) {
+                vline(pix, pw, ph, edgeX, startY, PX_PER_TILE, 0xffffff);
+                hline(pix, pw, ph, startX, edgeY, PX_PER_TILE, rgb);
+            } else if (wall === 12) {
+                vline(pix, pw, ph, startX, startY, PX_PER_TILE, 0xffffff);
+                hline(pix, pw, ph, startX, edgeY, PX_PER_TILE, rgb);
+            } else if (wall === 17) {
+                hline(pix, pw, ph, startX, startY, 1, rgb);
+            } else if (wall === 18) {
+                hline(pix, pw, ph, edgeX, startY, 1, rgb);
+            } else if (wall === 19) {
+                hline(pix, pw, ph, edgeX, edgeY, 1, rgb);
+            } else if (wall === 20) {
+                hline(pix, pw, ph, startX, edgeY, 1, rgb);
+            } else if (wall === 25) {
+                for (let i = 0; i < PX_PER_TILE; i++) {
+                    hline(pix, pw, ph, startX + i, edgeY - i, 1, rgb);
+                }
+            } else if (wall === 26) {
+                for (let i = 0; i < PX_PER_TILE; i++) {
+                    hline(pix, pw, ph, startX + i, startY + i, 1, rgb);
+                }
+            }
+        }
+    }
+
+    // ---- pack into PNG scanlines (filter byte 0 per row, then RGB) ----
+    const stride = 1 + pw * 3;
+    const raw = Buffer.alloc(stride * ph);
+    for (let y = 0; y < ph; y++) {
+        const rowStart = y * stride;
+        const rowPix = y * pw;
+        for (let x = 0; x < pw; x++) {
+            const c = pix[rowPix + x];
+            const off = rowStart + 1 + x * 3;
+            raw[off] = (c >> 16) & 0xff;
+            raw[off + 1] = (c >> 8) & 0xff;
+            raw[off + 2] = c & 0xff;
+        }
+    }
+    return raw;
 }
 
 // ---- hand-rolled PNG encoding (no new npm dependency; node:zlib does the deflate) ----
@@ -211,8 +809,7 @@ function pngChunk(type: string, data: Buffer): Buffer {
 }
 
 // scanlines must already be filter-byte-prefixed (1 + width*3 bytes per row, filter
-// type 0/None throughout - simplest correct encoding; leaves some compression on the
-// table versus per-row Paeth/Up filtering, acceptable for a build-time asset).
+// type 0/None throughout - simplest correct encoding).
 function encodePng(width: number, height: number, scanlines: Buffer): Buffer {
     const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -221,9 +818,9 @@ function encodePng(width: number, height: number, scanlines: Buffer): Buffer {
     ihdrData.writeUInt32BE(height, 4);
     ihdrData[8] = 8; // bit depth
     ihdrData[9] = 2; // color type: truecolor (RGB)
-    ihdrData[10] = 0; // compression method
-    ihdrData[11] = 0; // filter method
-    ihdrData[12] = 0; // interlace method
+    ihdrData[10] = 0;
+    ihdrData[11] = 0;
+    ihdrData[12] = 0;
     const ihdr = pngChunk('IHDR', ihdrData);
 
     const idatData = zlib.deflateSync(scanlines, { level: 6 });
@@ -234,168 +831,29 @@ function encodePng(width: number, height: number, scanlines: Buffer): Buffer {
     return Buffer.concat([signature, ihdr, idat, iend]);
 }
 
-// ---- layer assembly ----
-
-interface LayerBounds {
-    minMapX: number;
-    maxMapX: number;
-    minMapZ: number;
-    maxMapZ: number;
-    minAbsX: number;
-    maxAbsX: number;
-    minAbsZ: number;
-    maxAbsZ: number;
-    widthPx: number;
-    heightPx: number;
-}
-
-function computeBounds(squares: SquareColors[]): LayerBounds {
-    let minMapX = Infinity;
-    let maxMapX = -Infinity;
-    let minMapZ = Infinity;
-    let maxMapZ = -Infinity;
-    for (const sq of squares) {
-        minMapX = Math.min(minMapX, sq.mapX);
-        maxMapX = Math.max(maxMapX, sq.mapX);
-        minMapZ = Math.min(minMapZ, sq.mapZ);
-        maxMapZ = Math.max(maxMapZ, sq.mapZ);
-    }
-
-    const minAbsX = minMapX * SQUARE_TILES;
-    const maxAbsX = (maxMapX + 1) * SQUARE_TILES - 1;
-    const minAbsZ = minMapZ * SQUARE_TILES;
-    const maxAbsZ = (maxMapZ + 1) * SQUARE_TILES - 1;
-
-    return {
-        minMapX,
-        maxMapX,
-        minMapZ,
-        maxMapZ,
-        minAbsX,
-        maxAbsX,
-        minAbsZ,
-        maxAbsZ,
-        widthPx: (maxAbsX - minAbsX + 1) * PX_PER_TILE,
-        heightPx: (maxAbsZ - minAbsZ + 1) * PX_PER_TILE
-    };
-}
-
-// pixelX = (absX - minAbsX) * PX_PER_TILE
-// pixelY = (maxAbsZ - absZ) * PX_PER_TILE   -- flipped so north (high Z) renders at the top
-function renderLayer(squares: SquareColors[], bounds: LayerBounds): Buffer {
-    const stride = 1 + bounds.widthPx * 3;
-    const raw = Buffer.alloc(stride * bounds.heightPx);
-
-    // fill background with the void color (filter byte for every row stays 0/None,
-    // which is already what Buffer.alloc's zero-fill gives us).
-    for (let y = 0; y < bounds.heightPx; y++) {
-        const rowStart = y * stride;
-        for (let x = 0; x < bounds.widthPx; x++) {
-            const off = rowStart + 1 + x * 3;
-            raw[off] = (VOID_RGB >> 16) & 0xff;
-            raw[off + 1] = (VOID_RGB >> 8) & 0xff;
-            raw[off + 2] = VOID_RGB & 0xff;
-        }
-    }
-
-    for (const sq of squares) {
-        for (let lz = 0; lz < SQUARE_TILES; lz++) {
-            const absZ = sq.mapZ * SQUARE_TILES + lz;
-            const tileRow = bounds.maxAbsZ - absZ;
-            const pixelY0 = tileRow * PX_PER_TILE;
-
-            for (let lx = 0; lx < SQUARE_TILES; lx++) {
-                const absX = sq.mapX * SQUARE_TILES + lx;
-                const tileCol = absX - bounds.minAbsX;
-                const pixelX0 = tileCol * PX_PER_TILE;
-
-                const cidx = (lz * SQUARE_TILES + lx) * 3;
-                const r = sq.rgb[cidx];
-                const g = sq.rgb[cidx + 1];
-                const b = sq.rgb[cidx + 2];
-
-                for (let dy = 0; dy < PX_PER_TILE; dy++) {
-                    const rowStart = (pixelY0 + dy) * stride;
-                    for (let dx = 0; dx < PX_PER_TILE; dx++) {
-                        const off = rowStart + 1 + (pixelX0 + dx) * 3;
-                        raw[off] = r;
-                        raw[off + 1] = g;
-                        raw[off + 2] = b;
-                    }
-                }
-            }
-        }
-    }
-
-    return raw;
-}
+// ---- main ----
 
 async function main(): Promise<void> {
-    const zipPath = 'data/pack/.cache/maps-server.zip';
-    if (!fs.existsSync(zipPath)) {
-        printWarning(`RenderWorldmapPng: ${zipPath} is missing - run tools/pack/Build.ts (or at least a map pack pass) first`);
+    if (!fs.existsSync(JAG_PATH)) {
+        printWarning(`RenderWorldmapPng: ${JAG_PATH} is missing - run tools/pack/Build.ts (which packs the worldmap) first`);
         process.exitCode = 1;
         return;
     }
 
-    FloType.load('data/pack');
-    if (FloType.configs.length === 0) {
-        printWarning('RenderWorldmapPng: FloType loaded zero configs - flo mapcolors will be unavailable, output will be all-void');
-    }
+    const jag = Jagfile.load(JAG_PATH);
+    const wm = parseWorldmap(jag);
 
-    const serverStore = openArtifactStore('maps-server');
-
-    // Enumerate candidate mapsquares by listing content/maps/*.jm2 directly instead of
-    // going through tools/pack/PackFile.ts's MapPack: MapPack's validateFilesPack
-    // validator only populates correctly on a SECOND .reload() in a standalone tsx
-    // run (some import-order interaction leaves Environment.build.srcDir/PackFile's
-    // revalidation resolving empty on the first pass) - reproducible outside this
-    // tool too, so it's a pack-loader quirk, not specific to this file. Reading the
-    // filenames directly sidesteps it entirely; the actual map DATA still comes from
-    // the maps-server.zip artifact store (serverStore below), same as Worldmap.ts.
-    const mapsDir = path.join(Environment.build.srcDir, 'maps');
-    const mapFiles = fs.readdirSync(mapsDir).filter(name => /^m\d+_\d+\.jm2$/.test(name));
-
-    const surfaceSquares: SquareColors[] = [];
-    const undergroundSquares: SquareColors[] = [];
-
-    for (const file of mapFiles) {
-        const mapName = file.slice(0, -'.jm2'.length);
-        if (!serverStore.has(mapName)) {
-            continue;
-        }
-
-        const [mapX, mapZ] = mapName
-            .substring(1)
-            .split('_')
-            .map(x => parseInt(x, 10));
-        if (!Number.isInteger(mapX) || !Number.isInteger(mapZ)) {
-            continue;
-        }
-
-        const landData = serverStore.read(mapName);
-        if (!landData) {
-            continue;
-        }
-
-        // same one-off exception Worldmap.ts carries for the underground pass square.
-        const baseLevel = mapX === 33 && mapZ >= 71 && mapZ <= 73 ? 1 : 0;
-
-        const rgb = decodeSquareColors(landData, baseLevel);
-        const entry: SquareColors = { mapX, mapZ, rgb };
-
+    const surface: Square[] = [];
+    const underground: Square[] = [];
+    for (const sq of wm.squares.values()) {
         // +100-mapsquare convention: mapZ >= 100 is the underground layer.
-        if (mapZ >= 100) {
-            undergroundSquares.push(entry);
-        } else {
-            surfaceSquares.push(entry);
-        }
+        (sq.mapZ >= 100 ? underground : surface).push(sq);
     }
 
-    printInfo(`RenderWorldmapPng: decoded ${surfaceSquares.length} surface square(s), ${undergroundSquares.length} underground square(s)`);
+    printInfo(`RenderWorldmapPng: parsed ${surface.length} surface square(s), ${underground.length} underground square(s), ${wm.labels.length} label(s)`);
 
-    if (surfaceSquares.length === 0 && undergroundSquares.length === 0) {
-        printWarning('RenderWorldmapPng: no mapsquares found in the artifact store - nothing to render');
+    if (surface.length === 0 && underground.length === 0) {
+        printWarning('RenderWorldmapPng: worldmap.jag carried no mapsquares - nothing to render');
         process.exitCode = 1;
         return;
     }
@@ -404,23 +862,28 @@ async function main(): Promise<void> {
 
     const meta: Record<string, unknown> = { pxPerTile: PX_PER_TILE };
 
-    if (surfaceSquares.length > 0) {
-        const bounds = computeBounds(surfaceSquares);
-        const raw = renderLayer(surfaceSquares, bounds);
+    if (surface.length > 0) {
+        const bounds = computeBounds(surface);
+        const raw = renderLayer(surface, bounds, wm);
         const png = encodePng(bounds.widthPx, bounds.heightPx, raw);
         fs.writeFileSync(path.join(OUT_DIR, 'worldmap-surface.png'), png);
         meta.surface = bounds;
         printInfo(`RenderWorldmapPng: wrote worldmap-surface.png (${bounds.widthPx}x${bounds.heightPx}, ${png.length} bytes)`);
     }
 
-    if (undergroundSquares.length > 0) {
-        const bounds = computeBounds(undergroundSquares);
-        const raw = renderLayer(undergroundSquares, bounds);
+    if (underground.length > 0) {
+        const bounds = computeBounds(underground);
+        const raw = renderLayer(underground, bounds, wm);
         const png = encodePng(bounds.widthPx, bounds.heightPx, raw);
         fs.writeFileSync(path.join(OUT_DIR, 'worldmap-underground.png'), png);
         meta.underground = bounds;
         printInfo(`RenderWorldmapPng: wrote worldmap-underground.png (${bounds.widthPx}x${bounds.heightPx}, ${png.length} bytes)`);
     }
+
+    // Place-name labels are drawn by the SPA as SVG text (scales with the map), so they
+    // ship as data, not baked pixels. Coords are absolute tiles; size 0/1/2 = POI/town/
+    // region. `/` in text is a line break (rendered as multi-line by the SPA).
+    meta.labels = wm.labels;
 
     fs.writeFileSync(path.join(OUT_DIR, 'worldmap-meta.json'), JSON.stringify(meta, null, 2));
     printInfo(`RenderWorldmapPng: wrote ${path.join(OUT_DIR, 'worldmap-meta.json')}`);

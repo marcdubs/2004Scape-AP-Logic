@@ -450,6 +450,28 @@ main#app {
     pointer-events: none;
 }
 
+/* authentic world-map place names - scale WITH the map (map furniture), unlike pins.
+   dark halo (paint-order: stroke) keeps them legible over any terrain colour. */
+.map-label {
+    fill: #ffffff;
+    stroke: #000000;
+    stroke-width: 0.18em;
+    paint-order: stroke;
+    text-anchor: middle;
+    font-family: inherit;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+    opacity: 0.92;
+}
+
+.map-label-2 {
+    fill: #ffb833; /* region names (gold), matching the in-client world map */
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
 .site-ring {
     r: var(--ring-r, 8);
     fill: none;
