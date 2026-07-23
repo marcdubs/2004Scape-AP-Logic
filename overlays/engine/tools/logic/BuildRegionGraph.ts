@@ -74,8 +74,27 @@ import { GatedAreaBox, loadGatedAreas, tileNearBox } from './GatedAreas.js';
 const PACK_DIR = 'data/pack';
 const ZIP_PATH = path.join(PACK_DIR, '.cache', 'maps-server.zip');
 const CONFIG_DIR = process.argv.includes('--config-dir') ? process.argv[process.argv.indexOf('--config-dir') + 1] : 'data/config';
-const OUT_PATH = path.join('tools', 'logic', 'region-graph.json');
+const OUT_PATH = process.argv.includes('--out') ? process.argv[process.argv.indexOf('--out') + 1] : path.join('tools', 'logic', 'region-graph.json');
 const GATED_DOOR_MARGIN = 2; // tiles - see the door-handling comment above.
+
+// `--extra-closed-doors <door-scan.json>`: build a Set of "level:absX:absZ" tile keys from
+// every gated passage's placementCoords, to force those doors closed during the flood-fill.
+function loadExtraClosedDoors(): Set<string> {
+    const set = new Set<string>();
+    const flagIdx = process.argv.indexOf('--extra-closed-doors');
+    if (flagIdx === -1) {
+        return set;
+    }
+    const file = process.argv[flagIdx + 1];
+    const scan = JSON.parse(fs.readFileSync(file, 'utf8')) as { gatedPassages?: { placementCoords?: string[] }[] };
+    for (const d of scan.gatedPassages ?? []) {
+        for (const raw of d.placementCoords ?? []) {
+            const [level, mapX, mapZ, localX, localZ] = raw.split('_').map(Number);
+            set.add(`${level}:${mapX * 64 + localX}:${mapZ * 64 + localZ}`);
+        }
+    }
+    return set;
+}
 
 const LEVELS = 4;
 const SQUARE_TILES = 64;
@@ -177,7 +196,7 @@ function loadGround(lands: Int8Array, packet: Packet, mapsquareX: number, mapsqu
 // ---- loc loading - port of GameMap.loadLocations, with the door-open heuristic
 // inserted before applyLocCollision. ----
 
-function loadLocations(lands: Int8Array, packet: Packet, mapsquareX: number, mapsquareZ: number, gatedBoxes: GatedAreaBox[], stats: { doorsOpened: number; doorsGated: number }): void {
+function loadLocations(lands: Int8Array, packet: Packet, mapsquareX: number, mapsquareZ: number, gatedBoxes: GatedAreaBox[], extraClosed: Set<string>, stats: { doorsOpened: number; doorsGated: number }): void {
     let locId = -1;
     let locIdOffset = packet.gsmarts();
     while (locIdOffset !== 0) {
@@ -210,7 +229,7 @@ function loadLocations(lands: Int8Array, packet: Packet, mapsquareX: number, map
 
             if (type.blockwalk) {
                 const openable = isOpenableDoorLoc(type);
-                const nearGate = openable && gatedBoxes.some(box => tileNearBox(actualLevel, absoluteX, absoluteZ, box, GATED_DOOR_MARGIN));
+                const nearGate = openable && (gatedBoxes.some(box => tileNearBox(actualLevel, absoluteX, absoluteZ, box, GATED_DOOR_MARGIN)) || extraClosed.has(`${actualLevel}:${absoluteX}:${absoluteZ}`));
                 if (openable && !nearGate) {
                     stats.doorsOpened++;
                     // deliberately skip applyLocCollision - see file header "Door handling".
@@ -258,6 +277,16 @@ async function main(): Promise<void> {
 
     const gated = loadGatedAreas(CONFIG_DIR);
     console.log(`BuildRegionGraph: ap-gated-areas.json ${gated.present ? `present (${gated.areas.length} area(s))` : 'ABSENT (fail-open: no gated doors will be closed)'}`);
+
+    // `--extra-closed-doors <door-scan.json>` keeps EVERY ScanDoors-gated passage closed
+    // during the flood-fill, regardless of the curated box list, so every gated pocket
+    // isolates as its own region. This is the derivation-only mode DeriveGatedAreas.ts uses
+    // to read each pocket's bbox before ap-gated-areas.json exists for it; a normal
+    // (curated) run omits the flag and behaves exactly as before.
+    const extraClosed = loadExtraClosedDoors();
+    if (extraClosed.size > 0) {
+        console.log(`BuildRegionGraph: --extra-closed-doors keeping ${extraClosed.size} ScanDoors-gated door tile(s) closed`);
+    }
 
     const zipEntries = unzipSync(fs.readFileSync(ZIP_PATH));
     const mapKeys = Object.keys(zipEntries).filter(k => k[0] === 'm');
@@ -316,7 +345,7 @@ async function main(): Promise<void> {
         loadGround(lands, new Packet(zipEntries[key]), mapsquareX, mapsquareZ);
 
         const stats = { doorsOpened: 0, doorsGated: 0 };
-        loadLocations(lands, new Packet(locEntry), mapsquareX, mapsquareZ, gatedBoxes, stats);
+        loadLocations(lands, new Packet(locEntry), mapsquareX, mapsquareZ, gatedBoxes, extraClosed, stats);
         doorsOpened += stats.doorsOpened;
         doorsGated += stats.doorsGated;
     }

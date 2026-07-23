@@ -210,27 +210,82 @@ function loadQuestRegions(): QuestRegionsFile {
     return JSON.parse(fs.readFileSync(QUEST_REGIONS_PATH, 'utf8'));
 }
 
-// ---- curated varp resolvers for ap-gated-areas.json's `{varp,gte}` require form.
-// These names come straight from the shipped ap-gated-areas.json's "derivation" fields
-// (Workstream A) - "qp" is generic and always tracked; the rest are area-specific
-// persistent-flag varps this tool doesn't have direct visibility into, so they're
-// mapped to the nearest equivalent state this simulation DOES track. Curated and
-// growable, same pattern as quest-regions.json - an unrecognized varp name falls back
-// to 0 (fail-closed) via GatedAreas.ts's requireSatisfied. ----
+// ---- varp resolver for ap-gated-areas.json's `{varp,gte}` / `{varp,bit}` require forms.
+// Every gate references a quest-progress varp; this simulation is quest-ATOMIC (tracks
+// completion + doability, not per-stage), so the model maps each gate varp to the state
+// its quest is in. The 47 gate varps in the shipped gated-areas file all belong to one of
+// the sim's quests (DeriveGatedAreas + the subagent require pass - see problems.txt #9).
+//
+// KEY MODELLING CHOICE: a quest-progress gate is satisfiable when its quest is DOABLE (its
+// non-region prerequisites - skills + prereq quests + QP - are met), NOT when it is
+// complete. This is essential and correct:
+//   - It breaks CIRCULARITY: a quest's own interior door (e.g. Phoenix Gang hideout, gating
+//     %phoenixgang, needed to DO Shield of Arrav) would deadlock if it required the quest
+//     complete. "Doable" lets the fixpoint flow: prereqs met -> door opens -> quest-region
+//     reachable -> quest completes.
+//   - It can't cause a FALSE PASS on quest-internal items: a "quest X complete" gate can't
+//     legitimately hide an item that quest X itself needs (vanilla contradiction), so
+//     opening at "doable" never makes an unbeatable seed look beatable.
+// Returns an all-low-bits value (0x7FFFFFFF) when doable, so both `gte` thresholds and any
+// `testbit` (bits 0-30) pass; 0 otherwise -> requireSatisfied treats the gate as closed.
+const GATE_VARP_ALL = 0x7FFFFFFF;
 
-function resolveVarp(name: string, qp: number, completed: Set<string>, statCaps: Map<string, number>): number | undefined {
-    switch (name) {
-        case 'qp':
-            return qp;
-        case 'heroquest': // Heroes' Guild gate; heroquest>=15 in vanilla means Heroes' Quest complete.
-            return completed.has('hero') ? 999 : 0;
-        case 'legendsquest': // Legends' Guild gate; legendsquest>=75 means Legends' Quest complete.
-            return completed.has('legends') ? 999 : 0;
-        case 'prayer_guild': // Not a quest at all - set permanently once base Prayer >= 31 (Abbot Langley dialogue).
-            return (statCaps.get('prayer') ?? 99) >= 31 ? 1 : 0;
-        default:
-            return undefined; // unknown varp -> requireSatisfied treats as 0 (fail-closed).
+// varp -> sim quest id (quests.json). Unmapped varps fall through to 0 (fail-closed).
+const VARP_TO_QUEST: Record<string, string> = {
+    arenaquest: 'arena', ballquest: 'ball', biohazard: 'biohazard', cogquest: 'cog',
+    death_equiproom: 'death', desertrescue_map_mechanisms: 'desertrescue',
+    dragon_oracle: 'dragon', dragon_wall: 'dragon', dragonquest: 'dragon',
+    druidspirit: 'druid', eadgar_quest: 'eadgar', grail: 'grail', grandtree: 'grandtree',
+    handelmort_traps_disabled: 'totem', hazeelcult_side: 'hazeelcult', hazeelcultquest: 'hazeelcult',
+    horrorair: 'horror', horrorarrow: 'horror', horrorearth: 'horror', horrorfire: 'horror',
+    horrorquest: 'horror', horrorsword: 'horror', horrorwater: 'horror',
+    hunt_store_employed: 'hunt', ibanmulti: 'upass', ikov: 'ikov', itwatchtower_bits: 'itwatchtower',
+    junglepotion: 'junglepotion', legends_bits: 'legends', mcannon: 'mcannon', murderquest: 'murder',
+    priestperil: 'priest', regicide_quest: 'regicide', scorpcatcher: 'scorpcatcher', tbwt_main: 'tbwt',
+    treequest: 'tree', troll_entered_stronghold: 'troll', troll_freed_eadgar: 'troll',
+    troll_quest: 'troll', viking: 'viking'
+};
+
+// varps used by BOTH a post-quest COMPLETION gate (guild / gang-complete) AND a mid-quest
+// gate on the same varp. Modelled as completed?ALL : (doable?mid:0) so the completion gate
+// stays completion-SAFE (never opens early - avoids a false pass on post-quest reward areas)
+// while mid-quest doors on the same varp still open at "doable". `mid` sits above every
+// mid-quest threshold on that varp and below its completion threshold.
+const SPLIT_VARPS: Record<string, { quest: string; mid: number }> = {
+    heroquest: { quest: 'hero', mid: 14 },            // guild needs >=15 (complete); mansion/HQ doors need 10/8
+    blackarmgang: { quest: 'blackarmgang', mid: 3 },  // hideout door needs >=3 (joined); Heroes doors need 4 (complete)
+    phoenixgang: { quest: 'blackarmgang', mid: 9 },   // hideout door needs >=9 (joined); Heroes kitchen needs 10 (complete)
+    legendsquest: { quest: 'legends', mid: 74 }       // guild needs >=75 (complete); interior force-barrier needs >=18 (mid-quest)
+};
+const COMPLETION_ONLY: Record<string, string> = {};
+
+function questDoable(q: QuestReq | undefined, qp: number, completed: Set<string>, statCaps: Record<StatName, number>): boolean {
+    if (!q) {
+        return false; // varp maps to a quest this sim doesn't model -> fail-closed
     }
+    return skillsSatisfied(q.skills, statCaps) && qp >= (q.requiredQp ?? 0) && questsChainSatisfied(q.quests, q.questsAny, completed);
+}
+
+function resolveVarp(name: string, qp: number, completed: Set<string>, statCaps: Record<StatName, number>, statCapsLower: Map<string, number>, questsById: Map<string, QuestReq>): number | undefined {
+    if (name === 'qp') {
+        return qp;
+    }
+    if (name === 'prayer_guild') { // not a quest - permanent once base Prayer >= 31 (Abbot Langley).
+        return (statCapsLower.get('prayer') ?? 99) >= 31 ? 1 : 0;
+    }
+    const split = SPLIT_VARPS[name];
+    if (split) {
+        return completed.has(split.quest) ? GATE_VARP_ALL : (questDoable(questsById.get(split.quest), qp, completed, statCaps) ? split.mid : 0);
+    }
+    const co = COMPLETION_ONLY[name];
+    if (co) {
+        return completed.has(co) ? GATE_VARP_ALL : 0;
+    }
+    const quest = VARP_TO_QUEST[name];
+    if (quest) {
+        return questDoable(questsById.get(quest), qp, completed, statCaps) ? GATE_VARP_ALL : 0;
+    }
+    return undefined; // unknown varp -> requireSatisfied treats as 0 (fail-closed).
 }
 
 // ---- quest requirement checks (small reimplementation of Engine.ts's private
@@ -388,11 +443,31 @@ function main(): void {
         return { has: (_item: string) => true };
     }
 
+    // every varp any gated-area OR entrance-edge require references - resolved fresh each
+    // sphere from the current quest/qp/skill state. Data-driven so new gates in the config
+    // need no code change here (only VARP_TO_QUEST needs the varp->quest line if it's new).
+    const neededVarps = new Set<string>(['qp', 'prayer_guild']);
+    const collectVarps = (r: GatedAreaRequire): void => {
+        if ('allOf' in r) {
+            r.allOf.forEach(collectVarps);
+        } else if ('varp' in r) {
+            neededVarps.add(r.varp);
+        }
+    };
+    for (const ra of resolvedAreas) {
+        collectVarps(ra.area.require);
+    }
+    for (const edge of entranceEdges) {
+        if (edge.require) {
+            collectVarps(edge.require);
+        }
+    }
+
     function buildCtx(): RequireContext {
         return {
             varps: new Map(
-                ['qp', 'heroquest', 'legendsquest', 'prayer_guild']
-                    .map(name => [name, resolveVarp(name, qp, completed, statCapsLower)] as const)
+                [...neededVarps]
+                    .map(name => [name, resolveVarp(name, qp, completed, statCaps, statCapsLower, questsById)] as const)
                     .filter((e): e is [string, number] => e[1] !== undefined)
             ),
             heldItems: heldItems(),
