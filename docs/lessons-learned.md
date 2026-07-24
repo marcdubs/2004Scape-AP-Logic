@@ -3143,3 +3143,73 @@ tool run, the rest are `public/ap/` refresh or `install.js`):
   running a tsx tool FROM WSL needs the **linux** binary - the shared node_modules only
   had win32. Fix that worked: `npm install --no-save --force @esbuild/linux-x64` (after
   `rm -rf node_modules/@esbuild/.win32-x64-*` to clear a stale rename temp).
+
+## Session-end addendum: entrance/area-gate expansion + item obtainability logic (2026-07-24)
+
+Two big logic layers landed (feat/v2 branch, PR #2). Both turn a randomizer from
+"probably fine" into "provably beatable" by feeding real data into `ValidateSeed`.
+
+### Gated-area expansion 7 → 97 (problems.txt #8/#9)
+
+- **`tools/map/ScanDoors.ts`** — deterministic scan of every passage-controlling
+  loc. Completeness argument: for blocking geometry to open it must EITHER have an
+  `[oploc*,X]` handler OR be spawned/removed by `loc_add/change/del` — both
+  greppable, so the union is the whole universe. "Gated" is a STRUCTURAL property
+  (open-op behind an `if` on a gate-signal), not a name guess. Separates passages
+  from containers (op1=Open is shared by chests) — watch the `outdoorfurniture_*`
+  substring trap where "door" hides inside the model name. Found 157 gated
+  passages vs the 7 hand-curated.
+- **`tools/logic/DeriveGatedAreas.ts`** — turns ScanDoors output into
+  `ap-gated-areas.json` entries: exact boxes via region flood-fill
+  (`BuildRegionGraph.ts --extra-closed-doors` isolates each pocket), requires
+  parsed/normalised. Oversized (sprawling-cave) boxes are flagged, not trusted —
+  a bbox over-captures an irregular region. 10 large-dungeon boxes held back.
+- The 59 hard requires (bitfield gates, Thieving-level locked doors, `!`/compound
+  conditions) were resolved by a **5-way subagent pass** over the quest scripts →
+  `ap-gated-areas.requires.json`. Subagents also correctly EXCLUDED non-gates:
+  agility-obstacle cooldowns (`%..._pipe_used >= map_clock`), board-game rank
+  gates, intra-quest puzzle levers, non-door interactables.
+- New **`{varp,bit}` / `{varp,bitClear}` require forms** in `GatedAreas.ts`
+  (validator) and `ApAreaGates.ts` (runtime) for `testbit(%varp, ^bit)` gates.
+- **Quest-doability model** (`ValidateSeed.ts` `resolveVarp`): a quest-progress
+  varp gate is satisfiable when its quest is DOABLE (non-region prereqs met), NOT
+  complete. This breaks circular deadlock (a quest's own interior door needs the
+  quest, which needs the door) and can't false-pass. The mid-vs-complete SPLIT
+  (heroquest/blackarmgang/phoenixgang/legendsquest) keeps guild gates
+  completion-safe while interior doors open mid-quest. Data-driven varp
+  enumeration over the gated-areas config. THIS WAS THE FIX that made 97 areas
+  validate — a naive completion-gate deadlocked Shield-of-Arrav / Legends.
+- **Barcrawl pubs are now hard region anchors** (was just "karamja"): all 10 bars'
+  bartender spawn coords → region anchors in `quest-regions.json`. Blurberry's
+  (Grand Tree, its own region) and the two Karamja bars are shuffle-sensitive.
+
+### Four-source item obtainability (problems.txt #16) — see [item-logic.md](item-logic.md)
+
+- `heldItems()` was narrative-only (`() => true`). Now it's a real fixpoint over
+  four OR'd sources (gather/process skill-gated, buy/drop region-gated), so quest
+  item needs gate on actual obtainability. See item-logic.md for the full design.
+- Data via subagent passes: `item-sources.json`, `quest-items.json` (63 quests),
+  `shop-sources.json` (489 buyable), `drop-sources.json` (259 dropped),
+  `npc-spawns.json` (1114, via `BuildNpcSpawns.ts`).
+
+### Hard-won lessons this session
+
+- **"Buy" is NOT a free pass under shopsanity.** Treating buyable items as always
+  obtainable is the same mistake as treating gathered items as free — the shop's
+  accessibility is itself a region-reachability question (shopsanity relocates the
+  owner). The correct model takes the OR over ALL sources, each with its
+  randomizer-adjusted accessibility. Every "is X free?" assumption in a randomizer
+  logic layer deserves this scrutiny.
+- **`ValidateSeed` reads the runtime `ap-unlocks.json` as its STARTING cap state.**
+  A stale mid-playthrough `ap-unlocks.json` (non-zero counts) makes validation run
+  against inflated skill caps — too lenient. A fresh seed is all-caps-20
+  (`GenerateSeed.ts` writes it zeroed). Bit us when analysing sphere depth; zero it
+  before a true fresh-seed check. Entrance-reroll validation shares this gotcha.
+- **Sphere depth is a BALANCING signal, not a logic bug.** Even at the correct
+  cap-20 start, quests bunched into ~3 spheres because skill-milestone checks that
+  grant cap items are densely reachable, cascading caps upward fast. Deeper spheres
+  come from tighter item-gating, not from the logic being wrong.
+- **The reroll-until-valid loop (`--require-perfect`) is a workaround** for the
+  beatability logic living in THIS repo instead of Archipelago. The endgame is the
+  apworld owning reachability (AP fill = construct-valid, no reroll). All this
+  logic data is the groundwork for that migration.
