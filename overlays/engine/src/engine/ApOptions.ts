@@ -99,14 +99,14 @@ export function setApOption(name: string, value: boolean): void {
 
 /**
  * Effective XP multiplier for a stat at the given base level. Progressive mode
- * (default on): 5x at level 1, doubling every 15 levels - 10x at 15, 20x at
- * 30, 40x at 45, 80x at 60, 160x at 75, 320x at 90+ - so pacing scales across
+ * (default on): 10x at level 1, doubling every 15 levels - 20x at 15, 40x at
+ * 30, 80x at 45, 160x at 60, 320x at 75, 640x at 90+ - so pacing scales across
  * the whole game without hand-editing world.json's xpRate mid-run. Doubling
  * every 15 (not the originally proposed 10) keeps late levels meaningful: the
  * XP curve itself doubles every ~7 levels, and a 10-level doubling tracks it
  * so closely that levels 30+ cost ~1-4 actions each and capped-skill XP
  * banking would auto-complete whole +20 cap brackets. At /15, level 98->99 is
- * still ~77 actions (~5 min). It REPLACES the flat xpRate while on; toggling
+ * still ~38 actions (~2.5 min). It REPLACES the flat xpRate while on; toggling
  * progressiveXpRate off restores vanilla flat-rate behavior. AP reward XP
  * (AP_STAT_ADVANCE_RAW) bypasses multipliers entirely and never reaches this.
  */
@@ -114,5 +114,5 @@ export function apXpMultiplier(baseLevel: number): number {
     if (!getApOption('progressiveXpRate')) {
         return Environment.node.xpRate;
     }
-    return 5 * 2 ** Math.floor(baseLevel / 15);
+    return 10 * 2 ** Math.floor(baseLevel / 15);
 }

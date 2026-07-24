@@ -24,6 +24,7 @@ import { Goal, QuestReq, StatName } from '../sim/types.js';
 
 import { WorldTile, parseRawCoord } from './Coords.js';
 import { GatedArea, GatedAreaRequire, RequireContext, describeRequire, loadGatedAreas, requireSatisfied } from './GatedAreas.js';
+import { addRegionSources, applySwaps, computeObtainable, itemAvailable, loadItemSources, loadNpcSpawns, loadQuestItems } from './ItemGraph.js';
 import { GeneratedIgnores, RequirementGroup, buildRequirementGroups, collectScriptEdges, loadGeneratedQuestRegions, usableWorldEdges } from './GeneratedQuestRegions.js';
 import { RegionGraph, loadRegionGraph } from './RegionGraph.js';
 
@@ -294,6 +295,57 @@ function resolveVarp(name: string, qp: number, completed: Set<string>, statCaps:
 // import [sim's engine] code unless clean" since region-awareness changes the shape of
 // the fixpoint enough that sharing the loop itself isn't a clean fit). ----
 
+// Loads the gathersanity/processsanity swap tables (ap-gather.json / ap-process.json,
+// obj-id -> obj-id) and translates them to a name -> name product swap via obj.pack, so
+// the item-source graph can be re-keyed to the shuffled world. Absent files (gathersanity
+// off) => null => vanilla graph.
+function loadGatherProcessSwaps(configDir: string): Map<string, string> | null {
+    const objPack = path.resolve(process.cwd(), '../content/pack/obj.pack');
+    if (!fs.existsSync(objPack)) {
+        return null;
+    }
+    const idToName = new Map<number, string>();
+    for (const line of fs.readFileSync(objPack, 'utf8').split(/\r?\n/)) {
+        const eq = line.indexOf('=');
+        if (eq !== -1) {
+            idToName.set(parseInt(line.slice(0, eq), 10), line.slice(eq + 1).trim());
+        }
+    }
+    const swap = new Map<string, string>();
+    for (const fname of ['ap-gather.json', 'ap-process.json']) {
+        const file = path.join(configDir, fname);
+        if (!fs.existsSync(file)) {
+            continue;
+        }
+        const map = (JSON.parse(fs.readFileSync(file, 'utf8')) as { map?: Record<string, number> }).map ?? {};
+        for (const [fromId, toId] of Object.entries(map)) {
+            const from = idToName.get(parseInt(fromId, 10));
+            const to = idToName.get(toId);
+            if (from && to) {
+                swap.set(from, to);
+            }
+        }
+    }
+    return swap.size > 0 ? swap : null;
+}
+
+// loads tools/logic/data/<fname> as item -> [provider npc debugnames] (shop owners for
+// buy-sources.json, monsters for drop-sources.json). Absent => empty.
+function loadItemProviders(fname: string): Map<string, string[]> {
+    const file = path.join('tools', 'logic', 'data', fname);
+    const map = new Map<string, string[]>();
+    if (!fs.existsSync(file)) {
+        return map;
+    }
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+    for (const [item, npcs] of Object.entries(raw)) {
+        if (!item.startsWith('_') && Array.isArray(npcs)) {
+            map.set(item, npcs.map(String));
+        }
+    }
+    return map;
+}
+
 function skillsSatisfied(skills: Partial<Record<StatName, number>> | undefined, caps: Record<StatName, number>): boolean {
     if (!skills) {
         return true;
@@ -355,6 +407,34 @@ function main(): void {
     const { edges: entranceEdges, present: entrancesPresent } = loadEntranceEdges(CONFIG_DIR, graph);
     const gated = loadGatedAreas(CONFIG_DIR);
     const resolvedAreas = resolveGatedAreas(gated.areas, graph);
+
+    // Item-acquisition graph (problems.txt #16): item -> how it's gathered/processed, so a
+    // quest that needs a gathered/processed item gates on the required skill instead of the
+    // sim assuming every item is free. Static game data (tools/logic/data/), absent =>
+    // empty => every item assumed obtainable (exact prior behaviour). itemSources applies
+    // any gathersanity/processsanity swap so obtainability reflects the shuffled world.
+    const itemSources = applySwaps(loadItemSources(), loadGatherProcessSwaps(CONFIG_DIR));
+    // add the BUY (shop-owner region) and DROP (monster region) sources - the four-source
+    // OR model. item->provider-npc data is static (tools/logic/data/), resolved to a region
+    // via the npc spawn map + region graph. Absent files => gather/process only.
+    {
+        const npcSpawns = loadNpcSpawns();
+        const resolveNpcRegion = (coord: string): number => {
+            const [level, mapX, mapZ, localX, localZ] = coord.split('_').map(Number);
+            return graph.resolveRegion({ level, x: mapX * 64 + localX, z: mapZ * 64 + localZ });
+        };
+        addRegionSources(itemSources, loadItemProviders('shop-sources.json'), npcSpawns, resolveNpcRegion, 'buy');
+        addRegionSources(itemSources, loadItemProviders('drop-sources.json'), npcSpawns, resolveNpcRegion, 'drop');
+    }
+    const questItems = loadQuestItems();
+    let obtainable = new Set<string>(); // recomputed each sphere from current statCaps
+    // only GATHER/PROCESS-sourced quest needs are gated (buy/drop/given/quest items are
+    // assumed available - we never invent a gate we can't prove). itemAvailable's
+    // "unmodelled => true" rule is the second guard.
+    const questItemsSatisfied = (id: string): boolean =>
+        (questItems.get(id) ?? [])
+            .filter(n => (n.obtained === 'gather' || n.obtained === 'process'))
+            .every(n => itemAvailable(n.item, itemSources, obtainable));
 
     const qr = loadQuestRegions();
     const anchorRegions = new Map<string, number>();
@@ -435,12 +515,12 @@ function main(): void {
     let sphere = 0;
 
     function heldItems() {
-        // Item requirements are treated as always-satisfiable (narrative-only), matching
-        // tools/sim/Engine.ts's documented policy - no quest or gated area in this
-        // dataset currently needs a real gathersanity/processsanity item-swap check
-        // (verified during that tool's build; the mechanism stays a ready extension
-        // point there, not here).
-        return { has: (_item: string) => true };
+        // Item obtainability now MODELLED (problems.txt #16): an item is available iff it's
+        // not a gathered/processed item (assumed obtainable - shop/drop/given/misc) OR its
+        // gather/process chain is reachable under the current skill caps. `obtainable` is
+        // the current-sphere fixpoint. Absent item-sources.json => every item unmodelled =>
+        // always true (exact prior narrative-only behaviour).
+        return { has: (item: string) => itemAvailable(item, itemSources, obtainable) };
     }
 
     // every varp any gated-area OR entrance-edge require references - resolved fresh each
@@ -503,6 +583,10 @@ function main(): void {
 
     for (;;) {
         let changed = false;
+        // recompute item obtainability from the current (growing) skill caps AND reachable
+        // regions before this sphere's gates/quests consult it (buy/drop sources gate on
+        // region reachability, so obtainability grows as the map opens up).
+        obtainable = computeObtainable(itemSources, statCaps, reachableRegions);
         const ctx = buildCtx();
 
         // 1. entrance edges (gated or not).
@@ -588,6 +672,7 @@ function main(): void {
                 skillsSatisfied(q.skills, statCaps) &&
                 qp >= (q.requiredQp ?? 0) &&
                 questsChainSatisfied(q.quests, q.questsAny, completed) &&
+                questItemsSatisfied(q.id) &&
                 (q.gateKey === undefined || (placementCounts.get(q.gateKey) ?? 0) >= 1) &&
                 regionsSatisfied(qr.quests[q.id]?.requiredAnchors, anchorRegions, reachableRegions) &&
                 unsatisfiedGroups(q.id, reachableRegions).length === 0
