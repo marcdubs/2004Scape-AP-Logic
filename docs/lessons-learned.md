@@ -3213,3 +3213,118 @@ Two big logic layers landed (feat/v2 branch, PR #2). Both turn a randomizer from
   beatability logic living in THIS repo instead of Archipelago. The endgame is the
   apworld owning reachability (AP fill = construct-valid, no reroll). All this
   logic data is the groundwork for that migration.
+
+## Session-end addendum: re-activating all gated areas via region-membership (GitHub #16, 2026-07-24)
+
+Fixed the "97-area expansion strands ~33 quests" bug and re-activated the full
+gated-area set (107 areas: 7 curated guilds + 100 auto-derived). The user's decision
+was **Option 3** (gate by the true enclosed region set, not a bounding rectangle) —
+explicitly NOT the cheap "seal a safe subset" path. See [[dont-revert-build-proper-solution]].
+
+### The "33 stranded" number was mostly a methodology confound — verify this first
+
+`quest-regions.generated.json` bakes **region ids** resolved against a specific
+`region-graph.json`. Rebuilding the graph (different gating ⇒ different flood-fill ⇒
+**different region ids**) without ALSO re-running `ExtractQuestRegions.ts` leaves every
+requirement group pointing at stale ids that no longer match the reachable set → dozens
+of spurious "extracted region group(s) unreachable". The issue's repro
+(`cp 97-file … && BuildRegionGraph && ValidateSeed`) omitted the extractor re-run, so
+most of its 33 were phantom. **Rule: `ap-gated-areas.json`, `region-graph.json`, and
+`quest-regions.generated.json` are a matched TRIPLE — regenerate all three together, or
+validation lies.** With a consistent triple, the 97 already passed all goals; the only
+real gated-area failure was `druid` (one bbox over-capture). Always sanity-check a
+"stranded quest" by resolving its evidence tile in the CURRENT graph before trusting it.
+
+### The real bug: bbox over-capture (what Option 3 fixes)
+
+`witchgrill` (Black Knights' Fortress spy-grill, `%spy=1`, a reused loc placed in two
+unrelated spots) derived a **16 835-tile sprawling box** that happened to enclose the
+druid cauldron pocket (region 4301) — a region *disconnected* from the grill, merely
+inside the rectangle. Box-membership gated it on an unsatisfiable `spy` → cauldron
+stranded → druid unbeatable.
+
+### The fix (region-membership keyed on door tiles)
+
+Door tile coords are the only **graph-independent** gate key. Derived areas now carry
+`doors: ["level_mapX_mapZ_localX_localZ", …]` (`GatedArea.doors`, from ScanDoors
+`placementCoords`). Then:
+
+- **BuildRegionGraph** closes EXACTLY those door tiles (no box margin) for areas with
+  `doors`; the 7 curated guilds keep margin-2 box closing (they have tight boxes, no
+  door list). This dropped doors-kept-closed from 507 (margin sweep of sprawling boxes,
+  which fragmented innocent buildings) to 164.
+- **ValidateSeed `resolveDoorGatedArea`** probes each door tile's neighborhood: small
+  (≤ `POCKET_TILE_CAP` = 4000) non-mainland neighbors are the gated INSIDE pockets;
+  everything adjacent is a reconnection trigger. A disconnected island (cauldron) is
+  never door-adjacent, so it is never gated. Multi-floor interiors reconnect via the
+  internal-stair script edge (already require-guarded since commit d4940b9).
+- **Gates are SYMMETRIC.** Deep dungeon gates (Elvarg's lair, Golrie's cell) have small
+  pockets on BOTH sides and NO mainland neighbor → the old "outside must be reachable"
+  test produced `outside={}` and never fired, stranding Dragon Slayer. Fix: the trigger
+  set is *all* door-adjacent regions, so reaching either side (e.g. the approach pocket
+  via a script-teleport) + requirement met opens the crossing. This was the subtle
+  regression that appeared the moment box-membership was replaced — watch for it.
+
+Result: 107 areas validate identically to the 7 curated (all goals reachable, no
+stranded progression, 62/63 quests — the lone `hunt` block is pre-existing and
+unrelated, it fails on the 7-curated baseline too). Runtime `ApAreaGates` still uses
+`boxes` (ignores `doors`); it does not choke on the new field.
+
+### Known follow-up (out of scope for #16)
+
+Derived `boxes` are still cut against `region-graph.gated.json` (all-doors-closed), so
+some remain sprawling (witchgrill, the troll-stronghold doors). The **validator** now
+ignores boxes for `doors`-carrying areas, but the **runtime** `ApAreaGates` bounce still
+uses them, so a shuffled entrance landing inside a sprawling box could be spuriously
+gated. Tightening runtime boxes to the pocket bbox (or teaching ApAreaGates region
+membership) is the remaining polish. `witchgrill`'s `%spy` gate is genuinely mis-derived
+(quest-internal spy state, not an area lockout) — a candidate for the requires-exclude
+list, but harmless to beatability now.
+
+## SimulateProgression's false blockers: `ap-unlocks.json` is a STARTING state (2026-07-24)
+
+**Symptom.** `npx tsx tools/sim/SimulateProgression.ts --verbosity 2` printed a wall of
+blockers — `attack capped at 20 by unlocks; needs 40` and friends, recursed through the
+whole Heroes'/Legends' chain — on a seed `GenerateSeed`'s own fill *and* `ValidateSeed`
+both called beatable. Easy to misread as a logic/gating regression (it surfaced while
+testing #16); it is neither. Nothing about area gating was involved.
+
+**Reproduce it.** Take any config dir with an `ap-unlocks.json` and *no*
+`ap-placements.json`, then run the sim. The presence/absence of that one file is what
+picks the code path:
+
+```
+placements present, non-empty  -> placement sphere loop (collects items as it walks)  OK
+placements absent/empty        -> vanilla path (single fixpoint at fixed caps)         <- the trap
+```
+
+**Root cause.** The vanilla path reads `ap-unlocks.json` as its permanent cap set, which
+progression-sim.md justified as "the counts an AP client would have delivered by *the
+end*". Placement mode silently changed what that file contains: `GenerateSeed` writes a
+**locked, all-zero starting** table, and during a live AP run it holds only what the
+multiworld has delivered so far. Every skill therefore reads as capped at 20 forever, and
+a beatability tool reported the entire quest graph dead. A doc-vs-data drift, not a bug in
+the reachability engine — and the blocker text was specific enough to look authoritative.
+
+**Fix.** The vanilla path now models **end-of-run** caps (`PlacementEngine.endOfRunCounts`
+— built by *applying `buildItemPool` itself*, so it cannot drift from the real pool), and
+prints which model it used in the `Skill caps:` header. `--current-unlocks` opts back into
+the disk snapshot, which is what you want alongside `tools/ap/SetUnlock.ts` ("what can I do
+right now"). An `ap-placements.json` with zero item placements — the AP-multiworld shape,
+since `new-run` deletes the local file and `ApClient` rewrites it with `questGates` only —
+now takes that vanilla path with a printed note instead of running the sphere loop over an
+empty item map and "proving" every goal unreachable.
+
+**Generalizable lesson.** When a file grows a second writer, re-check every *reader*'s
+assumption about what it means. The engine's `ApUnlockOverrides` and placement mode both
+treat `ap-unlocks.json` as "received so far" (correct); only the vanilla-path sim treated
+it as "will have received" — and it was the one place nothing tested after placement mode
+landed, because the file simply didn't exist back when that path was validated.
+
+**Verification trio for this change.** (1) Placement path byte-identical before/after on
+two seeds (the change must not touch solo runs). (2) All four config shapes exercised:
+no-unlocks (uncapped label), unlocks+no-placements (end-of-run, all goals reachable),
+`--current-unlocks` (old snapshot blockers preserved verbatim), empty-placements
+(fallback + note). (3) `npx tsc --noEmit -p .` clean, and `GenerateSeed` still passes
+`ValidateSeed` on attempt 0 for seeds 1/42/777/12345/98765 — confirming generation was
+never the broken half.

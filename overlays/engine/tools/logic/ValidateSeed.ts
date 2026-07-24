@@ -23,7 +23,7 @@ import { applyPlacementItem, applyQuestGates, buildLocationCatalog, capsFromCoun
 import { Goal, QuestReq, StatName } from '../sim/types.js';
 
 import { WorldTile, parseRawCoord } from './Coords.js';
-import { GatedArea, GatedAreaRequire, RequireContext, describeRequire, loadGatedAreas, requireSatisfied } from './GatedAreas.js';
+import { GatedArea, GatedAreaRequire, POCKET_TILE_CAP, RequireContext, areaDoorTiles, describeRequire, loadGatedAreas, requireSatisfied } from './GatedAreas.js';
 import { addRegionSources, applySwaps, computeObtainable, itemAvailable, loadItemSources, loadNpcSpawns, loadQuestItems } from './ItemGraph.js';
 import { GeneratedIgnores, RequirementGroup, buildRequirementGroups, collectScriptEdges, loadGeneratedQuestRegions, usableWorldEdges } from './GeneratedQuestRegions.js';
 import { RegionGraph, loadRegionGraph } from './RegionGraph.js';
@@ -114,8 +114,61 @@ interface ResolvedGatedArea {
     outsideRegionIds: Set<number>;
 }
 
+// Region-membership resolution (GitHub #16, Option 3): for an area carrying a `doors`
+// list, the gated interior is the actual pocket(s) BEHIND those door tiles, not every
+// region that happens to fall inside a bounding rectangle. We probe each door tile's
+// neighborhood on both sides and classify each adjacent region:
+//   - INSIDE pocket: a small (<= POCKET_TILE_CAP) non-mainland region - the isolated
+//     interior the gate protects. This is exactly how DeriveGatedAreas picked the pocket
+//     to box, so it re-derives the same interior against the CURRENT graph - and, crucially,
+//     never sweeps in a disconnected island that merely sits inside the rectangle (the druid
+//     cauldron caught by the Black Knights' spy-grill box was such an island).
+//   - OUTSIDE: the mainland or an open/large region on the other side of the door.
+// A door is symmetric: once the requirement is met, crossing it works in EITHER direction,
+// so the reconnection trigger is "any adjacent region (inside OR outside) already reachable".
+// This matters for deep dungeon gates (Elvarg's lair, Golrie's cell) where BOTH sides are
+// small pockets and there is no mainland neighbor at all - the approach pocket is reached
+// via a script-teleport/ladder, and meeting the requirement then opens the lair. Multi-floor
+// interiors reconnect for free: the plane-0 pocket is gated here, and the internal stair up
+// (a script edge) carries the requirement and fires once that pocket is reachable (see
+// gatedRegionRequire below).
+function resolveDoorGatedArea(area: GatedArea, graph: RegionGraph): { gatedRegionIds: Set<number>; outsideRegionIds: Set<number> } {
+    const mainland = graph.meta.mainlandRegionId;
+    const inside = new Set<number>();
+    const adjacent = new Set<number>(); // every region touching a door tile, both sides
+    for (const door of areaDoorTiles(area)) {
+        // scan the door's immediate neighborhood on its own level (the tile itself is the
+        // blocked door loc, so it never resolves to a region).
+        for (let r = 1; r <= 2; r++) {
+            for (let dx = -r; dx <= r; dx++) {
+                for (let dz = -r; dz <= r; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) {
+                        continue; // only the new ring at this radius
+                    }
+                    const id = graph.regionAt(door.x + dx, door.z + dz, door.level);
+                    if (id === 0) {
+                        continue;
+                    }
+                    adjacent.add(id);
+                    if (id !== mainland && (graph.regionsById.get(id)?.tileCount ?? 0) <= POCKET_TILE_CAP) {
+                        inside.add(id);
+                    }
+                }
+            }
+        }
+    }
+    // gatedRegionIds = the interior pockets we (re)connect and attach the requirement to.
+    // outsideRegionIds = the trigger set: ALL adjacent regions, so reaching either side of
+    // the door (including a sibling pocket reached via a teleport) opens the crossing.
+    return { gatedRegionIds: inside, outsideRegionIds: adjacent };
+}
+
 function resolveGatedAreas(areas: GatedArea[], graph: RegionGraph): ResolvedGatedArea[] {
     return areas.map(area => {
+        if (area.doors && area.doors.length > 0) {
+            const { gatedRegionIds, outsideRegionIds } = resolveDoorGatedArea(area, graph);
+            return { area, gatedRegionIds, outsideRegionIds };
+        }
         const insideIds = new Set<number>();
         const outsideIds = new Set<number>();
         for (const box of area.boxes) {

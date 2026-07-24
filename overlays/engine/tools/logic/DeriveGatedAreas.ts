@@ -338,6 +338,10 @@ function main(): void {
             _sourceDoor: p.loc,
             _gateKind: p.gateKind,
             _derivation: `ScanDoors gate '${p.condition ?? ''}' on door ${p.loc}; ${note}`,
+            // Region-membership gating (GitHub #16): the exact door tiles are the stable,
+            // graph-independent key. BuildRegionGraph closes precisely these; ValidateSeed
+            // gates only the pocket(s) actually behind them (not the whole bounding box).
+            doors: p.placementCoords ?? [],
             boxes,
             require: require ?? ({ varp: '__UNPARSED__', gte: 0 } as GatedAreaRequire),
             message: `A strange force bars your way. (${p.displayName ?? p.loc})`,

@@ -69,7 +69,7 @@ import LocType from '#/cache/config/LocType.js';
 import Packet from '#/io/Packet.js';
 import { CollisionFlag, CollisionType, LocAngle, LocLayer, allocateIfAbsent, canTravel, changeFloor, changeLoc, changeWall, isFlagged, locShapeLayer } from '#/engine/routefinder/index.js';
 
-import { GatedAreaBox, loadGatedAreas, tileNearBox } from './GatedAreas.js';
+import { GatedAreaBox, loadGatedAreas, parseDoorCoord, tileNearBox } from './GatedAreas.js';
 
 const PACK_DIR = 'data/pack';
 const ZIP_PATH = path.join(PACK_DIR, '.cache', 'maps-server.zip');
@@ -196,7 +196,7 @@ function loadGround(lands: Int8Array, packet: Packet, mapsquareX: number, mapsqu
 // ---- loc loading - port of GameMap.loadLocations, with the door-open heuristic
 // inserted before applyLocCollision. ----
 
-function loadLocations(lands: Int8Array, packet: Packet, mapsquareX: number, mapsquareZ: number, gatedBoxes: GatedAreaBox[], extraClosed: Set<string>, stats: { doorsOpened: number; doorsGated: number }): void {
+function loadLocations(lands: Int8Array, packet: Packet, mapsquareX: number, mapsquareZ: number, gatedBoxes: GatedAreaBox[], gatedDoorTiles: Set<string>, extraClosed: Set<string>, stats: { doorsOpened: number; doorsGated: number }): void {
     let locId = -1;
     let locIdOffset = packet.gsmarts();
     while (locIdOffset !== 0) {
@@ -229,7 +229,12 @@ function loadLocations(lands: Int8Array, packet: Packet, mapsquareX: number, map
 
             if (type.blockwalk) {
                 const openable = isOpenableDoorLoc(type);
-                const nearGate = openable && (gatedBoxes.some(box => tileNearBox(actualLevel, absoluteX, absoluteZ, box, GATED_DOOR_MARGIN)) || extraClosed.has(`${actualLevel}:${absoluteX}:${absoluteZ}`));
+                // Two ways a door is kept closed: (1) its exact tile is one of an area's
+                // `doors` (v1.3 region-membership gating - precise, no collateral) or a
+                // ScanDoors --extra-closed-doors tile; (2) it falls within GATED_DOOR_MARGIN
+                // of a legacy box-only area (the 7 curated guilds, which carry no door list).
+                const tileKey = `${actualLevel}:${absoluteX}:${absoluteZ}`;
+                const nearGate = openable && (gatedDoorTiles.has(tileKey) || extraClosed.has(tileKey) || gatedBoxes.some(box => tileNearBox(actualLevel, absoluteX, absoluteZ, box, GATED_DOOR_MARGIN)));
                 if (openable && !nearGate) {
                     stats.doorsOpened++;
                     // deliberately skip applyLocCollision - see file header "Door handling".
@@ -291,7 +296,21 @@ async function main(): Promise<void> {
     const zipEntries = unzipSync(fs.readFileSync(ZIP_PATH));
     const mapKeys = Object.keys(zipEntries).filter(k => k[0] === 'm');
 
-    const gatedBoxes = gated.areas.flatMap(a => a.boxes);
+    // Box-margin door closing is used ONLY for legacy areas with no `doors` list (the 7
+    // curated guilds). Areas that carry `doors` (the auto-derived set) instead have their
+    // EXACT gate tiles closed - this avoids the margin-2 sweep of a sprawling derived box
+    // slamming shut hundreds of innocent doors and fragmenting the map (GitHub #16).
+    const gatedBoxes = gated.areas.filter(a => !a.doors || a.doors.length === 0).flatMap(a => a.boxes);
+    const gatedDoorTiles = new Set<string>();
+    for (const area of gated.areas) {
+        for (const raw of area.doors ?? []) {
+            const { level, x, z } = parseDoorCoord(raw);
+            gatedDoorTiles.add(`${level}:${x}:${z}`);
+        }
+    }
+    if (gatedDoorTiles.size > 0) {
+        console.log(`BuildRegionGraph: ${gatedDoorTiles.size} exact gated-door tile(s) from area 'doors' lists (region-membership gating); ${gatedBoxes.length} legacy box(es) still use margin-${GATED_DOOR_MARGIN} closing`);
+    }
 
     // squareKey "mx_mz" -> present. Used to bound the flood-fill so unloaded/void
     // mapsquares never act as connective tissue between regions (CollisionEngine.isFlagged
@@ -345,7 +364,7 @@ async function main(): Promise<void> {
         loadGround(lands, new Packet(zipEntries[key]), mapsquareX, mapsquareZ);
 
         const stats = { doorsOpened: 0, doorsGated: 0 };
-        loadLocations(lands, new Packet(locEntry), mapsquareX, mapsquareZ, gatedBoxes, extraClosed, stats);
+        loadLocations(lands, new Packet(locEntry), mapsquareX, mapsquareZ, gatedBoxes, gatedDoorTiles, extraClosed, stats);
         doorsOpened += stats.doorsOpened;
         doorsGated += stats.doorsGated;
     }

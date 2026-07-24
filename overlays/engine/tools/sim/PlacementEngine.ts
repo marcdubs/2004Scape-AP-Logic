@@ -440,6 +440,31 @@ function capitalize(s: string): string {
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/**
+ * The real-key counts a run ENDS with, once every progression copy in `mode`'s pool has
+ * been collected. Built by applying the pool itself (never a second hardcoded table that
+ * could drift from `buildItemPool`), so it stays correct if copy counts ever change.
+ *
+ * Why this exists: `ap-unlocks.json` on disk is a *starting* state (GenerateSeed writes it
+ * zeroed, and during an AP run it holds only what the multiworld has delivered SO FAR).
+ * The vanilla-path simulator, however, is a beatability question - "can this seed be
+ * finished", not "what can I do this second" - and progression-sim.md's central
+ * simplification assumes the unlock counts it reads are the ones "an AP client would have
+ * delivered by the end". Feeding it the live snapshot instead makes it report every
+ * skill hard-capped at 20 forever and diagnose the whole quest graph as blocked. See
+ * SimulateProgression.ts's `--current-unlocks` for the opt-in snapshot behavior.
+ */
+export function endOfRunCounts(mode: PoolMode): Map<string, number> {
+    const counts = new Map<string, number>();
+    for (const key of realUnlockKeys()) {
+        counts.set(key, 0);
+    }
+    for (const copy of buildItemPool(mode)) {
+        copy.apply(counts);
+    }
+    return counts;
+}
+
 // The real ap-unlocks.json keys placement mode's starting state controls (gear families,
 // tool families, and one progressive_<skill> per cappable skill). Used both to write the
 // zeroed starting table and to know which keys `capsFromCounts`/reachability should read.
