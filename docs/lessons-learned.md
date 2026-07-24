@@ -3213,3 +3213,70 @@ Two big logic layers landed (feat/v2 branch, PR #2). Both turn a randomizer from
   beatability logic living in THIS repo instead of Archipelago. The endgame is the
   apworld owning reachability (AP fill = construct-valid, no reroll). All this
   logic data is the groundwork for that migration.
+
+## Session-end addendum: re-activating all gated areas via region-membership (GitHub #16, 2026-07-24)
+
+Fixed the "97-area expansion strands ~33 quests" bug and re-activated the full
+gated-area set (107 areas: 7 curated guilds + 100 auto-derived). The user's decision
+was **Option 3** (gate by the true enclosed region set, not a bounding rectangle) —
+explicitly NOT the cheap "seal a safe subset" path. See [[dont-revert-build-proper-solution]].
+
+### The "33 stranded" number was mostly a methodology confound — verify this first
+
+`quest-regions.generated.json` bakes **region ids** resolved against a specific
+`region-graph.json`. Rebuilding the graph (different gating ⇒ different flood-fill ⇒
+**different region ids**) without ALSO re-running `ExtractQuestRegions.ts` leaves every
+requirement group pointing at stale ids that no longer match the reachable set → dozens
+of spurious "extracted region group(s) unreachable". The issue's repro
+(`cp 97-file … && BuildRegionGraph && ValidateSeed`) omitted the extractor re-run, so
+most of its 33 were phantom. **Rule: `ap-gated-areas.json`, `region-graph.json`, and
+`quest-regions.generated.json` are a matched TRIPLE — regenerate all three together, or
+validation lies.** With a consistent triple, the 97 already passed all goals; the only
+real gated-area failure was `druid` (one bbox over-capture). Always sanity-check a
+"stranded quest" by resolving its evidence tile in the CURRENT graph before trusting it.
+
+### The real bug: bbox over-capture (what Option 3 fixes)
+
+`witchgrill` (Black Knights' Fortress spy-grill, `%spy=1`, a reused loc placed in two
+unrelated spots) derived a **16 835-tile sprawling box** that happened to enclose the
+druid cauldron pocket (region 4301) — a region *disconnected* from the grill, merely
+inside the rectangle. Box-membership gated it on an unsatisfiable `spy` → cauldron
+stranded → druid unbeatable.
+
+### The fix (region-membership keyed on door tiles)
+
+Door tile coords are the only **graph-independent** gate key. Derived areas now carry
+`doors: ["level_mapX_mapZ_localX_localZ", …]` (`GatedArea.doors`, from ScanDoors
+`placementCoords`). Then:
+
+- **BuildRegionGraph** closes EXACTLY those door tiles (no box margin) for areas with
+  `doors`; the 7 curated guilds keep margin-2 box closing (they have tight boxes, no
+  door list). This dropped doors-kept-closed from 507 (margin sweep of sprawling boxes,
+  which fragmented innocent buildings) to 164.
+- **ValidateSeed `resolveDoorGatedArea`** probes each door tile's neighborhood: small
+  (≤ `POCKET_TILE_CAP` = 4000) non-mainland neighbors are the gated INSIDE pockets;
+  everything adjacent is a reconnection trigger. A disconnected island (cauldron) is
+  never door-adjacent, so it is never gated. Multi-floor interiors reconnect via the
+  internal-stair script edge (already require-guarded since commit d4940b9).
+- **Gates are SYMMETRIC.** Deep dungeon gates (Elvarg's lair, Golrie's cell) have small
+  pockets on BOTH sides and NO mainland neighbor → the old "outside must be reachable"
+  test produced `outside={}` and never fired, stranding Dragon Slayer. Fix: the trigger
+  set is *all* door-adjacent regions, so reaching either side (e.g. the approach pocket
+  via a script-teleport) + requirement met opens the crossing. This was the subtle
+  regression that appeared the moment box-membership was replaced — watch for it.
+
+Result: 107 areas validate identically to the 7 curated (all goals reachable, no
+stranded progression, 62/63 quests — the lone `hunt` block is pre-existing and
+unrelated, it fails on the 7-curated baseline too). Runtime `ApAreaGates` still uses
+`boxes` (ignores `doors`); it does not choke on the new field.
+
+### Known follow-up (out of scope for #16)
+
+Derived `boxes` are still cut against `region-graph.gated.json` (all-doors-closed), so
+some remain sprawling (witchgrill, the troll-stronghold doors). The **validator** now
+ignores boxes for `doors`-carrying areas, but the **runtime** `ApAreaGates` bounce still
+uses them, so a shuffled entrance landing inside a sprawling box could be spuriously
+gated. Tightening runtime boxes to the pocket bbox (or teaching ApAreaGates region
+membership) is the remaining polish. `witchgrill`'s `%spy` gate is genuinely mis-derived
+(quest-internal spy state, not an area lockout) — a candidate for the requires-exclude
+list, but harmless to beatability now.
