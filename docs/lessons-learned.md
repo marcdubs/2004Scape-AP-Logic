@@ -3280,3 +3280,51 @@ gated. Tightening runtime boxes to the pocket bbox (or teaching ApAreaGates regi
 membership) is the remaining polish. `witchgrill`'s `%spy` gate is genuinely mis-derived
 (quest-internal spy state, not an area lockout) — a candidate for the requires-exclude
 list, but harmless to beatability now.
+
+## SimulateProgression's false blockers: `ap-unlocks.json` is a STARTING state (2026-07-24)
+
+**Symptom.** `npx tsx tools/sim/SimulateProgression.ts --verbosity 2` printed a wall of
+blockers — `attack capped at 20 by unlocks; needs 40` and friends, recursed through the
+whole Heroes'/Legends' chain — on a seed `GenerateSeed`'s own fill *and* `ValidateSeed`
+both called beatable. Easy to misread as a logic/gating regression (it surfaced while
+testing #16); it is neither. Nothing about area gating was involved.
+
+**Reproduce it.** Take any config dir with an `ap-unlocks.json` and *no*
+`ap-placements.json`, then run the sim. The presence/absence of that one file is what
+picks the code path:
+
+```
+placements present, non-empty  -> placement sphere loop (collects items as it walks)  OK
+placements absent/empty        -> vanilla path (single fixpoint at fixed caps)         <- the trap
+```
+
+**Root cause.** The vanilla path reads `ap-unlocks.json` as its permanent cap set, which
+progression-sim.md justified as "the counts an AP client would have delivered by *the
+end*". Placement mode silently changed what that file contains: `GenerateSeed` writes a
+**locked, all-zero starting** table, and during a live AP run it holds only what the
+multiworld has delivered so far. Every skill therefore reads as capped at 20 forever, and
+a beatability tool reported the entire quest graph dead. A doc-vs-data drift, not a bug in
+the reachability engine — and the blocker text was specific enough to look authoritative.
+
+**Fix.** The vanilla path now models **end-of-run** caps (`PlacementEngine.endOfRunCounts`
+— built by *applying `buildItemPool` itself*, so it cannot drift from the real pool), and
+prints which model it used in the `Skill caps:` header. `--current-unlocks` opts back into
+the disk snapshot, which is what you want alongside `tools/ap/SetUnlock.ts` ("what can I do
+right now"). An `ap-placements.json` with zero item placements — the AP-multiworld shape,
+since `new-run` deletes the local file and `ApClient` rewrites it with `questGates` only —
+now takes that vanilla path with a printed note instead of running the sphere loop over an
+empty item map and "proving" every goal unreachable.
+
+**Generalizable lesson.** When a file grows a second writer, re-check every *reader*'s
+assumption about what it means. The engine's `ApUnlockOverrides` and placement mode both
+treat `ap-unlocks.json` as "received so far" (correct); only the vanilla-path sim treated
+it as "will have received" — and it was the one place nothing tested after placement mode
+landed, because the file simply didn't exist back when that path was validated.
+
+**Verification trio for this change.** (1) Placement path byte-identical before/after on
+two seeds (the change must not touch solo runs). (2) All four config shapes exercised:
+no-unlocks (uncapped label), unlocks+no-placements (end-of-run, all goals reachable),
+`--current-unlocks` (old snapshot blockers preserved verbatim), empty-placements
+(fallback + note). (3) `npx tsc --noEmit -p .` clean, and `GenerateSeed` still passes
+`ValidateSeed` on attempt 0 for seeds 1/42/777/12345/98765 — confirming generation was
+never the broken half.
