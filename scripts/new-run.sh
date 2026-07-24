@@ -146,7 +146,8 @@ fi
 # (Skips gracefully if region-graph.json isn't built yet - see the one-time note.)
 if [ "$RUN_VALIDATE" = 1 ]; then
   if [ -f tools/logic/region-graph.json ]; then
-    [ "$VERBOSE" = 1 ] && run tools/logic/ValidateSeed.ts --verbose || run tools/logic/ValidateSeed.ts
+    # tolerate a non-zero (BLOCKED) exit - the report is the point, don't abort the run.
+    if [ "$VERBOSE" = 1 ]; then npx tsx tools/logic/ValidateSeed.ts --verbose || true; else npx tsx tools/logic/ValidateSeed.ts || true; fi
   else
     echo; echo "==> skipping ValidateSeed: tools/logic/region-graph.json missing - run 'npx tsx tools/logic/BuildRegionGraph.ts' once (one-time)."
   fi
