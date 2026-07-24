@@ -452,16 +452,24 @@ function main(): void {
     // quest script edges + quest-agnostic world edges, minus vanilla transitions the
     // seed's overrides replaced (their trigger runs the override, not the case body).
     const overriddenTriggers = new Set(entranceEdges.map(e => e.key.split(':')[0]));
-    // Optimistic extracted edges must never bypass the curated area-gate model: any
-    // edge INTO a gated area's interior regions is dropped (step 3 of the fixpoint is
-    // the sole authority on entering those; leaving them stays fine).
-    const gatedInterior = new Set<number>();
+    // Extracted edges into a gated area's interior must not BYPASS the gate - but they
+    // must not be DROPPED either (dropping them severs a room's own internal connectivity,
+    // e.g. the stair from the Black Arm hideout up to its weapon cupboard, which strands
+    // multi-floor quest interiors under the expanded gated-area set - see GitHub #16).
+    // Instead we ATTACH the area's requirement to the edge: the internal stair works once
+    // the gate is met, so the whole room (all floors) reconnects, and the gate is still
+    // enforced. region id -> its gated area's require.
+    const gatedRegionRequire = new Map<number, GatedAreaRequire>();
     for (const ra of resolvedAreas) {
         for (const id of ra.gatedRegionIds) {
-            gatedInterior.add(id);
+            if (!gatedRegionRequire.has(id)) {
+                gatedRegionRequire.set(id, ra.area.require);
+            }
         }
     }
-    const scriptEdges = (generated ? [...collectScriptEdges(generated), ...usableWorldEdges(generated, overriddenTriggers)] : []).filter(se => !gatedInterior.has(se.toRegion));
+    const scriptEdges: { fromRegions: number[]; toRegion: number; require?: GatedAreaRequire }[] =
+        (generated ? [...collectScriptEdges(generated), ...usableWorldEdges(generated, overriddenTriggers)] : [])
+            .map(se => gatedRegionRequire.has(se.toRegion) ? { ...se, require: gatedRegionRequire.get(se.toRegion) } : se);
 
     function unsatisfiedGroups(id: string, reachable: Set<number>): RequirementGroup[] {
         const groups = generatedGroups.get(id);
@@ -624,6 +632,9 @@ function main(): void {
         for (const se of scriptEdges) {
             if (reachableRegions.has(se.toRegion) || !se.fromRegions.some(r => reachableRegions.has(r))) {
                 continue;
+            }
+            if (se.require && !requireSatisfied(se.require, ctx)) {
+                continue; // edge enters a gated interior - gate must be met (matches the runtime bounce)
             }
             reachableRegions.add(se.toRegion);
             changed = true;
