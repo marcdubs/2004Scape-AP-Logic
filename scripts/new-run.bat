@@ -64,6 +64,8 @@ set REFRESH_REGION_GRAPH=0
 REM only after map/content changes (validator input; slow-ish)
 set REFRESH_WORLDMAP_PNG=0
 REM tracker map images; only after map changes
+set RUN_VALIDATE=1
+REM print the beatability report (spheres + goals + item obtainability) at the end
 
 REM ============================ per-stage knobs ================================
 
@@ -198,12 +200,32 @@ if "%ADOPTED%"=="1" (
     echo ==^> AP run: removed local ap-placements.json - multiworld owns placements; quest gates re-sync on connect
 )
 
+REM Beatability report: sphere-by-sphere reachability incl. the four-source item
+REM obtainability model. --verbose prints every sphere; otherwise just the verdict.
+if "%RUN_VALIDATE%"=="1" (
+    if exist "tools\logic\region-graph.json" (
+        echo.
+        REM tolerate a non-zero (BLOCKED) exit - the report is the point, don't abort the run.
+        if "%VERBOSE%"=="1" (
+            echo ==^> npx tsx tools/logic/ValidateSeed.ts --verbose
+            call npx tsx tools/logic/ValidateSeed.ts --verbose
+        ) else (
+            echo ==^> npx tsx tools/logic/ValidateSeed.ts
+            call npx tsx tools/logic/ValidateSeed.ts
+        )
+    ) else (
+        echo.
+        echo ==^> skipping ValidateSeed: tools\logic\region-graph.json missing - run "npx tsx tools/logic/BuildRegionGraph.ts" once ^(one-time^).
+    )
+)
+
 echo.
 echo ================================================================
 echo New run rolled (seed %SEED%). Now:
 echo   1. RESTART the Windows server.
-echo   2. Walkthrough: npx tsx tools/sim/SimulateProgression.ts --verbosity 2   (solo runs only - AP runs have no local placements)
-echo   3. Sanity:      npx tsx tools/logic/ValidateSeed.ts
+echo   2. Walkthrough: npx tsx tools/sim/SimulateProgression.ts --verbosity 2   (AP runs get the quest-graph report instead: the room owns placements)
+echo                   add --current-unlocks to ask "what can I do RIGHT NOW" with the unlocks already received
+echo   3. Re-validate: npx tsx tools/logic/ValidateSeed.ts --verbose   (ran above unless RUN_VALIDATE=0)
 echo   4. Tracker:     http://localhost:8080/ap/   (?spoiler=1 to see everything)
 echo   5. Testing aids: tools/ap/SetUnlock.ts ^<name^> ^<count^> ^| --clear
 echo ================================================================

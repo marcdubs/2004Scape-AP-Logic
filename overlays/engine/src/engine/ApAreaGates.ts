@@ -64,6 +64,7 @@ interface Box {
 
 type ResolvedRequire =
     | { kind: 'varp'; varpId: number; gte: number }
+    | { kind: 'varpBit'; varpId: number; bit: number; set: boolean } // set=true: bit must be 1 ({varp,bit}); set=false: bit must be 0 ({varp,bitClear})
     | { kind: 'stat'; statId: number; gte: number }
     | { kind: 'item'; objId: number }
     | { kind: 'allOf'; all: ResolvedRequire[] };
@@ -100,13 +101,20 @@ function resolveRequire(raw: unknown, areaName: string): ResolvedRequire | null 
     }
     const r = raw as Record<string, unknown>;
 
-    if (typeof r.varp === 'string' && typeof r.gte === 'number') {
+    if (typeof r.varp === 'string' && (typeof r.gte === 'number' || typeof r.bit === 'number' || typeof r.bitClear === 'number')) {
         const varpId = VarPlayerType.getId(r.varp);
         if (varpId === -1) {
             printWarning(`AP area gates: area "${areaName}" references unknown varp "${r.varp}"`);
             return null;
         }
-        return { kind: 'varp', varpId, gte: r.gte };
+        // bitfield-varp gates (testbit(%varp, ^bitconst)): bit set / bit clear.
+        if (typeof r.bit === 'number') {
+            return { kind: 'varpBit', varpId, bit: r.bit, set: true };
+        }
+        if (typeof r.bitClear === 'number') {
+            return { kind: 'varpBit', varpId, bit: r.bitClear, set: false };
+        }
+        return { kind: 'varp', varpId, gte: r.gte as number };
     }
 
     if (typeof r.stat === 'string' && typeof r.gte === 'number') {
@@ -247,6 +255,8 @@ function evalRequire(player: Player, req: ResolvedRequire): boolean {
     switch (req.kind) {
         case 'varp':
             return player.vars[req.varpId] >= req.gte;
+        case 'varpBit':
+            return (((player.vars[req.varpId] >> req.bit) & 1) === 1) === req.set;
         case 'stat':
             return player.baseLevels[req.statId] >= req.gte;
         case 'item':

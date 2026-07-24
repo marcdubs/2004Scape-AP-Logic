@@ -61,7 +61,7 @@ quest that is itself blocked — walked all the way down).
 ### The central simplification: skill training has no time cost
 
 A skill is modeled as instantly trainable to any level **up to its seed-fixed cap**
-(from `ap-unlocks.json`; missing file = uncapped/99). There is no xp-rate or grind-time
+(missing `ap-unlocks.json` = uncapped/99). There is no xp-rate or grind-time
 model. This is deliberate, not an oversight: Archipelago logic cares about
 *reachability*, not real-time pacing (the same way OSRS-apworld logic doesn't simulate
 how many hours 99 Woodcutting takes) — and it collapses "sphere" down to its real meaning
@@ -71,10 +71,47 @@ quest is reachable in sphere 1 except the ones gated by *other quests* (Dragon S
 32 QP, and the Heroes'/Legends'/Underground Pass/Regicide/Nature Spirit chains) — see
 the current-seed run below.
 
+### Where the caps come from: end-of-run, not the file on disk
+
+The vanilla (no-`ap-placements.json`) path answers a **beatability** question — "is this
+seed finishable" — so the counts it reasons about are the ones a *finished* run holds:
+the entire progression pool collected (`PlacementEngine.endOfRunCounts`, built by applying
+`buildItemPool` itself so it can never drift from the real pool). Caps therefore top out
+at 99 for every cappable skill, and a blocker in this mode always means a genuine
+quest-graph problem (a QP wall, a prerequisite chain), never "you haven't found the item
+yet".
+
+This is a **correction, not a new model**: the doc always described `ap-unlocks.json` as
+"the counts an AP client would have delivered by the end", but placement mode changed what
+the file actually contains. `GenerateSeed.ts` writes a *locked, all-zero starting* table,
+and during a live AP run the file holds only what the multiworld has delivered so far.
+Reading a starting table as an end state made the tool report every skill capped at 20
+forever and diagnose essentially the whole quest graph as blocked (`attack capped at 20 by
+unlocks; needs 40`, ×N) on seeds that `GenerateSeed`'s own fill and `ValidateSeed` both
+call beatable — a pure false negative, and a confusing one because the blocker text looked
+so specific.
+
+Two escape hatches, both explicit in the header line the run prints:
+
+- `--current-unlocks` — reason about the raw on-disk snapshot instead. This is the right
+  mode when you're poking at a live run with `tools/ap/SetUnlock.ts` and the question is
+  "what can I do **right now**". Blockers there mean "not yet", not "never".
+- An `ap-placements.json` that holds *no item placements* (the AP-multiworld shape: the
+  room owns placement, so `new-run` deletes the local file and `ApClient` rewrites it with
+  the seed's `questGates` only) falls back to this same vanilla report with a printed note,
+  rather than running the placement sphere loop over an empty item map and "proving" every
+  goal unreachable. Family-D quest gates are deliberately not applied in that fallback: at
+  end-of-run every `quest_<id>` item the room holds has arrived, so gating on them would
+  re-introduce the same false-blocker class.
+
+Solo (locally-filled) seeds are unaffected by any of this — a populated
+`ap-placements.json` takes the placement-aware sphere loop, which has always collected
+items as it walks and never used the disk snapshot as a ceiling.
+
 ### What's NOT modeled yet (noted per the design brief, not silently dropped)
 
-- **AP item receipt ORDER.** `ap-unlocks.json` is treated as a fixed snapshot for the
-  whole run (the counts an AP client would have delivered by "the end"). Simulating
+- **AP item receipt ORDER.** The unlock counts are fixed for the whole run (end-of-run by
+  default, the disk snapshot under `--current-unlocks`). Simulating
   "you have 2 Progressive Mining out of 7, in THIS order relative to quest completions"
   is a real feature gap for the eventual apworld port — the engine's sphere loop is
   already structured to support it (an outer loop re-running `runSimulation` with

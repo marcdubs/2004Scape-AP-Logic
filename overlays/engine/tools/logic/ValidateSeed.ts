@@ -23,7 +23,8 @@ import { applyPlacementItem, applyQuestGates, buildLocationCatalog, capsFromCoun
 import { Goal, QuestReq, StatName } from '../sim/types.js';
 
 import { WorldTile, parseRawCoord } from './Coords.js';
-import { GatedArea, GatedAreaRequire, RequireContext, describeRequire, loadGatedAreas, requireSatisfied } from './GatedAreas.js';
+import { GatedArea, GatedAreaRequire, POCKET_TILE_CAP, RequireContext, areaDoorTiles, describeRequire, loadGatedAreas, requireSatisfied } from './GatedAreas.js';
+import { addRegionSources, applySwaps, computeObtainable, itemAvailable, loadItemSources, loadNpcSpawns, loadQuestItems } from './ItemGraph.js';
 import { GeneratedIgnores, RequirementGroup, buildRequirementGroups, collectScriptEdges, loadGeneratedQuestRegions, usableWorldEdges } from './GeneratedQuestRegions.js';
 import { RegionGraph, loadRegionGraph } from './RegionGraph.js';
 
@@ -113,8 +114,61 @@ interface ResolvedGatedArea {
     outsideRegionIds: Set<number>;
 }
 
+// Region-membership resolution (GitHub #16, Option 3): for an area carrying a `doors`
+// list, the gated interior is the actual pocket(s) BEHIND those door tiles, not every
+// region that happens to fall inside a bounding rectangle. We probe each door tile's
+// neighborhood on both sides and classify each adjacent region:
+//   - INSIDE pocket: a small (<= POCKET_TILE_CAP) non-mainland region - the isolated
+//     interior the gate protects. This is exactly how DeriveGatedAreas picked the pocket
+//     to box, so it re-derives the same interior against the CURRENT graph - and, crucially,
+//     never sweeps in a disconnected island that merely sits inside the rectangle (the druid
+//     cauldron caught by the Black Knights' spy-grill box was such an island).
+//   - OUTSIDE: the mainland or an open/large region on the other side of the door.
+// A door is symmetric: once the requirement is met, crossing it works in EITHER direction,
+// so the reconnection trigger is "any adjacent region (inside OR outside) already reachable".
+// This matters for deep dungeon gates (Elvarg's lair, Golrie's cell) where BOTH sides are
+// small pockets and there is no mainland neighbor at all - the approach pocket is reached
+// via a script-teleport/ladder, and meeting the requirement then opens the lair. Multi-floor
+// interiors reconnect for free: the plane-0 pocket is gated here, and the internal stair up
+// (a script edge) carries the requirement and fires once that pocket is reachable (see
+// gatedRegionRequire below).
+function resolveDoorGatedArea(area: GatedArea, graph: RegionGraph): { gatedRegionIds: Set<number>; outsideRegionIds: Set<number> } {
+    const mainland = graph.meta.mainlandRegionId;
+    const inside = new Set<number>();
+    const adjacent = new Set<number>(); // every region touching a door tile, both sides
+    for (const door of areaDoorTiles(area)) {
+        // scan the door's immediate neighborhood on its own level (the tile itself is the
+        // blocked door loc, so it never resolves to a region).
+        for (let r = 1; r <= 2; r++) {
+            for (let dx = -r; dx <= r; dx++) {
+                for (let dz = -r; dz <= r; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) {
+                        continue; // only the new ring at this radius
+                    }
+                    const id = graph.regionAt(door.x + dx, door.z + dz, door.level);
+                    if (id === 0) {
+                        continue;
+                    }
+                    adjacent.add(id);
+                    if (id !== mainland && (graph.regionsById.get(id)?.tileCount ?? 0) <= POCKET_TILE_CAP) {
+                        inside.add(id);
+                    }
+                }
+            }
+        }
+    }
+    // gatedRegionIds = the interior pockets we (re)connect and attach the requirement to.
+    // outsideRegionIds = the trigger set: ALL adjacent regions, so reaching either side of
+    // the door (including a sibling pocket reached via a teleport) opens the crossing.
+    return { gatedRegionIds: inside, outsideRegionIds: adjacent };
+}
+
 function resolveGatedAreas(areas: GatedArea[], graph: RegionGraph): ResolvedGatedArea[] {
     return areas.map(area => {
+        if (area.doors && area.doors.length > 0) {
+            const { gatedRegionIds, outsideRegionIds } = resolveDoorGatedArea(area, graph);
+            return { area, gatedRegionIds, outsideRegionIds };
+        }
         const insideIds = new Set<number>();
         const outsideIds = new Set<number>();
         for (const box of area.boxes) {
@@ -210,27 +264,82 @@ function loadQuestRegions(): QuestRegionsFile {
     return JSON.parse(fs.readFileSync(QUEST_REGIONS_PATH, 'utf8'));
 }
 
-// ---- curated varp resolvers for ap-gated-areas.json's `{varp,gte}` require form.
-// These names come straight from the shipped ap-gated-areas.json's "derivation" fields
-// (Workstream A) - "qp" is generic and always tracked; the rest are area-specific
-// persistent-flag varps this tool doesn't have direct visibility into, so they're
-// mapped to the nearest equivalent state this simulation DOES track. Curated and
-// growable, same pattern as quest-regions.json - an unrecognized varp name falls back
-// to 0 (fail-closed) via GatedAreas.ts's requireSatisfied. ----
+// ---- varp resolver for ap-gated-areas.json's `{varp,gte}` / `{varp,bit}` require forms.
+// Every gate references a quest-progress varp; this simulation is quest-ATOMIC (tracks
+// completion + doability, not per-stage), so the model maps each gate varp to the state
+// its quest is in. The 47 gate varps in the shipped gated-areas file all belong to one of
+// the sim's quests (DeriveGatedAreas + the subagent require pass - see problems.txt #9).
+//
+// KEY MODELLING CHOICE: a quest-progress gate is satisfiable when its quest is DOABLE (its
+// non-region prerequisites - skills + prereq quests + QP - are met), NOT when it is
+// complete. This is essential and correct:
+//   - It breaks CIRCULARITY: a quest's own interior door (e.g. Phoenix Gang hideout, gating
+//     %phoenixgang, needed to DO Shield of Arrav) would deadlock if it required the quest
+//     complete. "Doable" lets the fixpoint flow: prereqs met -> door opens -> quest-region
+//     reachable -> quest completes.
+//   - It can't cause a FALSE PASS on quest-internal items: a "quest X complete" gate can't
+//     legitimately hide an item that quest X itself needs (vanilla contradiction), so
+//     opening at "doable" never makes an unbeatable seed look beatable.
+// Returns an all-low-bits value (0x7FFFFFFF) when doable, so both `gte` thresholds and any
+// `testbit` (bits 0-30) pass; 0 otherwise -> requireSatisfied treats the gate as closed.
+const GATE_VARP_ALL = 0x7FFFFFFF;
 
-function resolveVarp(name: string, qp: number, completed: Set<string>, statCaps: Map<string, number>): number | undefined {
-    switch (name) {
-        case 'qp':
-            return qp;
-        case 'heroquest': // Heroes' Guild gate; heroquest>=15 in vanilla means Heroes' Quest complete.
-            return completed.has('hero') ? 999 : 0;
-        case 'legendsquest': // Legends' Guild gate; legendsquest>=75 means Legends' Quest complete.
-            return completed.has('legends') ? 999 : 0;
-        case 'prayer_guild': // Not a quest at all - set permanently once base Prayer >= 31 (Abbot Langley dialogue).
-            return (statCaps.get('prayer') ?? 99) >= 31 ? 1 : 0;
-        default:
-            return undefined; // unknown varp -> requireSatisfied treats as 0 (fail-closed).
+// varp -> sim quest id (quests.json). Unmapped varps fall through to 0 (fail-closed).
+const VARP_TO_QUEST: Record<string, string> = {
+    arenaquest: 'arena', ballquest: 'ball', biohazard: 'biohazard', cogquest: 'cog',
+    death_equiproom: 'death', desertrescue_map_mechanisms: 'desertrescue',
+    dragon_oracle: 'dragon', dragon_wall: 'dragon', dragonquest: 'dragon',
+    druidspirit: 'druid', eadgar_quest: 'eadgar', grail: 'grail', grandtree: 'grandtree',
+    handelmort_traps_disabled: 'totem', hazeelcult_side: 'hazeelcult', hazeelcultquest: 'hazeelcult',
+    horrorair: 'horror', horrorarrow: 'horror', horrorearth: 'horror', horrorfire: 'horror',
+    horrorquest: 'horror', horrorsword: 'horror', horrorwater: 'horror',
+    hunt_store_employed: 'hunt', ibanmulti: 'upass', ikov: 'ikov', itwatchtower_bits: 'itwatchtower',
+    junglepotion: 'junglepotion', legends_bits: 'legends', mcannon: 'mcannon', murderquest: 'murder',
+    priestperil: 'priest', regicide_quest: 'regicide', scorpcatcher: 'scorpcatcher', tbwt_main: 'tbwt',
+    treequest: 'tree', troll_entered_stronghold: 'troll', troll_freed_eadgar: 'troll',
+    troll_quest: 'troll', viking: 'viking'
+};
+
+// varps used by BOTH a post-quest COMPLETION gate (guild / gang-complete) AND a mid-quest
+// gate on the same varp. Modelled as completed?ALL : (doable?mid:0) so the completion gate
+// stays completion-SAFE (never opens early - avoids a false pass on post-quest reward areas)
+// while mid-quest doors on the same varp still open at "doable". `mid` sits above every
+// mid-quest threshold on that varp and below its completion threshold.
+const SPLIT_VARPS: Record<string, { quest: string; mid: number }> = {
+    heroquest: { quest: 'hero', mid: 14 },            // guild needs >=15 (complete); mansion/HQ doors need 10/8
+    blackarmgang: { quest: 'blackarmgang', mid: 3 },  // hideout door needs >=3 (joined); Heroes doors need 4 (complete)
+    phoenixgang: { quest: 'blackarmgang', mid: 9 },   // hideout door needs >=9 (joined); Heroes kitchen needs 10 (complete)
+    legendsquest: { quest: 'legends', mid: 74 }       // guild needs >=75 (complete); interior force-barrier needs >=18 (mid-quest)
+};
+const COMPLETION_ONLY: Record<string, string> = {};
+
+function questDoable(q: QuestReq | undefined, qp: number, completed: Set<string>, statCaps: Record<StatName, number>): boolean {
+    if (!q) {
+        return false; // varp maps to a quest this sim doesn't model -> fail-closed
     }
+    return skillsSatisfied(q.skills, statCaps) && qp >= (q.requiredQp ?? 0) && questsChainSatisfied(q.quests, q.questsAny, completed);
+}
+
+function resolveVarp(name: string, qp: number, completed: Set<string>, statCaps: Record<StatName, number>, statCapsLower: Map<string, number>, questsById: Map<string, QuestReq>): number | undefined {
+    if (name === 'qp') {
+        return qp;
+    }
+    if (name === 'prayer_guild') { // not a quest - permanent once base Prayer >= 31 (Abbot Langley).
+        return (statCapsLower.get('prayer') ?? 99) >= 31 ? 1 : 0;
+    }
+    const split = SPLIT_VARPS[name];
+    if (split) {
+        return completed.has(split.quest) ? GATE_VARP_ALL : (questDoable(questsById.get(split.quest), qp, completed, statCaps) ? split.mid : 0);
+    }
+    const co = COMPLETION_ONLY[name];
+    if (co) {
+        return completed.has(co) ? GATE_VARP_ALL : 0;
+    }
+    const quest = VARP_TO_QUEST[name];
+    if (quest) {
+        return questDoable(questsById.get(quest), qp, completed, statCaps) ? GATE_VARP_ALL : 0;
+    }
+    return undefined; // unknown varp -> requireSatisfied treats as 0 (fail-closed).
 }
 
 // ---- quest requirement checks (small reimplementation of Engine.ts's private
@@ -238,6 +347,57 @@ function resolveVarp(name: string, qp: number, completed: Set<string>, statCaps:
 // tools/sim/Engine.ts, and the design brief asks this tool to "steal patterns, don't
 // import [sim's engine] code unless clean" since region-awareness changes the shape of
 // the fixpoint enough that sharing the loop itself isn't a clean fit). ----
+
+// Loads the gathersanity/processsanity swap tables (ap-gather.json / ap-process.json,
+// obj-id -> obj-id) and translates them to a name -> name product swap via obj.pack, so
+// the item-source graph can be re-keyed to the shuffled world. Absent files (gathersanity
+// off) => null => vanilla graph.
+function loadGatherProcessSwaps(configDir: string): Map<string, string> | null {
+    const objPack = path.resolve(process.cwd(), '../content/pack/obj.pack');
+    if (!fs.existsSync(objPack)) {
+        return null;
+    }
+    const idToName = new Map<number, string>();
+    for (const line of fs.readFileSync(objPack, 'utf8').split(/\r?\n/)) {
+        const eq = line.indexOf('=');
+        if (eq !== -1) {
+            idToName.set(parseInt(line.slice(0, eq), 10), line.slice(eq + 1).trim());
+        }
+    }
+    const swap = new Map<string, string>();
+    for (const fname of ['ap-gather.json', 'ap-process.json']) {
+        const file = path.join(configDir, fname);
+        if (!fs.existsSync(file)) {
+            continue;
+        }
+        const map = (JSON.parse(fs.readFileSync(file, 'utf8')) as { map?: Record<string, number> }).map ?? {};
+        for (const [fromId, toId] of Object.entries(map)) {
+            const from = idToName.get(parseInt(fromId, 10));
+            const to = idToName.get(toId);
+            if (from && to) {
+                swap.set(from, to);
+            }
+        }
+    }
+    return swap.size > 0 ? swap : null;
+}
+
+// loads tools/logic/data/<fname> as item -> [provider npc debugnames] (shop owners for
+// buy-sources.json, monsters for drop-sources.json). Absent => empty.
+function loadItemProviders(fname: string): Map<string, string[]> {
+    const file = path.join('tools', 'logic', 'data', fname);
+    const map = new Map<string, string[]>();
+    if (!fs.existsSync(file)) {
+        return map;
+    }
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+    for (const [item, npcs] of Object.entries(raw)) {
+        if (!item.startsWith('_') && Array.isArray(npcs)) {
+            map.set(item, npcs.map(String));
+        }
+    }
+    return map;
+}
 
 function skillsSatisfied(skills: Partial<Record<StatName, number>> | undefined, caps: Record<StatName, number>): boolean {
     if (!skills) {
@@ -301,6 +461,34 @@ function main(): void {
     const gated = loadGatedAreas(CONFIG_DIR);
     const resolvedAreas = resolveGatedAreas(gated.areas, graph);
 
+    // Item-acquisition graph (problems.txt #16): item -> how it's gathered/processed, so a
+    // quest that needs a gathered/processed item gates on the required skill instead of the
+    // sim assuming every item is free. Static game data (tools/logic/data/), absent =>
+    // empty => every item assumed obtainable (exact prior behaviour). itemSources applies
+    // any gathersanity/processsanity swap so obtainability reflects the shuffled world.
+    const itemSources = applySwaps(loadItemSources(), loadGatherProcessSwaps(CONFIG_DIR));
+    // add the BUY (shop-owner region) and DROP (monster region) sources - the four-source
+    // OR model. item->provider-npc data is static (tools/logic/data/), resolved to a region
+    // via the npc spawn map + region graph. Absent files => gather/process only.
+    {
+        const npcSpawns = loadNpcSpawns();
+        const resolveNpcRegion = (coord: string): number => {
+            const [level, mapX, mapZ, localX, localZ] = coord.split('_').map(Number);
+            return graph.resolveRegion({ level, x: mapX * 64 + localX, z: mapZ * 64 + localZ });
+        };
+        addRegionSources(itemSources, loadItemProviders('shop-sources.json'), npcSpawns, resolveNpcRegion, 'buy');
+        addRegionSources(itemSources, loadItemProviders('drop-sources.json'), npcSpawns, resolveNpcRegion, 'drop');
+    }
+    const questItems = loadQuestItems();
+    let obtainable = new Set<string>(); // recomputed each sphere from current statCaps
+    // only GATHER/PROCESS-sourced quest needs are gated (buy/drop/given/quest items are
+    // assumed available - we never invent a gate we can't prove). itemAvailable's
+    // "unmodelled => true" rule is the second guard.
+    const questItemsSatisfied = (id: string): boolean =>
+        (questItems.get(id) ?? [])
+            .filter(n => (n.obtained === 'gather' || n.obtained === 'process'))
+            .every(n => itemAvailable(n.item, itemSources, obtainable));
+
     const qr = loadQuestRegions();
     const anchorRegions = new Map<string, number>();
     for (const [name, def] of Object.entries(qr.anchors)) {
@@ -317,16 +505,24 @@ function main(): void {
     // quest script edges + quest-agnostic world edges, minus vanilla transitions the
     // seed's overrides replaced (their trigger runs the override, not the case body).
     const overriddenTriggers = new Set(entranceEdges.map(e => e.key.split(':')[0]));
-    // Optimistic extracted edges must never bypass the curated area-gate model: any
-    // edge INTO a gated area's interior regions is dropped (step 3 of the fixpoint is
-    // the sole authority on entering those; leaving them stays fine).
-    const gatedInterior = new Set<number>();
+    // Extracted edges into a gated area's interior must not BYPASS the gate - but they
+    // must not be DROPPED either (dropping them severs a room's own internal connectivity,
+    // e.g. the stair from the Black Arm hideout up to its weapon cupboard, which strands
+    // multi-floor quest interiors under the expanded gated-area set - see GitHub #16).
+    // Instead we ATTACH the area's requirement to the edge: the internal stair works once
+    // the gate is met, so the whole room (all floors) reconnects, and the gate is still
+    // enforced. region id -> its gated area's require.
+    const gatedRegionRequire = new Map<number, GatedAreaRequire>();
     for (const ra of resolvedAreas) {
         for (const id of ra.gatedRegionIds) {
-            gatedInterior.add(id);
+            if (!gatedRegionRequire.has(id)) {
+                gatedRegionRequire.set(id, ra.area.require);
+            }
         }
     }
-    const scriptEdges = (generated ? [...collectScriptEdges(generated), ...usableWorldEdges(generated, overriddenTriggers)] : []).filter(se => !gatedInterior.has(se.toRegion));
+    const scriptEdges: { fromRegions: number[]; toRegion: number; require?: GatedAreaRequire }[] =
+        (generated ? [...collectScriptEdges(generated), ...usableWorldEdges(generated, overriddenTriggers)] : [])
+            .map(se => gatedRegionRequire.has(se.toRegion) ? { ...se, require: gatedRegionRequire.get(se.toRegion) } : se);
 
     function unsatisfiedGroups(id: string, reachable: Set<number>): RequirementGroup[] {
         const groups = generatedGroups.get(id);
@@ -380,19 +576,39 @@ function main(): void {
     let sphere = 0;
 
     function heldItems() {
-        // Item requirements are treated as always-satisfiable (narrative-only), matching
-        // tools/sim/Engine.ts's documented policy - no quest or gated area in this
-        // dataset currently needs a real gathersanity/processsanity item-swap check
-        // (verified during that tool's build; the mechanism stays a ready extension
-        // point there, not here).
-        return { has: (_item: string) => true };
+        // Item obtainability now MODELLED (problems.txt #16): an item is available iff it's
+        // not a gathered/processed item (assumed obtainable - shop/drop/given/misc) OR its
+        // gather/process chain is reachable under the current skill caps. `obtainable` is
+        // the current-sphere fixpoint. Absent item-sources.json => every item unmodelled =>
+        // always true (exact prior narrative-only behaviour).
+        return { has: (item: string) => itemAvailable(item, itemSources, obtainable) };
+    }
+
+    // every varp any gated-area OR entrance-edge require references - resolved fresh each
+    // sphere from the current quest/qp/skill state. Data-driven so new gates in the config
+    // need no code change here (only VARP_TO_QUEST needs the varp->quest line if it's new).
+    const neededVarps = new Set<string>(['qp', 'prayer_guild']);
+    const collectVarps = (r: GatedAreaRequire): void => {
+        if ('allOf' in r) {
+            r.allOf.forEach(collectVarps);
+        } else if ('varp' in r) {
+            neededVarps.add(r.varp);
+        }
+    };
+    for (const ra of resolvedAreas) {
+        collectVarps(ra.area.require);
+    }
+    for (const edge of entranceEdges) {
+        if (edge.require) {
+            collectVarps(edge.require);
+        }
     }
 
     function buildCtx(): RequireContext {
         return {
             varps: new Map(
-                ['qp', 'heroquest', 'legendsquest', 'prayer_guild']
-                    .map(name => [name, resolveVarp(name, qp, completed, statCapsLower)] as const)
+                [...neededVarps]
+                    .map(name => [name, resolveVarp(name, qp, completed, statCaps, statCapsLower, questsById)] as const)
                     .filter((e): e is [string, number] => e[1] !== undefined)
             ),
             heldItems: heldItems(),
@@ -428,6 +644,10 @@ function main(): void {
 
     for (;;) {
         let changed = false;
+        // recompute item obtainability from the current (growing) skill caps AND reachable
+        // regions before this sphere's gates/quests consult it (buy/drop sources gate on
+        // region reachability, so obtainability grows as the map opens up).
+        obtainable = computeObtainable(itemSources, statCaps, reachableRegions);
         const ctx = buildCtx();
 
         // 1. entrance edges (gated or not).
@@ -465,6 +685,9 @@ function main(): void {
         for (const se of scriptEdges) {
             if (reachableRegions.has(se.toRegion) || !se.fromRegions.some(r => reachableRegions.has(r))) {
                 continue;
+            }
+            if (se.require && !requireSatisfied(se.require, ctx)) {
+                continue; // edge enters a gated interior - gate must be met (matches the runtime bounce)
             }
             reachableRegions.add(se.toRegion);
             changed = true;
@@ -513,6 +736,7 @@ function main(): void {
                 skillsSatisfied(q.skills, statCaps) &&
                 qp >= (q.requiredQp ?? 0) &&
                 questsChainSatisfied(q.quests, q.questsAny, completed) &&
+                questItemsSatisfied(q.id) &&
                 (q.gateKey === undefined || (placementCounts.get(q.gateKey) ?? 0) >= 1) &&
                 regionsSatisfied(qr.quests[q.id]?.requiredAnchors, anchorRegions, reachableRegions) &&
                 unsatisfiedGroups(q.id, reachableRegions).length === 0

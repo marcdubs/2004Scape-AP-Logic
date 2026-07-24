@@ -52,6 +52,7 @@ RUN_ENTRANCES=1           # entrance shuffle + automatic logic validation/reroll
 RUN_PLACEMENT=1           # AP placement: checks contain the unlocks (RESETS run progress!)
 REFRESH_REGION_GRAPH=0    # only after map/content changes (validator input; slow-ish)
 REFRESH_WORLDMAP_PNG=0    # tracker map images; only after map changes
+RUN_VALIDATE=1            # print the beatability report (spheres + goals + item obtainability) at the end
 
 # ============================ per-stage knobs ================================
 
@@ -140,12 +141,25 @@ if [ "$ADOPTED" = 1 ]; then
   echo "==> AP run: removed local ap-placements.json (multiworld owns placements; quest gates re-sync on connect)"
 fi
 
+# Beatability report: sphere-by-sphere reachability incl. the four-source item
+# obtainability model. --verbose prints every sphere; otherwise just the verdict.
+# (Skips gracefully if region-graph.json isn't built yet - see the one-time note.)
+if [ "$RUN_VALIDATE" = 1 ]; then
+  if [ -f tools/logic/region-graph.json ]; then
+    # tolerate a non-zero (BLOCKED) exit - the report is the point, don't abort the run.
+    if [ "$VERBOSE" = 1 ]; then npx tsx tools/logic/ValidateSeed.ts --verbose || true; else npx tsx tools/logic/ValidateSeed.ts || true; fi
+  else
+    echo; echo "==> skipping ValidateSeed: tools/logic/region-graph.json missing - run 'npx tsx tools/logic/BuildRegionGraph.ts' once (one-time)."
+  fi
+fi
+
 echo
 echo "================================================================"
 echo "New run rolled (seed $SEED). Now:"
 echo "  1. RESTART the Windows server."
-echo "  2. Walkthrough: npx tsx tools/sim/SimulateProgression.ts --verbosity 2   (solo runs only - AP runs have no local placements)"
-echo "  3. Sanity:      npx tsx tools/logic/ValidateSeed.ts"
+echo "  2. Walkthrough: npx tsx tools/sim/SimulateProgression.ts --verbosity 2   (AP runs get the quest-graph report instead: the room owns placements)"
+echo "                  add --current-unlocks to ask 'what can I do RIGHT NOW' with the unlocks already received"
+echo "  3. Re-validate: npx tsx tools/logic/ValidateSeed.ts --verbose   (ran above unless RUN_VALIDATE=0)"
 echo "  4. Tracker:     http://localhost:8080/ap/   (?spoiler=1 to see everything)"
 echo "  5. Testing aids: tools/ap/SetUnlock.ts <name> <count> | --clear"
 echo "================================================================"
