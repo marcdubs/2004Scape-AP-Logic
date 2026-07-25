@@ -3,6 +3,7 @@ import path from 'path';
 
 import { GatedArea, GatedAreaBox, GatedAreaRequire, loadGatedAreas } from './GatedAreas.js';
 import { loadRegionGraph, RegionGraph } from './RegionGraph.js';
+import { isTutorialTile } from '../shared/TutorialIsland.js';
 
 // Turns ScanDoors' deterministic gated-passage list (tools/map/door-scan.json) into DRAFT
 // ap-gated-areas.json entries, so the runtime area-gate (ApAreaGates) and the seed
@@ -289,9 +290,10 @@ function main(): void {
         if (coords.length === 0) {
             continue; // no static placement (dynamic barrier / member-map) - not boxable here
         }
-        // Tutorial Island (mapsquare 48,48) is protected everywhere in this project - its
-        // %tutorial-gated doors are a normal onboarding sequence, never an AP area gate.
-        if (coords.some(c => (c.x >> 6) === 48 && (c.z >> 6) === 48)) {
+        // Tutorial Island is protected everywhere in this project - its %tutorial-gated
+        // doors are a normal onboarding sequence, never an AP area gate. Footprint comes
+        // from the same shared list the entrance shuffle protects (issue #14).
+        if (coords.some(c => isTutorialTile(c.x, c.z))) {
             skippedTutorial++;
             continue;
         }

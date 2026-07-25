@@ -303,8 +303,8 @@ same op2/op3 keys via the patched `stair_options`/`ladder_options` labels.
 Left vanilla on purpose: unpaired floor-shift halves (a one-way redirect on a house
 staircase breaks the "come back the way you came" guarantee), unpaired scanned
 placements (cellars whose surface entrance is a loc type we don't handle yet),
-quest-gated entrances, and Tutorial Island (mapsquare 48,48 -
-`PROTECTED_MAPSQUARES`).
+quest-gated entrances, and Tutorial Island (six mapsquares, read from the game's own
+`tutorial_island.dbrow` by `tools/shared/TutorialIsland.ts`).
 
 Reciprocity is guaranteed for every shuffled gate: the far side of wherever you land
 leads back to next to where you entered. Scanned-gate arrival tiles are the far

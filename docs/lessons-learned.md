@@ -168,7 +168,11 @@ reasoning:
   angle`. Loc ids resolve via `content/pack/loc.pack` (id=name) and category
   membership via `category=` in `.loc` configs. A placement scanner is the next
   logical tool.
-- Tutorial Island is mapsquare (48,48); `PROTECTED_MAPSQUARES` hard-excludes it.
+- Tutorial Island is SIX mapsquares - (47,47) (47,48) (48,47) (48,48) (49,48) and the
+  underground (48,148) - not just (48,48). `tools/shared/TutorialIsland.ts` derives that
+  list from `content/scripts/tutorial/configs/tutorial_island.dbrow` (the coord_pair
+  table behind `~in_tutorial_island`), and every tool that has to keep off the island
+  asks it: `RandomizeEntrances`, `DeriveGatedAreas`, `RandomizeSpawn`. See issue #14.
 - Same seed number does NOT reproduce the same layout across algorithm changes (the
   dedupe fix changed the candidate list, which changed what seed 1803231336
   produces). Treat seeds as valid only within one tool version.
@@ -1872,8 +1876,9 @@ checks green incl. [queue,player_death] carrying opcode 1907. NOT in-game tested
   writes data/config/ap-spawn.json (reseed = rewrite + restart). City = 1 of the 7
   vanilla spellbook landmarks (tool cross-checks live magic_spells.dbrow and warns
   loudly if the teleport shuffle deranged it - home uses vanilla coords regardless).
-  Chunk = random mainland square from 127 candidates (surface, mapX>=40, mapZ<=62
-  core band, no Tutorial Island/wilderness/Karamja; wilderness boundary VERIFIED:
+  Chunk = random mainland square from ~110 candidates (surface, mapX>=40, mapZ<=62
+  core band, no Tutorial Island/wilderness/Karamja - the tutorial exclusion dropped 4
+  more squares once it used the real six-square footprint; wilderness boundary VERIFIED:
   x in [2944,3392) & z in [3520,6400), 3520 = mapsquare edge 55, confirmed by both
   Player.isInWilderness() and move.rs2's [mapzone,0_46_55]; >=8 LOCs or >=1 NPC to
   skip ocean; --include-far-west opens mapX<40 back up). death.rs2 overlay = 2-line
@@ -3328,3 +3333,50 @@ no-unlocks (uncapped label), unlocks+no-placements (end-of-run, all goals reacha
 (fallback + note). (3) `npx tsc --noEmit -p .` clean, and `GenerateSeed` still passes
 `ValidateSeed` on attempt 0 for seeds 1/42/777/12345/98765 — confirming generation was
 never the broken half.
+
+## Tutorial Island is six mapsquares, not one (GitHub #14, 2026-07-25)
+
+**The bug.** A random entrance turned up on Tutorial Island: `0_49_48_3_6`, a ladder that
+should never have been in the pool. `RandomizeEntrances.PROTECTED_MAPSQUARES` was
+`[[48, 48]]` — a single mapsquare — but the island's footprint spills east into (49,48),
+so the ladder was, as far as the tool could see, ordinary mainland.
+
+**The real footprint, and where to get it.** Don't eyeball the maps: the content already
+answers this. `content/scripts/tutorial/configs/tutorial_island.dbrow` is the coord_pair
+table behind `~in_tutorial_island(coord)`, which the game itself uses to decide what
+counts as tutorial ground. Six mapsquares:
+
+```
+(47,47) (47,48) (48,47) (48,48) (49,48)   surface
+(48,148)                                   underground (the mining/smithing cave)
+```
+
+Note (48,148) is the underground layer of (48,48) (`mapZ + 100`, the +6400-tile Z
+convention). Its neighbours (47,148)/(49,148)/(48,149) exist as map files but are NOT
+tutorial — that region is Lumbridge-side cave, so don't be tempted to extend the
+underground band by symmetry. The dbrow is authoritative; derive, don't guess.
+
+**The fix.** `tools/shared/TutorialIsland.ts` parses the dbrow once and exports
+`isTutorialMapsquare(mapX, mapZ)` / `isTutorialTile(x, z)` / `tutorialMapsquares()`. It
+throws rather than falling back to a hardcoded list if the dbrow is missing — a silent
+fallback is exactly how the footprint shrank unnoticed in the first place. Three tools
+consume it, and there were three, not the two the issue named:
+
+- `RandomizeEntrances.ts` — entrance shuffle pool (also logs the protected squares now).
+- `DeriveGatedAreas.ts` — tutorial doors are onboarding, never an AP area gate.
+- `RandomizeSpawn.ts` — **found while fixing the other two**: chunk mode had the same
+  `[[48, 48]]` copy, so a chunk-mode HOME could be placed on Tutorial Island.
+
+**Generalizable lesson.** A constant that encodes a fact about the game world will be
+copy-pasted into the next tool that needs it, and then only one copy gets corrected. If
+the content defines the fact (dbrow / config / script table), read it at runtime; a
+grep for the constant's *value* (`48, 48`) — not its name — is what turned up the third
+copy.
+
+**Verification.** (1) `--export-pool` before/after: exactly one gate removed, the
+reported `0_49_48_3_6` ladder and its `1_49_48_3_6` top, nothing else added or dropped
+(366 → 365 gates), and zero pool entries left in any of the six squares. (2)
+`DeriveGatedAreas` output byte-identical (110 areas, 7 tutorial skips) — no behaviour
+change today, drift closed for tomorrow. (3) `RandomizeSpawn --mode chunk` candidate
+pool 114 → 110: the four newly-protected surface squares really were live HOME
+candidates. (4) `npx tsc --noEmit -p .` clean.

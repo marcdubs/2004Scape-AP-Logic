@@ -9,6 +9,7 @@ import { CONTENT_ROOT, ENTRANCE_DIR, type CoordLiteral, type Entrance, parseFile
 import { scanPlacements } from './LocPlacementScanner.js';
 import { execNpxTsx } from '../shared/Npx.js';
 import { derangement, mulberry32 } from '../shared/Prng.js';
+import { isTutorialMapsquare, tutorialMapsquares } from '../shared/TutorialIsland.js';
 
 // Shuffles game entrances and writes a runtime override table
 // (data/config/ap-entrances.json) that the engine's ap_entrance_override command
@@ -65,9 +66,9 @@ const SCAN_LADDER_MIDDLE = 'laddermiddle';
 const LADDER_PAIR_RADIUS = 3;
 
 // mapsquares that must never be touched by the shuffle, regardless of classification -
-// currently just Tutorial Island (48,48), so a brand-new player can never get stranded
-// mid-tutorial.
-const PROTECTED_MAPSQUARES: [number, number][] = [[48, 48]];
+// Tutorial Island, so a brand-new player can never get stranded mid-tutorial. Its
+// footprint is six mapsquares, not the one this used to assume; TutorialIsland.ts reads
+// the real one from the content the game itself checks against (issue #14).
 
 type Indexed<T> = T & { _index: number };
 type Candidate = Indexed<Entrance> & { source: { type: 'literal'; coord: CoordLiteral }; destination: CoordLiteral };
@@ -89,7 +90,7 @@ function overrideKey(coord: CoordLiteral, op: number): string {
 }
 
 function inProtectedMapsquare(coord: CoordLiteral): boolean {
-    return PROTECTED_MAPSQUARES.some(([mx, mz]) => mx === coord.mapX && mz === coord.mapZ);
+    return isTutorialMapsquare(coord.mapX, coord.mapZ);
 }
 
 function isProtected(e: Indexed<Entrance>): boolean {
@@ -419,6 +420,7 @@ function runAttempt(seed: number, dryRun: boolean, rewrite: boolean, mixed: bool
     // validated literals so they can join the floor-shift pool - see ApproachResolver.
     const approach = resolveApproachDestinations(allEntrances);
     printInfo(`resolved ${approach.resolved} player-relative destination(s) via forceapproach geometry (${approach.failed} left vanilla)`);
+    printInfo(`protected mapsquares (Tutorial Island): ${tutorialMapsquares().map(([mx, mz]) => `${mx},${mz}`).join(' ')}`);
 
     // Workstream B (docs/entrance-logic.md): gated entrances join the shuffle pool with
     // their requirement kept - the patched handlers (see ladders.rs2, mcannon_ladders.rs2,
