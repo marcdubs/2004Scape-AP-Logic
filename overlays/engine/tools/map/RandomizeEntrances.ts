@@ -6,6 +6,7 @@ import { printError, printInfo, printWarning } from '#/util/Logger.js';
 
 import { resolveApproachDestinations } from './ApproachResolver.js';
 import { CONTENT_ROOT, ENTRANCE_DIR, type CoordLiteral, type Entrance, parseFile, parseZanarisDoorText, type Requirement, resolveSameTileRelative } from './EntranceParser.js';
+import { expandAngleKeyedEntrances } from './LocAngleResolver.js';
 import { scanPlacements } from './LocPlacementScanner.js';
 import { execNpxTsx } from '../shared/Npx.js';
 import { derangement, mulberry32 } from '../shared/Prng.js';
@@ -427,6 +428,25 @@ function runAttempt(seed: number, dryRun: boolean, rewrite: boolean, mixed: bool
             allEntrances.push({ ...e, _index: nextIndex++ });
         }
         textByFile.set(file, fs.readFileSync(backupPath, 'utf8').replace(/\r\n/g, '\n'));
+    }
+
+    // give the angle-keyed handlers (Tree Gnome Stronghold wooden spiral stairs, the
+    // angled ship ladders) one concrete entrance per map placement - they carry no
+    // source coord of their own, so without this they never reach the pool at all
+    // (issue #4). Runs before the approach resolver: the ones whose destination is
+    // player-relative come out of here with a literal SOURCE and are resolvable from
+    // there like any other.
+    const angle = expandAngleKeyedEntrances(allEntrances);
+    for (let i = allEntrances.length - 1; i >= 0; i--) {
+        if (angle.consumed.has(allEntrances[i])) {
+            allEntrances.splice(i, 1);
+        }
+    }
+    for (const e of angle.entrances) {
+        allEntrances.push({ ...e, _index: nextIndex++ });
+    }
+    if (angle.handlers > 0) {
+        printInfo(`expanded ${angle.handlers} angle-keyed handler(s) into ${angle.entrances.length} placement(s) (${angle.skippedPlacements} placement angle(s) had no case - left vanilla)`);
     }
 
     // upgrade player-relative movecoord destinations (Falador smith/pub etc.) to

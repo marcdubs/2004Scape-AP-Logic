@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 
+import { boundsFor, median } from './ModelGeometry.js';
+
 // Parses content/scripts/**/*.npc config files for cosmetic model# lines. Not a
 // general .npc parser - it only looks for `[block]` headers (to tag each occurrence
 // with its owning npc debugname) and `model<N>=<value>` lines.
@@ -101,7 +103,220 @@ export function hasPlaceholderName(value: string): boolean {
     return /_model_\d+$/.test(value);
 }
 
-function isNeverSwappable(value: string): boolean {
+// every name in content/pack/model.pack - the id=name catalog, checked into vanilla
+// content (unlike the build-generated packs). Cached: several of the rules below walk
+// the whole list.
+let modelPackCache: string[] | null = null;
+
+export function modelPackNames(): string[] {
+    if (modelPackCache) {
+        return modelPackCache;
+    }
+    modelPackCache = [];
+    if (!fs.existsSync(MODEL_PACK_PATH)) {
+        return modelPackCache;
+    }
+    for (const line of fs.readFileSync(MODEL_PACK_PATH, 'utf8').split(/\r?\n/)) {
+        const eq = line.indexOf('=');
+        if (eq !== -1) {
+            modelPackCache.push(line.slice(eq + 1).trim());
+        }
+    }
+    return modelPackCache;
+}
+
+// The categories that have to cover a body region on their own. An `*extra` category
+// (torsoextra/headextra) or a necklace is an accessory BY DEFINITION - layering is what
+// it's for - so the layered-accessory rule below must not be applied to those or it
+// would flag half of them.
+const COVERAGE_CATEGORIES = new Set(['torso', 'legs', 'arms', 'head', 'feet', 'hands']);
+
+export type VanillaUsage = { sole: number; layered: number; wearers: string[]; wearersWithoutHead: number };
+
+let vanillaUsage: Map<string, VanillaUsage> | null = null;
+
+// How every (man|woman)_* model is actually WORN in vanilla, read out of the .npc
+// configs: how often it is the only value of its category in a block ("sole") versus
+// one of several ("layered"), and how many of its wearers have no separate head model
+// at all. Read from the pristine backup when one exists - the live files may already
+// carry a previous shuffle's output, and grading a randomized tree against itself is
+// how a bad value would justify itself.
+function loadVanillaUsage(): Map<string, VanillaUsage> {
+    if (vanillaUsage) {
+        return vanillaUsage;
+    }
+    vanillaUsage = new Map();
+    const root = fs.existsSync(BACKUP_ROOT) ? BACKUP_ROOT : SCRIPTS_ROOT;
+    if (!fs.existsSync(root)) {
+        return vanillaUsage;
+    }
+
+    const record = (block: string, models: string[]): void => {
+        const byCategory = new Map<string, string[]>();
+        const categories = new Set<string>();
+        for (const value of models) {
+            const match = value.match(SWAPPABLE_RE);
+            if (!match) {
+                continue;
+            }
+            const category = `${match[1]}_${match[2]}`;
+            categories.add(category);
+            (byCategory.get(category) ?? byCategory.set(category, []).get(category)!).push(value);
+        }
+        for (const [category, values] of byCategory) {
+            const gender = category.slice(0, category.indexOf('_'));
+            for (const value of values) {
+                const entry = vanillaUsage!.get(value) ?? { sole: 0, layered: 0, wearers: [], wearersWithoutHead: 0 };
+                if (values.length === 1) {
+                    entry.sole++;
+                } else {
+                    entry.layered++;
+                }
+                entry.wearers.push(block);
+                if (!categories.has(`${gender}_head`)) {
+                    entry.wearersWithoutHead++;
+                }
+                vanillaUsage!.set(value, entry);
+            }
+        }
+    };
+
+    for (const file of findNpcFiles(root)) {
+        let block = '';
+        let models: string[] = [];
+        for (const line of readNpcSource(file).split('\n')) {
+            if (line.startsWith('[')) {
+                record(block, models);
+                block = line.slice(1, line.lastIndexOf(']'));
+                models = [];
+                continue;
+            }
+            const match = line.match(MODEL_LINE_RE);
+            if (match) {
+                models.push(match[2]);
+            }
+        }
+        record(block, models);
+    }
+
+    return vanillaUsage;
+}
+
+// A piece that vanilla only ever layers ON TOP OF a real one of the same category is an
+// accessory, not a substitute for it. This is the rule behind three exclusions that were
+// each found the hard way, one user report at a time - man_torso_backpack ("the Tanner
+// has no torso"), man_legs_stitches ("Lowe has invisible legs"), man_legs_model_270
+// ("the Monks of Entrana have invisible legs") - so read it off the data instead of
+// waiting for the fourth report. Scoped to coverage categories and to values vanilla
+// actually uses: a model no NPC wears has no usage evidence either way, and those
+// never-worn hats/hairstyles are exactly the extra variety this tool exists to surface.
+//
+// Beyond the three known cases this also catches man_legs_combats (a thigh-only piece
+// layered over real legs in all 12 of its vanilla blocks - as a sole legs model it
+// leaves the shins bare, the still-open half of GitHub #8) and both
+// man_head_viking_helmet variants (always worn over a hair/head model; alone they are a
+// helmet with no head inside it).
+// how a single value is worn across vanilla, for the audit tool's report.
+export function vanillaUsageFor(value: string): VanillaUsage {
+    return loadVanillaUsage().get(value) ?? { sole: 0, layered: 0, wearers: [], wearersWithoutHead: 0 };
+}
+
+export function isLayeredAccessory(value: string): boolean {
+    const match = value.match(SWAPPABLE_RE);
+    if (!match || !COVERAGE_CATEGORIES.has(match[2])) {
+        return false;
+    }
+    const usage = loadVanillaUsage().get(value);
+    return !!usage && usage.sole === 0 && usage.layered > 0;
+}
+
+// how far above its category's normal reach a model has to sit before it is treated as
+// covering a region it has no business covering. man_torso tops out at 165-172 across
+// 28 of its 29 models; the 29th is at 193.
+const OVERSIZE_RATIO = 1.15;
+
+// how far above its category's normal ground line a coverage piece may stop before it
+// is not covering that region at all. Across every coverage category in the pack the
+// shortest legitimate piece is man_legs_viking, which stops 20 above the man_legs floor
+// (knee-height boots meeting the leg); the partial pieces stop 34, 45 and 73 above it.
+const FLOOR_GAP_LIMIT = 30;
+
+let categoryNorms: Map<string, { top: number; bottom: number }> | null = null;
+
+function categoryNorm(category: string): { top: number; bottom: number } | null {
+    if (!categoryNorms) {
+        categoryNorms = new Map();
+        const samples = new Map<string, { tops: number[]; bottoms: number[] }>();
+        for (const value of modelPackNames()) {
+            const match = value.match(SWAPPABLE_RE);
+            if (!match) {
+                continue;
+            }
+            const bounds = boundsFor(MODELS_ROOT, value);
+            if (!bounds) {
+                continue;
+            }
+            const key = `${match[1]}_${match[2]}`;
+            const entry = samples.get(key) ?? samples.set(key, { tops: [], bottoms: [] }).get(key)!;
+            entry.tops.push(bounds.top);
+            entry.bottoms.push(bounds.bottom);
+        }
+        for (const [key, entry] of samples) {
+            categoryNorms.set(key, { top: median(entry.tops), bottom: median(entry.bottoms) });
+        }
+    }
+    return categoryNorms.get(category) ?? null;
+}
+
+// A legs model that stops at the hips, or a torso that stops at the ribs, is a patch or
+// a pose piece - it cannot stand in for the region its category is responsible for, and
+// an NPC given one as their only piece there is missing a body part. This is the "no
+// legs" family of GitHub #8 reports read straight off the geometry rather than one
+// report at a time: across all six coverage categories it selects exactly
+// man_legs_viking_wounded (the prone injured-Jossik pose, floating hips with nothing
+// below), man_legs_combats and man_legs_stitches, and nothing else.
+export function doesNotReachCategoryFloor(value: string): boolean {
+    const match = value.match(SWAPPABLE_RE);
+    if (!match || !COVERAGE_CATEGORIES.has(match[2])) {
+        return false;
+    }
+    const bounds = boundsFor(MODELS_ROOT, value);
+    const norm = categoryNorm(`${match[1]}_${match[2]}`);
+    if (!bounds || !norm) {
+        return false;
+    }
+    return bounds.bottom - norm.bottom > FLOOR_GAP_LIMIT;
+}
+
+// Some torso models ARE the head: `man_torso_hunchback_baldhead` is one mesh containing
+// a hunched torso and a bald head, and vanilla's only wearer (tbwt_lubufu) has no
+// separate head model precisely because this piece supplies it. Sampled into an ordinary
+// NPC's torso slot it grafts a second bald head onto their shoulders, above and inside
+// whatever head and hat they already wear - the "null dwarf guy on their head" half of
+// GitHub #8.
+//
+// Neither signal is safe alone: plenty of models are legitimately tall for their
+// category (viking boots, viking horns, a hooded cloak), and a handful of vanilla NPCs
+// are simply configured without a head (man_torso_vampire's one wearer is). Requiring
+// BOTH - reaches well past the category norm AND every vanilla wearer lacks a head -
+// picks out exactly the one model in the pack whose name independently says the same
+// thing.
+export function isCombinedHeadMesh(value: string): boolean {
+    const match = value.match(SWAPPABLE_RE);
+    if (!match || match[2] !== 'torso') {
+        return false;
+    }
+    const bounds = boundsFor(MODELS_ROOT, value);
+    const norm = categoryNorm(`${match[1]}_${match[2]}`);
+    if (!bounds || !norm || bounds.top <= norm.top * OVERSIZE_RATIO) {
+        return false;
+    }
+    const usage = loadVanillaUsage().get(value);
+    const occurrences = usage ? usage.sole + usage.layered : 0;
+    return occurrences > 0 && usage!.wearersWithoutHead === occurrences;
+}
+
+export function isNeverSwappable(value: string): boolean {
     if (value === 'man_torso_backpack' || value === 'woman_torso_backpack') {
         return true;
     }
@@ -112,7 +327,10 @@ function isNeverSwappable(value: string): boolean {
         return true;
     }
     const detail = value.replace(/^(man|woman)_[a-z]+_/, '');
-    return detail === 'demon';
+    if (detail === 'demon') {
+        return true;
+    }
+    return isLayeredAccessory(value) || isCombinedHeadMesh(value) || doesNotReachCategoryFloor(value);
 }
 
 // model.pack is only an id=name CATALOG - having an entry there does not mean the
@@ -269,17 +487,8 @@ export function parseSlots(filePath: string, relFile: string): ModelSlot[] {
 // makes previously-unseen combinations possible.
 export function loadModelUniverse(): Map<string, string[]> {
     const bySwapKey = new Map<string, Set<string>>();
-    if (!fs.existsSync(MODEL_PACK_PATH)) {
-        return new Map();
-    }
 
-    const lines = fs.readFileSync(MODEL_PACK_PATH, 'utf8').split(/\r?\n/);
-    for (const line of lines) {
-        const eq = line.indexOf('=');
-        if (eq === -1) {
-            continue;
-        }
-        const value = line.slice(eq + 1).trim();
+    for (const value of modelPackNames()) {
         const swapMatch = value.match(SWAPPABLE_RE);
         if (!swapMatch || isNeverSwappable(value) || !hasModelData(value)) {
             continue;

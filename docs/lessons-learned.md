@@ -3600,3 +3600,129 @@ the gating quests complete early anyway - the gate changes check ORDER, not fina
 reachability. The regression test is `test_skill_gates.py`, which asserts both directions
 (no check on a gated skill is reachable empty-handed; all of them are once everything is
 collected) plus that ungated `first_xp` stayed free.
+
+## Bug sweep: all four open `bug` issues (GitHub #4/#8/#9/#12, 2026-07-26)
+
+One branch, four unrelated fixes. The through-line worth keeping: three of the four were
+"the data already says which case this is, nobody had read it" - the map's LOC angles,
+the p12 font metrics, and the .ob2 vertex bounds were each sitting there unused while the
+tool guessed or gave up.
+
+### #9 - long AP messages were clipped, not wrapped
+
+`mes()` writes one `MessageGame`, and the client draws it at x=4 inside a clip at x=463.
+Anything wider than ~456px just lost its tail. The issue proposed a two-line rs2 proc
+because "this dialect has no way to measure a string" - true of rs2, but **the engine has
+the very p12 metrics the client draws with** (`FontType.get(1)`, already used by
+`wrappedMessageGame` and by `split_init`). So the fix is four lines in
+`Player.messageGame`: if `font.stringWidth(msg) > 456`, write `font.split(msg, 456)`
+instead. One choke point covers rs2 `mes()`, every engine-side `Ap*.ts` message and world
+broadcasts, and messages that already fit keep the single-write path byte-identical.
+
+Measured against the real offenders: `Archipelago reward: 25 x Amulet of accuracy (no
+inventory space, sent to your bank)!` is 481px and now breaks after "your"; the skill-cap
+lines sit at 450px and were only just surviving (they wrap once a cap goes 3-digit).
+
+**Lesson: before writing a fixed-format workaround in rs2, check whether the engine can
+answer the question exactly.** It usually can - it loads the same cache the client does.
+
+### #4 - the Tree Gnome Stronghold wooden stairs never reached the pool
+
+`EntranceParser` emits three source shapes; `switch_int (loc_angle)` produced
+`source: {type:'angle'}`, which every downstream stage drops because it needs a literal
+source coord. The destinations are `movecoord(loc_coord, dx, dy, dz)`.
+
+The whole thing is determined by map data: a `.jm2` LOC line carries the placement's coord
+AND its angle, the angle picks the case, and `loc_coord` IS the placement coord
+(`LOC_COORD` pushes `activeLoc`'s own tile - no player position, no forceapproach
+geometry, no inference). `LocAngleResolver.ts` expands each angle-keyed handler into one
+concrete entrance per placement, before `ApproachResolver` runs so that the handlers whose
+destination is `movecoord(coord, ...)` (the angled ship ladders) come out with a literal
+SOURCE and get resolved from there under the existing reciprocal-validation gate.
+
+Result: +37 gates, 0 removed. All 21 wooden spiral staircases pair, with arrivals exactly
+matching what the vanilla script computes; the 16 angled ship-ladder gates come free from
+the same expansion. A full validated run landed a zero-stranded table on attempt 5.
+
+**Lesson: "the parser can't produce a concrete destination" is worth re-checking against
+the map data, not just the script text.** Two of the three shapes here needed geometry
+inference; this one needed a lookup.
+
+### #12 - tracker spoiler mode rendered nothing
+
+`web.ts` was already emitting the full override table under `spoiler.entrances`, keyed
+`"coord:op" -> destCoord` - *identically* to `discoveries.entrances`. Nothing in `app.js`
+read it: `buildSites`, the entrances list and `trackerSignature` all went straight to
+`discoveries`, so in spoiler mode every pin reported "not yet explored". One
+`knownEntrances(data)` helper that merges spoiler under discoveries (discoveries win on
+collision) populates the map lines, the site panel and the list at once. Counters stay
+honest about what was actually walked and say "· showing all" instead.
+
+**Lesson: when a feature "has the plumbing but doesn't work", diff the two payload shapes
+before designing a synthesis step.** They were already the same shape.
+
+### #8 - glitchy NPCs: read the .ob2, stop waiting for reports
+
+The drip exclusion list had been grown one user report at a time ("Betty is invisible",
+"the Monks have no legs", "everyone has demon hands"). Every entry turned out to be a
+model that is not a general-purpose substitute for its category - and that is *visible in
+the data*, if something reads it. `ModelGeometry.ts` now parses .ob2 vertex bounds (the
+last 18 bytes are the trailer; vertices are delta-encoded with the CLIENT's `gsmarts`,
+which is a **different encoding from the engine's `Packet.gsmarts`** - that one bites).
+
+Three derived rules replace the hand-curation, each validated against the whole 381-model
+universe:
+
+1. **Layered accessory** - worn in vanilla but never the only value of its category in any
+   block, scoped to coverage categories (an `*extra` piece is layered by definition).
+   Reproduces `man_torso_backpack` / `man_legs_stitches` / `man_legs_model_270` from data,
+   and newly catches `man_legs_combats` (thigh-only, layered in all 12 of its blocks - a
+   direct cause of "no legs") and `man_head_viking_helmet` + `_basic`, which are a
+   **two-piece helmet**: they only ever appear together, so either alone is half a helmet
+   with no head inside it.
+2. **Does not reach the category's ground line** (>30 above the category's median floor).
+   Across all six coverage categories this selects exactly three models - the same
+   `combats` and `stitches`, plus `man_legs_viking_wounded`, the prone injured-Jossik pose
+   (floating hips, nothing below) - and nothing else. The shortest *legitimate* piece,
+   `man_legs_viking`, stops 20 above the floor, so the margin is real.
+3. **Torso mesh that includes a head** - reaches >15% past the category's median top AND
+   every vanilla wearer has no head model. Both signals are noisy alone (viking boots and
+   viking horns are legitimately tall; `man_torso_vampire`'s one wearer just happens to be
+   configured headless), together they select exactly `man_torso_hunchback_baldhead`,
+   whose sole wearer `tbwt_lubufu` has no head model *because this piece supplies it*.
+   Dropped into an ordinary NPC's torso slot it grafts a second bald head onto their
+   shoulders, above and inside their real head and hat. **That is the "null dwarf guy on
+   their head" report.**
+
+`AuditDripModels.ts` is the standing version of that investigation - run it bare for the
+per-category geometry plus everything the rules drop and everything still in the pool that
+looks unusual (currently: nothing), or `--npc <debugname>` to get one NPC's vanilla ->
+current assignment with each model's geometry, which is the "which slot broke this NPC"
+question the old reports needed a whole session to answer.
+
+**Two methodology traps, both hit during this work:**
+
+- **`content/scripts` is the RANDOMIZED tree.** The first usage audit ran against it and
+  concluded `man_legs_combats` was a normal sole-worn model in 24 blocks. It is layered in
+  all 12 of its *vanilla* blocks; the 24 came from a previous shuffle's output. Vanilla
+  lives in `content/.ap-backup/scripts` - `loadVanillaUsage()` reads there when it exists.
+  Grading a randomized tree against itself is how a bad value justifies itself.
+- **A geometric threshold alone is not a rule.** The 1.15x oversize test flags viking
+  boots, viking horns and a hooded cloak alongside the real culprit. Every rule here needs
+  a second, independent signal (vanilla usage) agreeing before it excludes anything;
+  single-signal outliers go in the audit's *review* list for a human, not in the gate.
+
+### Testing note: `../Server` had an older branch installed
+
+`../Server/engine` was missing `tools/shared/TutorialIsland.ts`, i.e. it predated the #14
+merge - the opposite of the usual warning but the same rule applies. Everything was tested
+by copying only the touched files in, running from there, then restoring from a scratchpad
+backup (including `data/config/ap-entrances.json`). `../Server` was left exactly as found
+and needs `node scripts/install.js` before in-game testing.
+
+One casualty worth knowing about: a `RandomizeDrip.ts --dry-run` overwrote
+`engine/tools/npc/drip-seed.json`, which is a human-readable spoiler with no programmatic
+consumers - but it was the only record of the drip seed the installed `.npc` files came
+from. The file now says `"dryRun": true`, so it is obvious it no longer describes the
+installed content. **Back up per-tool spoiler outputs too, not just the config the tool
+writes.**

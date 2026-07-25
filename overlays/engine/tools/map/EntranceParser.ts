@@ -184,7 +184,7 @@ function findBareGosub(chunk: string): string | null {
     return match[1];
 }
 
-function classify(source: SourceSpec, destination: CoordExpr | null): Entrance['kind'] {
+export function classify(source: SourceSpec, destination: CoordExpr | null): Entrance['kind'] {
     if (!destination) {
         return 'no-transition';
     }
@@ -279,14 +279,22 @@ export function extractRequirement(guardText: string): Requirement | null {
     return null;
 }
 
-// resolves a relative movecoord destination whose base is the OPERATING TILE itself
-// (`coord`/`coord()`) under the assumption the player is standing on the trigger's own
-// tile when the script runs - true for ladders (climbing straight up/down the tile
-// you're on; no forceapproach parking elsewhere the way wall-mounted stairs get, see
-// ApproachResolver.ts for that case). Only safe for that shape; returns null otherwise.
-export function resolveSameTileRelative(trigger: CoordLiteral, destination: CoordRelative): CoordLiteral | null {
-    const base = destination.base.trim();
-    if (base !== 'coord' && base !== 'coord()') {
+// applies a movecoord-style (dx, dy, dz) offset to a known tile, re-deriving the
+// mapsquare/local split so an offset that crosses a mapsquare edge still produces a
+// well-formed coord.
+export function offsetCoord(base: CoordLiteral, dx: number, dy: number, dz: number): CoordLiteral {
+    const worldX = base.worldX + dx;
+    const worldZ = base.worldZ + dz;
+    const mapX = Math.floor(worldX / 64);
+    const mapZ = Math.floor(worldZ / 64);
+    return decodeCoord(`${base.plane + dy}_${mapX}_${mapZ}_${worldX - mapX * 64}_${worldZ - mapZ * 64}`);
+}
+
+// reads the three offsets off a relative destination whose base is `expectedBase`,
+// requiring them to be integer constants (a `calc(...)`/random offset yields null so the
+// caller leaves that entrance alone).
+export function constantOffsets(destination: CoordRelative, expectedBase: string[]): { dx: number; dy: number; dz: number } | null {
+    if (!expectedBase.includes(destination.base.trim())) {
         return null;
     }
     const dx = parseInt(destination.dx, 10);
@@ -295,11 +303,20 @@ export function resolveSameTileRelative(trigger: CoordLiteral, destination: Coor
     if (!Number.isInteger(dx) || !Number.isInteger(dy) || !Number.isInteger(dz)) {
         return null;
     }
-    const worldX = trigger.worldX + dx;
-    const worldZ = trigger.worldZ + dz;
-    const mapX = Math.floor(worldX / 64);
-    const mapZ = Math.floor(worldZ / 64);
-    return decodeCoord(`${trigger.plane + dy}_${mapX}_${mapZ}_${worldX - mapX * 64}_${worldZ - mapZ * 64}`);
+    return { dx, dy, dz };
+}
+
+// resolves a relative movecoord destination whose base is the OPERATING TILE itself
+// (`coord`/`coord()`) under the assumption the player is standing on the trigger's own
+// tile when the script runs - true for ladders (climbing straight up/down the tile
+// you're on; no forceapproach parking elsewhere the way wall-mounted stairs get, see
+// ApproachResolver.ts for that case). Only safe for that shape; returns null otherwise.
+export function resolveSameTileRelative(trigger: CoordLiteral, destination: CoordRelative): CoordLiteral | null {
+    const offsets = constantOffsets(destination, ['coord', 'coord()']);
+    if (!offsets) {
+        return null;
+    }
+    return offsetCoord(trigger, offsets.dx, offsets.dy, offsets.dz);
 }
 
 // The Zanaris shed door (`[oploc1,zanarisdoor]` in quest_zanaris.rs2) is the one gated
