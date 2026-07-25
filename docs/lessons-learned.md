@@ -3464,3 +3464,47 @@ tables. That is the only readable record of the rolled world.
 **Still unmodelled: drop randomization.** `drop-sources.json` describes vanilla loot, so a
 `drop`-sourced item can read as obtainable when the shuffle moved it. Closing it means
 porting `MimicTransform.ts` (544 lines).
+
+### Follow-up 2: drop randomization modelled too (MimicTransform ported)
+
+The last unmodelled randomizer is done. All three designs are replayed in `randomizers.py`
+from the pool `RandomizeDrops.ts --export-pool` emits:
+
+- **tiered/chaos** rewrite each weighted loot slot's item (per-bucket or corpus-wide
+  sampling, `mulberry32(seed ^ hashKey(bucket))`), plus a derangement of the guaranteed
+  `death_drop` npc params.
+- **mimic** leaves items alone and points each monster's death handler at another
+  monster's whole table - a *unit-level* derangement, not an index-level one (all four
+  goblin variants run `goblin_drop_table`, so an index swap between them would change
+  nothing in game; the TS tool reshuffles until no slot keeps its own unit, and the port
+  does the same).
+
+Two things that cost real debugging time:
+
+- **Export what the tool SORTS, already sorted.** `RandomizeDrops` orders slots with
+  `file.localeCompare(...)`, and JS locale collation is not reproducible from Python in
+  general. Rather than gamble on ASCII paths agreeing, the pool export ships each bucket's
+  slot list and universe in the tool's own finished order. Same trick would apply to any
+  future port.
+- **Relocation must be a DELTA, not a recomputation.** `itemSources`' vanilla drop regions
+  come from `drop-sources.json`; the weighted-loot corpus is a *different* extraction -
+  broader in places (bespoke handlers, scripted gives), narrower in others. Recomputing
+  drop regions from the corpus invented regions the vanilla entry never claimed (ashes
+  gained three, big_bones five) and the identity test caught it immediately. The fix: per
+  item, take the monsters that stopped dropping it and the ones that started, and move only
+  those regions - keeping a region if some monster that still drops the item stands there.
+  Unrolled = exactly the identity, pinned by a test. **When two datasets describe the same
+  thing at different resolutions, apply changes as a delta against the authoritative one;
+  never recompute the authoritative one from the coarser one.**
+
+Also worth knowing: capturing tiered/chaos vectors with `--dry-run` against a
+mimic-transformed live corpus only records ~half the swaps (the tool can't find the lines
+to edit and says so). The *mapping* is unaffected - it comes from the pristine backup - so
+the fixture is a documented, verified subset, while mimic and death-drop vectors are
+complete and order-exact. Getting a full tiered vector would mean restoring the drop-script
+backup, i.e. mutating the user's content and forcing a pack rebuild; not worth it.
+
+With drops modelled the world-roll miss rate rose from ~1 in 30 to ~1 in 5 for Legends
+(mimic moves whole loot tables, so a quest item lands behind a monster the region model
+can't reach), so `WORLD_ROLL_ATTEMPTS` went 6 -> 8: expected cost ~1.25 attempts, chance of
+exhausting the budget ~2e-6.

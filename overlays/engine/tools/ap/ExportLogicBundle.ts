@@ -68,6 +68,7 @@ const GATHER_POOL_PATH = argVal('--gather-pool', path.join('data', 'config', 'ap
 const PROCESS_POOL_PATH = argVal('--process-pool', path.join('data', 'config', 'ap-process-pool.json'));
 const SHOP_POOL_PATH = argVal('--shop-pool', path.join('data', 'config', 'ap-shop-pool.json'));
 const SPAWN_POOL_PATH = argVal('--spawn-pool', path.join('data', 'config', 'ap-spawn-pool.json'));
+const DROP_POOL_PATH = argVal('--drop-pool', path.join('data', 'config', 'ap-drop-pool.json'));
 const QUEST_REGIONS_PATH = path.join('tools', 'logic', 'data', 'quest-regions.json');
 const GENERATED_REGIONS_PATH = path.join('tools', 'logic', 'data', 'quest-regions.generated.json');
 const QUESTS_PATH = path.join('tools', 'sim', 'data', 'quests.json');
@@ -123,6 +124,19 @@ interface SpawnPool {
     vanilla: string;
     city: { coord: string; label: string }[];
     chunk: { coord: string; label: string }[];
+}
+interface DropPool {
+    slots: { npc: string; item: string; bucket: string }[];
+    questCritical: string[];
+    stackable: string[];
+    tiered: { buckets: { name: string; universe: string[]; slots: number[] }[] };
+    chaos: { universe: string[]; slots: number[] };
+    mimic: {
+        units: { index: number; key: string; name: string; handlers: string[]; items: string[] }[];
+        slots: { index: number; handler: string; unitIndex: number; unitKey: string }[];
+        pinned: { handler: string; unitIndex: number; reason: string }[];
+    };
+    deathDrops: { npc: string; item: string }[];
 }
 
 // ---- item providers (same reading ValidateSeed does) ----
@@ -260,6 +274,7 @@ function main(): void {
     const processPool = loadPool<SkillProductPool>(PROCESS_POOL_PATH, path.join('tools', 'process', 'RandomizeProcessing.ts'));
     const shopPool = loadPool<ShopPool>(SHOP_POOL_PATH, path.join('tools', 'npc', 'RandomizeShops.ts'));
     const spawnPoolRaw = loadPool<SpawnPool>(SPAWN_POOL_PATH, path.join('tools', 'spawn', 'RandomizeSpawn.ts'));
+    const dropPool = loadPool<DropPool>(DROP_POOL_PATH, path.join('tools', 'drops', 'RandomizeDrops.ts'));
 
     const withRegion = (entries: { coord: string; label: string }[]) =>
         entries.map(e => ({ ...e, region: resolveRaw(e.coord) }));
@@ -283,26 +298,52 @@ function main(): void {
         buyOwners[item] = npcs;
     }
     const npcSpawns = loadNpcSpawns();
-    const npcRegions: Record<string, number> = {};
-    // every npc either owning a shop bundle OR named as an item's vanilla seller - the
-    // relocation walks both directions, and a missing region silently drops a source.
-    const shopNpcs = new Set([...Object.keys(shopOfNpc), ...Object.values(buyOwners).flat()]);
-    for (const npc of shopNpcs) {
+    const npcRegion = (npc: string): number => {
         const coord = npcSpawns.get(npc);
-        if (coord) {
-            const [level, mapX, mapZ, localX, localZ] = coord.split('_').map(Number);
-            const region = graph.resolveRegion({ level, x: mapX * 64 + localX, z: mapZ * 64 + localZ });
+        if (!coord) {
+            return 0;
+        }
+        const [level, mapX, mapZ, localX, localZ] = coord.split('_').map(Number);
+        return graph.resolveRegion({ level, x: mapX * 64 + localX, z: mapZ * 64 + localZ });
+    };
+    const regionsFor = (npcs: Iterable<string>): Record<string, number> => {
+        const out: Record<string, number> = {};
+        for (const npc of npcs) {
+            const region = npcRegion(npc);
             if (region !== 0) {
-                npcRegions[npc] = region;
+                out[npc] = region;
             }
         }
+        return out;
+    };
+    // every npc either owning a shop bundle OR named as an item's vanilla seller - the
+    // relocation walks both directions, and a missing region silently drops a source.
+    const npcRegions = regionsFor(new Set([...Object.keys(shopOfNpc), ...Object.values(buyOwners).flat()]));
+
+    // Drop relocation inputs, same shape of contract as shops: the vanilla `via: drop`
+    // regions stay in `itemSources` (parity with ValidateSeed), and these tables let a
+    // consumer that rolled a drop shuffle recompute them. `dropOwners` is what
+    // drop-sources.json says today, so the consumer can tell which of an item's vanilla
+    // drop regions the slot corpus explains (and may move) from the ones it doesn't
+    // (death_drop params, bespoke handlers - those stay put).
+    const dropOwners: Record<string, string[]> = {};
+    for (const [item, npcs] of loadItemProviders('drop-sources.json')) {
+        dropOwners[item] = npcs;
     }
+    const dropNpcRegions = regionsFor(new Set([
+        ...Object.values(dropOwners).flat(),
+        ...dropPool.slots.map(s => s.npc),
+        ...dropPool.mimic.units.flatMap(u => u.handlers),
+        ...dropPool.mimic.slots.map(s => s.handler),
+        ...dropPool.deathDrops.map(s => s.npc)
+    ]));
 
     const randomizerPools = {
         gather: gatherPool,
         process: processPool,
         shops: { ...shopPool, shopOfNpc, buyOwners, npcRegions },
-        spawn: spawnPool
+        spawn: spawnPool,
+        drops: { ...dropPool, dropOwners, npcRegions: dropNpcRegions }
     };
 
     const bundle = {
@@ -350,6 +391,7 @@ function main(): void {
     console.log(`  ${questScriptEdges.length} quest script edge(s), ${worldEdges.length} world edge(s), ${Object.keys(requirementGroups).length} quest/goal(s) with extracted region groups`);
     console.log(`  ${entrancePool.gates.length} entrance gate(s) + ${entrancePool.oneWays.length} one-way(s), ${Object.keys(itemSources).length} sourced item(s)`);
     console.log(`  replayable pools: ${gatherPool.products.length} gather product(s), ${processPool.products.length} process product(s), ${shopPool.eligible.length} shopkeeper(s), ${spawnPool.city.length} city + ${spawnPool.chunk.length} chunk home(s)`);
+    console.log(`                    ${dropPool.slots.length} drop slot(s), ${dropPool.mimic.units.length} loot table(s), ${dropPool.mimic.slots.length} mimic slot(s), ${dropPool.deathDrops.length} death drop(s)`);
 
     if (COPY_PATH) {
         fs.mkdirSync(path.dirname(path.resolve(COPY_PATH)), { recursive: true });

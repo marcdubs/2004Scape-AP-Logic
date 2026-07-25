@@ -846,8 +846,10 @@ parts:
 
 - `apworld/rs2004scape/` - the Python generation-side world. `logic.py` is the
   region fixpoint (a port of `ValidateSeed.ts`), `entrances.py` the
-  construct-valid entrance shuffle. Zip it as `rs2004scape.apworld` for an
-  Archipelago install.
+  construct-valid entrance shuffle, `randomizers.py` the replay of every other
+  randomizer (gathering, processing, shops, drops, spawn) so the fill knows the
+  world it is filling. Zip it as `rs2004scape.apworld` for an Archipelago
+  install.
 - `overlays/engine/tools/ap/ExportApWorldData.ts` - generates the shared
   datapackage (`ap-archipelago-data.json` / `rs2004_data.json`); ids are
   append-only.

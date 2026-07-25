@@ -197,6 +197,7 @@ That matters because the apworld needs to *know* those tables while its fill run
 | --- | --- |
 | gathersanity / processsanity | re-key which action yields which item, so item obtainability - and every quest needing a gathered/processed item - moves with the roll (`LogicEngine(item_swaps=...)`) |
 | shopsanity | an item's `buy` source moves to wherever its new shopkeeper stands (`relocate_buy_sources`) |
+| drop randomization | an item's `drop` source moves to whatever monster drops it now - all three modes, including mimic's whole-table swaps (`relocate_drop_sources`) |
 | spawn | changes the start region, i.e. sphere 0 itself (`LogicEngine(spawn_region=...)`) |
 
 Each roll mirrors its TypeScript original exactly: the same ordered candidate pool
@@ -205,20 +206,34 @@ PRNG (`prng.py` is a byte-exact port of `Prng.ts`), the same pin rules (quest-cr
 products pinned in chaos, not in shuffle), the same mode semantics.
 `test_randomizers.py` pins both layers against vectors captured from the real tools -
 raw `mulberry32` / `derangement` output, and the actual `ap-gather.json` /
-`ap-process.json` / `ap-spawn.json` / `shop-seed.json` written for seed 424242.
+`ap-process.json` / `ap-spawn.json` / `shop-seed.json` / `drop-seed.json` written for
+seed 424242. (The tiered/chaos drop vectors are a verified *subset*: the capture ran
+`--dry-run` against a mimic-transformed live corpus, so the tool could only locate half
+the lines to record. The mapping itself comes from the pristine backup and is
+unaffected; mimic and death-drop vectors are complete and order-exact.)
 
-**Not modelled: drop randomization.** `drop-sources.json` still describes vanilla loot
-tables, so a `drop`-sourced item may be considered obtainable when the shuffle moved it.
-Closing that means porting `MimicTransform.ts`; until then the drop half of the
-four-source model is optimistic in AP mode exactly as it is in local mode.
+**Drop randomization, all three designs.** `tiered`/`chaos` rewrite each weighted loot
+slot's item (plus a derangement of the guaranteed `death_drop` params); `mimic` leaves
+items alone and points each monster's death handler at another monster's ENTIRE table.
+Both change which monster - and therefore which region - an item can be killed for.
+
+The relocation is applied as a **delta**, not a recomputation, because the two datasets
+involved do not coincide: an item's vanilla drop regions come from `drop-sources.json`,
+which is broader in places than the weighted-loot corpus the roll touches (bespoke
+handlers, scripted gives) and narrower in others. So per item the model takes the
+monsters that *stopped* dropping it and the ones that *started*, and moves only those
+regions - keeping a region if some monster that still drops the item stands there.
+Anything the corpus cannot account for is left alone in both directions, and an unrolled
+roll is exactly the identity (pinned by a test).
 
 ### World rolls are retried; item fills are not
 
 If a rolled world can't reach a configured goal even with every item collected,
-`generate_early` rolls **another whole world** (up to `WORLD_ROLL_ATTEMPTS = 6`) and only
-raises `OptionError` if none works. Measured rate: ~1 roll in 30 needs a second attempt,
-usually because a gathersanity swap put a goal quest's item behind a skill the region
-model can't justify.
+`generate_early` rolls **another whole world** (up to `WORLD_ROLL_ATTEMPTS = 8`) and only
+raises `OptionError` if none works. Measured miss rate for the hardest goal (Legends)
+with every randomizer on and drops on mimic: ~1 roll in 5 - a gathersanity swap or a
+mimicked loot table puts a goal quest's item somewhere the region model can't justify.
+Expected cost ~1.25 attempts; chance of exhausting the budget ~2e-6.
 
 This is *not* the local mode's generate-and-test creeping back in. AP's fill still runs
 exactly once, over a world already known to be sound - the retry is over the WORLD (a
@@ -375,9 +390,9 @@ ap-archipelago.json, boot.
 - **DeathLink** (2004scape deaths are cheap - probably as an option, default
   off).
 - ~~**Region-aware apworld logic**~~ - **done** (GitHub #3): see "Logic model
-  in the apworld (v2)" above, including gathersanity / processsanity /
-  shopsanity / spawn, which the apworld now rolls itself during generation.
-  The one randomizer still unmodelled is **drop randomization** - see the note
-  under `randomizers.py`.
+  in the apworld (v2)" above. Every randomizer that can move an item or the
+  player - entrances, gathersanity, processsanity, shopsanity, drops (all three
+  modes) and spawn - is now rolled by the apworld during generation, so the
+  fill reasons about the world the player actually gets.
 - **Auto-release/collect semantics** on goal: AP handles via server settings;
   nothing client-side needed.

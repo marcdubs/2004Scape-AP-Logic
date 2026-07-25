@@ -17,12 +17,12 @@ The Archipelago generation-side package for 2004scape. Full design:
   reachability-preserving frontier over the exported entrance pool. AP cannot
   reroll, so the layout is sound by construction; the finished table ships to
   the game server in `slot_data.entranceOverrides`.
-- `rs2004scape/randomizers.py` + `prng.py` - the other four randomizers
-  (gathering, processing, shopsanity, spawn), rolled during generation so the
-  fill knows what each action yields, where each shop moved and where you
-  start. They ship as one shared **seed**, which the server's deterministic
-  tools replay into identical tables; `prng.py` is a byte-exact port of
-  `tools/shared/Prng.ts`, pinned by test vectors.
+- `rs2004scape/randomizers.py` + `prng.py` - the other five randomizers
+  (gathering, processing, shopsanity, drops, spawn), rolled during generation so
+  the fill knows what each action yields, what each monster drops, where each
+  shop moved and where you start. They ship as one shared **seed**, which the
+  server's deterministic tools replay into identical tables; `prng.py` is a
+  byte-exact port of `tools/shared/Prng.ts`, pinned by test vectors.
 - `rs2004scape/docs/` - webhost pages in AP's standard format: `en_2004Scape.md`
   (game info) and `setup_en.md` (setup tutorial, referenced by the `WebWorld`).
 - `rs2004scape/test/` - unit tests on AP's world test framework: datapackage

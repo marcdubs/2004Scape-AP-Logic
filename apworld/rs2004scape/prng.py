@@ -29,6 +29,14 @@ def _to_int32(value: int) -> int:
     return value - 0x100000000 if value >= 0x80000000 else value
 
 
+def hash_key(key: str) -> int:
+    """RandomizeDrops.hashKey - the per-bucket/per-pass seed salt (Java-style 31-hash)."""
+    h = 0
+    for char in key:
+        h = _to_int32(_imul(h, 31) + ord(char))
+    return h & _U32
+
+
 def mulberry32(seed: int) -> Callable[[], float]:
     """mulberry32 - small, fast, seedable PRNG. Same stream as the TS original."""
     state = seed & _U32

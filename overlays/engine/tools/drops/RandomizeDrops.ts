@@ -85,7 +85,15 @@ function parseArgs() {
                   .map(s => s.trim())
                   .filter(Boolean)
             : [];
-    return { seed, dryRun: args.includes('--dry-run'), mode: mode as 'tiered' | 'chaos' | 'mimic', noDeathDrop: args.includes('--no-death-drop'), exclude };
+    const poolIdx = args.indexOf('--export-pool');
+    return {
+        seed,
+        dryRun: args.includes('--dry-run'),
+        mode: mode as 'tiered' | 'chaos' | 'mimic',
+        noDeathDrop: args.includes('--no-death-drop'),
+        exclude,
+        exportPool: poolIdx !== -1 ? (args[poolIdx + 1] ?? 'data/config/ap-drop-pool.json') : undefined
+    };
 }
 
 // picks a value from pool that differs from avoid, resampling up to 50x - bounded so a
@@ -385,13 +393,103 @@ function randomizeMimic(seed: number, exclude: string[], dryRun: boolean) {
     };
 }
 
+// GitHub #3: dump the candidate sets for BOTH drop-randomization designs and exit.
+// The Archipelago apworld replays these shuffles with the shared seed so it knows which
+// monster drops what while its fill is still running - drops are one of the four sources
+// in the item-obtainability model, so a shuffled loot table genuinely moves an item's
+// "kill something for it" region.
+//
+// Everything that the tools sort is exported ALREADY SORTED, in their exact order:
+// RandomizeDrops sorts by `file.localeCompare(...)`, and JS locale collation is not
+// reproducible from Python in general. Exporting the finished order removes the question.
+function exportDropPool(outPath: string): void {
+    ensureDropScriptBackup();
+
+    const backupFiles = findDropScriptFiles(DROP_BACKUP_DIR);
+    const allSlots: DropSlot[] = [];
+    for (const file of backupFiles) {
+        allSlots.push(...parseDropSlots(file, path.relative(DROP_BACKUP_DIR, file)));
+    }
+    const allItems = new Set(allSlots.map(s => s.item));
+    const questCritical = loadQuestCriticalItems(allItems);
+    const stackable = loadStackableItems();
+
+    // slot identity for the consumer: the monster whose table the slot sits in, plus the
+    // item it holds in vanilla. `block` is the npc debugname (see DropTableParser).
+    const slotRecord = (s: DropSlot) => ({ npc: s.block, item: s.item, bucket: s.bucket });
+    const bySlot = new Map<DropSlot, number>();
+    allSlots.forEach((s, i) => bySlot.set(s, i));
+
+    const eligible = allSlots.filter(s => !questCritical.has(s.item));
+    const byFileLine = (a: DropSlot, b: DropSlot) => a.file.localeCompare(b.file) || a.line - b.line;
+
+    const tieredBuckets = BUCKETS.map(b => {
+        const items = new Set(allSlots.filter(s => s.bucket === b.name).map(s => s.item));
+        return {
+            name: b.name,
+            universe: [...items].sort(),
+            slots: eligible.filter(s => s.bucket === b.name).sort(byFileLine).map(s => bySlot.get(s)!)
+        };
+    });
+
+    // death_drop guaranteed items, in the order randomizeDeathDrops deranges them.
+    ensureNpcBackup();
+    const deathDropSlots: DeathDropSlot[] = [];
+    for (const file of findNpcFiles(BACKUP_ROOT)) {
+        deathDropSlots.push(...parseDeathDropSlots(file, path.relative(BACKUP_ROOT, file)));
+    }
+
+    // mimic: eligible death handlers, and the loot tables they can be pointed at.
+    const parse = parseMimic();
+    const mimicEligible = parse.slots.filter(s => !s.pinned).sort((a, b) => a.index - b.index);
+    const objAddItem = /obj_add\(\s*npc_coord\s*,\s*([A-Za-z0-9_]+)/g;
+    const units = parse.units.map(u => {
+        const items = new Set<string>();
+        for (const m of u.loot.matchAll(objAddItem)) {
+            items.add(m[1]);
+        }
+        return { index: u.index, key: `${u.file}:${u.name}`, name: u.name, handlers: u.handlers, items: [...items].sort() };
+    });
+    const unitIndexByKey = new Map(parse.units.map(u => [`${u.file}:${u.name}`, u.index]));
+
+    const poolOut = {
+        _generated: 'tools/drops/RandomizeDrops.ts --export-pool - the UNSHUFFLED candidate sets',
+        generatedAt: new Date().toISOString(),
+        slots: allSlots.map(slotRecord),
+        questCritical: [...questCritical].sort(),
+        stackable: [...stackable].sort(),
+        // tiered/chaos: per-bucket and flat universes, slots in the tools' own order
+        tiered: { buckets: tieredBuckets },
+        chaos: { universe: [...allItems].sort(), slots: eligible.sort(byFileLine).map(s => bySlot.get(s)!) },
+        // mimic: slot i's handler runs unit `unitIndex` in vanilla
+        mimic: {
+            units,
+            slots: mimicEligible.map(s => ({ index: s.index, handler: s.handler, unitIndex: unitIndexByKey.get(s.unitKey) ?? -1, unitKey: s.unitKey })),
+            pinned: parse.slots
+                .filter(s => s.pinned)
+                .map(s => ({ handler: s.handler, unitIndex: unitIndexByKey.get(s.unitKey) ?? -1, reason: s.pinned }))
+        },
+        // the death_drop .npc derangement (guaranteed drops). Skipped by mimic mode,
+        // which inlines each monster's own death drop into its extracted table.
+        deathDrops: deathDropSlots.map(s => ({ npc: s.block, item: s.value }))
+    };
+    fs.mkdirSync(path.dirname(path.resolve(outPath)), { recursive: true });
+    fs.writeFileSync(path.resolve(outPath), JSON.stringify(poolOut, null, 2) + '\n');
+    printInfo(`wrote ${allSlots.length} drop slot(s), ${units.length} loot table(s) and ${mimicEligible.length} mimic slot(s) to ${outPath} (pool only - no content touched)`);
+}
+
 function main() {
     if (!fs.existsSync(DROP_SCRIPTS_DIR)) {
         printWarning(`drop table scripts directory not found: ${DROP_SCRIPTS_DIR}`);
         process.exit(1);
     }
 
-    const { seed, dryRun, mode, noDeathDrop, exclude } = parseArgs();
+    const { seed, dryRun, mode, noDeathDrop, exclude, exportPool } = parseArgs();
+
+    if (exportPool) {
+        exportDropPool(exportPool);
+        return;
+    }
 
     const npcBackedUp = ensureNpcBackup();
     if (npcBackedUp) {

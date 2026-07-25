@@ -36,7 +36,7 @@ from worlds.generic.Rules import set_rule
 from .entrances import EntranceShuffler, coverage, vanilla_entrances
 from .logic import LogicEngine, load_bundle
 from .options import Goal, RS2004Options
-from .randomizers import relocate_buy_sources, roll_all
+from .randomizers import apply_rolls, roll_all
 
 DATA = json.loads(pkgutil.get_data(__name__, "data/rs2004_data.json").decode("utf-8"))
 LOGIC_BUNDLE = load_bundle()
@@ -64,9 +64,11 @@ for _name, _def in ITEMS.items():
 FILLER_NAME = "Mystery Reward"
 
 # How many complete worlds generate_early may roll looking for one whose goals are
-# reachable. Each attempt costs ~2.5s (the entrance frontier dominates) and the first
-# one succeeds ~29 times in 30, so this is a safety net, not a search.
-WORLD_ROLL_ATTEMPTS = 6
+# reachable. Each attempt costs ~2.5s (the entrance frontier dominates). Measured miss
+# rate for the hardest goal (Legends) with every randomizer on, drops on mimic: ~1 roll
+# in 5, so the expected cost is ~1.25 attempts and the chance of exhausting this budget
+# is ~2e-6. A safety net, not a search.
+WORLD_ROLL_ATTEMPTS = 8
 PROGRESSIVE_QUEST_NAME = "Progressive Quest Unlock"
 
 GEAR_ITEM_NAMES = {"Progressive Melee", "Progressive Armour", "Progressive Ranged", "Progressive Magic"}
@@ -365,13 +367,11 @@ class RS2004World(World):
             processing=self.options.processing_randomization.current_key,
             shops=bool(self.options.shop_randomization),
             spawn=self.options.spawn_randomization.current_key,
+            drops=self.options.drop_randomization.current_key,
         )
 
     def _engine_for(self, roll) -> LogicEngine:
-        item_sources = LOGIC_BUNDLE["itemSources"]
-        if roll.shops.enabled:
-            item_sources = relocate_buy_sources(
-                item_sources, LOGIC_BUNDLE["randomizerPools"]["shops"], roll.shops)
+        item_sources = apply_rolls(LOGIC_BUNDLE["itemSources"], LOGIC_BUNDLE["randomizerPools"], roll)
         return LogicEngine(
             {**LOGIC_BUNDLE, "itemSources": item_sources},
             quest_gates=self._unlocked_quests_gate_set(),
@@ -549,6 +549,12 @@ class RS2004World(World):
         spoiler_handle.write(f"Processing swaps:                {len(self.roll.process.swaps)} "
                              f"({self.roll.process.mode}, {len(self.roll.process.pinned)} pinned vanilla)\n")
         spoiler_handle.write(f"Shops relocated:                 {self.roll.shops.moved}\n")
+        drops = self.roll.drops
+        if drops.mode == "mimic":
+            spoiler_handle.write(f"Drop tables mimicked:            {len(drops.mimic_map)} monster(s)\n")
+        elif drops.enabled:
+            spoiler_handle.write(f"Drop slots reassigned:           {drops.slots_changed} "
+                                 f"({drops.mode}, + {len(drops.death_drops)} death drop(s))\n")
         if self.infeasible_quests:
             spoiler_handle.write(f"Quests excluded (unreachable):   {', '.join(sorted(self.infeasible_quests))}\n")
 
@@ -571,6 +577,25 @@ class RS2004World(World):
             spoiler_handle.write(f"\n\n2004Scape ({name}) - shop relocations:\n\n")
             for npc, shop in sorted(self.roll.shops.stocks_now.items()):
                 spoiler_handle.write(f"{npc} now stocks {shop}\n")
+
+        drops = self.roll.drops
+        if drops.mode == "mimic":
+            pool = LOGIC_BUNDLE["randomizerPools"]["drops"]
+            handler = {s["index"]: s["handler"] for s in pool["mimic"]["slots"]}
+            unit = {u["index"]: u["name"] for u in pool["mimic"]["units"]}
+            spoiler_handle.write(f"\n\n2004Scape ({name}) - drop tables [mimic]:\n\n")
+            for slot, borrowed in sorted(drops.mimic_map.items()):
+                spoiler_handle.write(f"{handler[slot]} drops like {unit.get(borrowed, '?')}\n")
+        elif drops.enabled:
+            slots = LOGIC_BUNDLE["randomizerPools"]["drops"]["slots"]
+            spoiler_handle.write(f"\n\n2004Scape ({name}) - drop slots [{drops.mode}]:\n\n")
+            for ref, item in sorted(drops.new_item.items()):
+                slot = slots[ref]
+                if item != slot["item"]:
+                    spoiler_handle.write(f"{slot['npc']} ({slot['bucket']}): {slot['item']} -> {item}\n")
+            spoiler_handle.write(f"\n\n2004Scape ({name}) - guaranteed death drops:\n\n")
+            for npc, item in sorted(drops.death_drops.items()):
+                spoiler_handle.write(f"{npc} -> {item}\n")
 
         spoiler_handle.write(f"\n\n2004Scape ({name}) - entrances:\n\n")
         for trigger, arrival in sorted(self.entrance_overrides.items()):
