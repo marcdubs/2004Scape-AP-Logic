@@ -63,6 +63,10 @@ for _name, _def in ITEMS.items():
 
 FILLER_NAME = "Mystery Reward"
 
+# skills a quest locks outright - see types.ts SKILL_QUEST_GATES for the two kinds of
+# entry (Runecrafting is a hard script gate, Herblore a deliberate balance choice).
+SKILL_QUEST_GATES = LOGIC_BUNDLE["meta"].get("skillQuestGates", {})
+
 # How many complete worlds generate_early may roll looking for one whose goals are
 # reachable. Each attempt costs ~2.5s (the entrance frontier dominates). Measured miss
 # rate for the hardest goal (Legends) with every randomizer on, drops on mimic: ~1 roll
@@ -224,6 +228,18 @@ class RS2004World(World):
         item = CAP_ITEM_BY_SKILL.get(skill)
         return item is not None and state.has(item, self.player, need)
 
+    def _skill_unlocked(self, state, skill) -> bool:
+        """Skills a quest locks outright - Runecrafting behind Rune Mysteries (the
+        essence mine refuses the teleport without it) and Herblore behind Druidic
+        Ritual. Enforced with or without region_logic: it is a property of the game,
+        not of the spatial model."""
+        quest = SKILL_QUEST_GATES.get(skill)
+        if quest is None:
+            return True
+        if self.region_logic:
+            return quest in self._derive(state).completed
+        return self._quest_rule(state, quest)
+
     def _qp(self, state) -> int:
         total = 0
         for qid, quest in QUESTS.items():
@@ -278,8 +294,12 @@ class RS2004World(World):
             required_qp = QUESTS["dragon"].get("requiredQp") or 0
             qp = self._derive(state).qp if self.region_logic else self._qp(state)
             return qp >= required_qp
-        if kind in ("level", "activity"):
+        if kind in ("level", "activity", "first_xp"):
             skill = loc.get("skill")
+            # a skill locked behind a quest yields no XP at all until it is done, so
+            # every check on it - even "first XP" - waits for that quest.
+            if not self._skill_unlocked(state, skill):
+                return False
             level = loc.get("level")
             if skill is None or level is None:
                 return True
@@ -398,6 +418,8 @@ class RS2004World(World):
                 out.add(check_id)
             elif loc["kind"] == "ds" and "dragon" in infeasible_quests:
                 out.add(check_id)
+            elif SKILL_QUEST_GATES.get(loc.get("skill")) in infeasible_quests:
+                out.add(check_id)  # the skill's gating quest can never be completed
             elif loc["kind"] == "barcrawl":
                 anchor = BARCRAWL_ANCHOR_BY_CHECK.get(check_id)
                 if anchor is None:

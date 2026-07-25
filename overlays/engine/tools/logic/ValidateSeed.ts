@@ -24,7 +24,7 @@ import { Goal, QuestReq, StatName } from '../sim/types.js';
 
 import { WorldTile, parseRawCoord } from './Coords.js';
 import { GatedAreaRequire, RequireContext, describeRequire, loadGatedAreas, requireSatisfied } from './GatedAreas.js';
-import { addRegionSources, applySwaps, computeObtainable, itemAvailable, loadItemSources, loadNpcSpawns, loadQuestItems } from './ItemGraph.js';
+import { addRegionSources, applySwaps, computeObtainable, itemAvailable, loadItemSources, loadNpcSpawns, loadQuestItems, stampQuestGates } from './ItemGraph.js';
 import { RequirementGroup, buildRequirementGroups, collectScriptEdges, loadGeneratedQuestRegions, usableWorldEdges } from './GeneratedQuestRegions.js';
 import {
     VANILLA_SPAWN_RAW,
@@ -210,7 +210,7 @@ function main(): void {
     // sim assuming every item is free. Static game data (tools/logic/data/), absent =>
     // empty => every item assumed obtainable (exact prior behaviour). itemSources applies
     // any gathersanity/processsanity swap so obtainability reflects the shuffled world.
-    const itemSources = applySwaps(loadItemSources(), loadGatherProcessSwaps(CONFIG_DIR));
+    const itemSources = applySwaps(stampQuestGates(loadItemSources()), loadGatherProcessSwaps(CONFIG_DIR));
     // add the BUY (shop-owner region) and DROP (monster region) sources - the four-source
     // OR model. item->provider-npc data is static (tools/logic/data/), resolved to a region
     // via the npc spawn map + region graph. Absent files => gather/process only.
@@ -369,7 +369,7 @@ function main(): void {
         // recompute item obtainability from the current (growing) skill caps AND reachable
         // regions before this sphere's gates/quests consult it (buy/drop sources gate on
         // region reachability, so obtainability grows as the map opens up).
-        obtainable = computeObtainable(itemSources, statCaps, reachableRegions);
+        obtainable = computeObtainable(itemSources, statCaps, reachableRegions, completed);
         const ctx = buildCtx();
 
         // 1. entrance edges (gated or not).

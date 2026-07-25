@@ -3508,3 +3508,44 @@ With drops modelled the world-roll miss rate rose from ~1 in 30 to ~1 in 5 for L
 (mimic moves whole loot tables, so a quest item lands behind a monster the region model
 can't reach), so `WORLD_ROLL_ATTEMPTS` went 6 -> 8: expected cost ~1.25 attempts, chance of
 exhausting the budget ~2e-6.
+
+### Skill-quest gates: Runecrafting and Herblore (2026-07-25, from play)
+
+Reported from a spoiler log: the seed wanted 20 Runecrafting before Rune Mysteries. It
+was right to complain - `reachableFromState` treated `first_xp` as unconditionally
+reachable ("every skill starts trainable") and `level_*` as cap-only, so nothing knew
+some skills are quest-locked. This affected BOTH modes (solo GenerateSeed placement and
+the AP fill), so the fix went in the shared model.
+
+`tools/sim/types.ts` now owns `SKILL_QUEST_GATES` + `skillUnlocked`, consumed by
+`PlacementEngine.reachableFromState`, `ItemGraph.computeObtainable`, the bundle exporter
+and `logic.py`. **Two kinds of entry, and the distinction is written into the table's
+doc comment so nobody "corrects" the second one:**
+
+- `runecraft -> runemysteries` is a HARD SCRIPT GATE. Verified in
+  `skill_runecraft/scripts/essence_mine.rs2:2`: the teleport refuses without the quest,
+  and nothing else in the corpus yields `blankrune` (no shop entry, no drop table). So
+  literally every point of Runecrafting XP is behind that quest.
+- `herblore -> druid` is a DELIBERATE BALANCE CHOICE (user call). This revision's
+  herblore scripts carry no Druidic Ritual check - I checked all of
+  `skill_herblore/scripts/` before adding it - so it is technically trainable from
+  scratch; it's gated because doing so is miserable in practice.
+
+Two mechanisms, because a skill gate isn't only about checks:
+
+1. **Checks**: `first_xp` / `level` / `activity` locations on a gated skill require the
+   quest. Note `first_xp` too - a quest-locked skill yields *no* XP, so even the first
+   point waits.
+2. **Item sources**: `computeObtainable` now takes the completed-quest set. Two ways a
+   source can be quest-locked - the skill itself (`skillUnlocked`), or the specific
+   ACTION (`QUEST_GATED_GATHER_ITEMS`, currently just `blankrune`). The action stamp goes
+   on the SOURCE object, not the item, so it survives gathersanity: the swap re-keys each
+   source under whatever the action now delivers, and the gate travels with it. That is
+   the correct reading - the essence *mine* is what's locked, no matter what mining it
+   hands you after a shuffle.
+
+Parity stayed green and all 139 tests passed, because in the spatial-only parity config
+the gating quests complete early anyway - the gate changes check ORDER, not final
+reachability. The regression test is `test_skill_gates.py`, which asserts both directions
+(no check on a gated skill is reachable empty-handed; all of them are once everything is
+collected) plus that ungated `first_xp` stayed free.

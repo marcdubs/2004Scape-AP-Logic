@@ -195,6 +195,9 @@ class LogicEngine:
         meta = bundle["meta"]
         self.mainland = meta["mainlandRegionId"]
         self.cappable_skills: List[str] = list(meta["cappableSkills"])
+        # skills no amount of items can train until a quest is done (rune essence is
+        # behind Rune Mysteries by script; Herblore is behind Druidic Ritual by choice)
+        self.skill_quest_gates: Dict[str, str] = dict(meta.get("skillQuestGates", {}))
         self.spawn_region = spawn_region if spawn_region is not None else meta["vanillaSpawnRegion"]
 
         self.quests: List[dict] = bundle["quests"]
@@ -377,11 +380,24 @@ class LogicEngine:
 
     # -- item obtainability (ItemGraph.computeObtainable) -------------------
 
-    def _compute_obtainable(self, caps: Mapping[str, int], regions: FrozenSet[int]) -> FrozenSet[str]:
+    def skill_unlocked(self, skill: Optional[str], completed: FrozenSet[str]) -> bool:
+        """Is this skill trainable at all yet? (types.ts SKILL_QUEST_GATES)"""
+        if skill is None:
+            return True
+        quest = self.skill_quest_gates.get(skill)
+        return quest is None or quest in completed
+
+    def _compute_obtainable(self, caps: Mapping[str, int], regions: FrozenSet[int],
+                            completed: FrozenSet[str] = frozenset()) -> FrozenSet[str]:
         obtainable: set = set()
         sources = self.item_sources
 
         def satisfiable(source: dict) -> bool:
+            quest = source.get("quest")
+            if quest is not None and quest not in completed:
+                return False  # the action itself is quest-locked (the essence mine)
+            if not self.skill_unlocked(source.get("skill"), completed):
+                return False  # the whole skill is quest-locked
             region = source.get("region")
             if region is not None:
                 return region in regions  # buy/drop: shop owner / monster region reachable
@@ -450,8 +466,8 @@ class LogicEngine:
         while True:
             changed = False
             frozen_regions = frozenset(regions)
-            obtainable = self._compute_obtainable(caps, frozen_regions)
             frozen_completed = frozenset(completed)
+            obtainable = self._compute_obtainable(caps, frozen_regions, frozen_completed)
             ctx = RequireContext(self._varp_map(qp, frozen_completed, caps), obtainable, self.item_sources, caps)
 
             # 1. entrance edges

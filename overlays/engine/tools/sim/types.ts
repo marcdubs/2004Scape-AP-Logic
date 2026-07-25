@@ -103,3 +103,40 @@ export interface QuestDatabase {
 export interface GoalDatabase {
     goals: Goal[];
 }
+
+/**
+ * Skills you cannot train until a quest is complete. Lives here (with STAT_NAMES)
+ * because both the placement/reachability side and the item-graph side need it.
+ *
+ * TWO KINDS OF ENTRY, and the difference matters - don't "correct" the second one:
+ *
+ *  - runecraft -> runemysteries : a HARD SCRIPT GATE. Rune essence exists only inside
+ *    the essence mine, and skill_runecraft/scripts/essence_mine.rs2:2 refuses the
+ *    teleport with "You need to have completed the Rune Mysteries Quest to use this
+ *    feature." Nothing else in the corpus yields blankrune - no shop, no drop table - so
+ *    every scrap of Runecrafting XP in the game is behind that quest.
+ *
+ *  - herblore -> druid (Druidic Ritual) : a DELIBERATE BALANCE CHOICE (user call,
+ *    2026-07-25). This revision's herblore scripts carry no Druidic Ritual check, so it
+ *    is technically trainable from the start - but doing so without the quest is
+ *    miserable enough in practice that the logic treats it as gated. The effect is only
+ *    to stop the fill hiding progression behind early Herblore checks; it never blocks
+ *    anything, since no quest requires a Herblore level and no item source is skilled
+ *    herblore today.
+ *
+ * Without these, a `level_runecraft_20` or `first_xp_herblore` check reads as sphere-0
+ * and the fill will happily hide progression behind XP you cannot reasonably earn yet.
+ */
+export const SKILL_QUEST_GATES: Readonly<Record<string, string>> = {
+    runecraft: 'runemysteries',
+    herblore: 'druid'
+};
+
+/** True if `skill` is trainable at all given the quests completed so far. */
+export function skillUnlocked(skill: string | undefined, completed: ReadonlySet<string>): boolean {
+    if (skill === undefined) {
+        return true;
+    }
+    const quest = SKILL_QUEST_GATES[skill];
+    return quest === undefined || completed.has(quest);
+}

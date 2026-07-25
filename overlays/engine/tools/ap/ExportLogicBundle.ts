@@ -32,12 +32,12 @@ import fs from 'fs';
 import path from 'path';
 
 import { CAPPABLE_SKILLS, QUEST_GATE_IDS, questGateKey } from '../sim/PlacementEngine.js';
-import { Goal, QuestReq } from '../sim/types.js';
+import { Goal, QuestReq, SKILL_QUEST_GATES } from '../sim/types.js';
 
 import { parseRawCoord } from '../logic/Coords.js';
 import { GatedAreaRequire, loadGatedAreas } from '../logic/GatedAreas.js';
 import { RequirementGroup, buildRequirementGroups, collectScriptEdges, loadGeneratedQuestRegions } from '../logic/GeneratedQuestRegions.js';
-import { addRegionSources, ItemSource, loadItemSources, loadNpcSpawns, loadQuestItems } from '../logic/ItemGraph.js';
+import { addRegionSources, ItemSource, loadItemSources, loadNpcSpawns, loadQuestItems, stampQuestGates } from '../logic/ItemGraph.js';
 import {
     COMPLETION_ONLY,
     GATE_VARP_ALL,
@@ -161,7 +161,9 @@ function buildItemSources(graph: RegionGraph): Map<string, ItemSource[]> {
     // whichever consumer holds the swap table (the apworld re-keys the graph itself once
     // it has rolled its gather/process tables). Exporting vanilla keeps the bundle
     // seed-independent - see the file header.
-    const sources = loadItemSources();
+    // stamp the quest-locked gathering actions before anything else touches the graph
+    // (the gate must ride on the SOURCE so gathersanity carries it - see ItemGraph).
+    const sources = stampQuestGates(loadItemSources());
     const npcSpawns = loadNpcSpawns();
     const resolveNpcRegion = (coord: string): number => {
         const [level, mapX, mapZ, localX, localZ] = coord.split('_').map(Number);
@@ -357,7 +359,9 @@ function main(): void {
             capsFormula: { base: 20, perCount: 10, max: 99 },
             cappableSkills: CAPPABLE_SKILLS,
             questGateIds: QUEST_GATE_IDS,
-            questGateKeyPrefix: questGateKey('')
+            questGateKeyPrefix: questGateKey(''),
+            // skills no amount of items can train until a quest is done
+            skillQuestGates: SKILL_QUEST_GATES
         },
         varpModel: {
             gateVarpAll: GATE_VARP_ALL,
