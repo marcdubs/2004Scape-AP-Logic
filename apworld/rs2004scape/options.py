@@ -78,15 +78,27 @@ class QuestUnlocks(DefaultOnToggle):
 class EntranceRandomization(Choice):
     """Shuffle ladder/stair/trapdoor destinations. on: connector and
     floor-shift pools shuffle separately; mixed: one chaos pool.
-    (seed option*: all options marked this way are adopted by the game server
-    on connect and applied the next time it rolls a seed - scripts/new-run -
-    not live mid-run.)"""
+    Archipelago builds this layout itself, reachability-preserving, and ships
+    the finished table to the game server in slot_data - the multiworld's fill
+    reasons over the SAME map you will actually play."""
 
     display_name = "Entrance Randomization"
     option_off = 0
     option_on = 1
     option_mixed = 2
     default = 1
+
+
+class RegionLogic(DefaultOnToggle):
+    """Reason about where things physically ARE. On: quest, barcrawl and goal
+    access rules run the full region/gate fixpoint (the same one
+    tools/logic/ValidateSeed.ts runs for solo seeds) over the entrance layout
+    this seed will actually use, so the fill can never hide progression behind
+    a door you cannot open. Off: the older travel-agnostic rules - skills, quest
+    prerequisites and QP only - leaving reachability to the game server.
+    Leave this on unless you are debugging generation."""
+
+    display_name = "Region Logic"
 
 
 class NpcDrip(DefaultOnToggle):
@@ -211,6 +223,7 @@ class RS2004Options(PerGameCommonOptions):
     progressive_quests: ProgressiveQuests
     relics: Relics
     music_checks: MusicChecks
+    region_logic: RegionLogic
     entrance_randomization: EntranceRandomization
     npc_drip: NpcDrip
     shop_randomization: ShopRandomization

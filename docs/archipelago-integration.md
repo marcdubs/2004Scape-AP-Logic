@@ -86,10 +86,121 @@ Item name conventions (AP-visible display names):
   `~ap_grant_check_reward` random reward for the online player (queued while
   nobody is online).
 
-## Logic model in the apworld (v1: travel-agnostic, mirrors PlacementEngine)
+## Logic model in the apworld (v2: region-aware, GitHub #3)
 
-The Python rules are a direct port of `reachableFromState` +
-`completableQuests` (the travel-agnostic path GenerateSeed itself uses):
+**Both randomizers stay first-class.** Local/solo seeds are still made by
+generate-and-test (`RandomizeEntrances.ts` shuffles, `ValidateSeed.ts` grades,
+the loop rerolls; `--require-perfect` is its acceptance criterion and is *not*
+going anywhere). Archipelago cannot reroll - its fill runs once - so AP mode is
+construct-valid instead: the apworld builds a sound layout up front and reasons
+over it. One logic source, two consumers.
+
+### The shared artifact: `data/rs2004_logic.json`
+
+`tools/ap/ExportLogicBundle.ts` emits the logic half of the contract (the
+catalog half is `ExportApWorldData.ts`). It is region-id based and
+seed-*independent* - the shape of the world, not one shuffle of it:
+
+| Key | What it carries |
+| --- | --- |
+| `meta` | mainland region id, vanilla spawn region, cap formula, cappable skills, quest-gate ids |
+| `varpModel` | `VARP_TO_QUEST`, `SPLIT_VARPS`, `COMPLETION_ONLY`, `STAT_VARPS` - the quest-doability model |
+| `anchors` / `questAnchors` / `goalAnchors` | curated `quest-regions.json` spatial requirements, resolved to region ids |
+| `alwaysConnected`, `openAreas` | curated free connectivity (Karamja boat, quest gauntlets) |
+| `gatedAreas` | all 107 areas with `require` + resolved interior/outside region ids |
+| `questScriptEdges`, `worldEdges` | extracted transitions (world edges keep their trigger coords so a seed's overrides can retire them) |
+| `requirementGroups` | `quest-regions.generated.json` evidence, per quest/goal, after curated ignores |
+| `entrancePool` | every physical gate's two sides (trigger, op, arrival, both resolved to regions) + one-ways + gate requirements |
+| `itemSources`, `questItems` | the four-source item-obtainability graph |
+| `quests`, `goals` | quests.json / goals.json verbatim |
+
+Everything region-shaped comes from `tools/logic/LogicModel.ts` - the *same*
+module `ValidateSeed.ts` imports - so the exported model and the local oracle's
+beliefs cannot drift by construction. The entrance pool comes from
+`RandomizeEntrances.ts --export-pool`, i.e. the shuffle's input, not its output.
+
+### `logic.py`: the fixpoint, in Python
+
+A faithful port of `ValidateSeed.ts`'s sphere expansion, in the same order:
+item obtainability -> entrance edges -> `alwaysConnected` -> script/world edges
+-> open areas -> gated areas -> quests, repeat to fixpoint. The non-obvious
+rule is ported verbatim: **a quest-progress varp gate opens when its quest is
+DOABLE, not COMPLETE** (otherwise a quest's own interior door deadlocks the
+quest), with `SPLIT_VARPS` keeping post-quest guild gates completion-safe.
+
+`derive(caps, unlocked_quests)` is memoized - the fixpoint only depends on the
+skill caps and which quest-gate items the state holds, which is exactly what an
+AP access rule varies. A full derive is ~10ms, so rules stay cheap.
+
+Access rules with `region_logic` on (the default):
+
+- Quest checks and `Completed: <quest>` events: `quest in derive(state).completed`
+  - which already folds in skills, QP, the prereq chain, the quest-gate item,
+  gathered/processed item availability *and* physical reachability.
+- `barcrawl_bar_N`: bar N's curated anchor region must be reachable (they line
+  up 1:1 with `goalAnchors.barcrawl`, in `quest_barcrawl.constant` order).
+- Goals: `goals.json`'s own definition - skills + QP + quest chain + the
+  anchors and extracted regions the goal needs you to stand in.
+- `level_*` / activities: skill caps, unchanged.
+- `ds_*` stages: Dragon Slayer startable, but QP now comes from the fixpoint.
+
+**Feasibility exclusion.** A check the region model cannot justify even with
+every item collected can never fire in game either, so the world does not
+create that location at all - putting anything there, even filler, would lose
+it. This is the AP-side twin of `GenerateSeed.ts`'s exclusion. The model only
+ever claims reachability it can prove, so the failure direction is "a real
+check sits out", never "an unreachable check holds progression". A configured
+*goal* being unreachable is fatal instead, with an explicit `OptionError`.
+
+### `entrances.py`: construct-valid entrance randomization
+
+With `region_logic` on, **the apworld builds the entrance layout**, in
+`generate_early`, before any rule runs - a reachability-preserving frontier,
+the same shape as Archipelago's own `worlds/generic/randomize_entrances`:
+
+```
+while unpaired exits remain:
+  pick a RANDOM unpaired exit whose trigger region is already reachable
+  pair it with a partner that opens new ground (any partner if none does)
+  re-derive reachability and repeat
+```
+
+Every exit is consumed only once it is reachable, so the layout is connected by
+construction - **nothing to reroll**. Pairing gate `i`'s A side with gate `j`'s
+B side writes `overrides[i.a.trigger] = j.a.arrival` and
+`overrides[j.b.trigger] = i.b.arrival`, the same reciprocity the local tool
+guarantees (walk back the way you came, end up where you started).
+
+The finished table rides to the game server in `slot_data.entranceOverrides`;
+`ApClient` writes it to `data/config/ap-entrances.json` and hot-reloads it, and
+`slot_data.seedOptions.entrances` is pinned to `"off"` so the next
+`scripts/new-run` cannot reshuffle the map the fill reasoned over.
+
+Measured (bundle of 2026-07-25, 366 gates + 4 one-ways): the vanilla layout
+leaves 650/736 pool sides reachable and strands 2 quests in the model; every
+frontier layout tried reached 709/736, all 63 quests and all 5 goals, in ~2.5s,
+with zero rerolls.
+
+### Parity: the two implementations must agree
+
+The failure mode of one logic, two implementations is silent drift.
+
+- `scripts/parity-check.py` runs `ValidateSeed.ts --json` and `logic.py` over
+  the *same* spatial-only scratch config (entrances + gated areas + spawn, no
+  placements or unlocks -> uncapped, no quest gates: exactly what
+  `RandomizeEntrances` grades against) and diffs reachable regions, completed
+  quests, QP and goals. `--write-fixture` freezes the result.
+- `apworld/rs2004scape/test/test_parity.py` replays that frozen fixture through
+  `logic.py` on every CI run - no engine checkout needed - and asserts the
+  model's invariants (cap formula, monotonicity, quest gates actually gating)
+  plus that frontier layouts stay beatable.
+
+### v1 (still available: `region_logic: false`)
+
+The older travel-agnostic rules - a direct port of `reachableFromState` +
+`completableQuests`, the path GenerateSeed itself uses - remain selectable for
+debugging or if the bundle is stale. In that mode the game server rolls its own
+entrance table again and `seedOptions.entrances` carries the chosen mode:
 
 - Every quest is an AP location AND an AP *event* ("Completed: <quest>") so
   other rules can require quest completion; QP is computed by summing the qp of
@@ -106,13 +217,11 @@ The Python rules are a direct port of `reachableFromState` +
   `kbd` (KBD kill check + the 50-combat floor via caps). Completion event =
   the corresponding check id(s) firing client-side.
 
-**Region/entrance logic is deliberately NOT in the apworld** (same division of
-labor as GenerateSeed vs ValidateSeed): the entrance shuffle happens on OUR
-server with its own seed, after AP generation. The rule that keeps this sound
-is unchanged from placement mode: an AP-mode server must run an entrance table
-that validates fully green (RandomizeEntrances already rerolls/grades until
-goals + quests are reachable). The apworld's travel-agnostic logic is exactly
-as strong as what GenerateSeed enforces locally today.
+In v1 region/entrance logic was deliberately NOT in the apworld: the entrance
+shuffle happened on OUR server with its own seed, after AP generation, and
+soundness rested on the server running a table that validated fully green
+(`RandomizeEntrances --require-perfect`). That is still the fallback contract
+whenever `region_logic: false`.
 
 ## Engine client design (ApClient.ts)
 
@@ -147,7 +256,13 @@ as strong as what GenerateSeed enforces locally today.
   `[queue,ap_remote_item]` shell for filler delivery.
 - **Goal**: on every fired check, test the goal condition from `slot_data.goal`;
   when satisfied send `StatusUpdate 30` (idempotent flag in ap-session.json).
-- **slot_data**: `{goal, musicChecks, questGates: [...]}`. On `Connected`, the
+- **slot_data**: `{goal, musicChecks, questGates: [...], regionLogic,
+  entranceOverrides: {...}}`. `entranceOverrides` is the apworld-built entrance
+  table (v2 logic, above): the client validates each key/value as a raw coord,
+  writes `data/config/ap-entrances.json` preserving any existing `gates` block
+  (a gate stays with the physical location, not the destination), and calls
+  `ApEntranceOverrides.reloadEntranceOverrides()` so it applies without a
+  restart. Absent/empty = the server keeps rolling its own. On `Connected`, the
   client writes `questGates` into `data/config/ap-placements.json` (placements
   object empty - AP mode has no local placements) so ApQuestGates/quest-tab
   hiding work unchanged, and adopts `musicChecks` via
@@ -174,9 +289,16 @@ ap-archipelago.json, boot.
 
 ## Setup walkthrough (once built)
 
-1. `cd ../Server/engine && npx tsx tools/ap/ExportApWorldData.ts` - refresh
-   `apworld/rs2004scape/data/rs2004_data.json` (only needed after catalog
-   changes).
+1. Refresh the two generated data files the apworld ships (only needed after a
+   catalog / region-graph / gated-area / quest-region change):
+   ```
+   cd ../Server/engine
+   npx tsx tools/ap/ExportApWorldData.ts     # catalog -> rs2004_data.json
+   npx tsx tools/ap/ExportLogicBundle.ts \
+       --copy ../../2004Scape-AP-Logic/apworld/rs2004scape/data/rs2004_logic.json
+   ```
+   then re-run `python3 scripts/parity-check.py --write-fixture` so the frozen
+   parity fixture matches the new bundle.
 2. Zip `apworld/rs2004scape/` as `rs2004scape.apworld`, drop it in an
    Archipelago install's `custom_worlds/`, include a `2004Scape` YAML in the
    players folder, generate, host (locally or archipelago.gg).
@@ -196,9 +318,13 @@ ap-archipelago.json, boot.
   another world ("Your X was sent to Bob's world").
 - **DeathLink** (2004scape deaths are cheap - probably as an option, default
   off).
-- **Region-aware apworld logic**: port the region fixpoint to Python, or
-  precompute a per-seed reachability matrix - only matters if entrance shuffle
-  should constrain the AP fill; today's validation-gated entrance tables make
-  it unnecessary for soundness.
+- ~~**Region-aware apworld logic**~~ - **done** (GitHub #3): see "Logic model
+  in the apworld (v2)" above. What is still open there: gathersanity /
+  processsanity swaps are rolled server-side *after* generation, so the
+  exported `itemSources` graph the fill reasons over is the vanilla one
+  (`LogicEngine(item_swaps=...)` accepts a swap table already - the apworld
+  just has no reason to build one until it rolls those tables too). Same for
+  shopsanity relocating buy sources and spawn randomization moving the start
+  region.
 - **Auto-release/collect semantics** on goal: AP handles via server settings;
   nothing client-side needed.

@@ -829,18 +829,35 @@ persist across reseeds indefinitely) or when reseeding everything for a fresh te
 `--seed` sets a shared default for all three tools; the per-tool `--*-seed` flags
 override it individually.
 
-## Archipelago integration (v1)
+## Archipelago integration (v2: region-aware)
 
 Real archipelago.gg multiworld support - full design in
 [docs/archipelago-integration.md](docs/archipelago-integration.md), apworld
-packaging/usage in [apworld/README.md](apworld/README.md). The moving parts:
+packaging/usage in [apworld/README.md](apworld/README.md).
 
-- `apworld/rs2004scape/` - the Python generation-side world (items, locations,
-  travel-agnostic rules ported from PlacementEngine). Zip it as
-  `rs2004scape.apworld` for an Archipelago install.
+**Two randomizers, one logic.** Local/solo seeds are made by generate-and-test:
+`RandomizeEntrances.ts` shuffles, `ValidateSeed.ts` grades, the loop rerolls
+until the seed is beatable (`--require-perfect`). Archipelago's fill runs once
+and cannot reroll, so AP mode is construct-valid instead - the apworld builds a
+reachability-preserving entrance layout itself and reasons over the same region
+/ gate / quest / item logic the local oracle uses. Both read one exported
+bundle, and `scripts/parity-check.py` fails if they ever disagree. The moving
+parts:
+
+- `apworld/rs2004scape/` - the Python generation-side world. `logic.py` is the
+  region fixpoint (a port of `ValidateSeed.ts`), `entrances.py` the
+  construct-valid entrance shuffle. Zip it as `rs2004scape.apworld` for an
+  Archipelago install.
 - `overlays/engine/tools/ap/ExportApWorldData.ts` - generates the shared
   datapackage (`ap-archipelago-data.json` / `rs2004_data.json`); ids are
   append-only.
+- `overlays/engine/tools/ap/ExportLogicBundle.ts` - generates the shared logic
+  bundle (`ap-logic-bundle.json` / `rs2004_logic.json`): regions, gated areas,
+  the entrance pool, the item graph, the quest-doability varp model. Everything
+  region-shaped comes from `tools/logic/LogicModel.ts`, the same module
+  `ValidateSeed.ts` imports, so the two cannot drift.
+- `scripts/parity-check.py` - runs both implementations over the same seed and
+  diffs regions / quests / QP / goals.
 - `overlays/engine/src/engine/ApClient.ts` - the runtime AP WebSocket client.
   Enabled by `data/config/ap-archipelago.json` (`{"enabled": true, "host": ...,
   "port": 38281, "slot": "..."}`); inert without it. Fired checks go out as
@@ -850,6 +867,13 @@ packaging/usage in [apworld/README.md](apworld/README.md). The moving parts:
 In AP mode the local GenerateSeed placement fill must NOT be active - the AP
 server owns all placements (ap-placements.json carries only slot_data's quest
 gates). Solo placement mode is unchanged when ap-archipelago.json is absent.
+
+With the default `region_logic: true`, Archipelago also owns the entrance
+layout: it arrives in `slot_data.entranceOverrides`, the client writes it to
+`data/config/ap-entrances.json` and hot-reloads it, and
+`seedOptions.entrances` arrives as `"off"` so the next seed roll leaves that
+map alone. Set `region_logic: false` to go back to the v1 contract (server-side
+entrance shuffle + travel-agnostic AP rules).
 
 ## License & credits
 

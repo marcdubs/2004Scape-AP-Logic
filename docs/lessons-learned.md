@@ -3328,3 +3328,87 @@ no-unlocks (uncapped label), unlocks+no-placements (end-of-run, all goals reacha
 (fallback + note). (3) `npx tsc --noEmit -p .` clean, and `GenerateSeed` still passes
 `ValidateSeed` on attempt 0 for seeds 1/42/777/12345/98765 — confirming generation was
 never the broken half.
+
+## The apworld gets the whole logic, and local mode keeps its reroll (GitHub #3, 2026-07-25)
+
+The framing that mattered. Issue #3 originally read "move beatability out of this repo
+and into the apworld, delete `--require-perfect`". That was wrong, and rewriting it
+first was the highest-leverage thing in the session: `--require-perfect` and the reroll
+loop are the *mechanism the local randomizer needs*, and local play is a supported
+product, not a stepping stone. The right goal is **one logic source, two consumers**:
+generate-and-test for solo seeds (AP can't reroll - its fill runs once), construct-valid
+for Archipelago. Everything below follows from that.
+
+### What was built
+
+1. **`tools/logic/LogicModel.ts`** - the shared model, carved out of `ValidateSeed.ts`
+   verbatim: gated-area resolution (bbox + the GitHub #16 door-probe path), open-area
+   membership, the curated `quest-regions.json` shape, and the quest-doability varp
+   model (`VARP_TO_QUEST` / `SPLIT_VARPS` / `resolveVarp`). ValidateSeed now imports it.
+   This is the anti-drift move: the exporter and the oracle reason over the *same
+   objects*, not two hand-synced copies.
+2. **`tools/ap/ExportLogicBundle.ts`** -> `ap-logic-bundle.json` (542 KB), the logic half
+   of the apworld contract (`ExportApWorldData.ts` is the catalog half). Region-id based
+   and seed-INDEPENDENT: the shape of the world, not one shuffle of it.
+3. **`RandomizeEntrances.ts --export-pool`** - dumps the shuffle's *input* (366 gates x 2
+   sides + 4 one-ways + gate requirements), so AP can run its own assignment over the
+   same candidate set. It writes no table and never rerolls.
+4. **`apworld/rs2004scape/logic.py`** - the sphere fixpoint in Python, same order, same
+   rules, memoized on (caps, held quest gates). ~10ms per derive.
+5. **`apworld/rs2004scape/entrances.py`** - reachability-preserving frontier assignment.
+6. **Rules rewired** - quest/goal/barcrawl access now asks the fixpoint. `ApClient`
+   accepts `slot_data.entranceOverrides`, writes `ap-entrances.json` and hot-reloads it.
+7. **Parity** - `scripts/parity-check.py` (live TS vs Python) and `test_parity.py` (the
+   frozen fixture, no engine checkout needed).
+
+### The result worth remembering
+
+The Python port matched `ValidateSeed.ts` **exactly on the first run** - 5273/5273
+regions, 62/62 quests, 130/130 QP, same 5 goals - and again under zeroed caps
+(5017 regions, 29 quests). That is the payoff for exporting a *resolved* bundle: every
+spatial judgment call (which pocket is behind which door, which regions an open area
+covers) was made once, in TypeScript, against the region graph. Python only had to
+re-implement the fixpoint loop, which is ~120 lines. **Port the algorithm, not the data
+resolution.**
+
+And the frontier shuffle needs no reroll at all: every seed tried (1, 2, 3, 7, 99, 12345)
+reached all 63 quests and all 5 goals, at 709/736 pool sides covered, in ~2.5s. The
+*vanilla* layout only manages 650/736 and strands 2 quests in the model - so AP's
+construct-valid layouts are strictly better than the map the game ships with.
+
+### Judgment calls a future session should know about
+
+- **No AP `Region` objects, and that is deliberate.** The obvious reading of the issue is
+  "build the region graph as AP Regions and call `worlds/generic/randomize_entrances`".
+  The graph is 16541 flood-fill regions; the endpoint set alone (entrance sides, gated
+  interiors, anchors, open-area members, extracted evidence) is 5916. But AP Regions buy
+  exactly one thing - telling the fill which *locations* are reachable - and our 287
+  checks are not spatially placed per region at all (a `LocationDef` has kind/skill/level/
+  questId, no coordinate). Spatial reasoning only ever affects *quest completability*,
+  which the fixpoint answers directly. So AP Regions would have been pure overhead, and
+  the frontier algorithm was reimplemented over the bundle graph instead (same shape:
+  connect a reachable exit, prefer partners that open new ground, re-derive).
+- **Feasibility exclusion must DELETE the location, not exclude it.**
+  `LocationProgressType.EXCLUDED` only means "no progression here" - the location must
+  still be *reachable* or AP's accessibility sweep fails. A check the region model can
+  never justify is not created at all; likewise the `Completed: <quest>` event for a quest
+  that can never complete (that one cost a test failure: `Unreachable locations: [Quest:
+  Pirate's Treasure, Event: Completed hunt]`).
+- **The model is conservative in both directions and that is the safe design.** Under the
+  *vanilla* layout it strands `demon` (an unreachable extracted coord) and `prince`
+  (redberries' buy/gather regions unreachable). Those are model gaps, not real ones. Since
+  the model only ever claims reachability it can prove, the failure mode is "a real check
+  sits out of the pool", never "an unreachable check holds someone's progression".
+- **`seedOptions.entrances` is pinned to `"off"` in AP mode.** If the server re-rolled
+  entrances after generation it would invalidate every rule the fill just used. The
+  override table in slot_data is the authority; two tests assert this both ways.
+- **Run the apworld tests with the Archipelago checkout's own interpreter**
+  (`~/Archipelago/venv/bin/python`). The system python is missing `schema` and the failure
+  looks like a broken world, not a missing dependency.
+
+### Still open
+
+Gathersanity/processsanity/shopsanity/spawn randomization are rolled server-side *after*
+generation, so the `itemSources` graph the fill reasons over is the vanilla one.
+`LogicEngine(item_swaps=...)` already accepts a swap table - the apworld just has no
+reason to build one until it rolls those tables itself, the way it now rolls entrances.
