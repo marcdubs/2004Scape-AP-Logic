@@ -3380,3 +3380,223 @@ reported `0_49_48_3_6` ladder and its `1_49_48_3_6` top, nothing else added or d
 change today, drift closed for tomorrow. (3) `RandomizeSpawn --mode chunk` candidate
 pool 114 → 110: the four newly-protected surface squares really were live HOME
 candidates. (4) `npx tsc --noEmit -p .` clean.
+## The apworld gets the whole logic, and local mode keeps its reroll (GitHub #3, 2026-07-25)
+
+The framing that mattered. Issue #3 originally read "move beatability out of this repo
+and into the apworld, delete `--require-perfect`". That was wrong, and rewriting it
+first was the highest-leverage thing in the session: `--require-perfect` and the reroll
+loop are the *mechanism the local randomizer needs*, and local play is a supported
+product, not a stepping stone. The right goal is **one logic source, two consumers**:
+generate-and-test for solo seeds (AP can't reroll - its fill runs once), construct-valid
+for Archipelago. Everything below follows from that.
+
+### What was built
+
+1. **`tools/logic/LogicModel.ts`** - the shared model, carved out of `ValidateSeed.ts`
+   verbatim: gated-area resolution (bbox + the GitHub #16 door-probe path), open-area
+   membership, the curated `quest-regions.json` shape, and the quest-doability varp
+   model (`VARP_TO_QUEST` / `SPLIT_VARPS` / `resolveVarp`). ValidateSeed now imports it.
+   This is the anti-drift move: the exporter and the oracle reason over the *same
+   objects*, not two hand-synced copies.
+2. **`tools/ap/ExportLogicBundle.ts`** -> `ap-logic-bundle.json` (542 KB), the logic half
+   of the apworld contract (`ExportApWorldData.ts` is the catalog half). Region-id based
+   and seed-INDEPENDENT: the shape of the world, not one shuffle of it.
+3. **`RandomizeEntrances.ts --export-pool`** - dumps the shuffle's *input* (366 gates x 2
+   sides + 4 one-ways + gate requirements), so AP can run its own assignment over the
+   same candidate set. It writes no table and never rerolls.
+4. **`apworld/rs2004scape/logic.py`** - the sphere fixpoint in Python, same order, same
+   rules, memoized on (caps, held quest gates). ~10ms per derive.
+5. **`apworld/rs2004scape/entrances.py`** - reachability-preserving frontier assignment.
+6. **Rules rewired** - quest/goal/barcrawl access now asks the fixpoint. `ApClient`
+   accepts `slot_data.entranceOverrides`, writes `ap-entrances.json` and hot-reloads it.
+7. **Parity** - `scripts/parity-check.py` (live TS vs Python) and `test_parity.py` (the
+   frozen fixture, no engine checkout needed).
+
+### The result worth remembering
+
+The Python port matched `ValidateSeed.ts` **exactly on the first run** - 5273/5273
+regions, 62/62 quests, 130/130 QP, same 5 goals - and again under zeroed caps
+(5017 regions, 29 quests). That is the payoff for exporting a *resolved* bundle: every
+spatial judgment call (which pocket is behind which door, which regions an open area
+covers) was made once, in TypeScript, against the region graph. Python only had to
+re-implement the fixpoint loop, which is ~120 lines. **Port the algorithm, not the data
+resolution.**
+
+And the frontier shuffle needs no reroll at all: every seed tried (1, 2, 3, 7, 99, 12345)
+reached all 63 quests and all 5 goals, at 709/736 pool sides covered, in ~2.5s. The
+*vanilla* layout only manages 650/736 and strands 2 quests in the model - so AP's
+construct-valid layouts are strictly better than the map the game ships with.
+
+### Judgment calls a future session should know about
+
+- **No AP `Region` objects, and that is deliberate.** The obvious reading of the issue is
+  "build the region graph as AP Regions and call `worlds/generic/randomize_entrances`".
+  The graph is 16541 flood-fill regions; the endpoint set alone (entrance sides, gated
+  interiors, anchors, open-area members, extracted evidence) is 5916. But AP Regions buy
+  exactly one thing - telling the fill which *locations* are reachable - and our 287
+  checks are not spatially placed per region at all (a `LocationDef` has kind/skill/level/
+  questId, no coordinate). Spatial reasoning only ever affects *quest completability*,
+  which the fixpoint answers directly. So AP Regions would have been pure overhead, and
+  the frontier algorithm was reimplemented over the bundle graph instead (same shape:
+  connect a reachable exit, prefer partners that open new ground, re-derive).
+- **Feasibility exclusion must DELETE the location, not exclude it.**
+  `LocationProgressType.EXCLUDED` only means "no progression here" - the location must
+  still be *reachable* or AP's accessibility sweep fails. A check the region model can
+  never justify is not created at all; likewise the `Completed: <quest>` event for a quest
+  that can never complete (that one cost a test failure: `Unreachable locations: [Quest:
+  Pirate's Treasure, Event: Completed hunt]`).
+- **The model is conservative in both directions and that is the safe design.** Under the
+  *vanilla* layout it strands `demon` (an unreachable extracted coord) and `prince`
+  (redberries' buy/gather regions unreachable). Those are model gaps, not real ones. Since
+  the model only ever claims reachability it can prove, the failure mode is "a real check
+  sits out of the pool", never "an unreachable check holds someone's progression".
+- **`seedOptions.entrances` is pinned to `"off"` in AP mode.** If the server re-rolled
+  entrances after generation it would invalidate every rule the fill just used. The
+  override table in slot_data is the authority; two tests assert this both ways.
+- **Run the apworld tests with the Archipelago checkout's own interpreter**
+  (`~/Archipelago/venv/bin/python`). The system python is missing `schema` and the failure
+  looks like a broken world, not a missing dependency.
+
+### Still open
+
+Gathersanity/processsanity/shopsanity/spawn randomization are rolled server-side *after*
+generation, so the `itemSources` graph the fill reasons over is the vanilla one.
+`LogicEngine(item_swaps=...)` already accepts a swap table - the apworld just has no
+reason to build one until it rolls those tables itself, the way it now rolls entrances.
+
+### Follow-up (same day): the apworld rolls the rest of the world too
+
+The gap left above - "gathersanity/processsanity/shopsanity/spawn are rolled server-side
+*after* generation, so the item graph the fill reasons over is the vanilla one" - is
+closed. The mechanism is worth remembering because it is *not* the same one entrances use:
+
+- **Entrances ship a table.** The engine reads `ap-entrances.json` at runtime, so AP can
+  hand over a finished layout.
+- **The other four ship a SEED.** Shopsanity rewrites `.npc` params and needs a pack
+  rebuild, so there is no table to hand over. Instead AP picks the seed, and the
+  deterministic TS tools reproduce the identical table server-side. `new-run.sh` already
+  feeds one shared `$SEED` to every randomizer, so **one number pins all four**
+  (`slot_data.seedOptions.seed` -> `seed-options-to-env.cjs` emits `SEED=`).
+
+For that to be worth anything the apworld must *know* those tables during generation, so
+each tool grew a `--export-pool` flag (the candidate list, i.e. the shuffle's input) and
+`randomizers.py` replays the shuffle over it. That needed `prng.py`, a byte-exact port of
+`mulberry32`/`shuffle`/`derangement` - watch `Math.imul` (32-bit *signed* multiply) and
+the `>>>`/`|0` mix; it matched on the first try and is pinned by vectors in
+`test_randomizers.py`, alongside vectors of the real `ap-gather.json` / `ap-process.json`
+/ `ap-spawn.json` / `shop-seed.json` for seed 424242.
+
+Three things this shook out that a future session should not have to rediscover:
+
+- **Key shop ownership by BUNDLE, not by shop id.** Several NPCs can share one shop id
+  (two barmaids, one pub inventory), so "who owns shop S now" is ambiguous and does not
+  reduce to the identity when shopsanity is off - the first attempt silently *added* buy
+  regions (cabbage gained region 16534 from a second barmaid). Ask instead "who took over
+  this particular shopkeeper's stock", which is a bijection. A test pins that the
+  shopsanity-off path and a relocation under identity ownership agree exactly.
+- **Retry the WORLD, not the fill.** With all four randomizers live, ~1 rolled world in 30
+  leaves a configured goal unreachable (a gathersanity swap puts a goal quest's item behind
+  a skill the region model can't justify). Failing the whole multiworld for that is
+  ridiculous, so `generate_early` rolls another world (up to 6). This is not
+  generate-and-test creeping back in: AP's fill still runs exactly once, over a world
+  already known sound; the retry is over the map, at ~2.5s a go, entirely inside
+  `generate_early`.
+- **Turning on real logic breaks tests that assumed everything is reachable.** Three had to
+  learn about feasibility exclusion: "every catalog location exists" (now minus the
+  excluded ones), "every gated quest is completable with its unlock item" (skip quests this
+  world excluded), and the exact-`seedOptions` dict (now carries `seed`). None were wrong
+  before; they were asserting the old contract.
+
+Also added `write_spoiler_header` / `write_spoiler`. A world whose locations all sit in one
+AP region gets a spoiler that says nothing about what was randomized - now it prints the
+world seed, home/spawn, entrance coverage, and the full gathering/processing/shop/entrance
+tables. That is the only readable record of the rolled world.
+
+**Still unmodelled: drop randomization.** `drop-sources.json` describes vanilla loot, so a
+`drop`-sourced item can read as obtainable when the shuffle moved it. Closing it means
+porting `MimicTransform.ts` (544 lines).
+
+### Follow-up 2: drop randomization modelled too (MimicTransform ported)
+
+The last unmodelled randomizer is done. All three designs are replayed in `randomizers.py`
+from the pool `RandomizeDrops.ts --export-pool` emits:
+
+- **tiered/chaos** rewrite each weighted loot slot's item (per-bucket or corpus-wide
+  sampling, `mulberry32(seed ^ hashKey(bucket))`), plus a derangement of the guaranteed
+  `death_drop` npc params.
+- **mimic** leaves items alone and points each monster's death handler at another
+  monster's whole table - a *unit-level* derangement, not an index-level one (all four
+  goblin variants run `goblin_drop_table`, so an index swap between them would change
+  nothing in game; the TS tool reshuffles until no slot keeps its own unit, and the port
+  does the same).
+
+Two things that cost real debugging time:
+
+- **Export what the tool SORTS, already sorted.** `RandomizeDrops` orders slots with
+  `file.localeCompare(...)`, and JS locale collation is not reproducible from Python in
+  general. Rather than gamble on ASCII paths agreeing, the pool export ships each bucket's
+  slot list and universe in the tool's own finished order. Same trick would apply to any
+  future port.
+- **Relocation must be a DELTA, not a recomputation.** `itemSources`' vanilla drop regions
+  come from `drop-sources.json`; the weighted-loot corpus is a *different* extraction -
+  broader in places (bespoke handlers, scripted gives), narrower in others. Recomputing
+  drop regions from the corpus invented regions the vanilla entry never claimed (ashes
+  gained three, big_bones five) and the identity test caught it immediately. The fix: per
+  item, take the monsters that stopped dropping it and the ones that started, and move only
+  those regions - keeping a region if some monster that still drops the item stands there.
+  Unrolled = exactly the identity, pinned by a test. **When two datasets describe the same
+  thing at different resolutions, apply changes as a delta against the authoritative one;
+  never recompute the authoritative one from the coarser one.**
+
+Also worth knowing: capturing tiered/chaos vectors with `--dry-run` against a
+mimic-transformed live corpus only records ~half the swaps (the tool can't find the lines
+to edit and says so). The *mapping* is unaffected - it comes from the pristine backup - so
+the fixture is a documented, verified subset, while mimic and death-drop vectors are
+complete and order-exact. Getting a full tiered vector would mean restoring the drop-script
+backup, i.e. mutating the user's content and forcing a pack rebuild; not worth it.
+
+With drops modelled the world-roll miss rate rose from ~1 in 30 to ~1 in 5 for Legends
+(mimic moves whole loot tables, so a quest item lands behind a monster the region model
+can't reach), so `WORLD_ROLL_ATTEMPTS` went 6 -> 8: expected cost ~1.25 attempts, chance of
+exhausting the budget ~2e-6.
+
+### Skill-quest gates: Runecrafting and Herblore (2026-07-25, from play)
+
+Reported from a spoiler log: the seed wanted 20 Runecrafting before Rune Mysteries. It
+was right to complain - `reachableFromState` treated `first_xp` as unconditionally
+reachable ("every skill starts trainable") and `level_*` as cap-only, so nothing knew
+some skills are quest-locked. This affected BOTH modes (solo GenerateSeed placement and
+the AP fill), so the fix went in the shared model.
+
+`tools/sim/types.ts` now owns `SKILL_QUEST_GATES` + `skillUnlocked`, consumed by
+`PlacementEngine.reachableFromState`, `ItemGraph.computeObtainable`, the bundle exporter
+and `logic.py`. **Two kinds of entry, and the distinction is written into the table's
+doc comment so nobody "corrects" the second one:**
+
+- `runecraft -> runemysteries` is a HARD SCRIPT GATE. Verified in
+  `skill_runecraft/scripts/essence_mine.rs2:2`: the teleport refuses without the quest,
+  and nothing else in the corpus yields `blankrune` (no shop entry, no drop table). So
+  literally every point of Runecrafting XP is behind that quest.
+- `herblore -> druid` is a DELIBERATE BALANCE CHOICE (user call). This revision's
+  herblore scripts carry no Druidic Ritual check - I checked all of
+  `skill_herblore/scripts/` before adding it - so it is technically trainable from
+  scratch; it's gated because doing so is miserable in practice.
+
+Two mechanisms, because a skill gate isn't only about checks:
+
+1. **Checks**: `first_xp` / `level` / `activity` locations on a gated skill require the
+   quest. Note `first_xp` too - a quest-locked skill yields *no* XP, so even the first
+   point waits.
+2. **Item sources**: `computeObtainable` now takes the completed-quest set. Two ways a
+   source can be quest-locked - the skill itself (`skillUnlocked`), or the specific
+   ACTION (`QUEST_GATED_GATHER_ITEMS`, currently just `blankrune`). The action stamp goes
+   on the SOURCE object, not the item, so it survives gathersanity: the swap re-keys each
+   source under whatever the action now delivers, and the gate travels with it. That is
+   the correct reading - the essence *mine* is what's locked, no matter what mining it
+   hands you after a shuffle.
+
+Parity stayed green and all 139 tests passed, because in the spatial-only parity config
+the gating quests complete early anyway - the gate changes check ORDER, not final
+reachability. The regression test is `test_skill_gates.py`, which asserts both directions
+(no check on a gated skill is reachable empty-handed; all of them are once everything is
+collected) plus that ungated `first_xp` stayed free.

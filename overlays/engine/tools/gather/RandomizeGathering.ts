@@ -152,7 +152,11 @@ function parseArgs(argv: string[]) {
         skills: [...SKILLS] as Skill[],
         exclude: new Set<string>(),
         questPins: null as boolean | null, // null = decide by mode (shuffle off, chaos on)
-        dryRun: false
+        dryRun: false,
+        // GitHub #3: dump the candidate pool and exit, so the Archipelago apworld can
+        // roll the same table itself (it needs the mapping to reason about item
+        // obtainability BEFORE the server ever runs this tool).
+        exportPool: null as string | null
     };
     for (let i = 2; i < argv.length; i++) {
         const arg = argv[i];
@@ -196,6 +200,8 @@ function parseArgs(argv: string[]) {
             args.questPins = false;
         } else if (arg === '--dry-run') {
             args.dryRun = true;
+        } else if (arg === '--export-pool') {
+            args.exportPool = argv[++i] ?? 'data/config/ap-gather-pool.json';
         } else {
             throw new Error(`unknown argument ${arg}`);
         }
@@ -233,6 +239,28 @@ function main() {
         if (!objIds.has(item)) {
             throw new Error(`product ${item} not found in obj.pack - parser drift?`);
         }
+    }
+
+    // GitHub #3: --export-pool writes the shuffle's INPUT (the ordered product pool,
+    // each product's skill and obj id, and the pin sets that decide who is eligible)
+    // and stops. The Archipelago apworld replays the exact same derangement over this
+    // list, so it knows what every gathering action will hand out while its fill is still
+    // running - which is what lets item obtainability be real logic in AP mode.
+    // Deterministic and mode-independent: pins are exported as data, not applied here.
+    if (args.exportPool) {
+        const questCriticalAll = loadQuestCriticalItems(new Set(skillOf.keys()));
+        const poolOut = {
+            _generated: 'tools/gather/RandomizeGathering.ts --export-pool - the UNSHUFFLED candidate pool',
+            generatedAt: new Date().toISOString(),
+            skills: args.skills,
+            products: [...skillOf.entries()].map(([item, skill]) => ({ item, skill, objId: objIds.get(item)! })),
+            hardExcluded: Object.fromEntries(Object.entries(HARD_EXCLUDED).filter(([item]) => skillOf.has(item))),
+            questCritical: [...questCriticalAll].sort()
+        };
+        fs.mkdirSync(path.dirname(path.resolve(args.exportPool)), { recursive: true });
+        fs.writeFileSync(path.resolve(args.exportPool), JSON.stringify(poolOut, null, 2) + '\n');
+        console.log(`wrote ${poolOut.products.length} product(s) to ${args.exportPool} (pool only - no table written)`);
+        return;
     }
 
     // pins: hard exclusions, quest-critical products (mode-aware - see the header
