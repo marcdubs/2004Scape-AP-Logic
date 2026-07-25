@@ -56,6 +56,30 @@
         };
     }
 
+    // The "source key -> destination coord" map everything entrance-shaped reads: the
+    // map's pin lines, the site panel, the entrances list. Normally that is exactly
+    // what the player has discovered; in spoiler mode the server also hands us the
+    // whole override table under data.spoiler.entrances, keyed identically
+    // ("level_mapX_mapZ_localX_localZ:op" -> destination coord), so merging it here
+    // populates every one of those views at once. Without this the spoiler payload
+    // arrived but nothing consumed it, and a clicked pin reported "not yet explored"
+    // for every entrance (issue #12). Discoveries win on collision so a real discovery
+    // is never displaced by the table it came from.
+    function knownEntrances(data) {
+        var discovered = (data && data.discoveries && data.discoveries.entrances) || {};
+        if (!spoilerMode || !data || !data.spoiler || !data.spoiler.entrances) {
+            return discovered;
+        }
+        var merged = {};
+        Object.keys(data.spoiler.entrances).forEach(function (key) {
+            merged[key] = data.spoiler.entrances[key];
+        });
+        Object.keys(discovered).forEach(function (key) {
+            merged[key] = discovered[key];
+        });
+        return merged;
+    }
+
     // ---- fetching ----
 
     function fetchTracker() {
@@ -330,9 +354,11 @@
 
         var discovered = (data.discoveries && data.discoveries.entrances) || {};
         var total = (data.totals && data.totals.entrances) || 0;
-        counterEl.textContent = '(' + Object.keys(discovered).length + ' / ' + total + ' discovered)';
+        // the count stays honest about what was actually walked even when spoiler mode
+        // is listing the whole table below it.
+        counterEl.textContent = '(' + Object.keys(discovered).length + ' / ' + total + ' discovered' + (spoilerMode ? ' · showing all' : '') + ')';
 
-        var rows = buildConnectionRows(discovered);
+        var rows = buildConnectionRows(knownEntrances(data));
         container.innerHTML = '';
 
         if (rows.length === 0) {
@@ -563,7 +589,7 @@
     var sitesCache = { sig: null, sites: null };
 
     function trackerSignature(data) {
-        var entrances = (data.discoveries && data.discoveries.entrances) || {};
+        var entrances = knownEntrances(data);
         var teleports = (data.discoveries && data.discoveries.teleports) || {};
         var sources = data.entranceSources || [];
         return sources.length + '|' + Object.keys(entrances).length + '|' + Object.keys(teleports).length;
@@ -584,7 +610,7 @@
             return sites[k];
         }
 
-        var discovered = (data.discoveries && data.discoveries.entrances) || {};
+        var discovered = knownEntrances(data);
         var sources = data.entranceSources || [];
 
         // fall back to just the discovered set if the server predates entranceSources
@@ -707,7 +733,8 @@
             var teleportTotal = (data.totals && data.totals.teleports) || 0;
             counters.innerHTML =
                 '<span>Entrances: <b>' + Object.keys(discoveredEntrances).length + ' / ' + entranceTotal + '</b></span>' +
-                '<span>Teleports: <b>' + Object.keys(discoveredTeleports).length + ' / ' + teleportTotal + '</b></span>';
+                '<span>Teleports: <b>' + Object.keys(discoveredTeleports).length + ' / ' + teleportTotal + '</b></span>' +
+                (spoilerMode ? '<span>showing <b>all</b></span>' : '');
             emptyEl.hidden = currentPins.length > 0;
         }
 

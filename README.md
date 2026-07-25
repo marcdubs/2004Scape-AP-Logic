@@ -393,6 +393,21 @@ cd Server/engine && npx tsx tools/npc/RandomizeDrip.ts [--seed <number>] [--dry-
 cd Server/engine && npx tsx tools/pack/Build.ts
 ```
 
+If an NPC ends up looking broken, `AuditDripModels.ts` is the diagnostic:
+
+```
+cd Server/engine && npx tsx tools/npc/AuditDripModels.ts                   # whole pool: geometry, exclusions, review list
+cd Server/engine && npx tsx tools/npc/AuditDripModels.ts --npc bob         # one npc: vanilla -> current, with each model's geometry
+cd Server/engine && npx tsx tools/npc/AuditDripModels.ts --category man_legs
+```
+
+It reads the actual `.ob2` vertex bounds (`ModelGeometry.ts`) plus how vanilla wears
+each value, which is what the swap-pool exclusion rules in `NpcDripParser.ts` are
+derived from - a piece vanilla only ever layers on top of a real one, a piece that
+doesn't reach its category's ground line, or a torso mesh that includes a head all get
+gated out of the sample-into pools. Point `--npc` at whatever looked wrong and it names
+the model.
+
 ...then restart the server. First run backs up every vanilla `.npc` file under
 `content/.ap-backup/scripts/` (mirroring the same backup convention entrance
 randomization uses) and every subsequent reseed re-derives from that backup, so
