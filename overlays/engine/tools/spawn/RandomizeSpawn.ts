@@ -5,6 +5,7 @@ import { printInfo, printWarning } from '#/util/Logger.js';
 
 import { CONTENT_ROOT } from '../map/EntranceParser.js';
 import { mulberry32 } from '../shared/Prng.js';
+import { isTutorialMapsquare } from '../shared/TutorialIsland.js';
 
 // Archipelago random spawn/home point (2004Scape-AP-Logic docs/goals-and-checks.md
 // Feature 3, expanded with a second "chunk" mode). Picks one seeded home coordinate
@@ -150,8 +151,9 @@ const WILDERNESS_MAPX_MIN = 46;
 const WILDERNESS_MAPX_MAX = 52;
 const WILDERNESS_MAPZ_MIN = 55;
 
-// Tutorial Island - same protected-mapsquare convention as RandomizeEntrances.ts.
-const PROTECTED_MAPSQUARES: [number, number][] = [[48, 48]];
+// Tutorial Island - the shared footprint (tools/shared/TutorialIsland.ts), same list
+// RandomizeEntrances protects. It is six mapsquares, not the (48,48) this used to
+// assume, so a chunk-mode HOME could land on the island (issue #14).
 
 // Surveyed the full content/maps/*.jm2 file list (483 files) 2026-07-15: mapZ is
 // bimodal - surface mapZ 20 (one outlier, a 4-section-only stub map, not real
@@ -278,7 +280,7 @@ function enumerateChunkCandidates(includeIslands: boolean, includeFarWest: boole
         if (mapX >= WILDERNESS_MAPX_MIN && mapX <= WILDERNESS_MAPX_MAX && mapZ >= WILDERNESS_MAPZ_MIN) {
             continue; // wilderness
         }
-        if (PROTECTED_MAPSQUARES.some(([px, pz]) => px === mapX && pz === mapZ)) {
+        if (isTutorialMapsquare(mapX, mapZ)) {
             continue; // Tutorial Island
         }
         if (mapX >= KARAMJA_MAPX_MIN && mapX <= KARAMJA_MAPX_MAX && mapZ >= KARAMJA_MAPZ_MIN && mapZ <= KARAMJA_MAPZ_MAX) {
