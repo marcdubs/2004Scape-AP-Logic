@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { StatName } from '../sim/types.js';
+import { StatName, skillUnlocked } from '../sim/types.js';
 
 // Item-acquisition graph for the seed validator (problems.txt #16). Answers "can the
 // player actually OBTAIN item X given their current skill caps?" so quest item
@@ -34,6 +34,34 @@ export interface ItemSource {
     inputs?: string[];
     region?: number; // set for buy/drop sources; the region that must be reachable
     via?: 'buy' | 'drop'; // provenance for spoiler/debug (region sources only)
+    /** Quest that must be COMPLETE before this source works at all - see QUEST_GATED_GATHER_ITEMS. */
+    quest?: string;
+}
+
+/**
+ * Gathering actions the game refuses to run until a quest is done, keyed by the item
+ * they yield in vanilla. Today just rune essence: the essence mine is only reachable
+ * through a teleport that checks Rune Mysteries
+ * (skill_runecraft/scripts/essence_mine.rs2:2), and nothing else in the corpus produces
+ * blankrune.
+ *
+ * Stamped onto the SOURCE, not the item, so it survives gathersanity: the swap re-keys
+ * each source under whatever the action now delivers, and the gate travels with it -
+ * which is the correct reading, because it is the essence-mine ACTION that is gated, no
+ * matter what it hands you afterwards.
+ */
+export const QUEST_GATED_GATHER_ITEMS: Readonly<Record<string, string>> = { blankrune: 'runemysteries' };
+
+/** Applies QUEST_GATED_GATHER_ITEMS in place. Call BEFORE applySwaps. */
+export function stampQuestGates(sources: Map<string, ItemSource[]>): Map<string, ItemSource[]> {
+    for (const [item, quest] of Object.entries(QUEST_GATED_GATHER_ITEMS)) {
+        for (const source of sources.get(item) ?? []) {
+            if (source.region === undefined) {
+                source.quest = quest;
+            }
+        }
+    }
+    return sources;
 }
 
 export interface QuestItemNeed {
@@ -116,13 +144,15 @@ export function applySwaps(vanilla: Map<string, ItemSource[]>, swap: Map<string,
 // ANY of its sources has skill cap >= level AND every input is itself obtainable (inputs
 // not in the graph are assumed obtainable - buy/drop/given/misc). Raw gathers (inputs=[])
 // gate on the cap alone. Recomputed per sphere as caps grow (cheap - a few hundred items).
-export function computeObtainable(sources: Map<string, ItemSource[]>, statCaps: Record<StatName, number>, reachableRegions: ReadonlySet<number>): Set<string> {
+export function computeObtainable(sources: Map<string, ItemSource[]>, statCaps: Record<StatName, number>, reachableRegions: ReadonlySet<number>, completedQuests: ReadonlySet<string> = new Set()): Set<string> {
     const obtainable = new Set<string>();
     const inputObtainable = (item: string): boolean => !sources.has(item) || obtainable.has(item);
     const satisfiable = (s: ItemSource): boolean =>
-        s.region !== undefined
-            ? reachableRegions.has(s.region)                                        // buy/drop: shop-owner / monster region reachable
-            : (statCaps[s.skill!] ?? 99) >= (s.level ?? 0) && (s.inputs ?? []).every(inputObtainable); // gather/process
+        (s.quest !== undefined && !completedQuests.has(s.quest)) || !skillUnlocked(s.skill, completedQuests)
+            ? false                                                                 // the action, or the whole skill, is quest-locked
+            : s.region !== undefined
+                ? reachableRegions.has(s.region)                                    // buy/drop: shop-owner / monster region reachable
+                : (statCaps[s.skill!] ?? 99) >= (s.level ?? 0) && (s.inputs ?? []).every(inputObtainable); // gather/process
     let changed = true;
     while (changed) {
         changed = false;

@@ -103,6 +103,9 @@ game: 2004Scape
   extra_goals: []          # e.g. ["kbd"] - ALL listed goals also required for victory
   progressive_quests: false # one difficulty-ordered "Progressive Quest Unlock" item instead of 61 named ones
   music_checks: false      # 230 extra "first visit to each music region" checks
+  region_logic: true       # default. Archipelago reasons about where things physically are,
+                           # and rolls the world (entrances, gathering, processing, shops,
+                           # drops, spawn) itself so the fill matches what you will play.
 ```
 
 `name:` is your **slot name** in the multiworld - it's how the game server
@@ -158,6 +161,37 @@ tar -xf output\AP_<id>.zip -C output AP_<id>.archipelago
 Leave that terminal running. Server state lives in `output/AP_<id>.apsave` next
 to the multidata - delete it to reset the run, regenerate for a new seed.
 
+#### The spoiler log
+
+The same zip also holds `AP_<id>_Spoiler.txt` - pull it out the same way
+(`unzip -o output/AP_<id>.zip -d output "*Spoiler.txt"`, or Windows
+`tar -xf output\AP_<id>.zip -C output AP_<id>_Spoiler.txt`). No extra flag is
+needed: Archipelago's shipped `host.yaml` defaults to `spoiler: 3`, which is
+the full log including the playthrough. (`--spoiler 0` turns it off, `1` drops
+the playthrough.)
+
+Alongside AP's own sections (options, every location's contents, the
+sphere-by-sphere playthrough), 2004Scape writes **the world it rolled** - none
+of which Archipelago could report on its own:
+
+```
+World seed:                      2769643227
+Home / spawn:                    Varrock (0_50_53_13_32)
+Entrance layout:                 736 redirect(s), 709/736 pool sides reachable
+Gathering swaps:                 38 (shuffle, 1 pinned vanilla)
+Processing swaps:                252 (shuffle, 0 pinned vanilla)
+Shops relocated:                 113
+Drop tables mimicked:            95 monster(s)
+```
+
+followed by the full tables - every gathering/processing swap
+(`coal -> charcoal`), every shop relocation (`bob now stocks miningstore`),
+every drop table (`_chicken drops like black_knight_drops`, or per-slot
+`brawling_bandit (rare): iron_scimitar -> firerune` in tiered/chaos mode), and
+every entrance redirect. Reading it spoils the run completely, which is the
+point - it is the reference for "is this seed doing what I asked", and the
+first thing to attach to a bug report.
+
 ### 5. Per run (Archipelago): connect, THEN roll the seed, then play
 
 1. Start the game server as usual (`cd Server/engine && npx tsx src/app.ts`,
@@ -180,6 +214,15 @@ to the multidata - delete it to reset the run, regenerate for a new seed.
    owns item placements; the server rewrites the file with the room's quest
    gates when it reconnects). Then **restart the game server**; it reconnects
    to the room on boot.
+
+   What "matches what the YAML asked for" means is stronger than it sounds:
+   Archipelago rolled this world *during generation* so its fill could reason
+   about it, so the file pins **the seed itself**. Every randomizer the script
+   runs (gathering, processing, shops, drops, spawn) is deterministic, so it
+   reproduces Archipelago's tables exactly. Entrances skip the roll entirely -
+   that table arrives finished in `slot_data` and the client writes it on
+   connect. This is why rolling before connecting produces a *different world
+   from the one the multiworld was filled against*, and why the order matters.
 4. **Game client**: http://localhost:8080/rs2.cgi - play. The tracker shows
    map, discoveries, and unlocks as you go. Checks announce in chat as you
    complete them, received items apply immediately (gear tiers, skill caps,
@@ -829,18 +872,37 @@ persist across reseeds indefinitely) or when reseeding everything for a fresh te
 `--seed` sets a shared default for all three tools; the per-tool `--*-seed` flags
 override it individually.
 
-## Archipelago integration (v1)
+## Archipelago integration (v2: region-aware)
 
 Real archipelago.gg multiworld support - full design in
 [docs/archipelago-integration.md](docs/archipelago-integration.md), apworld
-packaging/usage in [apworld/README.md](apworld/README.md). The moving parts:
+packaging/usage in [apworld/README.md](apworld/README.md).
 
-- `apworld/rs2004scape/` - the Python generation-side world (items, locations,
-  travel-agnostic rules ported from PlacementEngine). Zip it as
-  `rs2004scape.apworld` for an Archipelago install.
+**Two randomizers, one logic.** Local/solo seeds are made by generate-and-test:
+`RandomizeEntrances.ts` shuffles, `ValidateSeed.ts` grades, the loop rerolls
+until the seed is beatable (`--require-perfect`). Archipelago's fill runs once
+and cannot reroll, so AP mode is construct-valid instead - the apworld builds a
+reachability-preserving entrance layout itself and reasons over the same region
+/ gate / quest / item logic the local oracle uses. Both read one exported
+bundle, and `scripts/parity-check.py` fails if they ever disagree. The moving
+parts:
+
+- `apworld/rs2004scape/` - the Python generation-side world. `logic.py` is the
+  region fixpoint (a port of `ValidateSeed.ts`), `entrances.py` the
+  construct-valid entrance shuffle, `randomizers.py` the replay of every other
+  randomizer (gathering, processing, shops, drops, spawn) so the fill knows the
+  world it is filling. Zip it as `rs2004scape.apworld` for an Archipelago
+  install.
 - `overlays/engine/tools/ap/ExportApWorldData.ts` - generates the shared
   datapackage (`ap-archipelago-data.json` / `rs2004_data.json`); ids are
   append-only.
+- `overlays/engine/tools/ap/ExportLogicBundle.ts` - generates the shared logic
+  bundle (`ap-logic-bundle.json` / `rs2004_logic.json`): regions, gated areas,
+  the entrance pool, the item graph, the quest-doability varp model. Everything
+  region-shaped comes from `tools/logic/LogicModel.ts`, the same module
+  `ValidateSeed.ts` imports, so the two cannot drift.
+- `scripts/parity-check.py` - runs both implementations over the same seed and
+  diffs regions / quests / QP / goals.
 - `overlays/engine/src/engine/ApClient.ts` - the runtime AP WebSocket client.
   Enabled by `data/config/ap-archipelago.json` (`{"enabled": true, "host": ...,
   "port": 38281, "slot": "..."}`); inert without it. Fired checks go out as
@@ -850,6 +912,13 @@ packaging/usage in [apworld/README.md](apworld/README.md). The moving parts:
 In AP mode the local GenerateSeed placement fill must NOT be active - the AP
 server owns all placements (ap-placements.json carries only slot_data's quest
 gates). Solo placement mode is unchanged when ap-archipelago.json is absent.
+
+With the default `region_logic: true`, Archipelago also owns the entrance
+layout: it arrives in `slot_data.entranceOverrides`, the client writes it to
+`data/config/ap-entrances.json` and hot-reloads it, and
+`seedOptions.entrances` arrives as `"off"` so the next seed roll leaves that
+map alone. Set `region_logic: false` to go back to the v1 contract (server-side
+entrance shuffle + travel-agnostic AP rules).
 
 ## License & credits
 

@@ -53,7 +53,7 @@ import path from 'path';
 
 import { completableQuests } from './Engine.js';
 import { GatherProcessConfig, UnlocksConfig, allSkillCaps } from './ConfigLoader.js';
-import { Goal, QuestReq, STAT_NAMES, StatName } from './types.js';
+import { Goal, QuestReq, SKILL_QUEST_GATES, STAT_NAMES, StatName, skillUnlocked } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Location catalog
@@ -253,6 +253,7 @@ export const MUSIC_TRACK_IDS: readonly string[] = [
 // ConfigLoader.ts/ApUnlockOverrides.ts). Matches ApChecks.ts's onXpGain exactly (it skips
 // PlayerStat.HITPOINTS for both first_xp and level_ checks).
 export const CAPPABLE_SKILLS: StatName[] = STAT_NAMES.filter(s => s !== 'hitpoints');
+
 
 export const LEVEL_MILESTONES = [10, 20, 30, 40, 50, 60, 70, 80, 90];
 
@@ -524,10 +525,14 @@ export function reachableFromState(locations: LocationDef[], quests: QuestReq[],
                 reachable.add(loc.id); // sphere-0-ish, bronze kit suffices.
                 break;
             case 'first_xp':
-                reachable.add(loc.id); // every skill starts trainable (cap >= 20 >= 1).
+                // every skill starts trainable (cap >= 20 >= 1) EXCEPT the ones a quest
+                // gates outright - see SKILL_QUEST_GATES.
+                if (skillUnlocked(loc.skill, completed)) {
+                    reachable.add(loc.id);
+                }
                 break;
             case 'level':
-                if (loc.skill && loc.level !== undefined && caps[loc.skill] >= loc.level) {
+                if (loc.skill && loc.level !== undefined && caps[loc.skill] >= loc.level && skillUnlocked(loc.skill, completed)) {
                     reachable.add(loc.id);
                 }
                 break;
@@ -535,7 +540,7 @@ export function reachableFromState(locations: LocationDef[], quests: QuestReq[],
                 // Gated only by the vanilla script's own skill requirement (recorded on
                 // the def), applied against progressive caps like 'level'; ungated
                 // activities are sphere-0-ish, same reasoning as barcrawl/first_kill.
-                if (loc.skill === undefined || loc.level === undefined || caps[loc.skill] >= loc.level) {
+                if ((loc.skill === undefined || loc.level === undefined || caps[loc.skill] >= loc.level) && skillUnlocked(loc.skill, completed)) {
                     reachable.add(loc.id);
                 }
                 break;

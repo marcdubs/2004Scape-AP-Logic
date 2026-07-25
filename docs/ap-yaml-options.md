@@ -90,6 +90,42 @@ list only stops it *rolling*. The game server adopts this on connect (the
 | `teleporting_focus` | rune-free teleports; a Greater upgrade can roll later |
 | `npc_teleport` | teleport to a previously-met NPC |
 
+### `region_logic`
+
+`true` (default) / `false`. Reason about where things physically **are**.
+
+On, the world's access rules run the full region/gate/quest/item fixpoint - the
+same one `tools/logic/ValidateSeed.ts` runs for solo seeds, ported to Python in
+`apworld/rs2004scape/logic.py` - so the multiworld's fill can never hide
+progression behind a door this seed leaves shut. Two consequences:
+
+- **Archipelago builds the entrance layout**, not the game server. It uses a
+  reachability-preserving frontier (the same idea as AP's own
+  `randomize_entrances`), so the map is sound by construction and nothing is
+  rerolled. The finished table ships in `slot_data.entranceOverrides`, the
+  client writes it to `data/config/ap-entrances.json`, and
+  `seedOptions.entrances` is pinned to `off` so a later `new-run` cannot
+  reshuffle the map the fill reasoned over. `entrance_randomization` still
+  chooses the *style* (`off` / `on` / `mixed`).
+- **Checks the region model cannot justify are not created.** If no reachable
+  path to a quest exists even with every item collected, its check would never
+  fire in game either, so nothing is placed there. A configured *goal* being
+  unreachable is a generation error instead.
+
+- **Archipelago also rolls the rest of the world.** Gathersanity, processsanity,
+  shopsanity, drop randomization and spawn all change what is obtainable and
+  where you start, so they are rolled during generation too. Only entrances ship
+  as a finished table; the others ship as one shared **seed**
+  (`seedOptions.seed`), which the server's own deterministic tools replay into
+  the identical tables.
+- **If a goal turns out unreachable, the world is re-rolled** (up to 8 times)
+  before generation gives up. With every randomizer on and drops on `mimic`,
+  roughly 1 roll in 5 needs a second attempt.
+
+Off, the older travel-agnostic rules apply (skills, quest prerequisites and QP
+only) and the game server rolls its own entrance table again - in which case
+that roll must pass `--require-perfect`, as described below.
+
 ### Seed randomizer options (adopted at the next seed roll)
 
 Every server-side randomizer is configurable from the YAML. These can't apply
@@ -101,7 +137,9 @@ connect once, then run `new-run`. To fall back to the script knobs instead:
 `AP_SEED_OPTIONS=ignore bash scripts/new-run.sh` (Windows:
 `set AP_SEED_OPTIONS=ignore` first), or delete the file.
 
-Adoption also adds `--require-perfect` to the entrance roll: an AP run must
+Adoption also adds `--require-perfect` to the entrance roll **when the server
+is the one rolling entrances** (`region_logic: false`, or a run predating it):
+an AP run must
 never accept an entrance table that strands a quest (solo runs may - their
 stranded checks just become filler), because the multiworld's fill was
 computed before the table existed and a stranded check may hold another
@@ -110,7 +148,7 @@ quests", just re-run for a fresh seed.
 
 | option | values (default first) | controls |
 |---|---|---|
-| `entrance_randomization` | `on` / `off` / `mixed` | ladder/stair/trapdoor shuffle; `mixed` merges both gate pools |
+| `entrance_randomization` | `on` / `off` / `mixed` | ladder/stair/trapdoor shuffle; `mixed` merges both gate pools. With `region_logic: true` the apworld performs this shuffle itself and ships the table (see above) - the server's copy of this knob is forced to `off` |
 | `npc_drip` | `true` / `false` | NPC outfit/cosmetic shuffle |
 | `shop_randomization` | `true` / `false` | which NPC has which shop |
 | `teleport_randomization` | `true` / `false` | the 7 spellbook teleports land at each other's destinations (always a vanilla landmark, never wilderness; casting quest-gates stay put) |

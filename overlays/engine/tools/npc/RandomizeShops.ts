@@ -46,7 +46,19 @@ function parseArgs() {
                   .map(s => s.trim())
                   .filter(Boolean)
             : [];
-    return { seed, dryRun: args.includes('--dry-run'), mismatchedTitles: args.includes('--mismatched-titles'), exclude };
+    const poolIdx = args.indexOf('--export-pool');
+    return {
+        seed,
+        dryRun: args.includes('--dry-run'),
+        mismatchedTitles: args.includes('--mismatched-titles'),
+        exclude,
+        // GitHub #3: dump the eligible-bundle list and exit. Shopsanity is a content
+        // mutation (it needs a pack rebuild), so Archipelago cannot ship a shop TABLE
+        // the way it ships entrances - but it can pick the SEED and replay this exact
+        // derangement, which is enough to know which NPC ends up selling what while
+        // its fill is still running.
+        exportPool: poolIdx !== -1 ? (args[poolIdx + 1] ?? 'data/config/ap-shop-pool.json') : undefined
+    };
 }
 
 function main() {
@@ -55,7 +67,7 @@ function main() {
         process.exit(1);
     }
 
-    const { seed, dryRun, mismatchedTitles, exclude } = parseArgs();
+    const { seed, dryRun, mismatchedTitles, exclude, exportPool } = parseArgs();
 
     const backedUp = ensureNpcBackup();
     if (backedUp) {
@@ -90,6 +102,23 @@ function main() {
     const eligible = allBundles.filter(b => !excludedBundles.has(b));
     if (eligible.length < 2) {
         printWarning(`only ${eligible.length} eligible shopkeeper(s) found - nothing to shuffle`);
+    }
+
+    if (exportPool) {
+        // `eligible` order IS the shuffle's index space - the apworld deranges the same
+        // list, so this file must preserve it exactly. `all` carries the excluded ones
+        // too so the consumer can still resolve every npc -> shop ownership.
+        const poolOut = {
+            _generated: 'tools/npc/RandomizeShops.ts --export-pool - the UNSHUFFLED candidate set',
+            generatedAt: new Date().toISOString(),
+            eligible: eligible.map(b => ({ npc: b.block, shop: b.shop })),
+            excluded: allBundles.filter(b => excludedBundles.has(b)).map(b => ({ npc: b.block, shop: b.shop })),
+            hardcodedShopIds: [...hardcodedIds].sort()
+        };
+        fs.mkdirSync(path.dirname(path.resolve(exportPool)), { recursive: true });
+        fs.writeFileSync(path.resolve(exportPool), JSON.stringify(poolOut, null, 2) + '\n');
+        printInfo(`wrote ${poolOut.eligible.length} eligible + ${poolOut.excluded.length} excluded shopkeeper(s) to ${exportPool} (pool only - no content touched)`);
+        return;
     }
 
     const rand = mulberry32(seed);

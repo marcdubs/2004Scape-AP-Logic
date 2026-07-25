@@ -320,6 +320,45 @@ function applySlotData(slotData: Record<string, unknown> | undefined): void {
         }
     }
 
+    // The apworld's own entrance layout (GitHub #3). With region_logic on, Archipelago
+    // builds the trigger -> arrival table itself, reachability-preserving, and the
+    // multiworld's fill was computed against THAT map - so it is authoritative and must
+    // land in ap-entrances.json before the player moves. Written live; the engine's
+    // ApEntranceOverrides reloads it, no pack rebuild needed. slot_data also pins
+    // seedOptions.entrances to "off" so the next scripts/new-run cannot reshuffle it.
+    if (slotData.entranceOverrides && typeof slotData.entranceOverrides === 'object' && !Array.isArray(slotData.entranceOverrides)) {
+        const overrides = slotData.entranceOverrides as Record<string, unknown>;
+        const clean: Record<string, string> = {};
+        for (const [key, value] of Object.entries(overrides)) {
+            if (/^\d+_\d+_\d+_\d+_\d+:\d+$/.test(key) && typeof value === 'string' && /^\d+_\d+_\d+_\d+_\d+$/.test(value)) {
+                clean[key] = value;
+            }
+        }
+        if (Object.keys(clean).length > 0) {
+            try {
+                const file = 'data/config/ap-entrances.json';
+                // keep any gate requirements the local table already carried: the gate
+                // stays with the physical location, not the destination (workstream B).
+                let gates: unknown = {};
+                if (fs.existsSync(file)) {
+                    gates = (JSON.parse(fs.readFileSync(file, 'utf8')) as { gates?: unknown }).gates ?? {};
+                }
+                fs.writeFileSync(file, JSON.stringify({
+                    source: 'archipelago slot_data',
+                    generatedAt: new Date().toISOString(),
+                    overrides: clean,
+                    gates
+                }, null, 2), 'utf8');
+                void import('#/engine/ApEntranceOverrides.js')
+                    .then(m => m.reloadEntranceOverrides?.())
+                    .catch(() => { /* module may not expose a reload hook - restart picks it up */ });
+                printInfo(`AP client: adopted ${Object.keys(clean).length} entrance override(s) from slot_data`);
+            } catch (err) {
+                printWarning(`AP client: failed to write ap-entrances.json (${err instanceof Error ? err.message : err})`);
+            }
+        }
+    }
+
     // relics: which addon reward items may roll from Mystery Reward filler.
     // Absence from the list disables the roll; already-delivered items keep
     // working (ap_addons.rs2 usage is deliberately not option-gated).

@@ -31,6 +31,11 @@ node scripts/install.js                                  # deploy overlays -> ..
 cd ../Server/engine && npx tsx tools/pack/Build.ts       # rebuild pack (after overlay changes only)
 cd ../Server/engine && npx tsx tools/map/RandomizeEntrances.ts [--seed N] [--mixed] [--dry-run]
 cd ../Server/engine && npx tsc --noEmit -p .              # typecheck engine
+
+# Archipelago side (GitHub #3 - AP gets the SAME logic; local mode is unchanged)
+cd ../Server/engine && npx tsx tools/ap/ExportLogicBundle.ts \
+    --copy ../../2004Scape-AP-Logic/apworld/rs2004scape/data/rs2004_logic.json
+python3 scripts/parity-check.py [--write-fixture]        # ValidateSeed.ts vs logic.py
 ```
 
 ## Hard-won rules (details in lessons-learned)
