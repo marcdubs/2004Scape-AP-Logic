@@ -3412,3 +3412,55 @@ Gathersanity/processsanity/shopsanity/spawn randomization are rolled server-side
 generation, so the `itemSources` graph the fill reasons over is the vanilla one.
 `LogicEngine(item_swaps=...)` already accepts a swap table - the apworld just has no
 reason to build one until it rolls those tables itself, the way it now rolls entrances.
+
+### Follow-up (same day): the apworld rolls the rest of the world too
+
+The gap left above - "gathersanity/processsanity/shopsanity/spawn are rolled server-side
+*after* generation, so the item graph the fill reasons over is the vanilla one" - is
+closed. The mechanism is worth remembering because it is *not* the same one entrances use:
+
+- **Entrances ship a table.** The engine reads `ap-entrances.json` at runtime, so AP can
+  hand over a finished layout.
+- **The other four ship a SEED.** Shopsanity rewrites `.npc` params and needs a pack
+  rebuild, so there is no table to hand over. Instead AP picks the seed, and the
+  deterministic TS tools reproduce the identical table server-side. `new-run.sh` already
+  feeds one shared `$SEED` to every randomizer, so **one number pins all four**
+  (`slot_data.seedOptions.seed` -> `seed-options-to-env.cjs` emits `SEED=`).
+
+For that to be worth anything the apworld must *know* those tables during generation, so
+each tool grew a `--export-pool` flag (the candidate list, i.e. the shuffle's input) and
+`randomizers.py` replays the shuffle over it. That needed `prng.py`, a byte-exact port of
+`mulberry32`/`shuffle`/`derangement` - watch `Math.imul` (32-bit *signed* multiply) and
+the `>>>`/`|0` mix; it matched on the first try and is pinned by vectors in
+`test_randomizers.py`, alongside vectors of the real `ap-gather.json` / `ap-process.json`
+/ `ap-spawn.json` / `shop-seed.json` for seed 424242.
+
+Three things this shook out that a future session should not have to rediscover:
+
+- **Key shop ownership by BUNDLE, not by shop id.** Several NPCs can share one shop id
+  (two barmaids, one pub inventory), so "who owns shop S now" is ambiguous and does not
+  reduce to the identity when shopsanity is off - the first attempt silently *added* buy
+  regions (cabbage gained region 16534 from a second barmaid). Ask instead "who took over
+  this particular shopkeeper's stock", which is a bijection. A test pins that the
+  shopsanity-off path and a relocation under identity ownership agree exactly.
+- **Retry the WORLD, not the fill.** With all four randomizers live, ~1 rolled world in 30
+  leaves a configured goal unreachable (a gathersanity swap puts a goal quest's item behind
+  a skill the region model can't justify). Failing the whole multiworld for that is
+  ridiculous, so `generate_early` rolls another world (up to 6). This is not
+  generate-and-test creeping back in: AP's fill still runs exactly once, over a world
+  already known sound; the retry is over the map, at ~2.5s a go, entirely inside
+  `generate_early`.
+- **Turning on real logic breaks tests that assumed everything is reachable.** Three had to
+  learn about feasibility exclusion: "every catalog location exists" (now minus the
+  excluded ones), "every gated quest is completable with its unlock item" (skip quests this
+  world excluded), and the exact-`seedOptions` dict (now carries `seed`). None were wrong
+  before; they were asserting the old contract.
+
+Also added `write_spoiler_header` / `write_spoiler`. A world whose locations all sit in one
+AP region gets a spoiler that says nothing about what was randomized - now it prints the
+world seed, home/spawn, entrance coverage, and the full gathering/processing/shop/entrance
+tables. That is the only readable record of the rolled world.
+
+**Still unmodelled: drop randomization.** `drop-sources.json` describes vanilla loot, so a
+`drop`-sourced item can read as obtainable when the shuffle moved it. Closing it means
+porting `MimicTransform.ts` (544 lines).

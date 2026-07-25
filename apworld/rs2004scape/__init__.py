@@ -36,6 +36,7 @@ from worlds.generic.Rules import set_rule
 from .entrances import EntranceShuffler, coverage, vanilla_entrances
 from .logic import LogicEngine, load_bundle
 from .options import Goal, RS2004Options
+from .randomizers import relocate_buy_sources, roll_all
 
 DATA = json.loads(pkgutil.get_data(__name__, "data/rs2004_data.json").decode("utf-8"))
 LOGIC_BUNDLE = load_bundle()
@@ -61,6 +62,11 @@ for _name, _def in ITEMS.items():
         QUEST_UNLOCK_ITEM_BY_ID[_def["grant"][len("quest_"):]] = _name
 
 FILLER_NAME = "Mystery Reward"
+
+# How many complete worlds generate_early may roll looking for one whose goals are
+# reachable. Each attempt costs ~2.5s (the entrance frontier dominates) and the first
+# one succeeds ~29 times in 30, so this is a safety net, not a search.
+WORLD_ROLL_ATTEMPTS = 6
 PROGRESSIVE_QUEST_NAME = "Progressive Quest Unlock"
 
 GEAR_ITEM_NAMES = {"Progressive Melee", "Progressive Armour", "Progressive Ranged", "Progressive Magic"}
@@ -300,33 +306,78 @@ class RS2004World(World):
         """
         self.region_logic = bool(self.options.region_logic)
         self.entrance_overrides = {}
-        self.engine = LogicEngine(LOGIC_BUNDLE, quest_gates=self._unlocked_quests_gate_set())
-        if not self.region_logic:
-            return
-        mode = self.options.entrance_randomization.current_key
-        if mode == "off":
-            self.entrance_overrides = vanilla_entrances(self.engine)
-        else:
-            shuffler = EntranceShuffler(self.engine, self.random, mixed=(mode == "mixed"))
-            self.entrance_overrides = shuffler.shuffle()
-        # Layout-quality signal, never fatal: a few pool sides sit in areas the region
-        # model does not describe at all (standalone handlers outside the shuffle's
-        # reach), so full coverage is not expected - same status as ValidateSeed's lint
-        # warnings.
-        self.entrance_coverage = coverage(self.engine, self.entrance_overrides)
+        self.entrance_coverage = (0, 0)
 
-        # Goals ARE fatal: if the layout cannot reach a configured goal even with every
-        # item collected, no fill can fix it - say so now instead of failing later with
-        # an opaque "no path to victory".
-        max_state = self._max_state()
-        unreachable = [key for key in self._goal_keys()
-                       if GOAL_ID_BY_KEY[key] not in max_state.goals]
-        if unreachable:
-            raise OptionError(
-                f"2004Scape: goal(s) {', '.join(unreachable)} are unreachable under this seed's "
-                f"entrance layout. Re-roll the multiworld, or set region_logic: false to fall back "
-                f"to travel-agnostic rules."
-            )
+        if not self.region_logic:
+            self.run_seed = self.random.randrange(0x100000000)
+            self.roll = self._roll_world(self.run_seed)
+            self.engine = LogicEngine(LOGIC_BUNDLE, quest_gates=self._unlocked_quests_gate_set())
+            return
+
+        # Roll the whole world - the four server-side randomizers AND the entrance
+        # layout - and keep the first roll whose goals are actually reachable.
+        #
+        # This is NOT the local mode's generate-and-test over item placement (AP's fill
+        # still runs exactly once, over a world already known to be sound). It is a
+        # retry over the WORLD, which is cheap and entirely inside generate_early: a
+        # gathersanity swap can put a goal's quest item behind a skill the region model
+        # cannot reach, and re-rolling the world is a far better answer than making the
+        # whole multiworld fail. Measured ~1 roll in 30 needs a second attempt.
+        last_unreachable: list = []
+        for _ in range(WORLD_ROLL_ATTEMPTS):
+            seed = self.random.randrange(0x100000000)
+            roll = self._roll_world(seed)
+            engine = self._engine_for(roll)
+            mode = self.options.entrance_randomization.current_key
+            if mode == "off":
+                overrides = vanilla_entrances(engine)
+            else:
+                overrides = EntranceShuffler(engine, self.random, mixed=(mode == "mixed")).shuffle()
+
+            max_state = engine.derive(engine.uncapped(), frozenset(GATED_QUEST_IDS))
+            last_unreachable = [key for key in self._goal_keys()
+                                if GOAL_ID_BY_KEY[key] not in max_state.goals]
+            if not last_unreachable:
+                self.run_seed, self.roll, self.engine = seed, roll, engine
+                self.entrance_overrides = overrides
+                # Layout-quality signal, never fatal: a few pool sides sit in areas the
+                # region model does not describe at all (standalone handlers outside the
+                # shuffle's reach), so full coverage is not expected - same status as
+                # ValidateSeed's lint warnings.
+                self.entrance_coverage = coverage(engine, overrides)
+                return
+
+        raise OptionError(
+            f"2004Scape: goal(s) {', '.join(last_unreachable)} stayed unreachable across "
+            f"{WORLD_ROLL_ATTEMPTS} rolled worlds. Pick a different goal, loosen the seed options "
+            f"(gathering/processing/shops/spawn), or set region_logic: false to fall back to "
+            f"travel-agnostic rules."
+        )
+
+    def _roll_world(self, seed: int):
+        """One shared seed, exactly like scripts/new-run.sh: every server-side randomizer
+        derives its own stream from it, so shipping this single number reproduces all of
+        them byte for byte. Rolling them HERE is what lets the fill reason about the real
+        world - which action yields which item, where each shop moved, where you start."""
+        return roll_all(
+            LOGIC_BUNDLE, seed,
+            gathering=self.options.gathering_randomization.current_key,
+            processing=self.options.processing_randomization.current_key,
+            shops=bool(self.options.shop_randomization),
+            spawn=self.options.spawn_randomization.current_key,
+        )
+
+    def _engine_for(self, roll) -> LogicEngine:
+        item_sources = LOGIC_BUNDLE["itemSources"]
+        if roll.shops.enabled:
+            item_sources = relocate_buy_sources(
+                item_sources, LOGIC_BUNDLE["randomizerPools"]["shops"], roll.shops)
+        return LogicEngine(
+            {**LOGIC_BUNDLE, "itemSources": item_sources},
+            quest_gates=self._unlocked_quests_gate_set(),
+            spawn_region=roll.spawn.region,
+            item_swaps=roll.item_swaps(),
+        )
 
     def _unlocked_quests_gate_set(self) -> frozenset:
         """Quest ids the engine should treat as needing a `quest_<id>` unlock item."""
@@ -474,6 +525,57 @@ class RS2004World(World):
     def get_filler_item_name(self) -> str:
         return FILLER_NAME
 
+    # ------------------------------------------------------------------
+    # spoiler
+    # ------------------------------------------------------------------
+
+    def write_spoiler_header(self, spoiler_handle) -> None:
+        """The world this slot rolled - none of which AP can infer on its own.
+
+        Everything here is decided during generation and reproduced by the game server
+        from the same seed, so the spoiler is the only place a player (or a future
+        session debugging a seed) can see what world the fill actually reasoned over.
+        """
+        spoiler_handle.write(f"\nWorld seed:                      {self.run_seed}\n")
+        if not self.region_logic:
+            spoiler_handle.write("Region logic:                    off (travel-agnostic rules; the game server rolls its own world)\n")
+            return
+        reached, total = self.entrance_coverage
+        spoiler_handle.write(f"Home / spawn:                    {self.roll.spawn.label} ({self.roll.spawn.coord})\n")
+        spoiler_handle.write(f"Entrance layout:                 {len(self.entrance_overrides)} redirect(s), "
+                             f"{reached}/{total} pool sides reachable\n")
+        spoiler_handle.write(f"Gathering swaps:                 {len(self.roll.gather.swaps)} "
+                             f"({self.roll.gather.mode}, {len(self.roll.gather.pinned)} pinned vanilla)\n")
+        spoiler_handle.write(f"Processing swaps:                {len(self.roll.process.swaps)} "
+                             f"({self.roll.process.mode}, {len(self.roll.process.pinned)} pinned vanilla)\n")
+        spoiler_handle.write(f"Shops relocated:                 {self.roll.shops.moved}\n")
+        if self.infeasible_quests:
+            spoiler_handle.write(f"Quests excluded (unreachable):   {', '.join(sorted(self.infeasible_quests))}\n")
+
+    def write_spoiler(self, spoiler_handle) -> None:
+        if not self.region_logic:
+            return
+        name = self.multiworld.get_player_name(self.player)
+
+        spoiler_handle.write(f"\n\n2004Scape ({name}) - gathering swaps "
+                             f"[{self.roll.gather.mode}]:\n\n")
+        for was, now in sorted(self.roll.gather.swaps.items()):
+            spoiler_handle.write(f"{was} -> {now}\n")
+
+        spoiler_handle.write(f"\n\n2004Scape ({name}) - processing swaps "
+                             f"[{self.roll.process.mode}]:\n\n")
+        for was, now in sorted(self.roll.process.swaps.items()):
+            spoiler_handle.write(f"{was} -> {now}\n")
+
+        if self.roll.shops.enabled:
+            spoiler_handle.write(f"\n\n2004Scape ({name}) - shop relocations:\n\n")
+            for npc, shop in sorted(self.roll.shops.stocks_now.items()):
+                spoiler_handle.write(f"{npc} now stocks {shop}\n")
+
+        spoiler_handle.write(f"\n\n2004Scape ({name}) - entrances:\n\n")
+        for trigger, arrival in sorted(self.entrance_overrides.items()):
+            spoiler_handle.write(f"{trigger} -> {arrival}\n")
+
     def fill_slot_data(self) -> dict:
         goal_keys = self._goal_keys()
         quest_unlocks = bool(self.options.quest_unlocks.value)
@@ -497,6 +599,11 @@ class RS2004World(World):
             # seed knobs: the game server adopts these on connect and applies
             # them the next time it rolls a seed (scripts/new-run)
             "seedOptions": {
+                # THE seed. new-run.sh feeds one shared seed to every randomizer, so
+                # pinning it here makes the server reproduce the exact gathering,
+                # processing, shop and spawn tables this world's fill reasoned over.
+                # (Entrances don't need it - their finished table is above.)
+                "seed": self.run_seed,
                 # "off" whenever this world already shipped a table above - re-rolling
                 # entrances server-side would invalidate every rule the fill just used.
                 "entrances": "off" if self.region_logic else self.options.entrance_randomization.current_key,

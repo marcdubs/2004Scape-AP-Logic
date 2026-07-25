@@ -181,6 +181,58 @@ leaves 650/736 pool sides reachable and strands 2 quests in the model; every
 frontier layout tried reached 709/736, all 63 quests and all 5 goals, in ~2.5s,
 with zero rerolls.
 
+### `randomizers.py`: the rest of the seed, rolled during generation
+
+Entrances ship as a finished table because the engine reads them from JSON at runtime.
+The other four randomizers can't all work that way - shopsanity rewrites `.npc` params
+and needs a pack rebuild - so they use the other half of the same trick: **Archipelago
+picks the seed, and the deterministic TypeScript tools reproduce the identical table
+server-side.** `scripts/new-run.sh` already feeds one shared `$SEED` to every tool, so
+one number in `slot_data.seedOptions.seed` pins all of them
+(`seed-options-to-env.cjs` emits it as `SEED=`).
+
+That matters because the apworld needs to *know* those tables while its fill runs:
+
+| randomizer | effect on logic |
+| --- | --- |
+| gathersanity / processsanity | re-key which action yields which item, so item obtainability - and every quest needing a gathered/processed item - moves with the roll (`LogicEngine(item_swaps=...)`) |
+| shopsanity | an item's `buy` source moves to wherever its new shopkeeper stands (`relocate_buy_sources`) |
+| spawn | changes the start region, i.e. sphere 0 itself (`LogicEngine(spawn_region=...)`) |
+
+Each roll mirrors its TypeScript original exactly: the same ordered candidate pool
+(exported by that tool's own `--export-pool`, into `bundle.randomizerPools`), the same
+PRNG (`prng.py` is a byte-exact port of `Prng.ts`), the same pin rules (quest-critical
+products pinned in chaos, not in shuffle), the same mode semantics.
+`test_randomizers.py` pins both layers against vectors captured from the real tools -
+raw `mulberry32` / `derangement` output, and the actual `ap-gather.json` /
+`ap-process.json` / `ap-spawn.json` / `shop-seed.json` written for seed 424242.
+
+**Not modelled: drop randomization.** `drop-sources.json` still describes vanilla loot
+tables, so a `drop`-sourced item may be considered obtainable when the shuffle moved it.
+Closing that means porting `MimicTransform.ts`; until then the drop half of the
+four-source model is optimistic in AP mode exactly as it is in local mode.
+
+### World rolls are retried; item fills are not
+
+If a rolled world can't reach a configured goal even with every item collected,
+`generate_early` rolls **another whole world** (up to `WORLD_ROLL_ATTEMPTS = 6`) and only
+raises `OptionError` if none works. Measured rate: ~1 roll in 30 needs a second attempt,
+usually because a gathersanity swap put a goal quest's item behind a skill the region
+model can't justify.
+
+This is *not* the local mode's generate-and-test creeping back in. AP's fill still runs
+exactly once, over a world already known to be sound - the retry is over the WORLD (a
+~2.5s operation entirely inside `generate_early`), not over item placement. Re-rolling
+the map is a much better answer than failing the whole multiworld.
+
+### Spoiler output
+
+`write_spoiler_header` / `write_spoiler` document the rolled world, because nothing else
+in an AP spoiler can: the world seed, the home/spawn, entrance-layout coverage, and full
+gathering-swap, processing-swap, shop-relocation and entrance tables. For a world whose
+locations all live in one AP region, this is the only readable record of what was
+randomized.
+
 ### Parity: the two implementations must agree
 
 The failure mode of one logic, two implementations is silent drift.
@@ -262,7 +314,11 @@ whenever `region_logic: false`.
   writes `data/config/ap-entrances.json` preserving any existing `gates` block
   (a gate stays with the physical location, not the destination), and calls
   `ApEntranceOverrides.reloadEntranceOverrides()` so it applies without a
-  restart. Absent/empty = the server keeps rolling its own. On `Connected`, the
+  restart. Absent/empty = the server keeps rolling its own.
+  `seedOptions.seed` is the shared seed the world rolled everything else from -
+  `seed-options-to-env.cjs` emits it as `SEED=`, so the next `scripts/new-run`
+  reproduces the same gathering, processing, shop and spawn tables (and will
+  not delete an entrance table that came from slot_data). On `Connected`, the
   client writes `questGates` into `data/config/ap-placements.json` (placements
   object empty - AP mode has no local placements) so ApQuestGates/quest-tab
   hiding work unchanged, and adopts `musicChecks` via
@@ -319,12 +375,9 @@ ap-archipelago.json, boot.
 - **DeathLink** (2004scape deaths are cheap - probably as an option, default
   off).
 - ~~**Region-aware apworld logic**~~ - **done** (GitHub #3): see "Logic model
-  in the apworld (v2)" above. What is still open there: gathersanity /
-  processsanity swaps are rolled server-side *after* generation, so the
-  exported `itemSources` graph the fill reasons over is the vanilla one
-  (`LogicEngine(item_swaps=...)` accepts a swap table already - the apworld
-  just has no reason to build one until it rolls those tables too). Same for
-  shopsanity relocating buy sources and spawn randomization moving the start
-  region.
+  in the apworld (v2)" above, including gathersanity / processsanity /
+  shopsanity / spawn, which the apworld now rolls itself during generation.
+  The one randomizer still unmodelled is **drop randomization** - see the note
+  under `randomizers.py`.
 - **Auto-release/collect semantics** on goal: AP handles via server settings;
   nothing client-side needed.

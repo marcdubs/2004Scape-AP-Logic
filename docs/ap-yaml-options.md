@@ -112,6 +112,15 @@ progression behind a door this seed leaves shut. Two consequences:
   fire in game either, so nothing is placed there. A configured *goal* being
   unreachable is a generation error instead.
 
+- **Archipelago also rolls the rest of the world.** Gathersanity, processsanity,
+  shopsanity and spawn all change what is obtainable and where you start, so
+  they are rolled during generation too. Only entrances ship as a finished
+  table; the others ship as one shared **seed** (`seedOptions.seed`), which the
+  server's own deterministic tools replay into the identical tables. Drop
+  randomization is the one exception - it is still unmodelled logic-wise.
+- **If a goal turns out unreachable, the world is re-rolled** (up to 6 times)
+  before generation gives up. Roughly 1 roll in 30 needs a second attempt.
+
 Off, the older travel-agnostic rules apply (skills, quest prerequisites and QP
 only) and the game server rolls its own entrance table again - in which case
 that roll must pass `--require-perfect`, as described below.

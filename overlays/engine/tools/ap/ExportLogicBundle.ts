@@ -64,6 +64,10 @@ const OUT_PATH = argVal('--out', path.join('data', 'config', 'ap-logic-bundle.js
 const COPY_PATH = argv.includes('--copy') ? argVal('--copy', '') : '';
 const REGION_GRAPH_PATH = argVal('--region-graph', path.join('tools', 'logic', 'region-graph.json'));
 const POOL_PATH = argVal('--entrance-pool', path.join('data', 'config', 'ap-entrance-pool.json'));
+const GATHER_POOL_PATH = argVal('--gather-pool', path.join('data', 'config', 'ap-gather-pool.json'));
+const PROCESS_POOL_PATH = argVal('--process-pool', path.join('data', 'config', 'ap-process-pool.json'));
+const SHOP_POOL_PATH = argVal('--shop-pool', path.join('data', 'config', 'ap-shop-pool.json'));
+const SPAWN_POOL_PATH = argVal('--spawn-pool', path.join('data', 'config', 'ap-spawn-pool.json'));
 const QUEST_REGIONS_PATH = path.join('tools', 'logic', 'data', 'quest-regions.json');
 const GENERATED_REGIONS_PATH = path.join('tools', 'logic', 'data', 'quest-regions.generated.json');
 const QUESTS_PATH = path.join('tools', 'sim', 'data', 'quests.json');
@@ -83,12 +87,42 @@ interface PoolFile {
     requires: Record<string, { require: GatedAreaRequire; name: string }>;
 }
 
-function loadEntrancePool(): PoolFile {
-    if (!fs.existsSync(POOL_PATH)) {
-        console.log(`entrance pool missing - generating ${POOL_PATH}`);
-        execFileSync('npx', ['tsx', path.join('tools', 'map', 'RandomizeEntrances.ts'), '--export-pool', POOL_PATH], { stdio: 'inherit' });
+/** Reads a `--export-pool` dump, generating it from its tool if it isn't there yet. */
+function loadPool<T>(file: string, tool: string): T {
+    if (!fs.existsSync(file)) {
+        console.log(`pool missing - generating ${file}`);
+        execFileSync('npx', ['tsx', tool, '--export-pool', file], { stdio: 'inherit' });
     }
-    return JSON.parse(fs.readFileSync(POOL_PATH, 'utf8')) as PoolFile;
+    return JSON.parse(fs.readFileSync(file, 'utf8')) as T;
+}
+
+function loadEntrancePool(): PoolFile {
+    return loadPool<PoolFile>(POOL_PATH, path.join('tools', 'map', 'RandomizeEntrances.ts'));
+}
+
+// ---- the other randomizers' pools (GitHub #3) ----
+//
+// Every one of these is a deterministic shuffle over an ordered candidate list, so
+// exporting the LIST is enough for the apworld to replay the exact same table with the
+// same seed - which is what lets AP reason about item obtainability (gather/process
+// re-key which action yields what; shopsanity moves where an item can be bought) and
+// about where the player starts (spawn) while its fill is still running.
+
+interface SkillProductPool {
+    skills: string[];
+    products: { item: string; skill: string; objId: number }[];
+    hardExcluded: Record<string, string>;
+    questCritical: string[];
+}
+interface ShopPool {
+    eligible: { npc: string; shop: string }[];
+    excluded: { npc: string; shop: string }[];
+    hardcodedShopIds: string[];
+}
+interface SpawnPool {
+    vanilla: string;
+    city: { coord: string; label: string }[];
+    chunk: { coord: string; label: string }[];
 }
 
 // ---- item providers (same reading ValidateSeed does) ----
@@ -221,6 +255,56 @@ function main(): void {
 
     const spawnRegion = graph.resolveRegion(parseRawCoord(VANILLA_SPAWN_RAW));
 
+    // --- the remaining randomizers, as replayable pools (GitHub #3) ---
+    const gatherPool = loadPool<SkillProductPool>(GATHER_POOL_PATH, path.join('tools', 'gather', 'RandomizeGathering.ts'));
+    const processPool = loadPool<SkillProductPool>(PROCESS_POOL_PATH, path.join('tools', 'process', 'RandomizeProcessing.ts'));
+    const shopPool = loadPool<ShopPool>(SHOP_POOL_PATH, path.join('tools', 'npc', 'RandomizeShops.ts'));
+    const spawnPoolRaw = loadPool<SpawnPool>(SPAWN_POOL_PATH, path.join('tools', 'spawn', 'RandomizeSpawn.ts'));
+
+    const withRegion = (entries: { coord: string; label: string }[]) =>
+        entries.map(e => ({ ...e, region: resolveRaw(e.coord) }));
+    const spawnPool = {
+        vanilla: { coord: spawnPoolRaw.vanilla, label: 'Lumbridge (vanilla)', region: resolveRaw(spawnPoolRaw.vanilla) },
+        city: withRegion(spawnPoolRaw.city),
+        chunk: withRegion(spawnPoolRaw.chunk)
+    };
+
+    // Shopsanity relocation inputs. `itemSources` above keeps its VANILLA resolved buy
+    // regions (that is what ValidateSeed sees, so parity is by construction); these three
+    // tables let a consumer that rolled a shop shuffle re-point them: item -> its vanilla
+    // owner npcs -> those npcs' shops -> whoever owns those shops now -> their regions.
+    // Under identity ownership it reproduces the vanilla regions exactly.
+    const shopOfNpc: Record<string, string> = {};
+    for (const bundle of [...shopPool.eligible, ...shopPool.excluded]) {
+        shopOfNpc[bundle.npc] = bundle.shop;
+    }
+    const buyOwners: Record<string, string[]> = {};
+    for (const [item, npcs] of loadItemProviders('shop-sources.json')) {
+        buyOwners[item] = npcs;
+    }
+    const npcSpawns = loadNpcSpawns();
+    const npcRegions: Record<string, number> = {};
+    // every npc either owning a shop bundle OR named as an item's vanilla seller - the
+    // relocation walks both directions, and a missing region silently drops a source.
+    const shopNpcs = new Set([...Object.keys(shopOfNpc), ...Object.values(buyOwners).flat()]);
+    for (const npc of shopNpcs) {
+        const coord = npcSpawns.get(npc);
+        if (coord) {
+            const [level, mapX, mapZ, localX, localZ] = coord.split('_').map(Number);
+            const region = graph.resolveRegion({ level, x: mapX * 64 + localX, z: mapZ * 64 + localZ });
+            if (region !== 0) {
+                npcRegions[npc] = region;
+            }
+        }
+    }
+
+    const randomizerPools = {
+        gather: gatherPool,
+        process: processPool,
+        shops: { ...shopPool, shopOfNpc, buyOwners, npcRegions },
+        spawn: spawnPool
+    };
+
     const bundle = {
         _generated: `tools/ap/ExportLogicBundle.ts (${new Date().toISOString().slice(0, 10)}) - the logic half of the apworld contract; regenerate after any region-graph / gated-area / quest-region change`,
         game: '2004Scape',
@@ -251,6 +335,7 @@ function main(): void {
         worldEdges,
         requirementGroups,
         entrancePool,
+        randomizerPools,
         itemSources,
         questItems,
         quests,
@@ -264,6 +349,7 @@ function main(): void {
     console.log(`  ${gatedAreas.length} gated area(s), ${alwaysConnected.length} always-connected edge(s), ${openAreas.length} open area(s)`);
     console.log(`  ${questScriptEdges.length} quest script edge(s), ${worldEdges.length} world edge(s), ${Object.keys(requirementGroups).length} quest/goal(s) with extracted region groups`);
     console.log(`  ${entrancePool.gates.length} entrance gate(s) + ${entrancePool.oneWays.length} one-way(s), ${Object.keys(itemSources).length} sourced item(s)`);
+    console.log(`  replayable pools: ${gatherPool.products.length} gather product(s), ${processPool.products.length} process product(s), ${shopPool.eligible.length} shopkeeper(s), ${spawnPool.city.length} city + ${spawnPool.chunk.length} chunk home(s)`);
 
     if (COPY_PATH) {
         fs.mkdirSync(path.dirname(path.resolve(COPY_PATH)), { recursive: true });
