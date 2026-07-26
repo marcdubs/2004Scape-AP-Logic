@@ -35,8 +35,18 @@ Archipelago server can be the same machine or different ones.
 
 ```
 node scripts/install.js                             # deploy this repo's overlays -> ../Server
-cd ../Server/engine && npx tsx tools/pack/Build.ts  # one content pack build (~2 min)
+cd ../Server/engine
+npx tsx tools/pack/Clean.ts                         # only if this server was EVER built before
+npx tsx tools/pack/Build.ts                         # one content pack build (~2 min)
 ```
+
+**Clean first if the server has ever been packed** - which it has if you set it
+up the normal LostCityRS way, because that builds vanilla before you get here.
+The pack is incremental and decides what to redo by mtime, so overlays landing
+on an already-built server leave the generated cache *newer* than the sources
+it came from: the config step is skipped as up to date while the AP registry
+entries it never packed are already listed. See the third troubleshooting entry
+below for what that looks like when it bites.
 
 `install.js` also sets `build.verify: false` (and `verifyFolder`/`verifyPack`)
 in `Server/engine/data/config/world.json` - AP content adds objs/varps, so the
@@ -51,6 +61,15 @@ Troubleshooting the pack build:
   and mtime stamps behind. Run `npx tsx tools/pack/Clean.ts` in
   `Server/engine`, then build again (the post-clean build does a full ~2 min
   crawl).
+- **`Cannot read properties of undefined (reading 'type')`** and nothing else -
+  no file, no id. `data/pack` holds a vanilla build while `content/pack` holds
+  the AP registry, so `Compiler.ts` walks the registry (382 varps, 3902 objs)
+  and looks each id up in a binary that only has the vanilla ones (360 / 3895);
+  the 23 `ap_*` varps come back `undefined`. It needs BOTH halves to appear:
+  config outputs newer than their sources, so the pack step skips them, and
+  newer `.rs2` files, so the compiler still runs and reads the mismatch. Fix is
+  the same `Clean.ts` + rebuild - and doing that up front is why the build block
+  above starts with it.
 - **`tsx` dies with an esbuild platform error** (can happen when the same
   checkout is used from two OSes, e.g. Windows + WSL):
   `cd ../Server/engine && npm install`, then additionally
