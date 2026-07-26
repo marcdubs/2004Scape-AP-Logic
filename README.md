@@ -9,6 +9,9 @@ instead, and gets deployed on top via `scripts/install.js`.
 
 Yes, I used a whole lot of AI to build this, driving it with a lot of human design and testing. Documentation is often written by AI too in order to keep it up to date with the codebase. Documentation that is useful to the AI is also useful to humans, so I keep it in the repo. It also allows for future improvements to be built with the full context of what came before, in both documentation and code. The AI is not perfect, but it is a force multiplier for me and for you.
 
+Current release: **v2** (2026-07-26) - see [CHANGELOG.md](CHANGELOG.md) for what
+landed in it.
+
 **New session / new agent?** Read [docs/lessons-learned.md](docs/lessons-learned.md)
 first - it captures the architecture decisions, the rs2/engine recipes, the
 environment gotchas, and where the project is heading.

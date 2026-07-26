@@ -1,0 +1,142 @@
+# Keeps apworld/rs2004scape/data/rs2004_logic.json honest.
+#
+# The bundle is the apworld's entire picture of the world: the entrance pool it shuffles,
+# the gated areas, the item sources. ExportLogicBundle.ts builds it from six --export-pool
+# dumps, and it REUSES any dump already sitting in data/config - so on a dev box a pool
+# that grew (say, a new entrance handler reaching the shuffle) silently never lands in the
+# apworld, and Archipelago goes on shuffling a world that no longer exists.
+#
+# A CI runner cannot have that bug: it starts with no dumps, so every export is built from
+# the game data as it is today. That makes this workflow the source of truth.
+#
+#   pull_request  -> verify only. Fails with a diff if the PR leaves the bundle stale.
+#   push to main  -> re-export and commit the result straight to main.
+#   manual        -> same as push, for refreshing before a release.
+name: AP logic bundle
+
+on:
+  pull_request:
+    paths:
+      - 'overlays/engine/tools/**'
+      - 'overlays/engine/data/config/**'
+      - 'apworld/rs2004scape/data/rs2004_logic.json'
+      - 'scripts/install.js'
+      - 'scripts/bundle-drift.js'
+      - '.github/workflows/logic-bundle.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'overlays/engine/tools/**'
+      - 'overlays/engine/data/config/**'
+      - 'scripts/install.js'
+      - 'scripts/bundle-drift.js'
+      - '.github/workflows/logic-bundle.yml'
+  workflow_dispatch:
+
+# One at a time: the push/dispatch modes commit to main, and two runs racing each other
+# would be two exports fighting over the same file.
+concurrency:
+  group: logic-bundle
+  cancel-in-progress: false
+
+env:
+  # The only revision this project is validated against (README "One-time: game-server
+  # setup"). Both upstream repos are branched by revision.
+  LOSTCITY_REV: '274'
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    permissions:
+      # needed by the commit step; the verify path never writes.
+      contents: write
+
+    steps:
+      - name: Check out 2004Scape-AP-Logic
+        uses: actions/checkout@v4
+
+      # The overlays install ON TOP of plain LostCityRS checkouts, exactly as a player
+      # sets them up - a sibling Server/ directory holding engine/ and content/. Nothing
+      # here is private; start.js clones the same two repos over HTTPS.
+      - name: Check out LostCityRS engine + content (rev ${{ env.LOSTCITY_REV }})
+        run: |
+          mkdir -p Server
+          git clone --depth 1 --single-branch -b "$LOSTCITY_REV" \
+            https://github.com/LostCityRS/Engine-TS Server/engine
+          git clone --depth 1 --single-branch -b "$LOSTCITY_REV" \
+            https://github.com/LostCityRS/Content Server/content
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # Engine-TS declares "engines": { "node": ">=24" }.
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: Server/engine/package-lock.json
+
+      - name: Install engine dependencies
+        working-directory: Server/engine
+        run: npm ci
+
+      # Deploys this repo's overlays over the vanilla checkouts. No pack build (Build.ts)
+      # is needed: the logic tools read the tracked TEXT data - content/maps/*.jm2,
+      # content/pack/loc.pack, content/scripts/**.rs2 - not the built 50 MB cache.
+      - name: Deploy overlays
+        run: node scripts/install.js --server-root "$GITHUB_WORKSPACE/Server"
+
+      # No data/config/ap-*-pool.json exists on a fresh runner, so ExportLogicBundle
+      # regenerates all six pools from scratch. That is the whole point of running here.
+      - name: Export logic bundle
+        working-directory: Server/engine
+        run: npx tsx tools/ap/ExportLogicBundle.ts --out "$RUNNER_TEMP/fresh-bundle.json"
+
+      - name: Compare against the committed bundle
+        id: drift
+        run: |
+          set +e
+          node scripts/bundle-drift.js \
+            apworld/rs2004scape/data/rs2004_logic.json \
+            "$RUNNER_TEMP/fresh-bundle.json" > "$RUNNER_TEMP/drift.txt" 2>&1
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/drift.txt"
+          {
+            echo '### AP logic bundle'
+            echo ''
+            echo '```'
+            cat "$RUNNER_TEMP/drift.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -gt 1 ]; then
+            exit "$status"
+          fi
+          echo "drifted=$([ "$status" -eq 1 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      # --- pull_request: report, never write -------------------------------------------
+      - name: Fail the PR if the bundle is stale
+        if: github.event_name == 'pull_request' && steps.drift.outputs.drifted == 'true'
+        run: |
+          echo "::error::The apworld's logic bundle is stale - a fresh export disagrees" \
+               "with the committed one. See the job summary for what moved, and the" \
+               "refresh command printed above."
+          exit 1
+
+      # --- push to main / manual: refresh in place --------------------------------------
+      - name: Commit the refreshed bundle
+        if: github.event_name != 'pull_request' && steps.drift.outputs.drifted == 'true'
+        run: |
+          cp "$RUNNER_TEMP/fresh-bundle.json" apworld/rs2004scape/data/rs2004_logic.json
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apworld/rs2004scape/data/rs2004_logic.json
+          {
+            echo 'chore(apworld): re-export the logic bundle from a fresh pool'
+            echo ''
+            echo 'Exported by .github/workflows/logic-bundle.yml, which builds every'
+            echo '--export-pool dump from scratch - so this is the world as the game'
+            echo 'data describes it today, not as a cached dump remembered it.'
+            echo ''
+            head -20 "$RUNNER_TEMP/drift.txt"
+          } > "$RUNNER_TEMP/commit-msg.txt"
+          git commit -F "$RUNNER_TEMP/commit-msg.txt"
+          git push

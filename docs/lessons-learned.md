@@ -4071,3 +4071,52 @@ bottleneck for every downstream skill. Shipped as one knob, `gatherSpeed`.
   often, still not every swing), chop a normal tree, net-fish shrimp; then set
   `gatherSpeed` to 100 in `data/config/ap-options.json`, restart, and confirm
   the rates feel vanilla again.
+
+## The bundle export reuses stale pool dumps (2026-07-26)
+
+`scripts/parity-check.py` had been failing on region count (python 5232 vs ts
+5284) since the #4 bug sweep. It was not a logic bug in either implementation -
+the two engines are structurally identical. The apworld was reasoning about an
+older world.
+
+- **`ExportLogicBundle.loadPool` regenerates a `--export-pool` dump only when
+  the file is ABSENT** (`if (!fs.existsSync(file))`). All six pools work this
+  way. #4 taught `RandomizeEntrances` to expand angle-keyed handlers into the
+  shuffle pool (366 gates -> 402: 16 ship ladders + 21 Tree Gnome Stronghold
+  `spiralstairs_wooden`, x2 sides = 74 keys), but the Jul-25 dump on disk was
+  reused, so the exported bundle - and every apworld build since - never learned
+  those entrances exist.
+- **How it surfaces as a region gap**: `logic.py` builds entrance edges only
+  from the override table, resolving each key's regions through the pool
+  (`region_of_trigger.get(key, 0)`). A key absent from the pool resolves to
+  region 0 and the fixpoint skips the edge. The local table has 808 keys, the
+  stale pool 736 - the 72-key gap stranded 52 regions.
+- **It was never a beatability risk.** The Python side was strictly
+  conservative (`only_py = 0`); AP placed progression only where it believed
+  reachable, and those beliefs were all true. The real cost is that ~37
+  entrances silently stay VANILLA in a multiworld while a solo seed shuffles
+  them. There is no desync: AP shuffles, models and ships one table, and
+  `ApClient.ts` writes it verbatim, so AP's logic always describes AP's world.
+- **Debugging recipe**: copy `ValidateSeed.ts` to a scratch name in
+  `../Server/engine/tools/logic/`, add `reachableRegions` plus a
+  `prov: Map<number,string>` recorded at each of the 7 `reachableRegions.add()`
+  sites, and dump it in the `--json` block. The provenance string tells you
+  which rule opened each region; here all 52 traced to `entranceEdge`.
+- **`test_parity.py` cannot catch this class of drift.** The fixture pins one
+  frozen layout expressed in the pool vocabulary of its day. Worse, refreshing
+  the pool BREAKS it: 2 of its 736 keys (`0_49_48_3_6:1` / `1_49_48_3_6:1`) stop
+  existing as standalone sides once the angle-keyed expansion splits them per
+  placement, costing 5 regions (5268 != 5273). That is the fixture being stale,
+  not the export being wrong - re-freeze with
+  `scripts/parity-check.py --write-fixture` in the same change as any pool
+  refresh.
+- **The fix is CI, not a smarter cache.** `.github/workflows/logic-bundle.yml`
+  re-exports on a fresh runner, where no dump exists and `loadPool` therefore
+  always regenerates - the bug is structurally impossible there. PRs verify and
+  fail on drift; pushes to main and manual dispatch commit the refreshed bundle.
+  `scripts/bundle-drift.js` compares two bundles by canonicalized structure
+  (not bytes - a runner and a Windows box disagree on line endings without a
+  single fact changing) and names which key moved. Everything CI needs is
+  public and textual: `LostCityRS/Engine-TS` + `Content` at branch 274,
+  `content/maps/*.jm2`, `content/pack/loc.pack`, `content/scripts/**.rs2`. No
+  `Build.ts` pack build is required to export logic.

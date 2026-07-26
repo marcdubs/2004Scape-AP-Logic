@@ -3,7 +3,7 @@
 High-level notes on what changed, newest first. This file starts at v2; for
 anything earlier, `git log` is the record.
 
-## v2 — unreleased (`feat/v2`)
+## v2 — 2026-07-26
 
 The theme of this release is **provable beatability** and **Archipelago
 parity**: every randomizer is now modelled by one shared logic engine that both
