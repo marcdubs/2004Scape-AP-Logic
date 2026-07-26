@@ -4120,3 +4120,34 @@ older world.
   public and textual: `LostCityRS/Engine-TS` + `Content` at branch 274,
   `content/maps/*.jm2`, `content/pack/loc.pack`, `content/scripts/**.rs2`. No
   `Build.ts` pack build is required to export logic.
+
+## `content/pack/*.pack` IDs are a save format, not bookkeeping (2026-07-26)
+
+Player saves store varps BY NUMERIC ID - `PlayerLoading.ts` reads
+`const id = sav.g2(); player.vars[id] = sav.gVarInt()`. So `varp.pack` is part
+of the save format: renumber it and every existing character's quest progress
+and unlocks silently decode as different variables.
+
+- **Our overlay's `varp.pack` had all 359 vanilla varps renumbered** (e.g.
+  `waterfall_quest` 65 -> 28) with the 23 `ap_*` ones landing at 141-163, in the
+  middle. `obj.pack` was fine: 8 added, 0 moved.
+- **How that happens**: `validateConfigPack` loads the existing pack and only
+  ever APPENDS (`pack.register(pack.max++, name)`), so normal builds are stable.
+  But if the pack file is missing or empty, every name is registered in
+  *filesystem crawl order* - so a regeneration from scratch scrambles the whole
+  file, and does it differently on a different machine.
+- **Fixed** by rebuilding it as vanilla ids 0..358 verbatim plus `ap_*` at
+  **1000-1022**. The high base is the point: appending at 359 would collide the
+  moment upstream Content adds a varp of its own, and re-merging would shift our
+  ids again. Sparse ids are fine - `Compiler.ts` skips `varpInfo.map[id] ===
+  undefined`, the packer emits a 1024-entry idx, `Player.vars` is sized from
+  `VarPlayerType.count`, the webclient's `var`/`varServ` are growable JS arrays
+  synced over `this.var.length`, and the java client is `new int[2000]`.
+- **Never regenerate a `.pack` from an empty file.** If one needs rebuilding,
+  start from the vanilla copy (`git show <rev>:pack/varp.pack`) so existing ids
+  survive, and put new entries at a base upstream will not reach.
+- Nothing references varps numerically: our `ap-*.json` configs, the exported
+  logic bundle's `varpModel` (`varpToQuest`, `statVarps`) and the apworld are
+  all name-keyed - verified with `scripts/bundle-drift.js` reporting no drift
+  after the renumber. The cost is a one-time save break for characters created
+  before it.
