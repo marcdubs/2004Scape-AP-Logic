@@ -18,6 +18,12 @@
 
 const fs = require('fs');
 
+// Provenance stamps, not world facts. Every --export-pool dump carries its own, so they
+// appear NESTED inside randomizerPools as well as at the top level - strip them at any
+// depth or two identical exports a minute apart look like a changed world (and CI commits
+// on every single run).
+const PROVENANCE_KEYS = new Set(['_generated', 'generatedAt']);
+
 function canonical(value) {
     if (Array.isArray(value)) {
         return value.map(canonical);
@@ -25,6 +31,9 @@ function canonical(value) {
     if (value && typeof value === 'object') {
         const out = {};
         for (const key of Object.keys(value).sort()) {
+            if (PROVENANCE_KEYS.has(key)) {
+                continue;
+            }
             out[key] = canonical(value[key]);
         }
         return out;
