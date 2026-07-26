@@ -104,4 +104,38 @@ if (o.spawn === 'off') {
     set('SPAWN_MODE', o.spawn);
 }
 
+// Human-readable confirmation of what was adopted, on STDERR: both callers capture
+// only stdout (sh `eval "$(...)"`, bat `for /f ... in (`...`)`), so this reaches the
+// console without ever landing in the eval. It answers "am I actually rolling the
+// multiworld's world, or this script's defaults?" - the one question you cannot
+// afford to get wrong, and which counts-only output otherwise hides.
+const stageLabel = (value, offLabel = 'off (left vanilla)') => {
+    if (value === 'off' || value === false) return offLabel;
+    if (value === true || value === undefined) return 'on (default)';
+    return String(value);
+};
+const banner = [
+    '================================================================',
+    'ARCHIPELAGO MODE - this world is rolled from the multiworld',
+    '================================================================',
+    `  source:     ${file}`,
+    `              (written by the game server when it connected to the room)`,
+    Number.isInteger(o.seed)
+        ? `  seed:       ${o.seed >>> 0}  <- PINNED BY ARCHIPELAGO, overriding this script's roll`
+        : '  seed:       not pinned by the room - using this script\'s own seed',
+    o.entrances === 'off' && apBuiltEntranceTable()
+        ? '  entrances:  from slot_data (Archipelago built the layout; NOT re-rolled here)'
+        : `  entrances:  ${stageLabel(o.entrances, 'off (vanilla entrances)')}`,
+    `  gathering:  ${stageLabel(o.gathering)}`,
+    `  processing: ${stageLabel(o.processing)}`,
+    `  thieving:   ${o.thieving === undefined ? 'not sent by the room - using this script\'s knob' : stageLabel(o.thieving)}`,
+    `  drops:      ${stageLabel(o.drops)}`,
+    `  spawn:      ${stageLabel(o.spawn)}`,
+    `  npc drip:   ${stageLabel(o.npcDrip)}`,
+    `  shops:      ${stageLabel(o.shops)}`,
+    `  teleports:  ${stageLabel(o.teleports)}`,
+    '================================================================'
+];
+console.error(banner.join('\n'));
+
 console.log(out.join('\n'));

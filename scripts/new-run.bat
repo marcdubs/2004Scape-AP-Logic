@@ -153,11 +153,35 @@ REM above - flow: connect once, then re-run this script. The helper emits
 REM `set "K=V"` lines (with !VAR! delayed expansion for appends) executed below.
 
 set ADOPTED=0
-if /i "%AP_SEED_OPTIONS%"=="ignore" goto :seedopts_done
-if not exist "data\config\ap-seed-options.json" goto :seedopts_done
-echo ==^> adopting data\config\ap-seed-options.json (set AP_SEED_OPTIONS=ignore to skip)
+if /i "%AP_SEED_OPTIONS%"=="ignore" goto :seedopts_local
+if not exist "data\config\ap-seed-options.json" goto :seedopts_local
+REM the helper prints the full ARCHIPELAGO MODE banner (what it adopted) to stderr;
+REM only its stdout is the `set` lines this for /f consumes.
 for /f "usebackq delims=" %%L in (`node "%~dp0seed-options-to-env.cjs" "data\config\ap-seed-options.json" --bat`) do %%L
 set ADOPTED=1
+echo     (set AP_SEED_OPTIONS=ignore to re-run with the script's own knobs instead)
+echo.
+goto :seedopts_done
+
+:seedopts_local
+echo ================================================================
+echo LOCAL MODE - rolling from this script's own knobs
+echo ================================================================
+if /i "%AP_SEED_OPTIONS%"=="ignore" (
+    echo   AP_SEED_OPTIONS=ignore is set - the multiworld's options were
+    echo   deliberately skipped even if the file exists.
+) else (
+    echo   No data\config\ap-seed-options.json found, so nothing from
+    echo   Archipelago is being used - this is a solo/local seed.
+    echo.
+    echo   Playing an Archipelago multiworld? STOP. Connect the game
+    echo   server to the room first ^(tracker -^> Archipelago tab^), which
+    echo   writes that file, THEN re-run this script. Rolling now gives
+    echo   you a different world from the one the multiworld was filled
+    echo   against.
+)
+echo ================================================================
+echo.
 :seedopts_done
 
 REM ================================ stages =====================================
@@ -248,7 +272,14 @@ if "%RUN_VALIDATE%"=="1" (
 
 echo.
 echo ================================================================
-echo New run rolled (seed %SEED%). Now:
+if "%ADOPTED%"=="1" (
+    echo New run rolled ^(seed %SEED%^) in ARCHIPELAGO MODE.
+    echo   Every stage above used the multiworld's options from
+    echo   data\config\ap-seed-options.json - this world matches the one
+    echo   Archipelago filled. Now:
+) else (
+    echo New run rolled ^(seed %SEED%^) in LOCAL MODE ^(no Archipelago options^). Now:
+)
 echo   1. RESTART the Windows server.
 echo   2. Walkthrough: npx tsx tools/sim/SimulateProgression.ts --verbosity 2   (AP runs get the quest-graph report instead: the room owns placements)
 echo                   add --current-unlocks to ask "what can I do RIGHT NOW" with the unlocks already received

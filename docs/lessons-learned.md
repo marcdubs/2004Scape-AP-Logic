@@ -4226,3 +4226,31 @@ Two things worth carrying forward:
   an unrelated stage. `--quiet` keeps the count and drops the coords. When
   adding a cross-check that reads another tool's output, assume the diff is a
   spoiler.
+
+### Follow-up: the last two spoiler leaks, and saying which mode you are in
+
+Two things the first quiet pass missed, both found by the user reading real
+output:
+
+- **`ValidateSeed` prints at the end of every roll**, and its unconditional
+  output included the full `Goals:` list (`[x] Kill Elvarg - reached at sphere
+  4`) plus the raw spawn coord in its header - so the tail of `new-run` handed
+  back exactly what the randomizers had just been taught to hide. Now: reached
+  goals and the coord are `--verbose`-only, the header shows `Spawn: region N`,
+  and the summary is `Goals: 5/5 reachable`. **BLOCKED goals still print in
+  full, always** - that is the failure report the tool exists for, and a broken
+  seed has no surprise left to protect. Same reasoning for the unresolved-spawn
+  warning, which keeps its coord.
+- **Nothing in the output said whether the roll was using Archipelago data.**
+  The adoption was a single `==> adopting ...` line that scrolled past, which is
+  not enough reassurance for the one decision you cannot afford to get wrong.
+  `seed-options-to-env.cjs` now prints an `ARCHIPELAGO MODE` banner (source
+  file, the room-pinned seed, and the resolved setting for every stage), and the
+  scripts print a `LOCAL MODE` banner with a "connect first, then re-run"
+  warning when the file is absent; the closing summary names the mode again.
+
+**The mechanism worth remembering**: the banner goes to **stderr**. Both callers
+capture only stdout (`eval "$(node ...)"` in sh, `for /f ... in (`node ...`)` in
+bat), so anything on stderr reaches the console without ever entering the eval.
+That is the way to make a helper that emits shell assignments also talk to the
+human running it.

@@ -538,7 +538,17 @@ function main(): void {
 
     console.log('=== ValidateSeed (region-aware seed beatability) ===');
     console.log(`Config dir: ${CONFIG_DIR}`);
-    console.log(`Spawn: ${spawnRaw}${spawnRegion === 0 ? ' (WARNING: unresolved to any region!)' : ` -> region ${spawnRegion}`}`);
+    // The raw spawn coord IS the home spoiler (scripts/new-run hides it at the roll,
+    // so printing it here would hand it straight back). Region id stays - it is an
+    // internal graph id, and every diagnostic below refers to it. The unresolved
+    // case always prints the coord: that is a broken seed, not a surprise to protect.
+    console.log(
+        spawnRegion === 0
+            ? `Spawn: ${spawnRaw} (WARNING: unresolved to any region!)`
+            : VERBOSE
+              ? `Spawn: ${spawnRaw} -> region ${spawnRegion}`
+              : `Spawn: region ${spawnRegion} (--verbose for the coord)`
+    );
     console.log(`Entrances table: ${entrancesPresent ? `${entranceEdges.length} edge(s)` : 'ABSENT (vanilla entrances)'}`);
     console.log(`Gated areas table: ${gated.present ? `${gated.areas.length} area(s)` : 'ABSENT (no area gates)'}`);
     console.log(`Skill caps: ${placementsFile.present ? `from ap-placements.json (growing - ${placementFindsLog.length} progression item(s) collected this run)` : seedConfig.unlocks.present ? 'from ap-unlocks.json' : 'uncapped (vanilla - no ap-unlocks.json)'}`);
@@ -604,12 +614,27 @@ function main(): void {
         console.log('');
     }
 
-    console.log('Goals:');
-    for (const g of goals) {
-        const reached = goalSphere.get(g.id);
-        if (reached !== undefined) {
-            console.log(`  [x] ${g.name} - reached at sphere ${reached}`);
-        } else {
+    // Reached goals are listed only under --verbose: naming them (and the sphere
+    // each fell on) is a progression spoiler, and scripts/new-run calls this tool
+    // on every roll. BLOCKED goals always print in full - that is the failure
+    // report this tool exists for, and it is not a spoiler if the seed is broken.
+    const blockedGoals = goals.filter(g => goalSphere.get(g.id) === undefined);
+    if (VERBOSE) {
+        console.log('Goals:');
+        for (const g of goals) {
+            const reached = goalSphere.get(g.id);
+            if (reached !== undefined) {
+                console.log(`  [x] ${g.name} - reached at sphere ${reached}`);
+            } else {
+                console.log(`  [ ] ${g.name} - BLOCKED`);
+                for (const line of diagnoseGoal(g)) {
+                    console.log(`        - ${line}`);
+                }
+            }
+        }
+    } else {
+        console.log(`Goals: ${goals.length - blockedGoals.length}/${goals.length} reachable${blockedGoals.length === 0 ? ' (--verbose to list them and the sphere each falls on)' : ''}`);
+        for (const g of blockedGoals) {
             console.log(`  [ ] ${g.name} - BLOCKED`);
             for (const line of diagnoseGoal(g)) {
                 console.log(`        - ${line}`);

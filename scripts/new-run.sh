@@ -133,9 +133,31 @@ PLACEMENT_EXTRA=""        # e.g. "--max-progression-level 50"
 SEED_OPTS_FILE="data/config/ap-seed-options.json"
 ADOPTED=0
 if [ "${AP_SEED_OPTIONS:-}" != "ignore" ] && [ -f "$SEED_OPTS_FILE" ]; then
-  echo "==> adopting $SEED_OPTS_FILE (AP_SEED_OPTIONS=ignore to skip)"
+  # the helper prints the full ARCHIPELAGO MODE banner (what it adopted) to stderr;
+  # only its stdout is the assignments this eval consumes.
   eval "$(node "$SCRIPT_DIR/seed-options-to-env.cjs" "$SEED_OPTS_FILE")"
   ADOPTED=1
+  echo "    (AP_SEED_OPTIONS=ignore re-runs this with the script's own knobs instead)"
+  echo
+else
+  echo "================================================================"
+  echo "LOCAL MODE - rolling from this script's own knobs"
+  echo "================================================================"
+  if [ "${AP_SEED_OPTIONS:-}" = "ignore" ]; then
+    echo "  AP_SEED_OPTIONS=ignore is set - the multiworld's options were"
+    echo "  deliberately skipped even if $SEED_OPTS_FILE exists."
+  else
+    echo "  No $SEED_OPTS_FILE found, so nothing from"
+    echo "  Archipelago is being used - this is a solo/local seed."
+    echo
+    echo "  Playing an Archipelago multiworld? STOP. Connect the game"
+    echo "  server to the room first (tracker -> Archipelago tab), which"
+    echo "  writes that file, THEN re-run this script. Rolling now gives"
+    echo "  you a different world from the one the multiworld was filled"
+    echo "  against."
+  fi
+  echo "================================================================"
+  echo
 fi
 
 # ================================ stages =====================================
@@ -176,7 +198,14 @@ fi
 
 echo
 echo "================================================================"
-echo "New run rolled (seed $SEED). Now:"
+if [ "$ADOPTED" = 1 ]; then
+  echo "New run rolled (seed $SEED) in ARCHIPELAGO MODE."
+  echo "  Every stage above used the multiworld's options from"
+  echo "  $SEED_OPTS_FILE - this world matches the one"
+  echo "  Archipelago filled. Now:"
+else
+  echo "New run rolled (seed $SEED) in LOCAL MODE (no Archipelago options). Now:"
+fi
 echo "  1. RESTART the Windows server."
 echo "  2. Walkthrough: npx tsx tools/sim/SimulateProgression.ts --verbosity 2   (AP runs get the quest-graph report instead: the room owns placements)"
 echo "                  add --current-unlocks to ask 'what can I do RIGHT NOW' with the unlocks already received"

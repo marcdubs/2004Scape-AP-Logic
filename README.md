@@ -271,6 +271,27 @@ first thing to attach to a bug report.
    gates when it reconnects). Then **restart the game server**; it reconnects
    to the room on boot.
 
+   **You do not have to guess whether it worked.** The script opens with an
+   `ARCHIPELAGO MODE` banner listing the file it adopted, the seed the room
+   pinned, and the setting it took for every stage - and closes by repeating
+   which mode the run was rolled in:
+
+   ```
+   ================================================================
+   ARCHIPELAGO MODE - this world is rolled from the multiworld
+   ================================================================
+     source:     data/config/ap-seed-options.json
+                 (written by the game server when it connected to the room)
+     seed:       2769643227  <- PINNED BY ARCHIPELAGO, overriding this script's roll
+     entrances:  from slot_data (Archipelago built the layout; NOT re-rolled here)
+     gathering:  shuffle
+     ...
+   ================================================================
+   ```
+
+   If you see `LOCAL MODE` instead, the file was not there - you are rolling a
+   solo seed, and the banner tells you to connect first and re-run.
+
    What "matches what the YAML asked for" means is stronger than it sounds:
    Archipelago rolled this world *during generation* so its fill could reason
    about it, so the file pins **the seed itself**. Every randomizer the script
