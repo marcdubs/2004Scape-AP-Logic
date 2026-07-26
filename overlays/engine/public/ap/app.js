@@ -119,6 +119,7 @@
             })
             .then(function (catalog) {
                 state.checks = catalog;
+                lastChecksKey = null; // a fresh catalog may change flags without changing counts
                 (catalog.groups || []).forEach(function (group) {
                     if (!Object.prototype.hasOwnProperty.call(state.checksOpen, group.key)) {
                         state.checksOpen[group.key] = !!group.open;
@@ -549,6 +550,10 @@
         return table;
     }
 
+    // rebuilt only when something visible actually changed - the 5s poll would
+    // otherwise re-create up to 517 rows under the player's scroll position.
+    var lastChecksKey = null;
+
     function renderChecksTab() {
         var container = document.getElementById('checks-groups');
         var emptyEl = document.getElementById('checks-empty');
@@ -571,6 +576,12 @@
         var filterTerm = ((searchInput && searchInput.value) || '').trim().toLowerCase();
         var hideDoneBox = document.getElementById('checks-hide-done');
         var hideDone = !!(hideDoneBox && hideDoneBox.checked);
+
+        var renderKey = [catalog.checks.length, Object.keys(fired).length, filterTerm, hideDone].join('|');
+        if (renderKey === lastChecksKey) {
+            return;
+        }
+        lastChecksKey = renderKey;
 
         var byGroup = {};
         var totalObtainable = 0;
