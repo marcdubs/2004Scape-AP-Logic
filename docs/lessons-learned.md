@@ -3889,6 +3889,13 @@ chokepoints before designing; this one was a 2-hour feature because the answer w
 - **Deliberately out of scope**: `locked_door.dbrow` (thieving doors have no loot, they
   only open) and the `chest_steel_arrowtips` lockpick gate (a requirement, not a reward -
   its loot row is in the pool like every other chest).
+- **`src/web.ts` is CRLF too - not just content files.** CLAUDE.md's line-ending rule
+  names `.rs2`/config files, but the engine's `web.ts` is CRLF as well, and a bulk edit
+  via Python's `open(path, encoding='utf8')` (universal newlines) followed by a write
+  with `newline=''` silently rewrote all 2079 lines to LF. Caught by `git diff --stat`
+  reading absurdly large before the commit - always sanity-check the stat line against
+  what you think you changed. `open(path, 'rb')` / byte-level replace, or `newline=''`
+  on the READ too, avoids it entirely.
 - **Verified offline**: engine typecheck clean, pack build clean (`pack: 2:05.181`), a
   `ScriptProvider.getByName()` decompile check confirming opcode 1913 compiled into all
   three reward procs + `[debugproc,ap_thieving]`, loader round-trip 33/33 with
