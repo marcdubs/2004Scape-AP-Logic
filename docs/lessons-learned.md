@@ -3832,3 +3832,77 @@ Full design in `docs/tracker-map.md` ("Checks tab"); the reusable bits:
 - **Option values are append-only.** `option_tiered = 3` sits after `chaos = 2` rather
   than next to `shuffle`, because a YAML that wrote the number would otherwise silently
   change mode.
+
+## Thieving randomization (GitHub #6, 2026-07-26)
+
+The issue asked for a survey pass first, and the survey is the whole story: **all three
+thieving surfaces are dbtable-driven with a scalar item lookup, and all three reward
+cascades live in ONE file.** `skill_thieving/scripts/thieving.rs2` holds
+`pick_pocket_check_for_reward` / `stealing_check_for_reward` /
+`trapped_chest_check_for_reward`, each a descending-denominator rarity walk over its
+dbrow's `data=loot,<obj>,<min>,<max>,<rarity>[,<msg>]` tuples ending in exactly one
+`inv_add(inv, $reward, n)`. No inline `if ($random < N) obj_add(...)` cascade anywhere,
+so the issue's own decision rule ("runtime-override table if the reward is a scalar item
+lookup, else config mutation") settled the design before a line was written. Three
+one-token wraps + `AP_THIEVING_SWAP = 1913` = the entire content change. Survey the
+chokepoints before designing; this one was a 2-hour feature because the answer was
+"gathering, again", not a new shape.
+
+- **Wrap INSIDE the rarity branch, not around the whole cascade.** The wrap runs only
+  after `if ($roll >= $reward_rarity_denominator)` has already passed, so the vanilla
+  drop rate still decides *if* you get something. That matters for more than fidelity:
+  `recordDiscovery` fires from the swap lookup, so a wrap placed any earlier would leak
+  tracker rows for loot the player never actually received. Same reasoning applies to
+  any future randomizer whose chokepoint sits near a probability roll.
+- **The pre-swap `$reward` is deliberately still read by two things** in
+  `stealing_check_for_reward`: the `if ($reward = bread) sound_synth(pick, ...)` check
+  and the `"You steal <$reward_message>."` line (the message is a *sixth tuple field*,
+  not derived from the item). Leaving both vanilla is the feature - "You steal some
+  silk." while a raw shark lands in your pack is the mimic-style reveal, exactly like
+  gathering's "You manage to mine some coal." That is also the answer to the issue's
+  "Steals like `<x>` - cosmetic or reflecting swapped loot?" question: the *tracker* names
+  it explicitly (`Coins → steals like → Adamantite ore`, the Bestiary's "smells like"
+  idiom), the *game* only hints it.
+- **`renderItemSwapTab` took an optional 6th arg rather than a fourth copy.** The
+  Gathering/Recipes/Thieving tabs are the same obj-id -> obj-id render; the only
+  difference is the arrow label. One parameter beat a new function, and the "what's
+  left" list, spoiler mode and the discovered/total counter all came along free.
+- **Quantity is the one place thieving stresses the shared philosophy harder than
+  gathering/processing did.** Those tools' non-1 quantities top out at 5 (knives,
+  `nails`); thieving has `coins,1000,1000` (Ardougne castle chest), `coins,500,500`
+  (blood rune chest), `coins,200,300` (hero). Kept untouched anyway - "structure stays
+  put, content moves" is load-bearing across four randomizers now, and `inv_add` simply
+  fills what space exists for a non-stackable. `--exclude coins` is the escape hatch,
+  and it is documented in `new-run.sh`'s knob comment rather than buried in the tool.
+  If a future session does add a clamp, do it for all four tools at once.
+- **33 distinct loot items across 13 pickpocket rows / 9 stalls / 6 chests**, and the
+  bands populate well (5/2/8/3/5/10) because all three dbrows carry a plain `level`
+  column - `readDbrowProducts(file, { product: 'loot', level: 'level' })` fit all three
+  with no per-surface special casing, which is the payoff from #15 having generalized
+  `SkillTiers.ts`. Contrast fishing, which needed a bespoke `FishingLevels.ts`.
+- **`bread` and `uncut_sapphire` show a surface/level mismatch in the spoiler log**
+  (e.g. `pickpocket bread (lvl 5)` - bread's *surface* is pickpocket because that dbrow
+  is walked first, its *level* is 5 from the baker's stall). That's `minLevels` working
+  as designed (lowest level that yields it) next to a first-occurrence surface label.
+  Cosmetic; `RandomizeProcessing` behaves the same way. Don't "fix" it into a per-source
+  level - the band must model "when does this first become reachable".
+- **Deliberately out of scope**: `locked_door.dbrow` (thieving doors have no loot, they
+  only open) and the `chest_steel_arrowtips` lockpick gate (a requirement, not a reward -
+  its loot row is in the pool like every other chest).
+- **Verified offline**: engine typecheck clean, pack build clean (`pack: 2:05.181`), a
+  `ScriptProvider.getByName()` decompile check confirming opcode 1913 compiled into all
+  three reward procs + `[debugproc,ap_thieving]`, loader round-trip 33/33 with
+  passthrough on miss, spoiler<->JSON consistency, bijection with 0 fixed points, and
+  every id/name matching `obj.pack`. All four modes and the error paths dry-run clean.
+  The live Server checkout now has thieving seed 777 (shuffle).
+
+### Still open (deliberate, not forgotten)
+
+**The apworld does not model thieving swaps.** `randomizers.py`/`options.py` still roll
+only gather+process, so an AP fill can't reason about a quest item that moved onto a
+pickpocket. Local/solo mode is complete and correct. `--export-pool` already emits the
+exact input a port needs (items, surfaces, obj ids, levels, and the *exported* band
+strings - never re-derive those, see #15), and `seed-options-to-env.cjs` already honours
+an `o.thieving` slot option, so the server side is forward-compatible the day the option
+ships. What's left is the Python side: a `thieving` option, a `roll_skill_swaps` call,
+the `ExportLogicBundle` pool wiring, and a parity fixture.

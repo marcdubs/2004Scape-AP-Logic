@@ -25,6 +25,7 @@ import { AXE_TIERS, GEAR_FAMILY_LABELS, GEAR_TIER_LEVELS, GEAR_TIER_NAMES, GEAR_
 import { getEntranceOverrideCount, getEntranceSources } from '#/engine/ApEntranceOverrides.js';
 import { getGatherOverrideCount } from '#/engine/ApGatherOverrides.js';
 import { getProcessOverrideCount } from '#/engine/ApProcessOverrides.js';
+import { getThievingOverrideCount } from '#/engine/ApThievingOverrides.js';
 import { getTrackerState } from '#/engine/ApTracker.js';
 
 type NodeRequestInit = RequestInit & {
@@ -222,7 +223,7 @@ function tableSourceKeys(filePath: string): string[] {
     return map ? Object.keys(map) : [];
 }
 
-type ApSpoilerTables = { entrances: Record<string, string>; gather: Record<string, string>; process: Record<string, string>; drops: Record<string, string> };
+type ApSpoilerTables = { entrances: Record<string, string>; gather: Record<string, string>; process: Record<string, string>; thieving: Record<string, string>; drops: Record<string, string> };
 
 let spoilerTablesCache: ApSpoilerTables | null = null;
 
@@ -236,12 +237,14 @@ function loadSpoilerTables(): ApSpoilerTables {
         const entrances = readJsonFile<{ overrides?: Record<string, string> }>('data/config/ap-entrances.json')?.overrides ?? {};
         const gatherMap = readJsonFile<{ map?: Record<string, number> }>('data/config/ap-gather.json')?.map ?? {};
         const processMap = readJsonFile<{ map?: Record<string, number> }>('data/config/ap-process.json')?.map ?? {};
+        const thievingMap = readJsonFile<{ map?: Record<string, number> }>('data/config/ap-thieving.json')?.map ?? {};
         const dropsMap = readJsonFile<{ map?: Record<string, number> }>('data/config/ap-drops.json')?.map ?? {};
 
         spoilerTablesCache = {
             entrances,
             gather: Object.fromEntries(Object.entries(gatherMap).map(([k, v]) => [k, String(v)])),
             process: Object.fromEntries(Object.entries(processMap).map(([k, v]) => [k, String(v)])),
+            thieving: Object.fromEntries(Object.entries(thievingMap).map(([k, v]) => [k, String(v)])),
             drops: Object.fromEntries(Object.entries(dropsMap).map(([k, v]) => [k, String(v)]))
         };
     }
@@ -413,18 +416,20 @@ function buildApTrackerResponse(spoilerMode: boolean): unknown {
 
     collectIds(discoveries.gather, itemIds);
     collectIds(discoveries.process, itemIds);
+    collectIds(discoveries.thieving, itemIds);
     collectDropIds(discoveries.drops, dropSlotIds, dropUnitIds);
 
     // "what's left to find" lists for the gathering/recipes/bestiary/teleports tabs
     const sources = {
         gather: tableSourceKeys('data/config/ap-gather.json'),
         process: tableSourceKeys('data/config/ap-process.json'),
+        thieving: tableSourceKeys('data/config/ap-thieving.json'),
         drops: tableSourceKeys('data/config/ap-drops.json'),
         teleports: TELEPORT_SPELLS
     };
     // those sources are rendered by name, so they need naming too (the id -> name maps
     // below are otherwise scoped to what's been discovered)
-    for (const id of [...sources.gather, ...sources.process]) {
+    for (const id of [...sources.gather, ...sources.process, ...sources.thieving]) {
         const n = Number(id);
         if (Number.isInteger(n)) {
             itemIds.add(n);
@@ -442,6 +447,7 @@ function buildApTrackerResponse(spoilerMode: boolean): unknown {
         spoiler = loadSpoilerTables();
         collectIds(spoiler.gather, itemIds);
         collectIds(spoiler.process, itemIds);
+        collectIds(spoiler.thieving, itemIds);
         collectDropIds(spoiler.drops, dropSlotIds, dropUnitIds);
     }
 
@@ -507,6 +513,7 @@ function buildApTrackerResponse(spoilerMode: boolean): unknown {
             entrances: getEntranceOverrideCount(),
             gather: getGatherOverrideCount(),
             process: getProcessOverrideCount(),
+            thieving: getThievingOverrideCount(),
             drops: getDropOverrideCount(),
             // stable code fact, not a spoiler - the spellbook teleports wired to
             // ap_track in teleport.rs2; there's no JSON override table to size this

@@ -54,6 +54,8 @@ set RUN_GATHER=1
 REM gathering swap table (runtime JSON, restart only)
 set RUN_PROCESS=1
 REM processing/recipe swap table (runtime JSON, restart only)
+set RUN_THIEVING=1
+REM thieving loot swap table (runtime JSON, restart only)
 set RUN_SPAWN=1
 REM random home/respawn point (MUST run before entrances - see note above)
 set RUN_ENTRANCES=1
@@ -98,6 +100,15 @@ REM               [--skills cooking,smithing,crafting,fletching] [--exclude <ite
 REM               [--pin-quest-items] [--no-quest-pins] [--dry-run]
 set PROCESS_MODE=shuffle
 set PROCESS_EXTRA=
+
+REM RandomizeThieving.ts - what pickpockets/market stalls/trapped chests hand you.
+REM   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
+REM               [--surfaces pickpocket,stalls,chests] [--exclude <item,item>]
+REM               [--pin-quest-items] [--no-quest-pins] [--dry-run] [--export-pool <path>]
+REM   (`--exclude coins` leaves the big-money rows handing out vanilla coins;
+REM    quantity is never rescaled.)
+set THIEVING_MODE=shuffle
+set THIEVING_EXTRA=
 
 REM RandomizeSpawn.ts - the home/respawn point. Runs BEFORE entrances (see note up top).
 REM   all params: [--seed <n>] [--mode city|chunk] [--dry-run] [--include-far-west]
@@ -157,6 +168,12 @@ if "%RUN_PROCESS%"=="1" (
     echo.
     echo ==^> npx tsx tools/process/RandomizeProcessing.ts --seed %SEED% --mode %PROCESS_MODE% %PROCESS_EXTRA%
     call npx tsx tools/process/RandomizeProcessing.ts --seed %SEED% --mode %PROCESS_MODE% %PROCESS_EXTRA% || goto :error
+)
+
+if "%RUN_THIEVING%"=="1" (
+    echo.
+    echo ==^> npx tsx tools/thieving/RandomizeThieving.ts --seed %SEED% --mode %THIEVING_MODE% %THIEVING_EXTRA%
+    call npx tsx tools/thieving/RandomizeThieving.ts --seed %SEED% --mode %THIEVING_MODE% %THIEVING_EXTRA% || goto :error
 )
 
 if "%RUN_SPAWN%"=="1" (

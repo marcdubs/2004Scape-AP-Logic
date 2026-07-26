@@ -14,6 +14,7 @@
         <button class="tab-btn" data-tab="entrances">Entrances</button>
         <button class="tab-btn" data-tab="gathering">Gathering</button>
         <button class="tab-btn" data-tab="recipes">Recipes</button>
+        <button class="tab-btn" data-tab="thieving">Thieving</button>
         <button class="tab-btn" data-tab="bestiary">Bestiary</button>
         <button class="tab-btn" data-tab="teleports">Teleports</button>
         <button class="tab-btn" data-tab="checks">Checks</button>
@@ -94,6 +95,19 @@
             <tbody></tbody>
         </table>
         <div class="empty-state" id="recipes-empty" hidden>Nothing discovered yet. Go cook/smith/craft/fletch something!</div>
+    </section>
+
+    <section id="tab-thieving" class="tab-panel">
+        <h2>Thieving <span class="counter" id="thieving-counter"></span></h2>
+        <p class="tab-desc">Pickpocket/stall/chest loot that turned out different than vanilla, revealed the first time you actually stole it. The game still narrates the vanilla line &ndash; &ldquo;You steal some silk.&rdquo; &ndash; so what lands in your pack is the reveal.</p>
+        <div class="entrance-toolbar">
+            <label class="toggle-label"><input type="checkbox" id="thieving-show-undiscovered" checked> Show not-yet-discovered</label>
+        </div>
+        <table class="discovery-table" id="thieving-table">
+            <thead><tr><th>Vanilla loot</th><th></th><th>Steals like</th></tr></thead>
+            <tbody></tbody>
+        </table>
+        <div class="empty-state" id="thieving-empty" hidden>Nothing discovered yet. Go pick a pocket or rob a stall!</div>
     </section>
 
     <section id="tab-bestiary" class="tab-panel">
