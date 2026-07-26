@@ -802,3 +802,96 @@ main#app {
 .unlock-maxed td:last-child {
     color: var(--good);
 }
+
+/* ---- Checks tab (GitHub #19) ---- */
+
+.check-group {
+    margin-bottom: 1rem;
+    border: 2px solid var(--border);
+    outline: 1px solid var(--border-dark);
+    border-radius: 4px;
+    background: #1e1810;
+}
+
+.check-group > summary {
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    background: linear-gradient(#3d3323, #2c2418);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-shadow: 1px 1px 0 #000;
+    user-select: none;
+}
+
+.check-group > summary .counter {
+    float: right;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.check-group > summary .counter.all-done {
+    color: var(--good);
+}
+
+.check-group[open] > summary {
+    border-bottom: 1px solid var(--border);
+}
+
+.check-section {
+    margin: 0.75rem 0.75rem 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--gold);
+}
+
+.checks-table {
+    border: none;
+    outline: none;
+    border-radius: 0;
+}
+
+/* status dot, shared by the rows and the legend above them */
+.check-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 1px solid #000;
+    box-shadow: 0 0 0 1px #000;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.check-dot.done { background: var(--good); }
+.check-dot.todo { background: #201a12; border-color: #9a865e; }
+.check-dot.luck { background: var(--gold); }
+.check-dot.gone { background: #4a4038; border-color: #6b5c46; }
+
+.check-status {
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.check-done .check-status { color: var(--good); }
+.check-luck .check-status { color: var(--gold); }
+
+/* a check this seed never generated is struck through, not merely faint - it is
+   not a to-do item and must never read as one. */
+.check-gone {
+    opacity: 0.5;
+}
+
+.check-gone td:first-child {
+    text-decoration: line-through;
+}
+
+.check-spoiler {
+    color: var(--warn);
+    font-style: italic;
+}

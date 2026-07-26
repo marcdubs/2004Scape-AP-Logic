@@ -3726,3 +3726,33 @@ consumers - but it was the only record of the drip seed the installed `.npc` fil
 from. The file now says `"dryRun": true`, so it is obvious it no longer describes the
 installed content. **Back up per-tool spoiler outputs too, not just the config the tool
 writes.**
+
+## Tracker "Checks" tab (GitHub #19) - what the payload split taught us
+
+Full design in `docs/tracker-map.md` ("Checks tab"); the reusable bits:
+
+- **`/ap/tracker.json` is a 5s poll - do not put static tables on it.** The check
+  catalog is 517 names and never changes within a run, so it got its own
+  `GET /ap/checks.json` route fetched once at load (and again on tab open, which is
+  what picks up the one genuinely dynamic input: an Archipelago connect). Fired
+  state, which *does* change, stays on the poll as `discoveries.checks`. Any future
+  tab with a big static catalog should split the same way.
+- **`data/config/ap-archipelago-data.json` is a general-purpose catalog, not just
+  the AP client's datapackage.** It ships with the overlay and holds all 517
+  locations with the ids/names/kinds the multiworld, the spoiler log and (now) the
+  tracker all use. Reach for it before hand-listing checks anywhere engine-side -
+  `tools/sim/PlacementEngine.ts` is tooling and must not be imported from `src/`.
+- **"Can't do it yet" and "can't ever do it" must not render alike.** A check the
+  seed never generated (apworld feasibility exclusion / `musicChecks: false`) has to
+  be visibly out of the run *and* out of the denominator, or the list becomes a
+  to-do with impossible entries and an unreachable 100%. Two sources feed it:
+  `Connected`'s `missing_locations + checked_locations` in AP mode (ApClient now
+  keeps them), and a new `infeasibleChecks` array in `ap-placements.json` in solo
+  mode. Both are allowed to be absent - then nothing is marked, which is the safe
+  failure direction.
+- **`fillerOnly` is not "unobtainable".** It means "never holds progression" (clue
+  trails: acquisition is drop RNG; music: deliberate). Tag it, don't exclude it.
+  Conflating the two would have crossed out 233 perfectly reachable checks.
+- **Spoiler contents are mode-scoped.** Unfired contents come from
+  `ap-placements.json`, which in AP mode is a *stale solo artifact* - `?spoiler=1`
+  returns `{}` there rather than presenting last run's answers as this run's.

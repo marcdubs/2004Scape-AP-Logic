@@ -314,7 +314,7 @@ function writeStartingUnlocks(dir: string): void {
     fs.writeFileSync(path.join(dir, 'ap-unlocks.json'), JSON.stringify({ unlocks }, null, 4) + '\n');
 }
 
-function writePlacements(dir: string, seed: number, pool: PoolMode, placements: Map<string, PlacementRecord>, spoiler: PlacementSimResult): void {
+function writePlacements(dir: string, seed: number, pool: PoolMode, placements: Map<string, PlacementRecord>, spoiler: PlacementSimResult, infeasibleChecks: Set<string>): void {
     const placementsOut: Record<string, { item: string; count?: number; display?: string }> = {};
     for (const [locId, rec] of [...placements.entries()].sort(([a], [b]) => a.localeCompare(b))) {
         if (rec.item === 'filler') {
@@ -332,7 +332,12 @@ function writePlacements(dir: string, seed: number, pool: PoolMode, placements: 
         goals: spoiler.goalStatus.map(g => ({ id: g.goal.id, name: g.goal.name, reached: g.reached, sphereReached: g.sphereReached }))
     };
 
-    const out = { seed, pool, questGates: [...QUEST_GATE_IDS], placements: placementsOut, spoiler: spoilerOut };
+    // infeasibleChecks is NOT a spoiler (it says which checks this seed's region model
+    // can never justify, not what's in any of them) and is deliberately outside the
+    // `spoiler` block so the runtime may read it: the tracker's Checks tab renders these
+    // as "not in this seed" rather than leaving them on the player's to-do list forever.
+    // They still get a filler placement above, so nothing else changes shape.
+    const out = { seed, pool, questGates: [...QUEST_GATE_IDS], infeasibleChecks: [...infeasibleChecks].sort(), placements: placementsOut, spoiler: spoilerOut };
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'ap-placements.json'), JSON.stringify(out, null, 2) + '\n');
 }
@@ -354,11 +359,11 @@ function clearRunState(dir: string): string[] {
 // before ever touching the real config dir.
 // ---------------------------------------------------------------------------
 
-function stageAndValidate(realConfigDir: string, seed: number, pool: PoolMode, placements: Map<string, PlacementRecord>, spoiler: PlacementSimResult): { ok: boolean; scratchDir: string; output: string } {
+function stageAndValidate(realConfigDir: string, seed: number, pool: PoolMode, placements: Map<string, PlacementRecord>, spoiler: PlacementSimResult, infeasibleChecks: Set<string>): { ok: boolean; scratchDir: string; output: string } {
     const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ap-generate-seed-'));
 
     writeStartingUnlocks(scratchDir);
-    writePlacements(scratchDir, seed, pool, placements, spoiler);
+    writePlacements(scratchDir, seed, pool, placements, spoiler, infeasibleChecks);
 
     // Region/entrance/gated-area/spawn tables are independent of placement mode - carry
     // the REAL ones over (read-only copy) so the validator's region-aware logic still
@@ -482,7 +487,7 @@ function main(): void {
             }
         }
 
-        const { ok, scratchDir, output } = stageAndValidate(args.configDir, trySeed, args.pool, placements, spoiler);
+        const { ok, scratchDir, output } = stageAndValidate(args.configDir, trySeed, args.pool, placements, spoiler, spatial.infeasibleLocationIds);
         console.log(`  attempt ${attempt} (seed ${trySeed}): ValidateSeed ${ok ? 'PASSED' : 'FAILED'}`);
         if (!ok) {
             lastError = `ValidateSeed exited non-zero:\n${output}`;

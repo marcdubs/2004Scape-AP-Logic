@@ -14,6 +14,8 @@
     var state = {
         data: null,
         meta: null,
+        checks: null,       // /ap/checks.json catalog (fetched separately, see fetchChecks)
+        checksOpen: {},     // group key -> expanded, sticky across re-renders
         layer: 'surface',
         selectedSite: null
     };
@@ -101,6 +103,32 @@
             });
     }
 
+    // The check catalog is per-seed static (517 names), so it rides its own route
+    // instead of being re-shipped on every 5s tracker poll - fired state already comes
+    // down with tracker.json as discoveries.checks. Refetched when the Checks tab is
+    // opened, which is enough to pick up the one thing that does move: connecting to an
+    // Archipelago room teaches the server which locations this slot actually has.
+    function fetchChecks() {
+        var url = '/ap/checks.json' + (spoilerMode ? '?spoiler=1' : '');
+        return fetch(url, { cache: 'no-store' })
+            .then(function (res) {
+                if (!res.ok) {
+                    throw new Error('HTTP ' + res.status);
+                }
+                return res.json();
+            })
+            .then(function (catalog) {
+                state.checks = catalog;
+                (catalog.groups || []).forEach(function (group) {
+                    if (!Object.prototype.hasOwnProperty.call(state.checksOpen, group.key)) {
+                        state.checksOpen[group.key] = !!group.open;
+                    }
+                });
+                renderChecksTab();
+            })
+            .catch(function () { /* main status pill already reports the server being down */ });
+    }
+
     function fetchMeta() {
         fetch('worldmap-meta.json', { cache: 'no-store' })
             .then(function (res) {
@@ -139,6 +167,9 @@
                 btn.classList.add('active');
                 document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
                 document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+                if (btn.dataset.tab === 'checks') {
+                    fetchChecks();
+                }
             });
         });
     }
@@ -448,6 +479,203 @@
         var box = document.getElementById('unlocks-show-locked');
         if (box) {
             box.addEventListener('change', renderUnlocksTab);
+        }
+    }
+
+    // ---- render: checks (GitHub #19 - "which of the 517 checks have I fired?") ----
+    // Catalog from /ap/checks.json, fired state from the tracker ledger
+    // (data.discoveries.checks, written by ApChecks.fireCheck in both the solo and the
+    // Archipelago paths). A fired check's recorded value is what it gave you, so
+    // showing it is a discovery, not a spoiler; unfired contents only appear under
+    // ?spoiler=1, and only in solo placement mode where the server knows them.
+
+    function checkStatus(check, firedValue) {
+        if (firedValue !== undefined) {
+            return { cls: 'done', label: 'done' };
+        }
+        if (check.excluded) {
+            return { cls: 'gone', label: 'not in this seed' };
+        }
+        if (check.luck) {
+            return { cls: 'luck', label: 'luck-gated' };
+        }
+        return { cls: 'todo', label: 'not yet' };
+    }
+
+    function checkRow(check, firedValue, spoilerContents) {
+        var status = checkStatus(check, firedValue);
+        var tr = document.createElement('tr');
+        tr.className = 'check-row check-' + status.cls;
+
+        var tdName = document.createElement('td');
+        tdName.className = 'icon-cell';
+        var dot = document.createElement('span');
+        dot.className = 'check-dot ' + status.cls;
+        tdName.appendChild(dot);
+        if (check.skill && STAT_ICONS[check.skill]) {
+            tdName.appendChild(statIcon(check.skill));
+        }
+        tdName.appendChild(document.createTextNode(check.name));
+        tr.appendChild(tdName);
+
+        var tdStatus = document.createElement('td');
+        tdStatus.className = 'check-status';
+        tdStatus.textContent = status.label;
+        tr.appendChild(tdStatus);
+
+        var tdWhat = document.createElement('td');
+        if (firedValue !== undefined) {
+            tdWhat.textContent = firedValue;
+        } else if (spoilerContents) {
+            tdWhat.textContent = spoilerContents;
+            tdWhat.className = 'check-spoiler';
+        }
+        tr.appendChild(tdWhat);
+
+        return tr;
+    }
+
+    function checksTable(rows, fired, spoilerVisible) {
+        var table = document.createElement('table');
+        table.className = 'discovery-table checks-table';
+        var thead = document.createElement('thead');
+        thead.innerHTML = '<tr><th>Check</th><th>Status</th><th>' + (spoilerVisible ? 'Contains' : 'Gave you') + '</th></tr>';
+        table.appendChild(thead);
+        var tbody = document.createElement('tbody');
+        rows.forEach(function (check) {
+            tbody.appendChild(checkRow(check, fired[check.id], spoilerMode ? check.contents : null));
+        });
+        table.appendChild(tbody);
+        return table;
+    }
+
+    function renderChecksTab() {
+        var container = document.getElementById('checks-groups');
+        var emptyEl = document.getElementById('checks-empty');
+        var counterEl = document.getElementById('checks-counter');
+        var catalog = state.checks;
+
+        if (!catalog) {
+            return;
+        }
+        if (!catalog.present) {
+            container.innerHTML = '';
+            counterEl.textContent = '';
+            emptyEl.hidden = false;
+            return;
+        }
+        emptyEl.hidden = true;
+
+        var fired = (state.data && state.data.discoveries && state.data.discoveries.checks) || {};
+        var searchInput = document.getElementById('checks-search');
+        var filterTerm = ((searchInput && searchInput.value) || '').trim().toLowerCase();
+        var hideDoneBox = document.getElementById('checks-hide-done');
+        var hideDone = !!(hideDoneBox && hideDoneBox.checked);
+
+        var byGroup = {};
+        var totalObtainable = 0;
+        var totalFired = 0;
+        catalog.checks.forEach(function (check) {
+            if (!byGroup[check.group]) {
+                byGroup[check.group] = [];
+            }
+            byGroup[check.group].push(check);
+            // a check this seed never generated isn't part of the denominator - counting
+            // it would make 100% completion unreachable on paper.
+            if (!check.excluded) {
+                totalObtainable++;
+                if (fired[check.id] !== undefined) {
+                    totalFired++;
+                }
+            }
+        });
+
+        counterEl.textContent = '(' + totalFired + ' / ' + totalObtainable + ' fired' + (spoilerMode ? ' · showing contents' : '') + ')';
+
+        container.innerHTML = '';
+
+        catalog.groups.forEach(function (group) {
+            var all = byGroup[group.key] || [];
+            if (all.length === 0) {
+                return;
+            }
+
+            var obtainable = all.filter(function (c) { return !c.excluded; });
+            var doneCount = obtainable.filter(function (c) { return fired[c.id] !== undefined; }).length;
+
+            var visible = all;
+            if (hideDone) {
+                visible = visible.filter(function (c) { return fired[c.id] === undefined; });
+            }
+            if (filterTerm) {
+                visible = visible.filter(function (c) { return c.name.toLowerCase().indexOf(filterTerm) !== -1; });
+            }
+            if (visible.length === 0) {
+                return;
+            }
+
+            var details = document.createElement('details');
+            details.className = 'check-group';
+            // a filter is a request to see the matches, whatever the group's usual state
+            details.open = filterTerm ? true : !!state.checksOpen[group.key];
+            details.addEventListener('toggle', function () {
+                if (!filterTerm) {
+                    state.checksOpen[group.key] = details.open;
+                }
+            });
+
+            var summary = document.createElement('summary');
+            summary.textContent = group.label;
+            var count = document.createElement('span');
+            count.className = 'counter';
+            count.textContent = doneCount + ' / ' + obtainable.length;
+            if (doneCount === obtainable.length && obtainable.length > 0) {
+                count.classList.add('all-done');
+            }
+            summary.appendChild(count);
+            details.appendChild(summary);
+
+            // Miscellaneous is a merge of three kinds - keep their own headings inside it
+            // so "which barcrawl bar am I missing" is still one glance.
+            var sections = [];
+            var bySection = {};
+            visible.forEach(function (check) {
+                if (!bySection[check.section]) {
+                    bySection[check.section] = [];
+                    sections.push(check.section);
+                }
+                bySection[check.section].push(check);
+            });
+
+            sections.forEach(function (section) {
+                if (sections.length > 1) {
+                    var heading = document.createElement('h4');
+                    heading.className = 'check-section';
+                    heading.textContent = section;
+                    details.appendChild(heading);
+                }
+                details.appendChild(checksTable(bySection[section], fired, spoilerMode));
+            });
+
+            container.appendChild(details);
+        });
+
+        if (container.children.length === 0) {
+            var noMatch = document.createElement('p');
+            noMatch.className = 'tab-desc';
+            noMatch.textContent = filterTerm ? 'No checks match "' + filterTerm + '".' : 'Every check in this seed is done. Nice.';
+            container.appendChild(noMatch);
+        }
+    }
+
+    function initChecksControls() {
+        var search = document.getElementById('checks-search');
+        if (search) {
+            search.addEventListener('input', renderChecksTab);
+        }
+        var hideDone = document.getElementById('checks-hide-done');
+        if (hideDone) {
+            hideDone.addEventListener('change', renderChecksTab);
         }
     }
 
@@ -1312,6 +1540,7 @@
         renderBestiaryTab();
         renderTeleportsTab();
         renderEntrancesTab();
+        renderChecksTab();
         renderUnlocksTab();
         renderMap();
     }
@@ -1323,9 +1552,11 @@
         initSpoilerToggle();
         initMapControls();
         initEntranceSearch();
+        initChecksControls();
         initShowLockedToggle();
         initArchipelagoTab();
         fetchMeta();
+        fetchChecks();
         fetchTracker();
         setInterval(fetchTracker, POLL_MS);
     });

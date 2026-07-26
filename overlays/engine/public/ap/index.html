@@ -16,6 +16,7 @@
         <button class="tab-btn" data-tab="recipes">Recipes</button>
         <button class="tab-btn" data-tab="bestiary">Bestiary</button>
         <button class="tab-btn" data-tab="teleports">Teleports</button>
+        <button class="tab-btn" data-tab="checks">Checks</button>
         <button class="tab-btn" data-tab="unlocks">Unlocks</button>
         <button class="tab-btn" data-tab="archipelago">Archipelago</button>
     </nav>
@@ -104,6 +105,23 @@
             <tbody></tbody>
         </table>
         <div class="empty-state" id="teleports-empty" hidden>Nothing discovered yet. Go cast a teleport spell!</div>
+    </section>
+
+    <section id="tab-checks" class="tab-panel">
+        <h2>Checks <span class="counter" id="checks-counter"></span></h2>
+        <p class="tab-desc">Every check location this seed has, and whether you've fired it. <b>Miscellaneous</b> is open by default &mdash; it's the short list of one-off checks that are easy to forget exist (barcrawl bars, the gnomeball goal, the Mage Arena god cape). The long, self-evident groups start collapsed.</p>
+        <div class="entrance-toolbar">
+            <input type="search" id="checks-search" class="entrance-search" placeholder="Filter by check name&hellip;">
+            <label class="toggle-label"><input type="checkbox" id="checks-hide-done"> Hide completed</label>
+        </div>
+        <div class="map-legend">
+            <span class="legend-item"><span class="check-dot done"></span>fired</span>
+            <span class="legend-item"><span class="check-dot todo"></span>not yet</span>
+            <span class="legend-item"><span class="check-dot luck"></span>luck-gated (never holds progression)</span>
+            <span class="legend-item"><span class="check-dot gone"></span>not in this seed</span>
+        </div>
+        <div id="checks-groups"></div>
+        <div class="empty-state" id="checks-empty" hidden>No check catalog on this server &mdash; run <code>tools/ap/ExportApWorldData.ts</code> to write data/config/ap-archipelago-data.json.</div>
     </section>
 
     <section id="tab-unlocks" class="tab-panel">
