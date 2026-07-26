@@ -103,6 +103,7 @@ game: 2004Scape
   extra_goals: []          # e.g. ["kbd"] - ALL listed goals also required for victory
   progressive_quests: false # one difficulty-ordered "Progressive Quest Unlock" item instead of 61 named ones
   music_checks: false      # 230 extra "first visit to each music region" checks
+  gather_speed: 200        # mining/woodcutting/fishing success rate, % of vanilla (100 = untouched)
   region_logic: true       # default. Archipelago reasons about where things physically are,
                            # and rolls the world (entrances, gathering, processing, shops,
                            # drops, spawn) itself so the fill matches what you will play.

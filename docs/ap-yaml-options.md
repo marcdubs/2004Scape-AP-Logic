@@ -176,6 +176,27 @@ at level 1. The 15-level doubling deliberately trails the XP curve's own
 minutes of play, not one action). (AP reward XP is unaffected - those amounts
 are always absolute.)
 
+### `gather_speed`
+
+`200` (default), range `25`-`1000`. Mining / Woodcutting / Fishing success rate
+as a **percentage of vanilla**: `100` is untouched 2004 behavior, `200` means
+roughly twice as many swings pay out. It scales the level-interpolated success
+roll rather than forcing a success, so tool tier and level still matter - a
+rune pickaxe on a level-1 rock is still visibly better than bronze, the whole
+curve just shifts up. Applies **live** on connect, no reseed needed.
+
+The default is deliberately not vanilla, for the same reason
+`progressive_xp_rate` defaults on: with progressive XP the levels arrive fast
+but 2004 gathering hands you resources at 2004 speed, and the raw materials
+become the bottleneck for every downstream skill. The **per-swing action delay
+is untouched**, so one resource per swing/cast is still the ceiling no matter
+how high you set this - going past ~400 mostly just removes the last failed
+cycles at low levels. Set `100` for authentic rates.
+
+Nothing else that rolls against a skill moves: cooking burn chance, fletching,
+thieving and friends all keep vanilla odds (they share the vanilla
+`stat_random` command; only the three gathering skills call the AP one).
+
 ### `music_checks`
 
 `false` (default) / `true`. Adds 230 "first visit to each music-track region"

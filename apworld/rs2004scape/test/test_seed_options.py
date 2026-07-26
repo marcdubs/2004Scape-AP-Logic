@@ -13,6 +13,8 @@ class TestSeedOptionsDefaults(RS2004TestBase):
         slot_data = self.world.fill_slot_data()
         self.assertFalse(slot_data["infiniteRun"])
         self.assertTrue(slot_data["progressiveXpRate"])
+        # percentage, live server-side knob - 100 would be vanilla 2004 rates
+        self.assertEqual(slot_data["gatherSpeed"], 200)
         seed_options = slot_data["seedOptions"]
         # the shared seed is rolled per generation, so only its shape is fixed here -
         # test_ships_its_own_seed below is what pins its meaning
@@ -82,12 +84,14 @@ class TestSeedOptionsCustom(RS2004TestBase):
         "spawn_randomization": "chunk",
         "infinite_run": True,
         "progressive_xp_rate": False,
+        "gather_speed": 500,
     }
 
     def test_custom_values(self) -> None:
         slot_data = self.world.fill_slot_data()
         self.assertTrue(slot_data["infiniteRun"])
         self.assertFalse(slot_data["progressiveXpRate"])
+        self.assertEqual(slot_data["gatherSpeed"], 500)
         seed = slot_data["seedOptions"]
         self.assertEqual(seed["entrances"], "off")  # region_logic ships the table itself
         self.assertFalse(seed["npcDrip"])

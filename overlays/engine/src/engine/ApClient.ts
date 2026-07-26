@@ -25,7 +25,7 @@ import { randomUUID } from 'crypto';
 
 import WebSocket from 'ws';
 
-import { setApOption } from '#/engine/ApOptions.js';
+import { setApOption, setApOptionInt } from '#/engine/ApOptions.js';
 import * as ApUnlockOverrides from '#/engine/ApUnlockOverrides.js';
 import type Player from '#/engine/entity/Player.js';
 import { PlayerQueueType } from '#/engine/entity/PlayerQueueRequest.js';
@@ -336,6 +336,13 @@ function applySlotData(slotData: Record<string, unknown> | undefined): void {
     // progressive XP rate applies live too (Player.addXp consults ApOptions per gain)
     if (typeof slotData.progressiveXpRate === 'boolean') {
         setApOption('progressiveXpRate', slotData.progressiveXpRate);
+    }
+
+    // gathering speed applies live as well (AP_GATHER_RANDOM consults ApOptions on
+    // every mining/woodcutting/fishing roll). Numeric percentage, 100 = vanilla;
+    // out-of-range values are clamped by ApOptions on the next read.
+    if (typeof slotData.gatherSpeed === 'number') {
+        setApOptionInt('gatherSpeed', slotData.gatherSpeed);
     }
 
     // seed knobs (entrances/drip/shops/drops/gathering/processing/spawn):

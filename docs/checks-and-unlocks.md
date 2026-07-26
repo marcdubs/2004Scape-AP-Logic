@@ -215,10 +215,23 @@ validation scratch dir.
 ## Options & addon items (`ap-options.json`, built 2026-07-17)
 
 `data/config/ap-options.json` is the user-facing toggle file (boot-time; all
-keys default true; missing file = all enabled). rs2 reads it through the
-`ap_option(string)(int)` engine command (opcode 1910). Current keys:
+boolean keys default true; missing file = all enabled). rs2 reads it through the
+`ap_option(string)(int)` engine command (opcode 1910). Current boolean keys:
 `musicChecks`, `addonBankBox`, `addonTreeCompass`, `addonTeleportingFocus`,
 `addonNpcTeleport`.
+
+**Numeric tuning knobs** live in the same file and come back from the same
+`ap_option` command as their value (booleans come back as 1/0). Today that's
+`gatherSpeed` (added 2026-07-26, GitHub #13): a percentage applied to the
+mining/woodcutting/fishing success threshold, default **200**, clamped to
+25-1000. It is applied by a separate `ap_gather_random` command
+(`AP_GATHER_RANDOM`, opcode 1914) - vanilla `stat_random`'s math with the
+percentage folded into the interpolated threshold - so only the three gathering
+skills move and every other `stat_random` caller (cooking burn, fletching,
+thieving) keeps vanilla odds. Scaling the roll rather than flooring it keeps
+tool tier and level meaningful; the per-swing action delay is untouched, so one
+resource per swing remains the throughput ceiling. AP side: the `gather_speed`
+YAML option, adopted live from slot_data.
 
 **Addon items** (`ap_addons.obj`/`ap_addons.rs2`): a new
 `addons` reward-roll slot (1-in-16) delivers the first enabled-and-unowned item
