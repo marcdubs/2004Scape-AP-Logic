@@ -104,8 +104,13 @@ few-thousand-pixel image, one file is fine.
   extractable from the cache later; text first).
 - **Recipes tab**: same for processing swaps (cooking/smithing/crafting/
   fletching outputs).
+- **Thieving tab** (built 2026-07, GitHub #6): "Coins — steals like —
+  Adamantite ore" per discovered pickpocket/stall/chest loot swap.
 - **Bestiary tab**: "Goblin — smells like Cow" per discovered mimic.
 - **Teleports/Shops tab**: revealed cast-by-cast / visit-by-visit.
+- **Checks tab** (built 2026-07, GitHub #19 — see "Checks tab" below): the
+  517-location check catalog, grouped, with fired/not per row. This is the
+  "goals strip" idea below, delivered as a full tab.
 - **Goals strip** (piggybacks checks-and-unlocks.md): barcrawl bars N/10,
   Dragon Slayer stage, KBD status, checks fired — the varp watcher and
   `~ap_check_fired` proposed there can call `recordDiscovery('checks', ...)`
@@ -171,6 +176,53 @@ Regenerate with `npx tsx tools/map/RenderWorldmapPng.ts` (run in `../Server/engi
 it reads the built jag, so it only needs re-running when map content changes. Copy the
 three outputs (`worldmap-surface.png`, `worldmap-underground.png`, `worldmap-meta.json`)
 back into `overlays/engine/public/ap/` so `install.js` deploys them.
+
+## Checks tab (2026-07, GitHub #19)
+
+Every other tab answers "what did the randomizer do"; this one answers "what
+have I actually done". The data was already there — `ApChecks.fireCheck` calls
+`recordDiscovery('checks', ...)` on both the solo-placement and the AP path — so
+this was a UI change plus one new read-only route.
+
+- **Route split.** The catalog (517 names/kinds/flags) is per-seed *static*, so it
+  rides its own `GET /ap/checks.json` instead of bloating the 5s `tracker.json`
+  poll. Fired state stays on `tracker.json` as `discoveries.checks`. The SPA
+  fetches the catalog once at load and again whenever the tab is opened (cheap,
+  and it self-corrects after an Archipelago connect changes what's excluded).
+- **The catalog is the AP datapackage.** `data/config/ap-archipelago-data.json`
+  (written by `tools/ap/ExportApWorldData.ts`, already shipped for the AP client)
+  has all 517 locations with the same ids and display names the multiworld and
+  the spoiler log use — no second source of truth to drift.
+- **Grouping** reuses `RS2004World._KIND_GROUP`'s labels verbatim, with the three
+  odds-and-ends kinds (`activity` 13 + `barcrawl` 10 + `ds` 6 = 29) merged into a
+  **Miscellaneous** group that is open by default and keeps their headings as
+  sub-sections. Quests/Levels/First XP/First Kills/Music start collapsed with
+  `n/total` counters — they're long and self-evident; Miscellaneous is the list
+  you consult to find what you forgot exists.
+- **Not-obtainable ≠ not-done.** Two per-seed sources, one per mode:
+  - AP mode: `ApClient` now remembers `missing_locations` + `checked_locations`
+    from the `Connected` packet — together, exactly the locations the multiworld
+    generated for this slot. Anything in the catalog but not in that set was
+    dropped by the apworld's feasibility exclusion and can never fire.
+  - Solo placement mode: `GenerateSeed.ts` now writes its own
+    `spatial.infeasibleLocationIds` to `ap-placements.json` as `infeasibleChecks`
+    (outside the `spoiler` block — it says *which* checks are impossible, never
+    what's in them, so the runtime may read it).
+
+  Either source may be absent (never connected; a seed rolled before this
+  existed) — then nothing is marked, which is the safe direction. Excluded rows
+  render struck-through as "not in this seed" and are **out of the denominator**,
+  or 100% completion would be unreachable on paper.
+- **`fillerOnly` is a different thing** and gets its own "luck-gated" tag, not
+  exclusion: the three clue-trail tiers and the music tracks are perfectly
+  reachable, they just never hold progression (clue *acquisition* is drop RNG).
+- **`musicChecks: false`** drops the group entirely rather than showing 0/230 —
+  those watches are never even loaded (`ApChecks.loadWatches`).
+- **Contents.** A fired check shows what it gave you (that's a discovery, already
+  in the ledger). Unfired contents appear only under `?spoiler=1`, and only in
+  solo mode — in AP mode the multiworld owns them and a stale
+  `ap-placements.json` from an earlier solo run must never be shown as this
+  run's answer.
 
 ## Seed lifecycle & testing
 

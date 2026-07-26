@@ -25,7 +25,7 @@ import { randomUUID } from 'crypto';
 
 import WebSocket from 'ws';
 
-import { setApOption } from '#/engine/ApOptions.js';
+import { setApOption, setApOptionInt } from '#/engine/ApOptions.js';
 import * as ApUnlockOverrides from '#/engine/ApUnlockOverrides.js';
 import type Player from '#/engine/entity/Player.js';
 import { PlayerQueueType } from '#/engine/entity/PlayerQueueRequest.js';
@@ -95,6 +95,13 @@ let sentChecks = new Set<string>();
 
 let ws: WebSocket | null = null;
 let connected = false; // Connected packet received
+// Check ids this slot actually HAS in the multiworld, from the Connected packet's
+// missing_locations + checked_locations (together, every location the generator
+// created for us). The apworld drops locations its region model can't justify this
+// seed (RS2004World.create_regions' feasibility exclusion) and all 230 music
+// locations when music_checks is off - so a catalog id missing from this set can
+// never be checked in this run. Null until the first Connected (unknown, not empty).
+let slotCheckIds: Set<string> | null = null;
 let goals: string[] = ['dragon']; // victory requires EVERY listed goal's checks
 let lastError: string | null = null; // most recent connection problem, for the tracker's setup page
 let reconnectAttempt = 0;
@@ -228,6 +235,29 @@ function locationIdsFor(checkIds: Iterable<string>): number[] {
     return ids;
 }
 
+// Inverse of locationIdsFor for the two location-id arrays the Connected packet
+// carries: builds the set of check ids this slot actually holds (see slotCheckIds).
+// Ids belonging to OTHER games in the room never map back through
+// checkToLocationId, so a shared-id collision can't widen our set.
+function rememberSlotLocations(missing: unknown, checked: unknown): void {
+    if (!Array.isArray(missing) && !Array.isArray(checked)) {
+        return; // pre-0.6 server or a trimmed Connected - leave "unknown" rather than claiming everything is excluded
+    }
+    const byLocationId = new Map<number, string>();
+    for (const [checkId, locId] of checkToLocationId ?? []) {
+        byLocationId.set(locId, checkId);
+    }
+    const ids = new Set<string>();
+    for (const raw of [...(Array.isArray(missing) ? missing : []), ...(Array.isArray(checked) ? checked : [])]) {
+        const checkId = typeof raw === 'number' ? byLocationId.get(raw) : undefined;
+        if (checkId !== undefined) {
+            ids.add(checkId);
+        }
+    }
+    slotCheckIds = ids;
+    printInfo(`AP client: slot holds ${ids.size} of ${byLocationId.size} known check location(s)`);
+}
+
 function sendFullResync(): void {
     for (const id of loadFiredLedger()) {
         sentChecks.add(id);
@@ -308,6 +338,13 @@ function applySlotData(slotData: Record<string, unknown> | undefined): void {
         setApOption('progressiveXpRate', slotData.progressiveXpRate);
     }
 
+    // gathering speed applies live as well (AP_GATHER_RANDOM consults ApOptions on
+    // every mining/woodcutting/fishing roll). Numeric percentage, 100 = vanilla;
+    // out-of-range values are clamped by ApOptions on the next read.
+    if (typeof slotData.gatherSpeed === 'number') {
+        setApOptionInt('gatherSpeed', slotData.gatherSpeed);
+    }
+
     // seed knobs (entrances/drip/shops/drops/gathering/processing/spawn):
     // persisted for scripts/new-run to adopt on the NEXT seed roll - they can't
     // apply live (several need a content pack rebuild).
@@ -317,6 +354,45 @@ function applySlotData(slotData: Record<string, unknown> | undefined): void {
             printInfo('AP client: wrote ap-seed-options.json (applied on the next seed roll via scripts/new-run)');
         } catch (err) {
             printWarning(`AP client: failed to write ap-seed-options.json (${err instanceof Error ? err.message : err})`);
+        }
+    }
+
+    // The apworld's own entrance layout (GitHub #3). With region_logic on, Archipelago
+    // builds the trigger -> arrival table itself, reachability-preserving, and the
+    // multiworld's fill was computed against THAT map - so it is authoritative and must
+    // land in ap-entrances.json before the player moves. Written live; the engine's
+    // ApEntranceOverrides reloads it, no pack rebuild needed. slot_data also pins
+    // seedOptions.entrances to "off" so the next scripts/new-run cannot reshuffle it.
+    if (slotData.entranceOverrides && typeof slotData.entranceOverrides === 'object' && !Array.isArray(slotData.entranceOverrides)) {
+        const overrides = slotData.entranceOverrides as Record<string, unknown>;
+        const clean: Record<string, string> = {};
+        for (const [key, value] of Object.entries(overrides)) {
+            if (/^\d+_\d+_\d+_\d+_\d+:\d+$/.test(key) && typeof value === 'string' && /^\d+_\d+_\d+_\d+_\d+$/.test(value)) {
+                clean[key] = value;
+            }
+        }
+        if (Object.keys(clean).length > 0) {
+            try {
+                const file = 'data/config/ap-entrances.json';
+                // keep any gate requirements the local table already carried: the gate
+                // stays with the physical location, not the destination (workstream B).
+                let gates: unknown = {};
+                if (fs.existsSync(file)) {
+                    gates = (JSON.parse(fs.readFileSync(file, 'utf8')) as { gates?: unknown }).gates ?? {};
+                }
+                fs.writeFileSync(file, JSON.stringify({
+                    source: 'archipelago slot_data',
+                    generatedAt: new Date().toISOString(),
+                    overrides: clean,
+                    gates
+                }, null, 2), 'utf8');
+                void import('#/engine/ApEntranceOverrides.js')
+                    .then(m => m.reloadEntranceOverrides?.())
+                    .catch(() => { /* module may not expose a reload hook - restart picks it up */ });
+                printInfo(`AP client: adopted ${Object.keys(clean).length} entrance override(s) from slot_data`);
+            } catch (err) {
+                printWarning(`AP client: failed to write ap-entrances.json (${err instanceof Error ? err.message : err})`);
+            }
         }
     }
 
@@ -529,6 +605,7 @@ function handlePacket(packet: { cmd?: string } & Record<string, unknown>): void 
             reconnectAttempt = 0;
             lastError = null;
             printInfo(`AP client: connected to ${config?.host}:${config?.port} as "${config?.slot}"`);
+            rememberSlotLocations(packet.missing_locations, packet.checked_locations);
             applySlotData(packet.slot_data as Record<string, unknown> | undefined);
             sendFullResync();
             break;
@@ -648,6 +725,7 @@ export function reconfigure(): void {
         ws = null;
     }
     connected = false;
+    slotCheckIds = null; // re-learned from the next Connected packet
 
     const wasActive = config !== null;
     config = loadConfig();
@@ -675,6 +753,16 @@ export function reconfigure(): void {
     printInfo(`AP client: enabled (${checkToLocationId.size} locations, ${itemsById.size} items mapped)`);
     startDeliveryTimer();
     connect();
+}
+
+/**
+ * Check ids this slot holds in the multiworld, or null when that isn't known
+ * (not in AP mode, or connected but the Connected packet carried no location
+ * arrays). The tracker's Checks tab uses it to render locations the multiworld
+ * never generated as "not in this seed" instead of "not done yet".
+ */
+export function getSlotCheckIds(): Set<string> | null {
+    return isApModeActive() ? slotCheckIds : null;
 }
 
 /** Live client state for the tracker's Archipelago setup page. */

@@ -1,296 +1,771 @@
 {
-    "_comment": "Curated, hand-verified region requirements layered on top of tools/sim/data/quests.json + goals.json (docs/entrance-logic.md Workstream C). Deliberately NOT exhaustive - per the design brief, only goal-critical quests/goals get a real spatial anchor here; everything else is assumed reachable once the anchor's containing macro-region ('mainland') is reachable, matching progression-sim.md's own 'one connected mainland' travel model. Grow this file as more quests turn out to matter for goal reachability under a real shuffled seed.",
-
-    "anchors": {
-        "mainland": {
-            "level": 0,
-            "x": 3222,
-            "z": 3218,
-            "note": "Lumbridge, per the design brief. Region graph confirms this is the single largest surface region (id varies per build, see region-graph.json meta.mainlandRegionId)."
-        },
-        "karamja": {
-            "level": 1,
-            "x": 2956,
-            "z": 3143,
-            "note": "Musa Point dock arrival tile, sailors.rs2:10 (`karamja_sailor_dialogue(\"Karamja\", 1_46_49_12_7, ^sail_port_sarim_to_karamja)`). NPC-dialogue-triggered boat (~set_sail proc), NOT a ladders+stairs entrance - never touched by EntranceParser/RandomizeEntrances, always vanilla regardless of seed. Region-graph-verified as its own isolated region (not mainland) - see alwaysConnected below for why that's fine."
-        },
-        "melzars_maze_approach": {
-            "level": 0,
-            "x": 2941,
-            "z": 3248,
-            "note": "'melzardoor' loc placement, m45_50.jm2 local(61,48). This is the OUTSIDE approach tile to the Melzar's Maze building (confirmed region-graph-reachable from mainland, id 37 in the reference build). Deliberately NOT anchored on the maze's interior (past the door) - melzars_maze.rs2's oploc1/oplocu handlers show the door itself requires `last_useitem = melzarkey`, an in-dungeon puzzle-key gate (colored-key rat drops, see melzars_maze.rs2:75-136), not an entrance-shuffle-affected transition. That puzzle is narrative-only here, matching quests.json's dragon entry's own 'items' field (not hard-gated) and progression-sim.md's documented item-requirement policy. What DOES matter for seed validation is whether the building's outside approach is still reachable on foot after entrance shuffle - that's what this anchor checks."
-        },
-        "kbd_lair": {
-            "level": 0,
-            "x": 2716,
-            "z": 9817,
-            "note": "King black dragon NPC placement, m42_153.jm2 (real mapZ 53, +100 underground/instanced convention) local(28,25). Region-graph-verified as its own isolated region."
-        },
-        "entrana": {
-            "level": 0,
-            "x": 2851,
-            "z": 3349,
-            "note": "High Priest's church tile, area_entrana. Reached ONLY by the Port Sarim monks' boat - monk_of_entrana.rs2:23 `~set_sail(\"Entrana\", ..., 1_44_52_18_3, ^sail_port_sarim_to_entrana, 13)` - an NPC-dialogue transport exactly like the Karamja boat: never parsed by EntranceParser, never shuffled. Needed by grail (High Priest + crone) and hero (Entrana firebird feather)."
-        },
-        "crandor": {
-            "level": 0,
-            "x": 2833,
-            "z": 3255,
-            "note": "Crandor surface next to the crandor_rock_opening loc (m43-44_50). Reached by the Dragon Slayer ship (Ned, dialogue + quest stage - crandor.rs2's own notes in the dragon quest entry apply: never in the ladders+stairs pool, never shuffled). Once the surface is reachable, the extracted world edges from crandor_rock_opening/crandor_climbing_rope (crandor.rs2 oploc p_teleports) connect the underground lair chain automatically."
-        },
-        "kbd_lever_room": {
-            "level": 0,
-            "x": 3067,
-            "z": 10253,
-            "note": "'dragonkinginlever' loc placement, m47_160.jm2 local(59,13) - king_black_dragon.rs2's oploc1 handler for this loc does `~player_teleport_normal(0_42_153_29_10)`, landing directly in the kbd_lair region. This IS the real KBD entrance (a wilderness lever, not a ladders+stairs oploc), always vanilla/never shuffled."
-        },
-        "lava_maze_mirror_landing": {
-            "level": 0,
-            "x": 3016,
-            "z": 10249,
-            "note": "area_wilderness/scripts/lava_maze.rs2's 'wildymirrorladdertop2'/loc_1766 teleport pair (0_47_60_8_9 <-> 0_47_160_8_9), always vanilla/never shuffled (not in ladders+stairs). KNOWN GAP (documented, not silently dropped): this lands in a DIFFERENT region than kbd_lever_room within the same mapsquare m47_160 (region-graph-verified as two distinct regions) - i.e. this session traced the real always-vanilla KBD lever mechanism but did NOT finish tracing how a player physically walks from this mirror-ladder landing spot to the lever room inside the same instanced area (likely another internal connector - rope/further ladder/lava-safe-tile path - not yet found). Because of this, 'mainland' has NO verified alwaysConnected path to kbd_lever_room/kbd_lair yet, so the 'kbd' goal will show BLOCKED in ValidateSeed's output even though the underlying game mechanism (the lever) is real and always available. This is a graph-completeness gap in this file, not a seed-specific entrance-shuffle problem - see the session's final report for the explicit call-out. Follow-up: find the missing internal connector and add one more alwaysConnected hop (lava_maze_mirror_landing -> kbd_lever_room), or trace a shorter direct path."
-        }
+ "_comment": "Curated, hand-verified region requirements layered on top of tools/sim/data/quests.json + goals.json (docs/entrance-logic.md Workstream C). Deliberately NOT exhaustive - per the design brief, only goal-critical quests/goals get a real spatial anchor here; everything else is assumed reachable once the anchor's containing macro-region ('mainland') is reachable, matching progression-sim.md's own 'one connected mainland' travel model. Grow this file as more quests turn out to matter for goal reachability under a real shuffled seed.",
+ "anchors": {
+  "mainland": {
+   "level": 0,
+   "x": 3222,
+   "z": 3218,
+   "note": "Lumbridge, per the design brief. Region graph confirms this is the single largest surface region (id varies per build, see region-graph.json meta.mainlandRegionId)."
+  },
+  "karamja": {
+   "level": 1,
+   "x": 2956,
+   "z": 3143,
+   "note": "Musa Point dock arrival tile, sailors.rs2:10 (`karamja_sailor_dialogue(\"Karamja\", 1_46_49_12_7, ^sail_port_sarim_to_karamja)`). NPC-dialogue-triggered boat (~set_sail proc), NOT a ladders+stairs entrance - never touched by EntranceParser/RandomizeEntrances, always vanilla regardless of seed. Region-graph-verified as its own isolated region (not mainland) - see alwaysConnected below for why that's fine."
+  },
+  "melzars_maze_approach": {
+   "level": 0,
+   "x": 2941,
+   "z": 3248,
+   "note": "'melzardoor' loc placement, m45_50.jm2 local(61,48). This is the OUTSIDE approach tile to the Melzar's Maze building (confirmed region-graph-reachable from mainland, id 37 in the reference build). Deliberately NOT anchored on the maze's interior (past the door) - melzars_maze.rs2's oploc1/oplocu handlers show the door itself requires `last_useitem = melzarkey`, an in-dungeon puzzle-key gate (colored-key rat drops, see melzars_maze.rs2:75-136), not an entrance-shuffle-affected transition. That puzzle is narrative-only here, matching quests.json's dragon entry's own 'items' field (not hard-gated) and progression-sim.md's documented item-requirement policy. What DOES matter for seed validation is whether the building's outside approach is still reachable on foot after entrance shuffle - that's what this anchor checks."
+  },
+  "kbd_lair": {
+   "level": 0,
+   "x": 2716,
+   "z": 9817,
+   "note": "King black dragon NPC placement, m42_153.jm2 (real mapZ 53, +100 underground/instanced convention) local(28,25). Region-graph-verified as its own isolated region."
+  },
+  "entrana": {
+   "level": 0,
+   "x": 2851,
+   "z": 3349,
+   "note": "High Priest's church tile, area_entrana. Reached ONLY by the Port Sarim monks' boat - monk_of_entrana.rs2:23 `~set_sail(\"Entrana\", ..., 1_44_52_18_3, ^sail_port_sarim_to_entrana, 13)` - an NPC-dialogue transport exactly like the Karamja boat: never parsed by EntranceParser, never shuffled. Needed by grail (High Priest + crone) and hero (Entrana firebird feather)."
+  },
+  "crandor": {
+   "level": 0,
+   "x": 2833,
+   "z": 3255,
+   "note": "Crandor surface next to the crandor_rock_opening loc (m43-44_50). Reached by the Dragon Slayer ship (Ned, dialogue + quest stage - crandor.rs2's own notes in the dragon quest entry apply: never in the ladders+stairs pool, never shuffled). Once the surface is reachable, the extracted world edges from crandor_rock_opening/crandor_climbing_rope (crandor.rs2 oploc p_teleports) connect the underground lair chain automatically."
+  },
+  "kbd_lever_room": {
+   "level": 0,
+   "x": 3067,
+   "z": 10253,
+   "note": "'dragonkinginlever' loc placement, m47_160.jm2 local(59,13) - king_black_dragon.rs2's oploc1 handler for this loc does `~player_teleport_normal(0_42_153_29_10)`, landing directly in the kbd_lair region. This IS the real KBD entrance (a wilderness lever, not a ladders+stairs oploc), always vanilla/never shuffled."
+  },
+  "lava_maze_mirror_landing": {
+   "level": 0,
+   "x": 3016,
+   "z": 10249,
+   "note": "area_wilderness/scripts/lava_maze.rs2's 'wildymirrorladdertop2'/loc_1766 teleport pair (0_47_60_8_9 <-> 0_47_160_8_9), always vanilla/never shuffled (not in ladders+stairs). KNOWN GAP (documented, not silently dropped): this lands in a DIFFERENT region than kbd_lever_room within the same mapsquare m47_160 (region-graph-verified as two distinct regions) - i.e. this session traced the real always-vanilla KBD lever mechanism but did NOT finish tracing how a player physically walks from this mirror-ladder landing spot to the lever room inside the same instanced area (likely another internal connector - rope/further ladder/lava-safe-tile path - not yet found). Because of this, 'mainland' has NO verified alwaysConnected path to kbd_lever_room/kbd_lair yet, so the 'kbd' goal will show BLOCKED in ValidateSeed's output even though the underlying game mechanism (the lever) is real and always available. This is a graph-completeness gap in this file, not a seed-specific entrance-shuffle problem - see the session's final report for the explicit call-out. Follow-up: find the missing internal connector and add one more alwaysConnected hop (lava_maze_mirror_landing -> kbd_lever_room), or trace a shorter direct path."
+  },
+  "barcrawl_bluemoon": {
+   "level": 0,
+   "x": 3226,
+   "z": 3399,
+   "note": "Blue Moon Inn, Varrock (bluemoon_bartender spawn 0_50_53_26_7)"
+  },
+  "barcrawl_jollyboar": {
+   "level": 0,
+   "x": 3277,
+   "z": 3488,
+   "note": "Jolly Boar Inn, NE Varrock (jollyboar_bartender 0_51_54_13_32)"
+  },
+  "barcrawl_risingsun": {
+   "level": 0,
+   "x": 2957,
+   "z": 3370,
+   "note": "Rising Sun Inn, Falador (risingsun_barmaid 0_46_52_13_42)"
+  },
+  "barcrawl_flyinghorse": {
+   "level": 0,
+   "x": 2575,
+   "z": 3320,
+   "note": "Flying Horse Inn, East Ardougne (flyinghorse_bartender 0_40_51_15_56)"
+  },
+  "barcrawl_forestersarms": {
+   "level": 0,
+   "x": 2690,
+   "z": 3493,
+   "note": "Foresters Arms, Seers Village (foresters_bartender 0_42_54_2_37)"
+  },
+  "barcrawl_rustyanchor": {
+   "level": 0,
+   "x": 3045,
+   "z": 3257,
+   "note": "Rusty Anchor, Port Sarim (rustyanchor_bartender 0_47_50_37_57)"
+  },
+  "barcrawl_dragoninn": {
+   "level": 0,
+   "x": 2556,
+   "z": 3078,
+   "note": "Dragon Inn, Yanille (dragon_bartender 0_39_48_60_6)"
+  },
+  "barcrawl_blurberry": {
+   "level": 1,
+   "x": 2480,
+   "z": 3490,
+   "note": "Blurberrys Bar, Grand Tree upstairs (blurberry 1_38_54_48_34) - reaching it depends on the Grand Tree ladders, so a real shuffle-sensitive anchor"
+  },
+  "barcrawl_deadmanschest": {
+   "level": 0,
+   "x": 2797,
+   "z": 3155,
+   "note": "Dead Mans Chest, Brimhaven/Karamja (deadmans_bartender 0_43_49_45_19)"
+  },
+  "barcrawl_karamjaspirits": {
+   "level": 0,
+   "x": 2925,
+   "z": 3143,
+   "note": "Karamja Spirits/Zambos, Musa Point Karamja (zambo 0_45_49_45_7)"
+  }
+ },
+ "alwaysConnected": [
+  {
+   "from": "mainland",
+   "to": "karamja",
+   "note": "The 30gp Port Sarim boat (sailors.rs2 ~set_sail) is NPC-dialogue-triggered, not a ladders+stairs oploc entrance - EntranceParser never sees it, so it is NEVER shuffled and always connects exactly as vanilla. Modeled as a free, unconditional, always-present edge between the two anchor regions (both directions) rather than a real graph edge, matching docs/progression-sim.md's own treatment of Karamja ('trivial fare... narrative only, never a hard gate')."
+  },
+  {
+   "from": "mainland",
+   "to": "entrana",
+   "note": "Port Sarim monks' boat (monk_of_entrana.rs2 ~set_sail) - NPC-dialogue transport, never shuffled, same modeling convention as the Karamja boat."
+  },
+  {
+   "from": "mainland",
+   "to": "crandor",
+   "note": "Dragon Slayer ship via Ned (quest-stage dialogue transport, never shuffled). OPTIMISTIC per the documented convention: the ship exists once the quest reaches that stage; the validator's quest model tracks the stage requirements (maps, QP 32) separately."
+  },
+  {
+   "from": "mainland",
+   "to": "lava_maze_mirror_landing",
+   "note": "lava_maze.rs2's mirror-ladder teleport pair, always vanilla/never shuffled (surface trigger 0_47_60_8_9 is ordinary wilderness overworld terrain, already part of mainland)."
+  },
+  {
+   "from": "kbd_lever_room",
+   "to": "kbd_lair",
+   "note": "king_black_dragon.rs2's dragonkinginlever/dragonkingoutlever pair - a real, always-vanilla, never-shuffled entrance to the boss room. See kbd_lever_room's note for the still-missing link from lava_maze_mirror_landing to here."
+  }
+ ],
+ "generated": {
+  "_comment": "Review lever over quest-regions.generated.json (see GeneratedQuestRegions.ts). ignoreGlobal: evidence keys exempted for every quest (shared-helper noise). ignore: per-quest key lists a human judged optional/flavor/alternative-route. Every entry should say WHY in _notes.",
+  "_notes": {
+   "upass": "upass_ledge and the narrow walkway (upass_obstacles.rs2) sit on the LEVEL-1 MEGAREGION (region ~730, 415k tiles - the world's merged level-1 walkable layer, a collision-map artifact that swallows the pass's upper walkways). Whether a seed 'reaches' that artifact region is arbitrary (any shuffled stair landing anywhere on it flips the answer), so requiring it is meaningless; the pass traversal itself is modeled by the underground-pass open area. Do NOT try to filter megaregions out of extraction instead - they are load-bearing for world edges (see ExtractQuestRegions.ts's note; tried and reverted 2026-07-17).",
+   "squire": "general_use/scripts/cupboards.rs2's [label,search_cupboard] is the WORLD-WIDE cupboard dispatcher (one switch_coord over every searchable cupboard); it touches %squire so the whole block attributes to squire, but only 2_46_52_40_8 (Sir Vyvin's room, Falador castle level 2 - kept, NOT ignored) is a Knight's Sword requirement. The ignored coords are Morgan's house (vampire's garlic), Alrena's house (elena), the exam centre (itexam), and three flavor cupboards (sorcerers tower / fight arena / ranging guild)."
+  },
+  "ignoreGlobal": [],
+  "ignore": {
+   "squire": [
+    "coord|0_41_53_36_34",
+    "coord|1_48_51_24_4",
+    "coord|0_40_52_14_6",
+    "coord|0_52_52_26_4",
+    "coord|0_42_53_10_12",
+    "coord|0_40_49_29_46"
+   ],
+   "upass": [
+    "subject|loc:upass_ledge",
+    "subject|loc:walkway_upass_narrow_mid_top"
+   ]
+  }
+ },
+ "_openAreasComment": "Curated traversable quest areas (see ValidateSeed's OpenArea). Justification pattern for every entry: ONLY the 353-record ladders+stairs script set is ever shuffled; these areas' internal/approach transitions are bespoke handlers (agility obstacles, scripted gates/doors, dialogue hops, machete chops), so their vanilla connectivity is seed-independent. Item/level requirements along the way are narrative-only per docs/progression-sim.md's documented policy. Boxes deliberately avoid upper-level void megaregions (member tile cap in code).",
+ "openAreas": [
+  {
+   "name": "underground-pass",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Underground Pass gauntlet: entrance cave from West Ardougne + rock/bridge/well/tunnel obstacles (upass_obstacles.rs2, quest_upass.rs2 - p_teleport/~forcewalk handlers, some via variables the extractor can't follow). Includes the Iban temple level-1 areas and Koftik's end cave. Needed by upass + regicide.",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2304,
+     "z1": 9600,
+     "x2": 2495,
+     "z2": 9727
     },
-
-    "alwaysConnected": [
-        {
-            "from": "mainland",
-            "to": "karamja",
-            "note": "The 30gp Port Sarim boat (sailors.rs2 ~set_sail) is NPC-dialogue-triggered, not a ladders+stairs oploc entrance - EntranceParser never sees it, so it is NEVER shuffled and always connects exactly as vanilla. Modeled as a free, unconditional, always-present edge between the two anchor regions (both directions) rather than a real graph edge, matching docs/progression-sim.md's own treatment of Karamja ('trivial fare... narrative only, never a hard gate')."
-        },
-        {
-            "from": "mainland",
-            "to": "entrana",
-            "note": "Port Sarim monks' boat (monk_of_entrana.rs2 ~set_sail) - NPC-dialogue transport, never shuffled, same modeling convention as the Karamja boat."
-        },
-        {
-            "from": "mainland",
-            "to": "crandor",
-            "note": "Dragon Slayer ship via Ned (quest-stage dialogue transport, never shuffled). OPTIMISTIC per the documented convention: the ship exists once the quest reaches that stage; the validator's quest model tracks the stage requirements (maps, QP 32) separately."
-        },
-        {
-            "from": "mainland",
-            "to": "lava_maze_mirror_landing",
-            "note": "lava_maze.rs2's mirror-ladder teleport pair, always vanilla/never shuffled (surface trigger 0_47_60_8_9 is ordinary wilderness overworld terrain, already part of mainland)."
-        },
-        {
-            "from": "kbd_lever_room",
-            "to": "kbd_lair",
-            "note": "king_black_dragon.rs2's dragonkinginlever/dragonkingoutlever pair - a real, always-vanilla, never-shuffled entrance to the boss room. See kbd_lever_room's note for the still-missing link from lava_maze_mirror_landing to here."
-        }
-    ],
-
-    "generated": {
-        "_comment": "Review lever over quest-regions.generated.json (see GeneratedQuestRegions.ts). ignoreGlobal: evidence keys exempted for every quest (shared-helper noise). ignore: per-quest key lists a human judged optional/flavor/alternative-route. Every entry should say WHY in _notes.",
-        "_notes": {
-            "upass": "upass_ledge and the narrow walkway (upass_obstacles.rs2) sit on the LEVEL-1 MEGAREGION (region ~730, 415k tiles - the world's merged level-1 walkable layer, a collision-map artifact that swallows the pass's upper walkways). Whether a seed 'reaches' that artifact region is arbitrary (any shuffled stair landing anywhere on it flips the answer), so requiring it is meaningless; the pass traversal itself is modeled by the underground-pass open area. Do NOT try to filter megaregions out of extraction instead - they are load-bearing for world edges (see ExtractQuestRegions.ts's note; tried and reverted 2026-07-17).",
-            "squire": "general_use/scripts/cupboards.rs2's [label,search_cupboard] is the WORLD-WIDE cupboard dispatcher (one switch_coord over every searchable cupboard); it touches %squire so the whole block attributes to squire, but only 2_46_52_40_8 (Sir Vyvin's room, Falador castle level 2 - kept, NOT ignored) is a Knight's Sword requirement. The ignored coords are Morgan's house (vampire's garlic), Alrena's house (elena), the exam centre (itexam), and three flavor cupboards (sorcerers tower / fight arena / ranging guild)."
-        },
-        "ignoreGlobal": [],
-        "ignore": {
-            "squire": ["coord|0_41_53_36_34", "coord|1_48_51_24_4", "coord|0_40_52_14_6", "coord|0_52_52_26_4", "coord|0_42_53_10_12", "coord|0_40_49_29_46"],
-            "upass": ["subject|loc:upass_ledge", "subject|loc:walkway_upass_narrow_mid_top"]
-        }
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2304,
+     "z1": 9792,
+     "x2": 2367,
+     "z2": 9919
     },
-
-    "_openAreasComment": "Curated traversable quest areas (see ValidateSeed's OpenArea). Justification pattern for every entry: ONLY the 353-record ladders+stairs script set is ever shuffled; these areas' internal/approach transitions are bespoke handlers (agility obstacles, scripted gates/doors, dialogue hops, machete chops), so their vanilla connectivity is seed-independent. Item/level requirements along the way are narrative-only per docs/progression-sim.md's documented policy. Boxes deliberately avoid upper-level void megaregions (member tile cap in code).",
-    "openAreas": [
-        {
-            "name": "underground-pass",
-            "connectTo": ["mainland"],
-            "note": "Underground Pass gauntlet: entrance cave from West Ardougne + rock/bridge/well/tunnel obstacles (upass_obstacles.rs2, quest_upass.rs2 - p_teleport/~forcewalk handlers, some via variables the extractor can't follow). Includes the Iban temple level-1 areas and Koftik's end cave. Needed by upass + regicide.",
-            "boxes": [
-                { "levels": [0], "x1": 2304, "z1": 9600, "x2": 2495, "z2": 9727 },
-                { "levels": [0], "x1": 2304, "z1": 9792, "x2": 2367, "z2": 9919 },
-                { "levels": [0], "x1": 2304, "z1": 4544, "x2": 2367, "z2": 4607 },
-                { "levels": [1], "x1": 2112, "z1": 4544, "x2": 2175, "z2": 4671 },
-                { "levels": [1], "x1": 1984, "z1": 4672, "x2": 2047, "z2": 4735 }
-            ]
-        },
-        {
-            "name": "tirannwn",
-            "connectTo": ["mainland"],
-            "note": "Elf lands west of the mountains (regicide): reached through the Underground Pass exit / Arandar - the pass traversal itself is the underground-pass entry above; the regicide leg (voyage temple wells, catapult, trap hand-holds) is all bespoke quest handlers.",
-            "boxes": [{ "levels": [0], "x1": 2112, "z1": 3072, "x2": 2367, "z2": 3327 }]
-        },
-        {
-            "name": "kharazi-jungle",
-            "connectTo": ["karamja"],
-            "note": "Kharazi jungle surface (legends: dense jungle chopped with a machete - oplocu handlers) + the underground temple/cave complex (marked walls, winch ropes, force barriers - quest_legends.rs2 label/oploc handlers) + the winch-down cave. Needed by legends + zombiequeen (its inzone box overlaps the same underground region).",
-            "boxes": [
-                { "levels": [0], "x1": 2752, "z1": 2880, "x2": 3007, "z2": 2943 },
-                { "levels": [0], "x1": 2624, "z1": 9216, "x2": 2943, "z2": 9407 },
-                { "levels": [0], "x1": 2368, "z1": 4672, "x2": 2431, "z2": 4735 }
-            ]
-        },
-        {
-            "name": "trollheim",
-            "connectTo": ["mainland"],
-            "note": "Death Plateau approach pocket + Troll Stronghold interior + Eadgar's area (troll/eadgar): mountain paths, stronghold doors (troll_stronghold_entrance/exit p_teleports extracted, approach pocket bespoke), cell doors, storeroom.",
-            "boxes": [
-                { "levels": [0], "x1": 2816, "z1": 3584, "x2": 2879, "z2": 3647 },
-                { "levels": [0, 1], "x1": 2816, "z1": 9920, "x2": 2879, "z2": 10111 }
-            ]
-        },
-        {
-            "name": "fremennik-trial-maze",
-            "connectTo": ["mainland"],
-            "note": "Swensen the Navigator's portal maze (viking): entered via his trapdoor in Rellekka (trial dialogue flow), rooms interconnect by vt_mazeportal p_telejumps (extracted, but the maze has no non-portal approach so every room roots).",
-            "boxes": [{ "levels": [0], "x1": 2624, "z1": 9984, "x2": 2687, "z2": 10047 }]
-        },
-        {
-            "name": "fisher-realm",
-            "connectTo": ["karamja"],
-            "note": "Holy Grail's Fisher Realm, both variants (sad 41_73 / restored 43_73): entered by the magic whistle from the Karamja tower zone (opheld teleport, extracted); this entry merges the realm's interior splits (castle outer door, the broken bridge to the fisherman) which are quest-flow crossings.",
-            "boxes": [
-                { "levels": [0, 1, 2], "x1": 2624, "z1": 4672, "x2": 2687, "z2": 4735 },
-                { "levels": [0, 1, 2], "x1": 2752, "z1": 4672, "x2": 2815, "z2": 4735 }
-            ]
-        },
-        {
-            "name": "desert-mining-camp",
-            "connectTo": ["mainland"],
-            "note": "Tourist Trap: the camp interior + between-gates pocket + underground mine. Entered by the guarded gate / getting captured (dialogue), interior via cell-window rocks (~forcewalk2), mine cart (oploc2), mine cave (_desertrescue_minecave category oplocs).",
-            "boxes": [
-                { "levels": [0], "x1": 3264, "z1": 9408, "x2": 3327, "z2": 9471 },
-                { "levels": [0], "x1": 3264, "z1": 3008, "x2": 3327, "z2": 3071 }
-            ]
-        },
-        {
-            "name": "gutanoth-skavid",
-            "connectTo": ["mainland"],
-            "note": "Gu'Tanoth ogre city outskirts (grew's island behind the toll/bridge) + the skavid caves (itwatchtower: enter_skavid_cave / teleport_dark_skavid_cave labels; chompybird's ogre cave shares the underground square).",
-            "boxes": [
-                { "levels": [0], "x1": 2496, "z1": 9408, "x2": 2623, "z2": 9471 },
-                { "levels": [0], "x1": 2496, "z1": 3072, "x2": 2559, "z2": 3135 }
-            ]
-        },
-        {
-            "name": "lighthouse",
-            "connectTo": ["mainland"],
-            "note": "Horror from the Deep: basalt-rock stepping stones north of Rellekka (basalt_rocks.rs2 - movement handlers, not teleports) + the lighthouse basement (strange wall).",
-            "boxes": [
-                { "levels": [0], "x1": 2496, "z1": 3584, "x2": 2559, "z2": 3647 },
-                { "levels": [0, 1], "x1": 2496, "z1": 4608, "x2": 2559, "z2": 4671 }
-            ]
-        },
-        {
-            "name": "mort-myre",
-            "connectTo": ["mainland"],
-            "note": "Nature Spirit (druidspirit): Mort Myre swamp behind the guarded gate + the grotto island and its underground (grotto bridge/door handlers, filliman's teleports use variables).",
-            "boxes": [
-                { "levels": [0], "x1": 3328, "z1": 3136, "x2": 3455, "z2": 3391 },
-                { "levels": [0, 1], "x1": 3328, "z1": 9728, "x2": 3455, "z2": 9791 }
-            ]
-        },
-        {
-            "name": "crest-dungeon",
-            "connectTo": ["mainland"],
-            "note": "Family Crest lever/door dungeon (m42_151 underground): all seven blocked groups are its interior levers/doors; the dungeon's entrance and internal doors are bespoke quest handlers (quest_crest.rs2), not pool entrances.",
-            "boxes": [{ "levels": [0], "x1": 2688, "z1": 9664, "x2": 2751, "z2": 9727 }]
-        },
-        {
-            "name": "elemental-workshop",
-            "connectTo": ["mainland"],
-            "note": "Elemental Workshop interior (entered via the odd wall + battered book, extracted); one interior machine-room pocket (0_42_154_48_26) sits behind a scripted door the extractor missed.",
-            "boxes": [{ "levels": [0], "x1": 2688, "z1": 9856, "x2": 2751, "z2": 9919 }]
-        },
-        {
-            "name": "tamayu-hunt",
-            "connectTo": ["karamja"],
-            "note": "tbwt: Tamayu's Shaikahan hunt area - reached during his dialogue-driven hunt sequence (tbwt_tamayu.rs2 script teleports through variables).",
-            "boxes": [{ "levels": [0], "x1": 2496, "z1": 4544, "x2": 2559, "z2": 4607 }]
-        },
-        {
-            "name": "fight-arena-prison",
-            "connectTo": ["mainland"],
-            "note": "Fight Arena's prison wing: entered through the arena building via quest-scripted guard doors; the one blocked coord is the mid-quest cell teleport target.",
-            "boxes": [{ "levels": [0], "x1": 2560, "z1": 3136, "x2": 2623, "z2": 3199 }]
-        },
-        {
-            "name": "mourner-yard",
-            "connectTo": ["mainland"],
-            "note": "Biohazard: the mourner HQ backyard/watchtower base pocket - reached by the scripted fence-climb teleport during the break-in (def_coord table + p_teleport($var), invisible to the extractor).",
-            "boxes": [{ "levels": [0], "x1": 2540, "z1": 3290, "x2": 2580, "z2": 3320 }]
-        },
-        {
-            "name": "plague-tunnels",
-            "connectTo": ["mainland"],
-            "note": "Elena's rescue: the plague house tunnels/basement under West Ardougne (mud pile exit extracted; the entrance manhole/trapdoor is a bespoke handler).",
-            "boxes": [{ "levels": [0], "x1": 2496, "z1": 9664, "x2": 2623, "z2": 9791 }]
-        },
-        {
-            "name": "lumber-yard",
-            "connectTo": ["mainland"],
-            "note": "Gertrude's Cat: the lumber yard behind the broken fence (squeeze-through handler) + the upstairs nest area.",
-            "boxes": [{ "levels": [0, 1], "x1": 3264, "z1": 3456, "x2": 3327, "z2": 3519 }]
-        },
-        {
-            "name": "sorcerers-tower-top",
-            "connectTo": ["mainland"],
-            "note": "Scorpion Catcher: Thormac at the top (level 3) of the Sorcerer's Tower - internal ladders are any-source generics whose relative destinations chain floor by floor; the top-floor hop roots because its ladder's placement sits inside the level-2 room region.",
-            "boxes": [{ "levels": [3], "x1": 2688, "z1": 3392, "x2": 2751, "z2": 3455 }]
-        },
-        {
-            "name": "grand-tree-tops",
-            "connectTo": ["mainland"],
-            "note": "Grand Tree: the tree's upper branches (level 2 watch post, level 3 glider platform - tight boxes to dodge the void megaregions) + Femi's cart-smuggle spot inside the stronghold gate (dialogue).",
-            "boxes": [
-                { "levels": [2], "x1": 2484, "z1": 3463, "x2": 2492, "z2": 3471 },
-                { "levels": [3], "x1": 2459, "z1": 3495, "x2": 2471, "z2": 3507 },
-                { "levels": [0], "x1": 2432, "z1": 3328, "x2": 2495, "z2": 3391 }
-            ]
-        },
-        {
-            "name": "baxtorian-falls",
-            "connectTo": ["mainland"],
-            "note": "Waterfall Quest: the ledge rocks/overhanging tree crossings on the falls (rope-on-rock oplocu handlers) + the waterfall dungeon behind the ledge door.",
-            "boxes": [
-                { "levels": [0], "x1": 2496, "z1": 3456, "x2": 2559, "z2": 3519 },
-                { "levels": [0], "x1": 2560, "z1": 9856, "x2": 2623, "z2": 9919 }
-            ]
-        },
-        {
-            "name": "temple-of-ikov-depths",
-            "connectTo": ["mainland"],
-            "note": "Temple of Ikov dungeon chain (dark stairs extracted; deeper sections behind the ice bridge / Winelda's teleport root because their handlers use variables).",
-            "boxes": [{ "levels": [0], "x1": 2624, "z1": 9728, "x2": 2687, "z2": 9919 }]
-        },
-        {
-            "name": "yanille-dungeon",
-            "connectTo": ["mainland"],
-            "note": "Yanille agility dungeon (itwatchtower's poison spiders): entered via agility obstacles (bespoke), not pool entrances.",
-            "boxes": [{ "levels": [0], "x1": 2560, "z1": 9536, "x2": 2623, "z2": 9599 }]
-        },
-        {
-            "name": "gnome-village-maze",
-            "connectTo": ["mainland"],
-            "note": "Tree Gnome Village hedge-maze center (King Bolren, the spirit tree clearing): entered by squeezing through the loose railing - gnomevillage_fence.rs2's [oploc1,treegnomelooserailing] uses ~agility_exactmove with computed coords, invisible to static extraction. Latent gap surfaced by seed 480430917 (earlier entrance tables happened to drop a shuffled arrival inside the maze region, masking it).",
-            "boxes": [{ "levels": [0], "x1": 2530, "z1": 3155, "x2": 2560, "z2": 3185 }]
-        },
-        {
-            "name": "fishing-platform",
-            "connectTo": ["mainland"],
-            "note": "Sea Slug: the Fishing Platform and Holgart's small island - Holgart's rowboat is an NPC-dialogue transport (same class as the Karamja/Entrana boats).",
-            "boxes": [{ "levels": [0], "x1": 2752, "z1": 3264, "x2": 2815, "z2": 3327 }]
-        }
-    ],
-
-    "quests": {
-        "dragon": {
-            "requiredAnchors": ["melzars_maze_approach"],
-            "notes": "Dragon Slayer's Crandor leg (Ned's ship dialogue, crandor.rs2 p_teleport literals 0_44_150_17_58 / 0_44_50_17_57) is ALSO NPC-dialogue-triggered and outside content/scripts/ladders+stairs/ - never shuffled, always available once the quest reaches that stage, so it needs no region anchor of its own. The one genuinely shuffle-sensitive physical requirement is being able to walk to the Melzar's Maze building at all."
-        }
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2304,
+     "z1": 4544,
+     "x2": 2367,
+     "z2": 4607
     },
-
-    "goals": {
-        "kbd": {
-            "requiredAnchors": ["kbd_lair"],
-            "notes": "goals.json's kbd entry already encodes the 40/40/40/40 combat judgment call; this adds the spatial half - the lair region must actually be reachable. CURRENT STATE (honest, see kbd_lever_room's note): the real always-vanilla lever entrance IS traced and modeled, but the connector from mainland/wilderness surface into the lever's own chamber is not yet found, so this goal reports BLOCKED in ValidateSeed today. That is a known region-graph tracing gap for this one goal, not evidence the live seed is actually unbeatable - flagged explicitly rather than silently faked with an unverified edge."
-        },
-        "barcrawl": {
-            "requiredAnchors": ["karamja"],
-            "notes": "Two of the ten barcrawl bars (Dead Man's Chest in Brimhaven, Karamja Spirits) are on Karamja. Region-graph-checked via the alwaysConnected boat edge above, not a hard shuffle-sensitive gate (matching progression-sim.md's treatment) - included here so ValidateSeed's region layer agrees with the simulator's own documented judgment call instead of silently ignoring Karamja reachability."
-        }
+    {
+     "levels": [
+      1
+     ],
+     "x1": 2112,
+     "z1": 4544,
+     "x2": 2175,
+     "z2": 4671
+    },
+    {
+     "levels": [
+      1
+     ],
+     "x1": 1984,
+     "z1": 4672,
+     "x2": 2047,
+     "z2": 4735
     }
+   ]
+  },
+  {
+   "name": "tirannwn",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Elf lands west of the mountains (regicide): reached through the Underground Pass exit / Arandar - the pass traversal itself is the underground-pass entry above; the regicide leg (voyage temple wells, catapult, trap hand-holds) is all bespoke quest handlers.",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2112,
+     "z1": 3072,
+     "x2": 2367,
+     "z2": 3327
+    }
+   ]
+  },
+  {
+   "name": "kharazi-jungle",
+   "connectTo": [
+    "karamja"
+   ],
+   "note": "Kharazi jungle surface (legends: dense jungle chopped with a machete - oplocu handlers) + the underground temple/cave complex (marked walls, winch ropes, force barriers - quest_legends.rs2 label/oploc handlers) + the winch-down cave. Needed by legends + zombiequeen (its inzone box overlaps the same underground region).",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2752,
+     "z1": 2880,
+     "x2": 3007,
+     "z2": 2943
+    },
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2624,
+     "z1": 9216,
+     "x2": 2943,
+     "z2": 9407
+    },
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2368,
+     "z1": 4672,
+     "x2": 2431,
+     "z2": 4735
+    }
+   ]
+  },
+  {
+   "name": "trollheim",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Death Plateau approach pocket + Troll Stronghold interior + Eadgar's area (troll/eadgar): mountain paths, stronghold doors (troll_stronghold_entrance/exit p_teleports extracted, approach pocket bespoke), cell doors, storeroom.",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2816,
+     "z1": 3584,
+     "x2": 2879,
+     "z2": 3647
+    },
+    {
+     "levels": [
+      0,
+      1
+     ],
+     "x1": 2816,
+     "z1": 9920,
+     "x2": 2879,
+     "z2": 10111
+    }
+   ]
+  },
+  {
+   "name": "fremennik-trial-maze",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Swensen the Navigator's portal maze (viking): entered via his trapdoor in Rellekka (trial dialogue flow), rooms interconnect by vt_mazeportal p_telejumps (extracted, but the maze has no non-portal approach so every room roots).",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2624,
+     "z1": 9984,
+     "x2": 2687,
+     "z2": 10047
+    }
+   ]
+  },
+  {
+   "name": "fisher-realm",
+   "connectTo": [
+    "karamja"
+   ],
+   "note": "Holy Grail's Fisher Realm, both variants (sad 41_73 / restored 43_73): entered by the magic whistle from the Karamja tower zone (opheld teleport, extracted); this entry merges the realm's interior splits (castle outer door, the broken bridge to the fisherman) which are quest-flow crossings.",
+   "boxes": [
+    {
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "x1": 2624,
+     "z1": 4672,
+     "x2": 2687,
+     "z2": 4735
+    },
+    {
+     "levels": [
+      0,
+      1,
+      2
+     ],
+     "x1": 2752,
+     "z1": 4672,
+     "x2": 2815,
+     "z2": 4735
+    }
+   ]
+  },
+  {
+   "name": "desert-mining-camp",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Tourist Trap: the camp interior + between-gates pocket + underground mine. Entered by the guarded gate / getting captured (dialogue), interior via cell-window rocks (~forcewalk2), mine cart (oploc2), mine cave (_desertrescue_minecave category oplocs).",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 3264,
+     "z1": 9408,
+     "x2": 3327,
+     "z2": 9471
+    },
+    {
+     "levels": [
+      0
+     ],
+     "x1": 3264,
+     "z1": 3008,
+     "x2": 3327,
+     "z2": 3071
+    }
+   ]
+  },
+  {
+   "name": "gutanoth-skavid",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Gu'Tanoth ogre city outskirts (grew's island behind the toll/bridge) + the skavid caves (itwatchtower: enter_skavid_cave / teleport_dark_skavid_cave labels; chompybird's ogre cave shares the underground square).",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2496,
+     "z1": 9408,
+     "x2": 2623,
+     "z2": 9471
+    },
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2496,
+     "z1": 3072,
+     "x2": 2559,
+     "z2": 3135
+    }
+   ]
+  },
+  {
+   "name": "lighthouse",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Horror from the Deep: basalt-rock stepping stones north of Rellekka (basalt_rocks.rs2 - movement handlers, not teleports) + the lighthouse basement (strange wall).",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2496,
+     "z1": 3584,
+     "x2": 2559,
+     "z2": 3647
+    },
+    {
+     "levels": [
+      0,
+      1
+     ],
+     "x1": 2496,
+     "z1": 4608,
+     "x2": 2559,
+     "z2": 4671
+    }
+   ]
+  },
+  {
+   "name": "mort-myre",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Nature Spirit (druidspirit): Mort Myre swamp behind the guarded gate + the grotto island and its underground (grotto bridge/door handlers, filliman's teleports use variables).",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 3328,
+     "z1": 3136,
+     "x2": 3455,
+     "z2": 3391
+    },
+    {
+     "levels": [
+      0,
+      1
+     ],
+     "x1": 3328,
+     "z1": 9728,
+     "x2": 3455,
+     "z2": 9791
+    }
+   ]
+  },
+  {
+   "name": "crest-dungeon",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Family Crest lever/door dungeon (m42_151 underground): all seven blocked groups are its interior levers/doors; the dungeon's entrance and internal doors are bespoke quest handlers (quest_crest.rs2), not pool entrances.",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2688,
+     "z1": 9664,
+     "x2": 2751,
+     "z2": 9727
+    }
+   ]
+  },
+  {
+   "name": "elemental-workshop",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Elemental Workshop interior (entered via the odd wall + battered book, extracted); one interior machine-room pocket (0_42_154_48_26) sits behind a scripted door the extractor missed.",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2688,
+     "z1": 9856,
+     "x2": 2751,
+     "z2": 9919
+    }
+   ]
+  },
+  {
+   "name": "tamayu-hunt",
+   "connectTo": [
+    "karamja"
+   ],
+   "note": "tbwt: Tamayu's Shaikahan hunt area - reached during his dialogue-driven hunt sequence (tbwt_tamayu.rs2 script teleports through variables).",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2496,
+     "z1": 4544,
+     "x2": 2559,
+     "z2": 4607
+    }
+   ]
+  },
+  {
+   "name": "fight-arena-prison",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Fight Arena's prison wing: entered through the arena building via quest-scripted guard doors; the one blocked coord is the mid-quest cell teleport target.",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2560,
+     "z1": 3136,
+     "x2": 2623,
+     "z2": 3199
+    }
+   ]
+  },
+  {
+   "name": "mourner-yard",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Biohazard: the mourner HQ backyard/watchtower base pocket - reached by the scripted fence-climb teleport during the break-in (def_coord table + p_teleport($var), invisible to the extractor).",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2540,
+     "z1": 3290,
+     "x2": 2580,
+     "z2": 3320
+    }
+   ]
+  },
+  {
+   "name": "plague-tunnels",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Elena's rescue: the plague house tunnels/basement under West Ardougne (mud pile exit extracted; the entrance manhole/trapdoor is a bespoke handler).",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2496,
+     "z1": 9664,
+     "x2": 2623,
+     "z2": 9791
+    }
+   ]
+  },
+  {
+   "name": "lumber-yard",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Gertrude's Cat: the lumber yard behind the broken fence (squeeze-through handler) + the upstairs nest area.",
+   "boxes": [
+    {
+     "levels": [
+      0,
+      1
+     ],
+     "x1": 3264,
+     "z1": 3456,
+     "x2": 3327,
+     "z2": 3519
+    }
+   ]
+  },
+  {
+   "name": "sorcerers-tower-top",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Scorpion Catcher: Thormac at the top (level 3) of the Sorcerer's Tower - internal ladders are any-source generics whose relative destinations chain floor by floor; the top-floor hop roots because its ladder's placement sits inside the level-2 room region.",
+   "boxes": [
+    {
+     "levels": [
+      3
+     ],
+     "x1": 2688,
+     "z1": 3392,
+     "x2": 2751,
+     "z2": 3455
+    }
+   ]
+  },
+  {
+   "name": "grand-tree-tops",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Grand Tree: the tree's upper branches (level 2 watch post, level 3 glider platform - tight boxes to dodge the void megaregions) + Femi's cart-smuggle spot inside the stronghold gate (dialogue).",
+   "boxes": [
+    {
+     "levels": [
+      2
+     ],
+     "x1": 2484,
+     "z1": 3463,
+     "x2": 2492,
+     "z2": 3471
+    },
+    {
+     "levels": [
+      3
+     ],
+     "x1": 2459,
+     "z1": 3495,
+     "x2": 2471,
+     "z2": 3507
+    },
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2432,
+     "z1": 3328,
+     "x2": 2495,
+     "z2": 3391
+    }
+   ]
+  },
+  {
+   "name": "baxtorian-falls",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Waterfall Quest: the ledge rocks/overhanging tree crossings on the falls (rope-on-rock oplocu handlers) + the waterfall dungeon behind the ledge door.",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2496,
+     "z1": 3456,
+     "x2": 2559,
+     "z2": 3519
+    },
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2560,
+     "z1": 9856,
+     "x2": 2623,
+     "z2": 9919
+    }
+   ]
+  },
+  {
+   "name": "temple-of-ikov-depths",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Temple of Ikov dungeon chain (dark stairs extracted; deeper sections behind the ice bridge / Winelda's teleport root because their handlers use variables).",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2624,
+     "z1": 9728,
+     "x2": 2687,
+     "z2": 9919
+    }
+   ]
+  },
+  {
+   "name": "yanille-dungeon",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Yanille agility dungeon (itwatchtower's poison spiders): entered via agility obstacles (bespoke), not pool entrances.",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2560,
+     "z1": 9536,
+     "x2": 2623,
+     "z2": 9599
+    }
+   ]
+  },
+  {
+   "name": "gnome-village-maze",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Tree Gnome Village hedge-maze center (King Bolren, the spirit tree clearing): entered by squeezing through the loose railing - gnomevillage_fence.rs2's [oploc1,treegnomelooserailing] uses ~agility_exactmove with computed coords, invisible to static extraction. Latent gap surfaced by seed 480430917 (earlier entrance tables happened to drop a shuffled arrival inside the maze region, masking it).",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2530,
+     "z1": 3155,
+     "x2": 2560,
+     "z2": 3185
+    }
+   ]
+  },
+  {
+   "name": "fishing-platform",
+   "connectTo": [
+    "mainland"
+   ],
+   "note": "Sea Slug: the Fishing Platform and Holgart's small island - Holgart's rowboat is an NPC-dialogue transport (same class as the Karamja/Entrana boats).",
+   "boxes": [
+    {
+     "levels": [
+      0
+     ],
+     "x1": 2752,
+     "z1": 3264,
+     "x2": 2815,
+     "z2": 3327
+    }
+   ]
+  }
+ ],
+ "quests": {
+  "dragon": {
+   "requiredAnchors": [
+    "melzars_maze_approach"
+   ],
+   "notes": "Dragon Slayer's Crandor leg (Ned's ship dialogue, crandor.rs2 p_teleport literals 0_44_150_17_58 / 0_44_50_17_57) is ALSO NPC-dialogue-triggered and outside content/scripts/ladders+stairs/ - never shuffled, always available once the quest reaches that stage, so it needs no region anchor of its own. The one genuinely shuffle-sensitive physical requirement is being able to walk to the Melzar's Maze building at all."
+  }
+ },
+ "goals": {
+  "kbd": {
+   "requiredAnchors": [
+    "kbd_lair"
+   ],
+   "notes": "goals.json's kbd entry already encodes the 40/40/40/40 combat judgment call; this adds the spatial half - the lair region must actually be reachable. CURRENT STATE (honest, see kbd_lever_room's note): the real always-vanilla lever entrance IS traced and modeled, but the connector from mainland/wilderness surface into the lever's own chamber is not yet found, so this goal reports BLOCKED in ValidateSeed today. That is a known region-graph tracing gap for this one goal, not evidence the live seed is actually unbeatable - flagged explicitly rather than silently faked with an unverified edge."
+  },
+  "barcrawl": {
+   "requiredAnchors": [
+    "barcrawl_bluemoon",
+    "barcrawl_jollyboar",
+    "barcrawl_risingsun",
+    "barcrawl_flyinghorse",
+    "barcrawl_forestersarms",
+    "barcrawl_rustyanchor",
+    "barcrawl_dragoninn",
+    "barcrawl_blurberry",
+    "barcrawl_deadmanschest",
+    "barcrawl_karamjaspirits"
+   ],
+   "notes": "All 10 Alfred Grimhand barcrawl bars are now hard region anchors (was just \"karamja\"). The win is getbit_range(%barcrawl,3,12)=1023 - every bar must be physically reached, so entrance randomization that strands any pub (esp. Blurberrys in the Grand Tree, or the two Karamja bars behind the boat) now correctly blocks/rerolls. Bar->bartender-spawn coords resolved from map NPC data."
+  }
+ }
 }

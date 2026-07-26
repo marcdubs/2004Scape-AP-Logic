@@ -1,0 +1,916 @@
+{
+ "_note": "Item acquisition graph (item -> [{skill,level,inputs}]). Built from game config via subagent extraction (gather: mining/fishing/woodcutting from dbrows+spot scripts; process: smithing/smelting/cooking/crafting/fletching from dbrows). Consumed by ItemGraph.ts/ValidateSeed for quest item obtainability (problems.txt #16). Raw gathers have inputs=[]; processed items chain through inputs.",
+ "blankrune": [
+  {
+   "skill": "mining",
+   "level": 1,
+   "inputs": []
+  }
+ ],
+ "clay": [
+  {
+   "skill": "mining",
+   "level": 1,
+   "inputs": []
+  }
+ ],
+ "copper_ore": [
+  {
+   "skill": "mining",
+   "level": 1,
+   "inputs": []
+  }
+ ],
+ "tin_ore": [
+  {
+   "skill": "mining",
+   "level": 1,
+   "inputs": []
+  }
+ ],
+ "iron_ore": [
+  {
+   "skill": "mining",
+   "level": 15,
+   "inputs": []
+  }
+ ],
+ "coal": [
+  {
+   "skill": "mining",
+   "level": 30,
+   "inputs": []
+  }
+ ],
+ "gold_ore": [
+  {
+   "skill": "mining",
+   "level": 40,
+   "inputs": []
+  }
+ ],
+ "silver_ore": [
+  {
+   "skill": "mining",
+   "level": 20,
+   "inputs": []
+  }
+ ],
+ "mithril_ore": [
+  {
+   "skill": "mining",
+   "level": 55,
+   "inputs": []
+  }
+ ],
+ "adamantite_ore": [
+  {
+   "skill": "mining",
+   "level": 70,
+   "inputs": []
+  }
+ ],
+ "runite_ore": [
+  {
+   "skill": "mining",
+   "level": 85,
+   "inputs": []
+  }
+ ],
+ "blurite_ore": [
+  {
+   "skill": "mining",
+   "level": 10,
+   "inputs": []
+  }
+ ],
+ "limestone": [
+  {
+   "skill": "mining",
+   "level": 10,
+   "inputs": []
+  }
+ ],
+ "logs": [
+  {
+   "skill": "woodcutting",
+   "level": 0,
+   "inputs": []
+  }
+ ],
+ "achey_tree_logs": [
+  {
+   "skill": "woodcutting",
+   "level": 0,
+   "inputs": []
+  }
+ ],
+ "oak_logs": [
+  {
+   "skill": "woodcutting",
+   "level": 15,
+   "inputs": []
+  }
+ ],
+ "willow_logs": [
+  {
+   "skill": "woodcutting",
+   "level": 30,
+   "inputs": []
+  }
+ ],
+ "maple_logs": [
+  {
+   "skill": "woodcutting",
+   "level": 45,
+   "inputs": []
+  }
+ ],
+ "yew_logs": [
+  {
+   "skill": "woodcutting",
+   "level": 60,
+   "inputs": []
+  }
+ ],
+ "magic_logs": [
+  {
+   "skill": "woodcutting",
+   "level": 75,
+   "inputs": []
+  }
+ ],
+ "hollow_bark": [
+  {
+   "skill": "woodcutting",
+   "level": 45,
+   "inputs": []
+  }
+ ],
+ "raw_shrimp": [
+  {
+   "skill": "fishing",
+   "level": 1,
+   "inputs": []
+  }
+ ],
+ "raw_anchovies": [
+  {
+   "skill": "fishing",
+   "level": 15,
+   "inputs": []
+  }
+ ],
+ "raw_sardine": [
+  {
+   "skill": "fishing",
+   "level": 5,
+   "inputs": []
+  }
+ ],
+ "raw_herring": [
+  {
+   "skill": "fishing",
+   "level": 10,
+   "inputs": []
+  }
+ ],
+ "raw_mackerel": [
+  {
+   "skill": "fishing",
+   "level": 16,
+   "inputs": []
+  }
+ ],
+ "raw_trout": [
+  {
+   "skill": "fishing",
+   "level": 20,
+   "inputs": []
+  }
+ ],
+ "raw_cod": [
+  {
+   "skill": "fishing",
+   "level": 23,
+   "inputs": []
+  }
+ ],
+ "raw_pike": [
+  {
+   "skill": "fishing",
+   "level": 25,
+   "inputs": []
+  }
+ ],
+ "mort_slimey_eel": [
+  {
+   "skill": "fishing",
+   "level": 28,
+   "inputs": []
+  }
+ ],
+ "raw_salmon": [
+  {
+   "skill": "fishing",
+   "level": 30,
+   "inputs": []
+  }
+ ],
+ "raw_tuna": [
+  {
+   "skill": "fishing",
+   "level": 35,
+   "inputs": []
+  }
+ ],
+ "raw_lobster": [
+  {
+   "skill": "fishing",
+   "level": 40,
+   "inputs": []
+  }
+ ],
+ "raw_bass": [
+  {
+   "skill": "fishing",
+   "level": 46,
+   "inputs": []
+  }
+ ],
+ "raw_swordfish": [
+  {
+   "skill": "fishing",
+   "level": 50,
+   "inputs": []
+  }
+ ],
+ "raw_lava_eel": [
+  {
+   "skill": "fishing",
+   "level": 53,
+   "inputs": []
+  }
+ ],
+ "tbwt_raw_karambwanji": [
+  {
+   "skill": "fishing",
+   "level": 5,
+   "inputs": []
+  }
+ ],
+ "tbwt_raw_karambwan": [
+  {
+   "skill": "fishing",
+   "level": 65,
+   "inputs": []
+  }
+ ],
+ "raw_shark": [
+  {
+   "skill": "fishing",
+   "level": 76,
+   "inputs": []
+  }
+ ],
+ "bronze_bar": [
+  {
+   "skill": "smithing",
+   "level": 1,
+   "inputs": [
+    "copper_ore",
+    "tin_ore"
+   ]
+  }
+ ],
+ "iron_bar": [
+  {
+   "skill": "smithing",
+   "level": 15,
+   "inputs": [
+    "iron_ore"
+   ]
+  }
+ ],
+ "steel_bar": [
+  {
+   "skill": "smithing",
+   "level": 30,
+   "inputs": [
+    "iron_ore",
+    "coal"
+   ]
+  }
+ ],
+ "silver_bar": [
+  {
+   "skill": "smithing",
+   "level": 20,
+   "inputs": [
+    "silver_ore"
+   ]
+  }
+ ],
+ "gold_bar": [
+  {
+   "skill": "smithing",
+   "level": 40,
+   "inputs": [
+    "gold_ore"
+   ]
+  }
+ ],
+ "mithril_bar": [
+  {
+   "skill": "smithing",
+   "level": 50,
+   "inputs": [
+    "mithril_ore",
+    "coal"
+   ]
+  }
+ ],
+ "adamantite_bar": [
+  {
+   "skill": "smithing",
+   "level": 70,
+   "inputs": [
+    "adamantite_ore",
+    "coal"
+   ]
+  }
+ ],
+ "runite_bar": [
+  {
+   "skill": "smithing",
+   "level": 85,
+   "inputs": [
+    "runite_ore",
+    "coal"
+   ]
+  }
+ ],
+ "perfect_gold_bar": [
+  {
+   "skill": "smithing",
+   "level": 40,
+   "inputs": [
+    "perfect_gold_ore"
+   ]
+  }
+ ],
+ "bronze_dagger": [
+  {
+   "skill": "smithing",
+   "level": 1,
+   "inputs": [
+    "bronze_bar"
+   ]
+  }
+ ],
+ "bronze_sword": [
+  {
+   "skill": "smithing",
+   "level": 4,
+   "inputs": [
+    "bronze_bar"
+   ]
+  }
+ ],
+ "bronze_scimitar": [
+  {
+   "skill": "smithing",
+   "level": 5,
+   "inputs": [
+    "bronze_bar"
+   ]
+  }
+ ],
+ "bronze_longsword": [
+  {
+   "skill": "smithing",
+   "level": 6,
+   "inputs": [
+    "bronze_bar"
+   ]
+  }
+ ],
+ "bronze_2h_sword": [
+  {
+   "skill": "smithing",
+   "level": 14,
+   "inputs": [
+    "bronze_bar"
+   ]
+  }
+ ],
+ "bronze_axe": [
+  {
+   "skill": "smithing",
+   "level": 1,
+   "inputs": [
+    "bronze_bar"
+   ]
+  }
+ ],
+ "bronze_mace": [
+  {
+   "skill": "smithing",
+   "level": 2,
+   "inputs": [
+    "bronze_bar"
+   ]
+  }
+ ],
+ "bronze_med_helm": [
+  {
+   "skill": "smithing",
+   "level": 3,
+   "inputs": [
+    "bronze_bar"
+   ]
+  }
+ ],
+ "bronze_full_helm": [
+  {
+   "skill": "smithing",
+   "level": 7,
+   "inputs": [
+    "bronze_bar"
+   ]
+  }
+ ],
+ "bronze_sq_shield": [
+  {
+   "skill": "smithing",
+   "level": 8,
+   "inputs": [
+    "bronze_bar"
+   ]
+  }
+ ],
+ "bronze_kiteshield": [
+  {
+   "skill": "smithing",
+   "level": 12,
+   "inputs": [
+    "bronze_bar"
+   ]
+  }
+ ],
+ "bronze_platelegs": [
+  {
+   "skill": "smithing",
+   "level": 16,
+   "inputs": [
+    "bronze_bar"
+   ]
+  }
+ ],
+ "bronze_platebody": [
+  {
+   "skill": "smithing",
+   "level": 18,
+   "inputs": [
+    "bronze_bar"
+   ]
+  }
+ ],
+ "bronze_chainbody": [
+  {
+   "skill": "smithing",
+   "level": 11,
+   "inputs": [
+    "bronze_bar"
+   ]
+  }
+ ],
+ "iron_dagger": [
+  {
+   "skill": "smithing",
+   "level": 15,
+   "inputs": [
+    "iron_bar"
+   ]
+  }
+ ],
+ "iron_scimitar": [
+  {
+   "skill": "smithing",
+   "level": 20,
+   "inputs": [
+    "iron_bar"
+   ]
+  }
+ ],
+ "iron_2h_sword": [
+  {
+   "skill": "smithing",
+   "level": 29,
+   "inputs": [
+    "iron_bar"
+   ]
+  }
+ ],
+ "steel_2h_sword": [
+  {
+   "skill": "smithing",
+   "level": 44,
+   "inputs": [
+    "steel_bar"
+   ]
+  }
+ ],
+ "mithril_2h_sword": [
+  {
+   "skill": "smithing",
+   "level": 64,
+   "inputs": [
+    "mithril_bar"
+   ]
+  }
+ ],
+ "blurite_sword": [
+  {
+   "skill": "smithing",
+   "level": 8,
+   "inputs": [
+    "blurite_bar"
+   ]
+  }
+ ],
+ "blurite_bar": [
+  {
+   "skill": "smithing",
+   "level": 8,
+   "inputs": [
+    "blurite_ore"
+   ]
+  }
+ ],
+ "cooked_meat": [
+  {
+   "skill": "cooking",
+   "level": 1,
+   "inputs": [
+    "raw_beef"
+   ]
+  },
+  {
+   "skill": "cooking",
+   "level": 1,
+   "inputs": [
+    "raw_rat_meat"
+   ]
+  },
+  {
+   "skill": "cooking",
+   "level": 1,
+   "inputs": [
+    "raw_bear_meat"
+   ]
+  }
+ ],
+ "cooked_chicken": [
+  {
+   "skill": "cooking",
+   "level": 1,
+   "inputs": [
+    "raw_chicken"
+   ]
+  }
+ ],
+ "bread": [
+  {
+   "skill": "cooking",
+   "level": 1,
+   "inputs": [
+    "bread_dough"
+   ]
+  }
+ ],
+ "shrimp": [
+  {
+   "skill": "cooking",
+   "level": 1,
+   "inputs": [
+    "raw_shrimp"
+   ]
+  }
+ ],
+ "sardine": [
+  {
+   "skill": "cooking",
+   "level": 1,
+   "inputs": [
+    "raw_sardine"
+   ]
+  }
+ ],
+ "herring": [
+  {
+   "skill": "cooking",
+   "level": 5,
+   "inputs": [
+    "raw_herring"
+   ]
+  }
+ ],
+ "trout": [
+  {
+   "skill": "cooking",
+   "level": 15,
+   "inputs": [
+    "raw_trout"
+   ]
+  }
+ ],
+ "salmon": [
+  {
+   "skill": "cooking",
+   "level": 25,
+   "inputs": [
+    "raw_salmon"
+   ]
+  }
+ ],
+ "tuna": [
+  {
+   "skill": "cooking",
+   "level": 30,
+   "inputs": [
+    "raw_tuna"
+   ]
+  }
+ ],
+ "lobster": [
+  {
+   "skill": "cooking",
+   "level": 40,
+   "inputs": [
+    "raw_lobster"
+   ]
+  }
+ ],
+ "swordfish": [
+  {
+   "skill": "cooking",
+   "level": 45,
+   "inputs": [
+    "raw_swordfish"
+   ]
+  }
+ ],
+ "shark": [
+  {
+   "skill": "cooking",
+   "level": 80,
+   "inputs": [
+    "raw_shark"
+   ]
+  }
+ ],
+ "pike": [
+  {
+   "skill": "cooking",
+   "level": 20,
+   "inputs": [
+    "raw_pike"
+   ]
+  }
+ ],
+ "lava_eel": [
+  {
+   "skill": "cooking",
+   "level": 53,
+   "inputs": [
+    "raw_lava_eel"
+   ]
+  }
+ ],
+ "leather_gloves": [
+  {
+   "skill": "crafting",
+   "level": 1,
+   "inputs": [
+    "leather"
+   ]
+  }
+ ],
+ "leather_boots": [
+  {
+   "skill": "crafting",
+   "level": 7,
+   "inputs": [
+    "leather"
+   ]
+  }
+ ],
+ "leather_vambraces": [
+  {
+   "skill": "crafting",
+   "level": 11,
+   "inputs": [
+    "leather"
+   ]
+  }
+ ],
+ "leather_chaps": [
+  {
+   "skill": "crafting",
+   "level": 18,
+   "inputs": [
+    "leather"
+   ]
+  }
+ ],
+ "leather_armour": [
+  {
+   "skill": "crafting",
+   "level": 14,
+   "inputs": [
+    "leather"
+   ]
+  }
+ ],
+ "leather_cowl": [
+  {
+   "skill": "crafting",
+   "level": 9,
+   "inputs": [
+    "leather"
+   ]
+  }
+ ],
+ "coif": [
+  {
+   "skill": "crafting",
+   "level": 38,
+   "inputs": [
+    "leather"
+   ]
+  }
+ ],
+ "dragonhide_body": [
+  {
+   "skill": "crafting",
+   "level": 63,
+   "inputs": [
+    "dragon_leather"
+   ]
+  }
+ ],
+ "sapphire": [
+  {
+   "skill": "crafting",
+   "level": 20,
+   "inputs": [
+    "uncut_sapphire"
+   ]
+  }
+ ],
+ "emerald": [
+  {
+   "skill": "crafting",
+   "level": 27,
+   "inputs": [
+    "uncut_emerald"
+   ]
+  }
+ ],
+ "ruby": [
+  {
+   "skill": "crafting",
+   "level": 34,
+   "inputs": [
+    "uncut_ruby"
+   ]
+  }
+ ],
+ "diamond": [
+  {
+   "skill": "crafting",
+   "level": 43,
+   "inputs": [
+    "uncut_diamond"
+   ]
+  }
+ ],
+ "opal": [
+  {
+   "skill": "crafting",
+   "level": 1,
+   "inputs": [
+    "uncut_opal"
+   ]
+  }
+ ],
+ "jade": [
+  {
+   "skill": "crafting",
+   "level": 13,
+   "inputs": [
+    "uncut_jade"
+   ]
+  }
+ ],
+ "dragonstone": [
+  {
+   "skill": "crafting",
+   "level": 55,
+   "inputs": [
+    "uncut_dragonstone"
+   ]
+  }
+ ],
+ "bronze_arrowheads": [
+  {
+   "skill": "smithing",
+   "level": 5,
+   "inputs": [
+    "bronze_bar"
+   ]
+  }
+ ],
+ "iron_arrowheads": [
+  {
+   "skill": "smithing",
+   "level": 20,
+   "inputs": [
+    "iron_bar"
+   ]
+  }
+ ],
+ "bronze_arrow": [
+  {
+   "skill": "fletching",
+   "level": 1,
+   "inputs": [
+    "bronze_arrowheads"
+   ]
+  }
+ ],
+ "iron_arrow": [
+  {
+   "skill": "fletching",
+   "level": 15,
+   "inputs": [
+    "iron_arrowheads"
+   ]
+  }
+ ],
+ "unstrung_shortbow": [
+  {
+   "skill": "fletching",
+   "level": 5,
+   "inputs": [
+    "logs"
+   ]
+  }
+ ],
+ "unstrung_longbow": [
+  {
+   "skill": "fletching",
+   "level": 10,
+   "inputs": [
+    "logs"
+   ]
+  }
+ ],
+ "shortbow": [
+  {
+   "skill": "fletching",
+   "level": 5,
+   "inputs": [
+    "unstrung_shortbow"
+   ]
+  }
+ ],
+ "longbow": [
+  {
+   "skill": "fletching",
+   "level": 10,
+   "inputs": [
+    "unstrung_longbow"
+   ]
+  }
+ ],
+ "oak_shortbow": [
+  {
+   "skill": "fletching",
+   "level": 20,
+   "inputs": [
+    "unstrung_oak_shortbow"
+   ]
+  }
+ ],
+ "unstrung_oak_shortbow": [
+  {
+   "skill": "fletching",
+   "level": 20,
+   "inputs": [
+    "oak_logs"
+   ]
+  }
+ ]
+}

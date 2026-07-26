@@ -19,6 +19,13 @@ export interface UnlocksConfig {
     /** null = no ap-unlocks.json on disk = everything unlocked (vanilla-open AP run). */
     present: boolean;
     unlocks: Map<string, number>;
+    /**
+     * How narration should describe where these counts came from. Set by callers that
+     * SUBSTITUTE the on-disk counts (SimulateProgression.ts's default end-of-run cap
+     * model - see PlacementEngine.endOfRunCounts); undefined = "straight off disk", and
+     * Narrate.ts falls back to its present/absent wording.
+     */
+    capsLabel?: string;
 }
 
 export interface GatherProcessConfig {

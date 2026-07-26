@@ -42,6 +42,13 @@ class TestMusicChecks(GoalTestMixin, RS2004TestBase):
     options = {"music_checks": True}
 
     def test_all_locations_present(self) -> None:
+        """With music on, every catalog check exists - except the ones this rolled world
+        can never reach, which are deliberately not created (see the feasibility
+        exclusion in create_regions: a location nothing can ever check would swallow
+        whatever was placed there)."""
         from .. import LOCATIONS
         real = [loc for loc in self.multiworld.get_locations(self.player) if loc.address is not None]
-        self.assertEqual(len(real), len(LOCATIONS))
+        excluded = self.world._infeasible_checks(self.world.infeasible_quests)
+        self.assertEqual(len(real), len(LOCATIONS) - len(excluded))
+        # the exclusion is a safety net, not the normal case - it must stay small
+        self.assertLess(len(excluded), len(LOCATIONS) // 10)

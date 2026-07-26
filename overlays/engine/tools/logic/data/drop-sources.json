@@ -1,0 +1,1607 @@
+{
+ "_note": "item -> monster debugnames that drop it (literal obj_add + death_drop). Resolved to regions via npc-spawns.json for the DROP obtainability source. Shared ~random* table procs NOT expanded (out of scope, noted in drops agent output).",
+ "acne_potion": [
+  "imp"
+ ],
+ "adamant_arrow": [
+  "white_knight"
+ ],
+ "adamant_axe": [
+  "troll_general"
+ ],
+ "adamant_dagger": [
+  "kalphite_lord",
+  "kalphite_lord_chamber"
+ ],
+ "adamant_dart_p": [
+  "black_dragon"
+ ],
+ "adamant_full_helm": [
+  "blue_dragon",
+  "green_dragon"
+ ],
+ "adamant_javelin": [
+  "black_dragon"
+ ],
+ "adamant_med_helm": [
+  "kalphite_soldier"
+ ],
+ "adamant_platebody": [
+  "black_dragon",
+  "red_dragon"
+ ],
+ "adamant_platelegs": [
+  "greater_demon"
+ ],
+ "adamant_spear": [
+  "shadow_warrior"
+ ],
+ "adamant_sq_shield": [
+  "troll_general"
+ ],
+ "adamantite_bar": [
+  "black_demon",
+  "black_dragon",
+  "red_dragon"
+ ],
+ "adamantite_ore": [
+  "blue_dragon",
+  "green_dragon"
+ ],
+ "air_talisman": [
+  "goblin",
+  "goblin_armed",
+  "goblin_guard",
+  "goblin_helmet"
+ ],
+ "airrune": [
+  "bearded_dark_wizard",
+  "black_demon",
+  "black_dragon",
+  "brawling_bandit",
+  "chaos_druid",
+  "chaos_druid_warrior",
+  "colonel_radick",
+  "dwarf_chaos",
+  "giantskeleton",
+  "kalphite_lord",
+  "kalphite_lord_chamber",
+  "mossgiant",
+  "necromancer",
+  "shadow_warrior",
+  "skeleton_armed",
+  "skeleton_unagressive",
+  "skeleton_unarmed",
+  "tower_guard",
+  "wizard",
+  "yanille_soldier",
+  "young_dark_wizard",
+  "zombie2",
+  "zombie_armed",
+  "zombie_entranan",
+  "zombie_unarmed"
+ ],
+ "amulet_mould": [
+  "gunthor_the_brave"
+ ],
+ "ashes": [
+  "chronozon",
+  "delrith",
+  "doomion",
+  "dragonslayer_demon",
+  "elemental_fire",
+  "holthion",
+  "imp",
+  "othainian"
+ ],
+ "ball_of_wool": [
+  "imp"
+ ],
+ "banana": [
+  "icegiant"
+ ],
+ "bass": [
+  "blue_dragon",
+  "green_dragon"
+ ],
+ "beer": [
+  "barbarian",
+  "giant",
+  "goblin",
+  "goblin_armed",
+  "goblin_guard",
+  "goblin_helmet",
+  "gunthor_the_brave",
+  "viking_guard",
+  "viking_guard2"
+ ],
+ "big_bones": [
+  "city_guard",
+  "death_troll_commander",
+  "death_troll_guard1",
+  "death_troll_guard2",
+  "death_troll_leuitanant",
+  "death_troll_melee1",
+  "death_troll_melee2",
+  "death_troll_melee3",
+  "death_troll_melee4",
+  "death_troll_melee5",
+  "death_troll_melee6",
+  "death_troll_melee7",
+  "death_troll_thrower1",
+  "death_troll_thrower2",
+  "death_troll_thrower3",
+  "death_troll_thrower4",
+  "death_troll_thrower5",
+  "enclave_guard",
+  "falseogretrader",
+  "gorad",
+  "jogre",
+  "lathastrainingogre",
+  "ogre",
+  "ogre2",
+  "ogre_chieftan",
+  "ogre_guard1",
+  "ogre_guard2",
+  "ogre_guard3",
+  "ogre_guard4",
+  "ogre_merchant",
+  "ogre_trader1",
+  "ogre_trader2",
+  "troll_champion",
+  "troll_general",
+  "troll_general2",
+  "troll_general3",
+  "troll_melee1",
+  "troll_prison_guard1",
+  "troll_prison_guard2",
+  "troll_spectator1",
+  "troll_spectator2",
+  "troll_spectator3",
+  "troll_spectator4",
+  "troll_spectator5",
+  "troll_spectator6",
+  "troll_spectator7",
+  "troll_thrower1",
+  "troll_thrower2",
+  "troll_thrower3",
+  "troll_thrower4",
+  "troll_thrower5"
+ ],
+ "black_axe": [
+  "black_demon"
+ ],
+ "black_bead": [
+  "imp"
+ ],
+ "black_cape": [
+  "highwayman"
+ ],
+ "black_claws": [
+  "death_ig_solider_wander"
+ ],
+ "black_dagger": [
+  "chaos_druid_warrior",
+  "salarin_the_twisted"
+ ],
+ "black_dagger_p": [
+  "shadow_warrior"
+ ],
+ "black_dart": [
+  "death_ig_solider_wander"
+ ],
+ "black_kiteshield": [
+  "icegiant"
+ ],
+ "black_knife": [
+  "death_ig_solider_wander",
+  "shadow_warrior"
+ ],
+ "black_longsword": [
+  "shadow_warrior"
+ ],
+ "black_mace": [
+  "dark_warrior"
+ ],
+ "black_med_helm": [
+  "dark_warrior"
+ ],
+ "black_robe": [
+  "bearded_dark_wizard",
+  "shadow_warrior",
+  "young_dark_wizard"
+ ],
+ "black_sq_shield": [
+  "mossgiant"
+ ],
+ "black_sword": [
+  "black_demon"
+ ],
+ "black_warhammer": [
+  "troll_general",
+  "viking_guard",
+  "viking_guard2"
+ ],
+ "blackwizhat": [
+  "bearded_dark_wizard",
+  "young_dark_wizard"
+ ],
+ "bloodrune": [
+  "bearded_dark_wizard",
+  "black_demon",
+  "black_dragon",
+  "brawling_bandit",
+  "colonel_radick",
+  "death_ig_solider_wander",
+  "earthwarrior",
+  "firegiant",
+  "icegiant",
+  "kalphite_lord",
+  "kalphite_lord_chamber",
+  "mossgiant",
+  "necromancer",
+  "otherworldly_being",
+  "red_dragon",
+  "shadow_warrior",
+  "tower_guard",
+  "white_knight",
+  "wizard",
+  "yanille_soldier",
+  "young_dark_wizard"
+ ],
+ "bluewizhat": [
+  "imp",
+  "wizard"
+ ],
+ "body_talisman": [
+  "giant"
+ ],
+ "bodyrune": [
+  "aggressive_black_knight",
+  "bearded_dark_wizard",
+  "black_knight",
+  "chaos_druid",
+  "goblin",
+  "goblin_armed",
+  "goblin_greenarmour",
+  "goblin_guard",
+  "goblin_helmet",
+  "goblin_redarmour",
+  "hobgoblin_armed",
+  "hobgoblin_unarmed",
+  "icegiant",
+  "kalphite_worker",
+  "necromancer",
+  "white_knight",
+  "wizard",
+  "young_dark_wizard",
+  "zombie2",
+  "zombie_armed",
+  "zombie_unarmed"
+ ],
+ "bolt": [
+  "al_kharid_warrior",
+  "dwarf_mountain",
+  "dwarf_normal",
+  "goblin",
+  "goblin_armed",
+  "goblin_guard",
+  "goblin_helmet",
+  "imp",
+  "rogue",
+  "thief1",
+  "thief_blanket"
+ ],
+ "bones": [
+  "jogre",
+  "jonny_the_beard"
+ ],
+ "brass_necklace": [
+  "goblin",
+  "goblin_armed",
+  "goblin_guard",
+  "goblin_helmet"
+ ],
+ "bread": [
+  "aggressive_black_knight",
+  "black_knight",
+  "imp",
+  "tribesman"
+ ],
+ "bread_dough": [
+  "imp"
+ ],
+ "bronze_arrow": [
+  "al_kharid_warrior",
+  "barbarian",
+  "colonel_radick",
+  "dark_warrior",
+  "farmer1",
+  "goblin_greenarmour",
+  "goblin_redarmour",
+  "gunthor_the_brave",
+  "rogue",
+  "skeleton_unagressive",
+  "skeleton_unarmed",
+  "thief1",
+  "thief_blanket",
+  "tower_guard",
+  "yanille_soldier",
+  "zombie_entranan"
+ ],
+ "bronze_axe": [
+  "barbarian",
+  "goblin_greenarmour",
+  "goblin_redarmour",
+  "zombie_entranan"
+ ],
+ "bronze_bar": [
+  "dwarf_mountain",
+  "dwarf_normal",
+  "giantskeleton",
+  "skeleton_armed"
+ ],
+ "bronze_battleaxe": [
+  "dwarf_mountain",
+  "dwarf_normal",
+  "gunthor_the_brave"
+ ],
+ "bronze_javelin": [
+  "goblin_greenarmour",
+  "goblin_redarmour"
+ ],
+ "bronze_kiteshield": [
+  "zombie_armed"
+ ],
+ "bronze_longsword": [
+  "chaos_druid",
+  "zombie2",
+  "zombie_entranan",
+  "zombie_unarmed"
+ ],
+ "bronze_med_helm": [
+  "al_kharid_warrior",
+  "dark_warrior",
+  "dwarf_mountain",
+  "dwarf_normal",
+  "farmer1",
+  "mugger",
+  "rogue",
+  "thief1",
+  "thief_blanket",
+  "zombie2",
+  "zombie_entranan",
+  "zombie_unarmed"
+ ],
+ "bronze_pickaxe": [
+  "dwarf_mountain",
+  "dwarf_normal"
+ ],
+ "bronze_scimitar": [
+  "goblin_greenarmour",
+  "goblin_redarmour"
+ ],
+ "bronze_spear": [
+  "goblin",
+  "goblin_armed",
+  "goblin_greenarmour",
+  "goblin_guard",
+  "goblin_helmet",
+  "goblin_redarmour",
+  "hobgoblin_unarmed",
+  "jogre",
+  "tribesman"
+ ],
+ "bronze_sq_shield": [
+  "goblin",
+  "goblin_armed",
+  "goblin_guard",
+  "goblin_helmet"
+ ],
+ "bronze_warhammer": [
+  "viking_guard",
+  "viking_guard2"
+ ],
+ "bucket_empty": [
+  "imp"
+ ],
+ "bucket_water": [
+  "imp",
+  "viking_guard",
+  "viking_guard2"
+ ],
+ "burnt_bread": [
+  "imp"
+ ],
+ "burnt_meat": [
+  "imp"
+ ],
+ "cabbage": [
+  "al_kharid_warrior",
+  "farmer1",
+  "imp",
+  "mugger",
+  "rogue",
+  "thief1",
+  "thief_blanket"
+ ],
+ "cadavaberries": [
+  "imp"
+ ],
+ "cake": [
+  "viking_guard",
+  "viking_guard2"
+ ],
+ "cert_coal": [
+  "troll_general"
+ ],
+ "cert_raw_tuna": [
+  "troll_general"
+ ],
+ "chaosrune": [
+  "aggressive_black_knight",
+  "al_kharid_warrior",
+  "barbarian",
+  "bearded_dark_wizard",
+  "black_demon",
+  "black_knight",
+  "brawling_bandit",
+  "colonel_radick",
+  "dark_warrior",
+  "druid",
+  "dwarf_chaos",
+  "dwarf_mountain",
+  "dwarf_normal",
+  "earthwarrior",
+  "farmer1",
+  "firegiant",
+  "giant",
+  "giantskeleton",
+  "goblin_greenarmour",
+  "goblin_redarmour",
+  "greater_demon",
+  "gunthor_the_brave",
+  "hobgoblin_armed",
+  "hobgoblin_unarmed",
+  "kalphite_lord",
+  "kalphite_lord_chamber",
+  "kalphite_soldier",
+  "kalphite_worker",
+  "lesser_demon",
+  "mossgiant",
+  "necromancer",
+  "otherworldly_being",
+  "rogue",
+  "skeleton_armed",
+  "skeleton_unagressive",
+  "skeleton_unarmed",
+  "thief1",
+  "thief_blanket",
+  "thug",
+  "tower_guard",
+  "white_knight",
+  "wizard",
+  "yanille_soldier",
+  "young_dark_wizard",
+  "zombie_armed"
+ ],
+ "cheese": [
+  "dwarf_chaos"
+ ],
+ "chefs_hat": [
+  "goblin",
+  "goblin_armed",
+  "goblin_guard",
+  "goblin_helmet",
+  "imp"
+ ],
+ "chocolate_cake": [
+  "black_dragon",
+  "red_dragon"
+ ],
+ "clay": [
+  "imp"
+ ],
+ "coal": [
+  "brawling_bandit",
+  "dwarf_chaos",
+  "dwarf_mountain",
+  "dwarf_normal",
+  "mossgiant",
+  "thug"
+ ],
+ "coins": [
+  "aggressive_black_knight",
+  "al_kharid_warrior",
+  "barbarian",
+  "bearded_dark_wizard",
+  "black_demon",
+  "black_dragon",
+  "black_knight",
+  "blue_dragon",
+  "brawling_bandit",
+  "chaos_druid",
+  "chaos_druid_warrior",
+  "colonel_radick",
+  "dark_warrior",
+  "death_ig_solider_wander",
+  "druid",
+  "dwarf_chaos",
+  "dwarf_mountain",
+  "dwarf_normal",
+  "earthwarrior",
+  "farmer1",
+  "firegiant",
+  "giant",
+  "giantskeleton",
+  "goblin",
+  "goblin_armed",
+  "goblin_greenarmour",
+  "goblin_guard",
+  "goblin_helmet",
+  "goblin_redarmour",
+  "greater_demon",
+  "green_dragon",
+  "gunthor_the_brave",
+  "hobgoblin_armed",
+  "hobgoblin_unarmed",
+  "icegiant",
+  "kalphite_lord",
+  "kalphite_lord_chamber",
+  "kalphite_soldier",
+  "kalphite_worker",
+  "lesser_demon",
+  "mossgiant",
+  "mugger",
+  "necromancer",
+  "otherworldly_being",
+  "red_dragon",
+  "rogue",
+  "salarin_the_twisted",
+  "shadow_warrior",
+  "skeleton_armed",
+  "skeleton_unagressive",
+  "skeleton_unarmed",
+  "thief1",
+  "thief_blanket",
+  "thug",
+  "tower_guard",
+  "tribesman",
+  "troll_general",
+  "viking_guard",
+  "viking_guard2",
+  "white_knight",
+  "wizard",
+  "yanille_soldier",
+  "young_dark_wizard",
+  "zombie2",
+  "zombie_armed",
+  "zombie_entranan",
+  "zombie_unarmed"
+ ],
+ "cooked_meat": [
+  "barbarian",
+  "gunthor_the_brave",
+  "imp"
+ ],
+ "copper_ore": [
+  "al_kharid_warrior",
+  "dwarf_mountain",
+  "dwarf_normal",
+  "farmer1",
+  "mugger",
+  "rogue",
+  "thief1",
+  "thief_blanket",
+  "viking_guard",
+  "viking_guard2",
+  "zombie2",
+  "zombie_unarmed"
+ ],
+ "cosmicrune": [
+  "aggressive_black_knight",
+  "bearded_dark_wizard",
+  "black_knight",
+  "dwarf_chaos",
+  "giant",
+  "giantskeleton",
+  "hobgoblin_armed",
+  "hobgoblin_unarmed",
+  "icegiant",
+  "kalphite_worker",
+  "mossgiant",
+  "necromancer",
+  "otherworldly_being",
+  "shadow_warrior",
+  "skeleton_armed",
+  "thug",
+  "young_dark_wizard",
+  "zombie_armed"
+ ],
+ "cow_hide": [
+  "cow"
+ ],
+ "deathrune": [
+  "aggressive_black_knight",
+  "black_knight",
+  "brawling_bandit",
+  "dwarf_chaos",
+  "earthwarrior",
+  "giant",
+  "greater_demon",
+  "icegiant",
+  "kalphite_soldier",
+  "lesser_demon",
+  "mossgiant",
+  "otherworldly_being",
+  "red_dragon",
+  "shadow_warrior",
+  "thug"
+ ],
+ "dragon_bones": [
+  "king_dragon"
+ ],
+ "dragonhide_black": [
+  "black_dragon"
+ ],
+ "dragonhide_blue": [
+  "blue_dragon"
+ ],
+ "dragonhide_green": [
+  "green_dragon"
+ ],
+ "dragonhide_red": [
+  "red_dragon"
+ ],
+ "druidrobebottom": [
+  "druid"
+ ],
+ "druidrobetop": [
+  "druid"
+ ],
+ "earth_talisman": [
+  "al_kharid_warrior",
+  "farmer1",
+  "rogue",
+  "thief1",
+  "thief_blanket"
+ ],
+ "earthrune": [
+  "aggressive_black_knight",
+  "al_kharid_warrior",
+  "barbarian",
+  "bearded_dark_wizard",
+  "black_knight",
+  "chaos_druid",
+  "chaos_druid_warrior",
+  "colonel_radick",
+  "dark_warrior",
+  "druid",
+  "earthwarrior",
+  "farmer1",
+  "goblin",
+  "goblin_armed",
+  "goblin_greenarmour",
+  "goblin_guard",
+  "goblin_helmet",
+  "goblin_redarmour",
+  "gunthor_the_brave",
+  "mossgiant",
+  "mugger",
+  "necromancer",
+  "rogue",
+  "skeleton_unagressive",
+  "skeleton_unarmed",
+  "thief1",
+  "thief_blanket",
+  "tower_guard",
+  "troll_general",
+  "wizard",
+  "yanille_soldier",
+  "young_dark_wizard"
+ ],
+ "egg": [
+  "imp"
+ ],
+ "eye_of_newt": [
+  "zombie_armed"
+ ],
+ "feather": [
+  "chicken"
+ ],
+ "fire_battlestaff": [
+  "firegiant"
+ ],
+ "fire_talisman": [
+  "bearded_dark_wizard",
+  "skeleton_unagressive",
+  "skeleton_unarmed",
+  "young_dark_wizard"
+ ],
+ "firerune": [
+  "al_kharid_warrior",
+  "barbarian",
+  "bearded_dark_wizard",
+  "black_demon",
+  "black_dragon",
+  "blue_dragon",
+  "chaos_druid_warrior",
+  "colonel_radick",
+  "druid",
+  "farmer1",
+  "firegiant",
+  "giant",
+  "greater_demon",
+  "green_dragon",
+  "gunthor_the_brave",
+  "hobgoblin_armed",
+  "hobgoblin_unarmed",
+  "kalphite_lord",
+  "kalphite_lord_chamber",
+  "kalphite_soldier",
+  "kalphite_worker",
+  "lesser_demon",
+  "necromancer",
+  "rogue",
+  "salarin_the_twisted",
+  "skeleton_unagressive",
+  "skeleton_unarmed",
+  "thief1",
+  "thief_blanket",
+  "tower_guard",
+  "wizard",
+  "yanille_soldier",
+  "young_dark_wizard",
+  "zombie_armed"
+ ],
+ "fishing_bait": [
+  "al_kharid_warrior",
+  "farmer1",
+  "mugger",
+  "rogue",
+  "thief1",
+  "thief_blanket",
+  "zombie2",
+  "zombie_armed",
+  "zombie_entranan",
+  "zombie_unarmed"
+ ],
+ "flier": [
+  "barbarian",
+  "gunthor_the_brave",
+  "imp"
+ ],
+ "fur": [
+  "barbarian",
+  "gunthor_the_brave",
+  "viking_guard",
+  "viking_guard2"
+ ],
+ "goblin_armour": [
+  "goblin",
+  "goblin_armed",
+  "goblin_greenarmour",
+  "goblin_guard",
+  "goblin_helmet",
+  "goblin_redarmour",
+  "hobgoblin_armed",
+  "hobgoblin_unarmed"
+ ],
+ "gold_bar": [
+  "greater_demon"
+ ],
+ "gold_ore": [
+  "lesser_demon",
+  "tribesman"
+ ],
+ "grain": [
+  "imp",
+  "skeleton_unagressive",
+  "skeleton_unarmed"
+ ],
+ "granite_shield": [
+  "troll_general"
+ ],
+ "grapes": [
+  "goblin_greenarmour",
+  "goblin_redarmour"
+ ],
+ "half_an_apple_pie": [
+  "white_knight"
+ ],
+ "hammer": [
+  "dwarf_mountain",
+  "dwarf_normal",
+  "imp"
+ ],
+ "hardleather_body": [
+  "kalphite_worker"
+ ],
+ "hot_feather": [
+  "fire_bird"
+ ],
+ "intelligence_report": [
+  "jonny_the_beard"
+ ],
+ "iron_2h_sword": [
+  "icegiant"
+ ],
+ "iron_arrow": [
+  "giant",
+  "giantskeleton",
+  "gunthor_the_brave",
+  "mossgiant",
+  "skeleton_armed",
+  "skeleton_unagressive",
+  "skeleton_unarmed",
+  "zombie2",
+  "zombie_unarmed"
+ ],
+ "iron_axe": [
+  "giantskeleton",
+  "gunthor_the_brave",
+  "skeleton_armed",
+  "zombie2",
+  "zombie_entranan",
+  "zombie_unarmed"
+ ],
+ "iron_bar": [
+  "dwarf_mountain",
+  "dwarf_normal",
+  "thug",
+  "white_knight"
+ ],
+ "iron_battleaxe": [
+  "dwarf_mountain",
+  "dwarf_normal",
+  "thug"
+ ],
+ "iron_dagger": [
+  "al_kharid_warrior",
+  "druid",
+  "farmer1",
+  "giant",
+  "rogue",
+  "skeleton_unagressive",
+  "skeleton_unarmed",
+  "thief1",
+  "thief_blanket",
+  "zombie_armed"
+ ],
+ "iron_full_helm": [
+  "aggressive_black_knight",
+  "black_knight",
+  "giant"
+ ],
+ "iron_javelin": [
+  "hobgoblin_armed",
+  "kalphite_worker"
+ ],
+ "iron_kiteshield": [
+  "giant"
+ ],
+ "iron_longsword": [
+  "white_knight"
+ ],
+ "iron_mace": [
+  "barbarian",
+  "dark_warrior",
+  "gunthor_the_brave",
+  "zombie_armed"
+ ],
+ "iron_med_helm": [
+  "giantskeleton",
+  "skeleton_armed",
+  "thug"
+ ],
+ "iron_ore": [
+  "colonel_radick",
+  "dark_warrior",
+  "dwarf_mountain",
+  "dwarf_normal",
+  "skeleton_unagressive",
+  "skeleton_unarmed",
+  "thug",
+  "tower_guard",
+  "viking_guard",
+  "viking_guard2",
+  "white_knight",
+  "yanille_soldier"
+ ],
+ "iron_platelegs": [
+  "icegiant"
+ ],
+ "iron_scimitar": [
+  "brawling_bandit",
+  "giantskeleton",
+  "skeleton_armed"
+ ],
+ "iron_spear": [
+  "hobgoblin_unarmed",
+  "jogre",
+  "tribesman"
+ ],
+ "iron_sword": [
+  "aggressive_black_knight",
+  "black_knight",
+  "giantskeleton",
+  "hobgoblin_armed",
+  "hobgoblin_unarmed",
+  "kalphite_worker",
+  "skeleton_armed"
+ ],
+ "iron_warhammer": [
+  "viking_guard",
+  "viking_guard2"
+ ],
+ "jail_key": [
+  "jailer"
+ ],
+ "jug_empty": [
+  "imp"
+ ],
+ "jug_water": [
+  "imp"
+ ],
+ "jug_wine": [
+  "icegiant",
+  "lesser_demon"
+ ],
+ "keg_of_beer": [
+  "viking_guard",
+  "viking_guard2"
+ ],
+ "knife": [
+  "jogre",
+  "mugger"
+ ],
+ "lawrune": [
+  "aggressive_black_knight",
+  "barbarian",
+  "bearded_dark_wizard",
+  "black_demon",
+  "black_dragon",
+  "black_knight",
+  "blue_dragon",
+  "brawling_bandit",
+  "chaos_druid",
+  "chaos_druid_warrior",
+  "druid",
+  "dwarf_chaos",
+  "earthwarrior",
+  "firegiant",
+  "giant",
+  "giantskeleton",
+  "green_dragon",
+  "gunthor_the_brave",
+  "hobgoblin_armed",
+  "hobgoblin_unarmed",
+  "icegiant",
+  "kalphite_lord",
+  "kalphite_lord_chamber",
+  "kalphite_worker",
+  "mossgiant",
+  "necromancer",
+  "otherworldly_being",
+  "red_dragon",
+  "salarin_the_twisted",
+  "skeleton_armed",
+  "thug",
+  "troll_general",
+  "white_knight",
+  "wizard",
+  "young_dark_wizard"
+ ],
+ "limpwurt_root": [
+  "chaos_druid_warrior",
+  "druid",
+  "giant",
+  "hobgoblin_armed",
+  "hobgoblin_unarmed",
+  "tribesman"
+ ],
+ "lobster": [
+  "black_demon",
+  "firegiant",
+  "kalphite_lord",
+  "kalphite_lord_chamber"
+ ],
+ "mackerel": [
+  "otherworldly_being"
+ ],
+ "magic_staff": [
+  "mossgiant"
+ ],
+ "mind_talisman": [
+  "colonel_radick",
+  "imp",
+  "tower_guard",
+  "wizard",
+  "yanille_soldier"
+ ],
+ "mindrune": [
+  "aggressive_black_knight",
+  "al_kharid_warrior",
+  "barbarian",
+  "bearded_dark_wizard",
+  "black_knight",
+  "brawling_bandit",
+  "chaos_druid",
+  "dark_warrior",
+  "dwarf_chaos",
+  "farmer1",
+  "giant",
+  "goblin_greenarmour",
+  "goblin_redarmour",
+  "gunthor_the_brave",
+  "icegiant",
+  "mugger",
+  "necromancer",
+  "rogue",
+  "thief1",
+  "thief_blanket",
+  "white_knight",
+  "wizard",
+  "young_dark_wizard",
+  "zombie2",
+  "zombie_unarmed"
+ ],
+ "mithril_2h_sword": [
+  "black_dragon",
+  "red_dragon"
+ ],
+ "mithril_arrow": [
+  "aggressive_black_knight",
+  "black_knight",
+  "white_knight",
+  "zombie_armed"
+ ],
+ "mithril_axe": [
+  "black_dragon",
+  "blue_dragon",
+  "green_dragon",
+  "kalphite_lord",
+  "kalphite_lord_chamber",
+  "red_dragon"
+ ],
+ "mithril_bar": [
+  "death_ig_solider_wander",
+  "dwarf_chaos",
+  "shadow_warrior"
+ ],
+ "mithril_battleaxe": [
+  "black_dragon",
+  "red_dragon"
+ ],
+ "mithril_chainbody": [
+  "kalphite_soldier",
+  "lesser_demon"
+ ],
+ "mithril_javelin": [
+  "red_dragon",
+  "tribesman"
+ ],
+ "mithril_kiteshield": [
+  "black_demon",
+  "black_dragon",
+  "blue_dragon",
+  "greater_demon",
+  "green_dragon",
+  "kalphite_lord",
+  "kalphite_lord_chamber",
+  "red_dragon"
+ ],
+ "mithril_longsword": [
+  "dwarf_chaos"
+ ],
+ "mithril_mace": [
+  "icegiant",
+  "otherworldly_being"
+ ],
+ "mithril_ore": [
+  "icegiant"
+ ],
+ "mithril_platebody": [
+  "troll_general"
+ ],
+ "mithril_spear": [
+  "blue_dragon",
+  "green_dragon",
+  "mossgiant",
+  "tribesman"
+ ],
+ "mithril_sq_shield": [
+  "dwarf_chaos",
+  "firegiant",
+  "icegiant",
+  "kalphite_soldier",
+  "lesser_demon"
+ ],
+ "mithril_sword": [
+  "kalphite_lord",
+  "kalphite_lord_chamber",
+  "mossgiant"
+ ],
+ "muddy_key": [
+  "dwarf_chaos"
+ ],
+ "naturerune": [
+  "bearded_dark_wizard",
+  "blue_dragon",
+  "brawling_bandit",
+  "chaos_druid",
+  "chaos_druid_warrior",
+  "colonel_radick",
+  "dark_warrior",
+  "dwarf_chaos",
+  "dwarf_mountain",
+  "dwarf_normal",
+  "earthwarrior",
+  "giant",
+  "goblin_greenarmour",
+  "goblin_redarmour",
+  "green_dragon",
+  "hobgoblin_armed",
+  "hobgoblin_unarmed",
+  "icegiant",
+  "jogre",
+  "kalphite_soldier",
+  "kalphite_worker",
+  "mossgiant",
+  "necromancer",
+  "otherworldly_being",
+  "salarin_the_twisted",
+  "skeleton_unagressive",
+  "skeleton_unarmed",
+  "thug",
+  "tower_guard",
+  "tribesman",
+  "troll_general",
+  "white_knight",
+  "wizard",
+  "yanille_soldier",
+  "young_dark_wizard",
+  "zombie2",
+  "zombie_entranan",
+  "zombie_unarmed"
+ ],
+ "newbiebones": [
+  "newbiechicken",
+  "newbiegiantrat"
+ ],
+ "null": [
+  "arena_scorpion",
+  "blessed_spider",
+  "dragonslayer_ghost",
+  "grave_scorpion",
+  "horror_rockcrab_inactive",
+  "horror_rockcrab_small_inactive",
+  "irvig_senay",
+  "kalrag",
+  "non_combat_bat",
+  "priestperilguarddog",
+  "ranalph_devere",
+  "san_tojalon",
+  "tbwt_beast_cutscene",
+  "upass_little_spider",
+  "zamorakghost",
+  "zqzombie_armed",
+  "zqzombie_unarmed"
+ ],
+ "pineapple": [
+  "jogre"
+ ],
+ "plainstaff": [
+  "barbarian",
+  "bearded_dark_wizard",
+  "necromancer",
+  "wizard",
+  "young_dark_wizard"
+ ],
+ "poison_bolt": [
+  "tribesman"
+ ],
+ "pot_empty": [
+  "imp"
+ ],
+ "pot_flour": [
+  "aggressive_black_knight",
+  "black_knight",
+  "imp",
+  "tribesman",
+  "white_knight"
+ ],
+ "rats_tail": [
+  "rat"
+ ],
+ "raw_beef": [
+  "cow"
+ ],
+ "raw_chicken": [
+  "chicken",
+  "imp"
+ ],
+ "raw_oomlie": [
+  "oomlie_bird"
+ ],
+ "raw_rat_meat": [
+  "giantrat"
+ ],
+ "raw_sardine": [
+  "viking_guard",
+  "viking_guard2"
+ ],
+ "raw_ugthanki_meat": [
+  "ugthanki"
+ ],
+ "red_bead": [
+  "imp"
+ ],
+ "red_cape": [
+  "goblin_greenarmour",
+  "goblin_redarmour"
+ ],
+ "ring_mould": [
+  "barbarian",
+  "viking_guard",
+  "viking_guard2"
+ ],
+ "rope": [
+  "mugger"
+ ],
+ "ruby_ring": [
+  "otherworldly_being"
+ ],
+ "rune_arrow": [
+  "firegiant",
+  "red_dragon"
+ ],
+ "rune_chainbody": [
+  "black_demon",
+  "kalphite_lord",
+  "kalphite_lord_chamber"
+ ],
+ "rune_dagger": [
+  "blue_dragon",
+  "green_dragon"
+ ],
+ "rune_dart": [
+  "red_dragon"
+ ],
+ "rune_full_helm": [
+  "greater_demon"
+ ],
+ "rune_knife": [
+  "black_dragon"
+ ],
+ "rune_longsword": [
+  "black_dragon",
+  "red_dragon"
+ ],
+ "rune_med_helm": [
+  "black_demon",
+  "kalphite_lord",
+  "kalphite_lord_chamber",
+  "lesser_demon"
+ ],
+ "rune_scimitar": [
+  "firegiant"
+ ],
+ "rune_warhammer": [
+  "troll_general"
+ ],
+ "sardine": [
+  "dark_warrior"
+ ],
+ "shade_bones1": [
+  "shadeshadow_level1"
+ ],
+ "shade_bones2": [
+  "shadeshadow_level2"
+ ],
+ "shade_bones3": [
+  "shadeshadow_level3"
+ ],
+ "shade_bones4": [
+  "shadeshadow_level4"
+ ],
+ "shade_bones5": [
+  "shadeshadow_level5"
+ ],
+ "shears": [
+  "imp"
+ ],
+ "shellpoint_blue": [
+  "mmsnailpoint_blue"
+ ],
+ "shellpoint_red+black": [
+  "mmsnailpoint_swamp"
+ ],
+ "shellpoint_yellow": [
+  "mmsnailpoint_yellow"
+ ],
+ "shellround_blue": [
+  "mmsnailround_blue"
+ ],
+ "shellround_orange": [
+  "mmsnailround_orange"
+ ],
+ "shellround_red+black": [
+  "mmsnailround_swamp"
+ ],
+ "shellround_yellow": [
+  "mmsnailround_yellow"
+ ],
+ "sinister_key": [
+  "salarin_the_twisted"
+ ],
+ "snape_grass": [
+  "chaos_druid",
+  "chaos_druid_warrior",
+  "salarin_the_twisted",
+  "tribesman"
+ ],
+ "spinach_roll": [
+  "mossgiant"
+ ],
+ "staff_of_earth": [
+  "earthwarrior"
+ ],
+ "staff_of_fire": [
+  "necromancer"
+ ],
+ "steel_2h_sword": [
+  "greater_demon"
+ ],
+ "steel_arrow": [
+  "colonel_radick",
+  "giant",
+  "mossgiant",
+  "skeleton_unagressive",
+  "skeleton_unarmed",
+  "tower_guard",
+  "yanille_soldier",
+  "zombie2",
+  "zombie_unarmed"
+ ],
+ "steel_arrow_p": [
+  "tribesman"
+ ],
+ "steel_axe": [
+  "brawling_bandit",
+  "firegiant",
+  "greater_demon",
+  "icegiant",
+  "kalphite_soldier",
+  "lesser_demon",
+  "thug"
+ ],
+ "steel_bar": [
+  "aggressive_black_knight",
+  "black_knight",
+  "death_ig_solider_wander",
+  "firegiant",
+  "mossgiant"
+ ],
+ "steel_battleaxe": [
+  "black_demon",
+  "blue_dragon",
+  "greater_demon",
+  "green_dragon",
+  "kalphite_lord",
+  "kalphite_lord_chamber"
+ ],
+ "steel_claws": [
+  "death_ig_solider_wander"
+ ],
+ "steel_dagger": [
+  "hobgoblin_armed",
+  "hobgoblin_unarmed",
+  "kalphite_worker"
+ ],
+ "steel_full_helm": [
+  "death_ig_solider_wander",
+  "dwarf_chaos",
+  "kalphite_soldier",
+  "lesser_demon"
+ ],
+ "steel_javelin": [
+  "jogre",
+  "tribesman"
+ ],
+ "steel_kiteshield": [
+  "mossgiant"
+ ],
+ "steel_longsword": [
+  "giant",
+  "hobgoblin_armed",
+  "hobgoblin_unarmed",
+  "kalphite_worker"
+ ],
+ "steel_mace": [
+  "aggressive_black_knight",
+  "black_knight"
+ ],
+ "steel_med_helm": [
+  "colonel_radick",
+  "mossgiant",
+  "tower_guard",
+  "white_knight",
+  "yanille_soldier"
+ ],
+ "steel_platebody": [
+  "troll_general"
+ ],
+ "steel_platelegs": [
+  "blue_dragon",
+  "green_dragon"
+ ],
+ "steel_scimitar": [
+  "kalphite_soldier",
+  "lesser_demon"
+ ],
+ "steel_spear": [
+  "earthwarrior",
+  "hobgoblin_unarmed"
+ ],
+ "steel_sq_shield": [
+  "brawling_bandit"
+ ],
+ "steel_sword": [
+  "colonel_radick",
+  "icegiant",
+  "tower_guard",
+  "white_knight",
+  "yanille_soldier"
+ ],
+ "steel_warhammer": [
+  "troll_general",
+  "viking_guard",
+  "viking_guard2"
+ ],
+ "swamprocks1": [
+  "elemental_earth"
+ ],
+ "tbwt_beast_bones": [
+  "tbwt_beast"
+ ],
+ "tbwt_cleaning_cloth": [
+  "tribesman"
+ ],
+ "thread": [
+  "greater_demon"
+ ],
+ "tin_ore": [
+  "aggressive_black_knight",
+  "barbarian",
+  "black_knight",
+  "dwarf_mountain",
+  "dwarf_normal",
+  "goblin_greenarmour",
+  "goblin_redarmour",
+  "gunthor_the_brave",
+  "tribesman",
+  "viking_guard",
+  "viking_guard2",
+  "zombie_armed"
+ ],
+ "tinderbox": [
+  "imp",
+  "zombie_armed"
+ ],
+ "tomato": [
+  "dwarf_chaos"
+ ],
+ "troll_key_prison": [
+  "troll_general"
+ ],
+ "tuna": [
+  "greater_demon"
+ ],
+ "unholy_symbol_mould": [
+  "chaos_druid"
+ ],
+ "unicorn_horn": [
+  "unicorn"
+ ],
+ "unicorn_horn_dust": [
+  "chaos_druid_warrior"
+ ],
+ "unidentified_rogues_purse": [
+  "jogre",
+  "tribesman"
+ ],
+ "unidentified_snake_weed": [
+  "jogre",
+  "tribesman"
+ ],
+ "vial_empty": [
+  "druid"
+ ],
+ "vial_water": [
+  "chaos_druid",
+  "chaos_druid_warrior",
+  "elemental_water",
+  "salarin_the_twisted"
+ ],
+ "viking_helmet": [
+  "viking_guard",
+  "viking_guard2"
+ ],
+ "viking_shield": [
+  "viking_guard",
+  "viking_guard2"
+ ],
+ "viking_sword": [
+  "viking_guard",
+  "viking_guard2"
+ ],
+ "water_skin4": [
+  "kalphite_soldier",
+  "kalphite_worker"
+ ],
+ "water_talisman": [
+  "bearded_dark_wizard",
+  "wizard",
+  "young_dark_wizard"
+ ],
+ "waterrune": [
+  "bearded_dark_wizard",
+  "blue_dragon",
+  "brawling_bandit",
+  "dark_warrior",
+  "druid",
+  "dwarf_chaos",
+  "giant",
+  "giantskeleton",
+  "goblin",
+  "goblin_armed",
+  "goblin_guard",
+  "goblin_helmet",
+  "green_dragon",
+  "hobgoblin_armed",
+  "hobgoblin_unarmed",
+  "icegiant",
+  "kalphite_worker",
+  "mugger",
+  "necromancer",
+  "salarin_the_twisted",
+  "skeleton_armed",
+  "white_knight",
+  "wizard",
+  "young_dark_wizard"
+ ],
+ "weapon_poison": [
+  "shadow_warrior"
+ ],
+ "white_bead": [
+  "imp"
+ ],
+ "white_berries": [
+  "chaos_druid_warrior",
+  "salarin_the_twisted"
+ ],
+ "wizards_robe": [
+  "wizard"
+ ],
+ "wolf_bones": [
+  "canafis_man1",
+  "canafis_man2",
+  "canafis_man3",
+  "canafis_woman1",
+  "canafis_woman2",
+  "canafis_woman3",
+  "desert_wolf",
+  "jungle_wolf",
+  "viking_wolf"
+ ],
+ "yellow_bead": [
+  "imp"
+ ],
+ "zamrobebottom": [
+  "necromancer"
+ ],
+ "zamrobetop": [
+  "necromancer"
+ ]
+}

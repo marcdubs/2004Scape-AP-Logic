@@ -23,8 +23,21 @@ import { applyPlacementItem, applyQuestGates, buildLocationCatalog, capsFromCoun
 import { Goal, QuestReq, StatName } from '../sim/types.js';
 
 import { WorldTile, parseRawCoord } from './Coords.js';
-import { GatedArea, GatedAreaRequire, RequireContext, describeRequire, loadGatedAreas, requireSatisfied } from './GatedAreas.js';
-import { GeneratedIgnores, RequirementGroup, buildRequirementGroups, collectScriptEdges, loadGeneratedQuestRegions, usableWorldEdges } from './GeneratedQuestRegions.js';
+import { GatedAreaRequire, RequireContext, describeRequire, loadGatedAreas, requireSatisfied } from './GatedAreas.js';
+import { addRegionSources, applySwaps, computeObtainable, itemAvailable, loadItemSources, loadNpcSpawns, loadQuestItems, stampQuestGates } from './ItemGraph.js';
+import { RequirementGroup, buildRequirementGroups, collectScriptEdges, loadGeneratedQuestRegions, usableWorldEdges } from './GeneratedQuestRegions.js';
+import {
+    VANILLA_SPAWN_RAW,
+    collectRequiredVarps,
+    gatedRegionRequires,
+    loadQuestRegions,
+    questsChainSatisfied,
+    resolveAnchors,
+    resolveGatedAreas,
+    resolveOpenAreaMembers,
+    resolveVarp,
+    skillsSatisfied
+} from './LogicModel.js';
 import { RegionGraph, loadRegionGraph } from './RegionGraph.js';
 
 // ---- CLI args ----
@@ -52,10 +65,8 @@ const GENERATED_REGIONS_PATH = path.join('tools', 'logic', 'data', 'quest-region
 const QUESTS_PATH = path.join('tools', 'sim', 'data', 'quests.json');
 const GOALS_PATH = path.join('tools', 'sim', 'data', 'goals.json');
 
-// vanilla Lumbridge respawn, matches ApSpawnOverrides.ts's VANILLA_HOME literal exactly.
-const VANILLA_SPAWN_RAW = '0_50_50_21_18';
-
-// region graph loading lives in RegionGraph.ts (shared with ExtractQuestRegions.ts).
+// region graph loading lives in RegionGraph.ts (shared with ExtractQuestRegions.ts); the
+// region/varp model this tool shares with the apworld exporter lives in LogicModel.ts.
 
 // ---- entrance table (ap-entrances.json: overrides + optional gates) ----
 
@@ -99,166 +110,59 @@ function loadEntranceEdges(configDir: string, graph: RegionGraph): { edges: Entr
     return { edges, present: true };
 }
 
-// ---- gated areas: compute each area's isolated ("gated") region ids and the outside
-// region ids immediately bordering its box(es), per docs/entrance-logic.md's pragmatic
-// simplification ("area regions are reachable iff require satisfied AND an
-// edge/adjacency reaches them"). See BuildRegionGraph.ts's file header for why doors
-// near these boxes were kept closed in the first place - this is where that pays off:
-// a well-enclosed curated area reliably shows up as its own region id(s), distinct from
-// whatever borders it. ----
+// gated-area resolution, open-area membership, the curated quest-regions.json shape and
+// the quest-doability varp model all live in LogicModel.ts now (shared with
+// tools/ap/ExportLogicBundle.ts so the apworld reasons over the same objects).
 
-interface ResolvedGatedArea {
-    area: GatedArea;
-    gatedRegionIds: Set<number>;
-    outsideRegionIds: Set<number>;
-}
-
-function resolveGatedAreas(areas: GatedArea[], graph: RegionGraph): ResolvedGatedArea[] {
-    return areas.map(area => {
-        const insideIds = new Set<number>();
-        const outsideIds = new Set<number>();
-        for (const box of area.boxes) {
-            for (let x = box.x1; x <= box.x2; x++) {
-                for (let z = box.z1; z <= box.z2; z++) {
-                    const id = graph.regionAt(x, z, box.level);
-                    if (id !== 0) {
-                        insideIds.add(id);
-                    }
-                }
-            }
-            // 1-tile ring immediately outside the (padded) box.
-            for (let x = box.x1 - 1; x <= box.x2 + 1; x++) {
-                for (let z = box.z1 - 1; z <= box.z2 + 1; z++) {
-                    if (x >= box.x1 && x <= box.x2 && z >= box.z1 && z <= box.z2) {
-                        continue; // inside the box, not the ring.
-                    }
-                    const id = graph.regionAt(x, z, box.level);
-                    if (id !== 0) {
-                        outsideIds.add(id);
-                    }
-                }
-            }
+// Loads the gathersanity/processsanity swap tables (ap-gather.json / ap-process.json,
+// obj-id -> obj-id) and translates them to a name -> name product swap via obj.pack, so
+// the item-source graph can be re-keyed to the shuffled world. Absent files (gathersanity
+// off) => null => vanilla graph.
+function loadGatherProcessSwaps(configDir: string): Map<string, string> | null {
+    const objPack = path.resolve(process.cwd(), '../content/pack/obj.pack');
+    if (!fs.existsSync(objPack)) {
+        return null;
+    }
+    const idToName = new Map<number, string>();
+    for (const line of fs.readFileSync(objPack, 'utf8').split(/\r?\n/)) {
+        const eq = line.indexOf('=');
+        if (eq !== -1) {
+            idToName.set(parseInt(line.slice(0, eq), 10), line.slice(eq + 1).trim());
         }
-        const gatedRegionIds = new Set([...insideIds].filter(id => !outsideIds.has(id)));
-        return { area, gatedRegionIds, outsideRegionIds: outsideIds };
-    });
-}
-
-// ---- quest-regions.json (this tool's own curated data - see that file's _comment) ----
-
-interface AnchorDef {
-    level: number;
-    x: number;
-    z: number;
-    note?: string;
-}
-interface OpenAreaBox {
-    levels: number[];
-    x1: number;
-    z1: number;
-    x2: number;
-    z2: number;
-}
-interface OpenArea {
-    name: string;
-    connectTo: string[]; // anchor names
-    boxes: OpenAreaBox[];
-    note?: string;
-}
-
-interface QuestRegionsFile {
-    anchors: Record<string, AnchorDef>;
-    alwaysConnected: { from: string; to: string; note?: string }[];
-    /** Curated traversable areas: every region intersecting the boxes is treated as
-     *  mutually connected and connected to the named anchors. For quest gauntlets
-     *  whose internal transitions are bespoke handlers (agility obstacles, scripted
-     *  gates, dialogue hops) - by construction NEVER in the ladders+stairs shuffle
-     *  pool, so their vanilla connectivity is seed-independent; item/level needs are
-     *  narrative-only per the sim's documented policy. */
-    openAreas?: OpenArea[];
-    quests: Record<string, { requiredAnchors: string[]; notes?: string }>;
-    goals: Record<string, { requiredAnchors: string[]; notes?: string }>;
-    /** Review lever over quest-regions.generated.json - see GeneratedQuestRegions.ts. */
-    generated?: GeneratedIgnores;
-}
-
-// Regions larger than this are never open-area members: upper levels have
-// world-spanning walkable "void/roof" megaregions (e.g. the 1.1M-tile level-3 one)
-// that a box overlapping them by a tile would otherwise connect globally. The largest
-// legitimate quest area (Kharazi underground) is ~40k tiles.
-const OPEN_AREA_MEMBER_TILE_CAP = 100000;
-
-/** Region ids intersecting an open area's boxes. */
-function resolveOpenAreaMembers(area: OpenArea, graph: RegionGraph): Set<number> {
-    const members = new Set<number>();
-    for (const box of area.boxes) {
-        for (const level of box.levels) {
-            for (let x = box.x1; x <= box.x2; x++) {
-                for (let z = box.z1; z <= box.z2; z++) {
-                    const id = graph.regionAt(x, z, level);
-                    if (id !== 0 && (graph.regionsById.get(id)?.tileCount ?? 0) <= OPEN_AREA_MEMBER_TILE_CAP) {
-                        members.add(id);
-                    }
-                }
+    }
+    const swap = new Map<string, string>();
+    for (const fname of ['ap-gather.json', 'ap-process.json']) {
+        const file = path.join(configDir, fname);
+        if (!fs.existsSync(file)) {
+            continue;
+        }
+        const map = (JSON.parse(fs.readFileSync(file, 'utf8')) as { map?: Record<string, number> }).map ?? {};
+        for (const [fromId, toId] of Object.entries(map)) {
+            const from = idToName.get(parseInt(fromId, 10));
+            const to = idToName.get(toId);
+            if (from && to) {
+                swap.set(from, to);
             }
         }
     }
-    return members;
+    return swap.size > 0 ? swap : null;
 }
 
-function loadQuestRegions(): QuestRegionsFile {
-    return JSON.parse(fs.readFileSync(QUEST_REGIONS_PATH, 'utf8'));
-}
-
-// ---- curated varp resolvers for ap-gated-areas.json's `{varp,gte}` require form.
-// These names come straight from the shipped ap-gated-areas.json's "derivation" fields
-// (Workstream A) - "qp" is generic and always tracked; the rest are area-specific
-// persistent-flag varps this tool doesn't have direct visibility into, so they're
-// mapped to the nearest equivalent state this simulation DOES track. Curated and
-// growable, same pattern as quest-regions.json - an unrecognized varp name falls back
-// to 0 (fail-closed) via GatedAreas.ts's requireSatisfied. ----
-
-function resolveVarp(name: string, qp: number, completed: Set<string>, statCaps: Map<string, number>): number | undefined {
-    switch (name) {
-        case 'qp':
-            return qp;
-        case 'heroquest': // Heroes' Guild gate; heroquest>=15 in vanilla means Heroes' Quest complete.
-            return completed.has('hero') ? 999 : 0;
-        case 'legendsquest': // Legends' Guild gate; legendsquest>=75 means Legends' Quest complete.
-            return completed.has('legends') ? 999 : 0;
-        case 'prayer_guild': // Not a quest at all - set permanently once base Prayer >= 31 (Abbot Langley dialogue).
-            return (statCaps.get('prayer') ?? 99) >= 31 ? 1 : 0;
-        default:
-            return undefined; // unknown varp -> requireSatisfied treats as 0 (fail-closed).
+// loads tools/logic/data/<fname> as item -> [provider npc debugnames] (shop owners for
+// buy-sources.json, monsters for drop-sources.json). Absent => empty.
+function loadItemProviders(fname: string): Map<string, string[]> {
+    const file = path.join('tools', 'logic', 'data', fname);
+    const map = new Map<string, string[]>();
+    if (!fs.existsSync(file)) {
+        return map;
     }
-}
-
-// ---- quest requirement checks (small reimplementation of Engine.ts's private
-// skillsSatisfied/questsSatisfied/qpSatisfied - those aren't exported from
-// tools/sim/Engine.ts, and the design brief asks this tool to "steal patterns, don't
-// import [sim's engine] code unless clean" since region-awareness changes the shape of
-// the fixpoint enough that sharing the loop itself isn't a clean fit). ----
-
-function skillsSatisfied(skills: Partial<Record<StatName, number>> | undefined, caps: Record<StatName, number>): boolean {
-    if (!skills) {
-        return true;
-    }
-    for (const [stat, level] of Object.entries(skills) as [StatName, number][]) {
-        if (caps[stat] < level) {
-            return false;
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+    for (const [item, npcs] of Object.entries(raw)) {
+        if (!item.startsWith('_') && Array.isArray(npcs)) {
+            map.set(item, npcs.map(String));
         }
     }
-    return true;
-}
-
-function questsChainSatisfied(quests: string[] | undefined, questsAny: string[][] | undefined, completed: Set<string>): boolean {
-    if (quests && !quests.every(id => completed.has(id))) {
-        return false;
-    }
-    if (questsAny && !questsAny.every(group => group.some(id => completed.has(id)))) {
-        return false;
-    }
-    return true;
+    return map;
 }
 
 function regionsSatisfied(requiredAnchors: string[] | undefined, anchorRegions: Map<string, number>, reachableRegions: Set<number>): boolean {
@@ -301,11 +205,36 @@ function main(): void {
     const gated = loadGatedAreas(CONFIG_DIR);
     const resolvedAreas = resolveGatedAreas(gated.areas, graph);
 
-    const qr = loadQuestRegions();
-    const anchorRegions = new Map<string, number>();
-    for (const [name, def] of Object.entries(qr.anchors)) {
-        anchorRegions.set(name, graph.resolveRegion({ level: def.level, x: def.x, z: def.z }));
+    // Item-acquisition graph (problems.txt #16): item -> how it's gathered/processed, so a
+    // quest that needs a gathered/processed item gates on the required skill instead of the
+    // sim assuming every item is free. Static game data (tools/logic/data/), absent =>
+    // empty => every item assumed obtainable (exact prior behaviour). itemSources applies
+    // any gathersanity/processsanity swap so obtainability reflects the shuffled world.
+    const itemSources = applySwaps(stampQuestGates(loadItemSources()), loadGatherProcessSwaps(CONFIG_DIR));
+    // add the BUY (shop-owner region) and DROP (monster region) sources - the four-source
+    // OR model. item->provider-npc data is static (tools/logic/data/), resolved to a region
+    // via the npc spawn map + region graph. Absent files => gather/process only.
+    {
+        const npcSpawns = loadNpcSpawns();
+        const resolveNpcRegion = (coord: string): number => {
+            const [level, mapX, mapZ, localX, localZ] = coord.split('_').map(Number);
+            return graph.resolveRegion({ level, x: mapX * 64 + localX, z: mapZ * 64 + localZ });
+        };
+        addRegionSources(itemSources, loadItemProviders('shop-sources.json'), npcSpawns, resolveNpcRegion, 'buy');
+        addRegionSources(itemSources, loadItemProviders('drop-sources.json'), npcSpawns, resolveNpcRegion, 'drop');
     }
+    const questItems = loadQuestItems();
+    let obtainable = new Set<string>(); // recomputed each sphere from current statCaps
+    // only GATHER/PROCESS-sourced quest needs are gated (buy/drop/given/quest items are
+    // assumed available - we never invent a gate we can't prove). itemAvailable's
+    // "unmodelled => true" rule is the second guard.
+    const questItemsSatisfied = (id: string): boolean =>
+        (questItems.get(id) ?? [])
+            .filter(n => (n.obtained === 'gather' || n.obtained === 'process'))
+            .every(n => itemAvailable(n.item, itemSources, obtainable));
+
+    const qr = loadQuestRegions(QUEST_REGIONS_PATH);
+    const anchorRegions = resolveAnchors(qr, graph);
     const openAreas = (qr.openAreas ?? []).map(area => ({ area, members: resolveOpenAreaMembers(area, graph) }));
 
     // Extracted quest spatial requirements (quest-regions.generated.json) - every
@@ -317,16 +246,17 @@ function main(): void {
     // quest script edges + quest-agnostic world edges, minus vanilla transitions the
     // seed's overrides replaced (their trigger runs the override, not the case body).
     const overriddenTriggers = new Set(entranceEdges.map(e => e.key.split(':')[0]));
-    // Optimistic extracted edges must never bypass the curated area-gate model: any
-    // edge INTO a gated area's interior regions is dropped (step 3 of the fixpoint is
-    // the sole authority on entering those; leaving them stays fine).
-    const gatedInterior = new Set<number>();
-    for (const ra of resolvedAreas) {
-        for (const id of ra.gatedRegionIds) {
-            gatedInterior.add(id);
-        }
-    }
-    const scriptEdges = (generated ? [...collectScriptEdges(generated), ...usableWorldEdges(generated, overriddenTriggers)] : []).filter(se => !gatedInterior.has(se.toRegion));
+    // Extracted edges into a gated area's interior must not BYPASS the gate - but they
+    // must not be DROPPED either (dropping them severs a room's own internal connectivity,
+    // e.g. the stair from the Black Arm hideout up to its weapon cupboard, which strands
+    // multi-floor quest interiors under the expanded gated-area set - see GitHub #16).
+    // Instead we ATTACH the area's requirement to the edge: the internal stair works once
+    // the gate is met, so the whole room (all floors) reconnects, and the gate is still
+    // enforced. region id -> its gated area's require.
+    const gatedRegionRequire = gatedRegionRequires(resolvedAreas);
+    const scriptEdges: { fromRegions: number[]; toRegion: number; require?: GatedAreaRequire }[] =
+        (generated ? [...collectScriptEdges(generated), ...usableWorldEdges(generated, overriddenTriggers)] : [])
+            .map(se => gatedRegionRequire.has(se.toRegion) ? { ...se, require: gatedRegionRequire.get(se.toRegion) } : se);
 
     function unsatisfiedGroups(id: string, reachable: Set<number>): RequirementGroup[] {
         const groups = generatedGroups.get(id);
@@ -380,19 +310,27 @@ function main(): void {
     let sphere = 0;
 
     function heldItems() {
-        // Item requirements are treated as always-satisfiable (narrative-only), matching
-        // tools/sim/Engine.ts's documented policy - no quest or gated area in this
-        // dataset currently needs a real gathersanity/processsanity item-swap check
-        // (verified during that tool's build; the mechanism stays a ready extension
-        // point there, not here).
-        return { has: (_item: string) => true };
+        // Item obtainability now MODELLED (problems.txt #16): an item is available iff it's
+        // not a gathered/processed item (assumed obtainable - shop/drop/given/misc) OR its
+        // gather/process chain is reachable under the current skill caps. `obtainable` is
+        // the current-sphere fixpoint. Absent item-sources.json => every item unmodelled =>
+        // always true (exact prior narrative-only behaviour).
+        return { has: (item: string) => itemAvailable(item, itemSources, obtainable) };
     }
+
+    // every varp any gated-area OR entrance-edge require references - resolved fresh each
+    // sphere from the current quest/qp/skill state. Data-driven so new gates in the config
+    // need no code change here (only VARP_TO_QUEST needs the varp->quest line if it's new).
+    const neededVarps = collectRequiredVarps([
+        ...resolvedAreas.map(ra => ra.area.require),
+        ...entranceEdges.flatMap(e => (e.require ? [e.require] : []))
+    ]);
 
     function buildCtx(): RequireContext {
         return {
             varps: new Map(
-                ['qp', 'heroquest', 'legendsquest', 'prayer_guild']
-                    .map(name => [name, resolveVarp(name, qp, completed, statCapsLower)] as const)
+                [...neededVarps]
+                    .map(name => [name, resolveVarp(name, qp, completed, statCaps, statCapsLower, questsById)] as const)
                     .filter((e): e is [string, number] => e[1] !== undefined)
             ),
             heldItems: heldItems(),
@@ -428,6 +366,10 @@ function main(): void {
 
     for (;;) {
         let changed = false;
+        // recompute item obtainability from the current (growing) skill caps AND reachable
+        // regions before this sphere's gates/quests consult it (buy/drop sources gate on
+        // region reachability, so obtainability grows as the map opens up).
+        obtainable = computeObtainable(itemSources, statCaps, reachableRegions, completed);
         const ctx = buildCtx();
 
         // 1. entrance edges (gated or not).
@@ -465,6 +407,9 @@ function main(): void {
         for (const se of scriptEdges) {
             if (reachableRegions.has(se.toRegion) || !se.fromRegions.some(r => reachableRegions.has(r))) {
                 continue;
+            }
+            if (se.require && !requireSatisfied(se.require, ctx)) {
+                continue; // edge enters a gated interior - gate must be met (matches the runtime bounce)
             }
             reachableRegions.add(se.toRegion);
             changed = true;
@@ -513,6 +458,7 @@ function main(): void {
                 skillsSatisfied(q.skills, statCaps) &&
                 qp >= (q.requiredQp ?? 0) &&
                 questsChainSatisfied(q.quests, q.questsAny, completed) &&
+                questItemsSatisfied(q.id) &&
                 (q.gateKey === undefined || (placementCounts.get(q.gateKey) ?? 0) >= 1) &&
                 regionsSatisfied(qr.quests[q.id]?.requiredAnchors, anchorRegions, reachableRegions) &&
                 unsatisfiedGroups(q.id, reachableRegions).length === 0

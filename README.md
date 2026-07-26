@@ -103,6 +103,10 @@ game: 2004Scape
   extra_goals: []          # e.g. ["kbd"] - ALL listed goals also required for victory
   progressive_quests: false # one difficulty-ordered "Progressive Quest Unlock" item instead of 61 named ones
   music_checks: false      # 230 extra "first visit to each music region" checks
+  gather_speed: 200        # mining/woodcutting/fishing success rate, % of vanilla (100 = untouched)
+  region_logic: true       # default. Archipelago reasons about where things physically are,
+                           # and rolls the world (entrances, gathering, processing, shops,
+                           # drops, spawn) itself so the fill matches what you will play.
 ```
 
 `name:` is your **slot name** in the multiworld - it's how the game server
@@ -158,6 +162,37 @@ tar -xf output\AP_<id>.zip -C output AP_<id>.archipelago
 Leave that terminal running. Server state lives in `output/AP_<id>.apsave` next
 to the multidata - delete it to reset the run, regenerate for a new seed.
 
+#### The spoiler log
+
+The same zip also holds `AP_<id>_Spoiler.txt` - pull it out the same way
+(`unzip -o output/AP_<id>.zip -d output "*Spoiler.txt"`, or Windows
+`tar -xf output\AP_<id>.zip -C output AP_<id>_Spoiler.txt`). No extra flag is
+needed: Archipelago's shipped `host.yaml` defaults to `spoiler: 3`, which is
+the full log including the playthrough. (`--spoiler 0` turns it off, `1` drops
+the playthrough.)
+
+Alongside AP's own sections (options, every location's contents, the
+sphere-by-sphere playthrough), 2004Scape writes **the world it rolled** - none
+of which Archipelago could report on its own:
+
+```
+World seed:                      2769643227
+Home / spawn:                    Varrock (0_50_53_13_32)
+Entrance layout:                 736 redirect(s), 709/736 pool sides reachable
+Gathering swaps:                 38 (shuffle, 1 pinned vanilla)
+Processing swaps:                252 (shuffle, 0 pinned vanilla)
+Shops relocated:                 113
+Drop tables mimicked:            95 monster(s)
+```
+
+followed by the full tables - every gathering/processing swap
+(`coal -> charcoal`), every shop relocation (`bob now stocks miningstore`),
+every drop table (`_chicken drops like black_knight_drops`, or per-slot
+`brawling_bandit (rare): iron_scimitar -> firerune` in tiered/chaos mode), and
+every entrance redirect. Reading it spoils the run completely, which is the
+point - it is the reference for "is this seed doing what I asked", and the
+first thing to attach to a bug report.
+
 ### 5. Per run (Archipelago): connect, THEN roll the seed, then play
 
 1. Start the game server as usual (`cd Server/engine && npx tsx src/app.ts`,
@@ -180,6 +215,15 @@ to the multidata - delete it to reset the run, regenerate for a new seed.
    owns item placements; the server rewrites the file with the room's quest
    gates when it reconnects). Then **restart the game server**; it reconnects
    to the room on boot.
+
+   What "matches what the YAML asked for" means is stronger than it sounds:
+   Archipelago rolled this world *during generation* so its fill could reason
+   about it, so the file pins **the seed itself**. Every randomizer the script
+   runs (gathering, processing, shops, drops, spawn) is deterministic, so it
+   reproduces Archipelago's tables exactly. Entrances skip the roll entirely -
+   that table arrives finished in `slot_data` and the client writes it on
+   connect. This is why rolling before connecting produces a *different world
+   from the one the multiworld was filled against*, and why the order matters.
 4. **Game client**: http://localhost:8080/rs2.cgi - play. The tracker shows
    map, discoveries, and unlocks as you go. Checks announce in chat as you
    complete them, received items apply immediately (gear tiers, skill caps,
@@ -303,8 +347,8 @@ same op2/op3 keys via the patched `stair_options`/`ladder_options` labels.
 Left vanilla on purpose: unpaired floor-shift halves (a one-way redirect on a house
 staircase breaks the "come back the way you came" guarantee), unpaired scanned
 placements (cellars whose surface entrance is a loc type we don't handle yet),
-quest-gated entrances, and Tutorial Island (mapsquare 48,48 -
-`PROTECTED_MAPSQUARES`).
+quest-gated entrances, and Tutorial Island (six mapsquares, read from the game's own
+`tutorial_island.dbrow` by `tools/shared/TutorialIsland.ts`).
 
 Reciprocity is guaranteed for every shuffled gate: the far side of wherever you land
 leads back to next to where you entered. Scanned-gate arrival tiles are the far
@@ -349,6 +393,21 @@ count, so it's independent sampling rather than a permutation of a fixed list).
 cd Server/engine && npx tsx tools/npc/RandomizeDrip.ts [--seed <number>] [--dry-run] [--mixed-gender] [--no-weapons] [--exclude <substr,substr,...>]
 cd Server/engine && npx tsx tools/pack/Build.ts
 ```
+
+If an NPC ends up looking broken, `AuditDripModels.ts` is the diagnostic:
+
+```
+cd Server/engine && npx tsx tools/npc/AuditDripModels.ts                   # whole pool: geometry, exclusions, review list
+cd Server/engine && npx tsx tools/npc/AuditDripModels.ts --npc bob         # one npc: vanilla -> current, with each model's geometry
+cd Server/engine && npx tsx tools/npc/AuditDripModels.ts --category man_legs
+```
+
+It reads the actual `.ob2` vertex bounds (`ModelGeometry.ts`) plus how vanilla wears
+each value, which is what the swap-pool exclusion rules in `NpcDripParser.ts` are
+derived from - a piece vanilla only ever layers on top of a real one, a piece that
+doesn't reach its category's ground line, or a torso mesh that includes a head all get
+gated out of the sample-into pools. Point `--npc` at whatever looked wrong and it names
+the model.
 
 ...then restart the server. First run backs up every vanilla `.npc` file under
 `content/.ap-backup/scripts/` (mirroring the same backup convention entrance
@@ -519,6 +578,12 @@ Tools (`overlays/engine/tools/drops/`):
   and `parseDeathDropSlots()` for the separate `death_drop` axis.
 - `RandomizeDrops.ts` - reassigns eligible slots' items (mode-dependent, see Scope
   below) and separately deranges `death_drop` values across every eligible NPC.
+- `CapDropRarity.ts` - the drop-RATE pass (no seed, no items): rewrites cascade
+  thresholds so no loot slot is rarer than `--min-rate` (default 1/32). Orthogonal to
+  every swap mode above and runs after them - see "Rarity cap" below.
+- `SimulateDrops.ts` - rolls one monster's real loot table N times and prints what fell
+  out, vanilla vs capped side by side. Writes nothing; the capped column is computed in
+  memory, so it's safe to run before or after the cap is applied.
 - `MimicTransform.ts` - everything specific to `--mode mimic`: parses each
   `[ai_queue3,...]` death handler out of the pristine backup, extracts its
   post-prologue loot into a `[label,ap_drops_<n>]` block in one generated file
@@ -533,6 +598,7 @@ Tools (`overlays/engine/tools/drops/`):
 
 ```
 cd Server/engine && npx tsx tools/drops/RandomizeDrops.ts [--seed <number>] [--dry-run] [--mode tiered|chaos|mimic] [--no-death-drop] [--exclude <substr,substr,...>]
+cd Server/engine && npx tsx tools/drops/CapDropRarity.ts [--min-rate 1/32] [--dry-run] [--exclude <substr,substr,...>]
 cd Server/engine && npx tsx tools/pack/Build.ts
 ```
 
@@ -577,13 +643,101 @@ unit's label, or falls through to its untouched vanilla loot on a miss.
   source table's npc display name, also recorded as `nowName` in the spoiler). Only
   redirected kills print - the vanilla fallthrough path is silent.
 
+### Rarity cap (GitHub #11)
+
+`CapDropRarity.ts` guarantees no monster loot slot is rarer than `--min-rate` (default
+1/32 ≈ 3.1%). Vanilla rates go down to 1/512, and in a randomizer a required item can
+end up behind exactly one of those rolls - which is a wall, not a check. It is a
+rate-only pass: it rewrites `if ($random < N)` thresholds and never touches which item
+sits in a slot, so it composes with `tiered`/`chaos`/`mimic` in either order and needs
+no seed (it is fully deterministic). Run it after `RandomizeDrops.ts`, then rebuild the
+pack; `RegenerateAll.ts` does this for you (`--skip-rarity-cap` opts out, `--min-rate`
+passes through). Spoiler is `engine/tools/drops/drop-rarity-cap.json`.
+
+Where the extra probability comes from - the actual design decision, since a floor is
+not free:
+
+1. the cascade's no-drop tail (rolls above the last threshold) is spent first, down to
+   zero if needed;
+2. the remainder comes proportionally out of the branches already at or above the
+   floor, never pushing any of them below it.
+
+Step 2 is not optional: 46 of the 63 vanilla cascades need more than their entire
+no-drop tail to floor everything, and 9 of those (black demon, blue/green/red dragon,
+imp, fire giant, guard, chaos dwarf, kalphite queen) have no tail at all - their
+cascades already cover the full denominator. The visible cost is that common slots (coins, low-tier junk) shrink by
+roughly 15-25% in a typical table. Vanilla rarity ORDER is preserved: donors shrink in
+proportion to their surplus, so a 20% slot stays rarer than a 30% one.
+
+Applied to the vanilla corpus at 1/32 this raises 721 of 1212 branches across 62 of the
+63 cascades (chicken's two-branch table is already above the floor). Notable results:
+bandit's 1/128 steel axe becomes 4/128; werewolf's 1/512 `~randomjewel` becomes 16/512;
+imp's 32-branch table becomes exactly uniform at 4/128 each - 32 branches at a 1/32
+floor is the arithmetic limit, and imp is the one table that hits it.
+
+- The unit is the cascade BRANCH, not the item slot: a branch fires as a whole, and a
+  few branches hold two mutually-exclusive `obj_add` calls behind a `map_members` check.
+- Branches that call a shared proc (`~randomherb`, `~randomjewel`, `~ultrarare_getitem`)
+  are floored like any other branch - the pass has no opinion on what the proc returns.
+  The procs' own internal tables are NOT capped (they use an assignment form,
+  `$random = random(128)`, that isn't a cascade for parsing purposes) except
+  `megararetable`, which is a real `def_int` cascade and does get capped.
+- Vanilla's one explicit "nothing dropped" branch (guard.rs2) is not a drop, so it is
+  never floored - it donates like any above-floor branch.
+- In mimic mode the generated `ap_mimic.rs2` is capped too (that's where the loot tables
+  that actually run live); the cascades left behind in the handlers are the no-override
+  fallback and get capped as well.
+- If a cascade can't fit the floor inside its own denominator, the whole cascade is
+  scaled up (`random(6)` -> `random(24)`) rather than distorted. No vanilla cascade needs
+  this at 1/32; a coarser `--min-rate` can. A cascade with more drop branches than the
+  floor allows (>32 at 1/32) is impossible by arithmetic - it warns and stays vanilla.
+
+### Seeing it: the drop simulator
+
+```
+cd Server/engine && npx tsx tools/drops/SimulateDrops.ts <npc> [--kills 10000] [--seed <n>] [--min-rate 1/32] [--live] [--list]
+```
+
+Rolls that monster's actual cascade `--kills` times and prints the result twice - vanilla
+weights and capped weights, same seed, so the only thing that differs between the columns
+is the table:
+
+```
+$ npx tsx tools/drops/SimulateDrops.ts werewolf --kills 5000
+_werewolf (werewolf.rs2, vanilla backup) - 5,000 kills, seed 777, floor 1/32
+
+drop                            VANILLA                  CAPPED
+                       rate     sim   count       rate     sim   count
+~randomjewel          1/512   0.18%       9       1/32   3.24%     162
+rune_med_helm       1/170.7   0.52%      26       1/32   3.24%     162
+mithril_chainbody    1/51.2   1.68%      84       1/32   2.74%     137
+steel_scimitar         1/16   6.30%     315     1/18.3   5.62%     281
+coins                 1/3.2  32.00%    1600      1/3.7  27.74%    1387
+
+rarest drop: 1/512 -> 1/32; drops rarer than 1/32: 9 -> 0
+nothing at all: 0.59% -> 0.00% of kills
+```
+
+`--live` reads the installed content instead of the vanilla backup (including
+`ap_mimic.rs2`), which is how you check what a running server would actually give you.
+`--list` prints all 63 tables. `rate` is the table's exact odds and `sim`/`count` are the
+simulated results, so the two agreeing is the sim checking itself.
+
+Rows are one cascade BRANCH each, which is why a `~randomherb` branch shows as a single
+outcome (the proc's own table is out of scope for the cap) and why a `map_members`
+branch shows as `bloodrune | body_talisman` - one roll, two possible items. `death_drop`
+(bones/ashes) is reported separately when the npc config resolves, since it's guaranteed
+and outside the roll.
+
 ### Scope
 
 Only the 73-file monster drop-table corpus and the `death_drop` npc param are in
 scope - the shared reward sub-tables called via `~procname` (`~randomherb`,
 `~randomjewel`, `~ultrarare_getitem`, `~megararetable`, `~randomjunk` in
 `shared_droptables.rs2`) and any `obj_add(...)` drops outside that folder (quest/area
-scripts) are deliberately left untouched.
+scripts) are deliberately left untouched. (Scope here means WHICH ITEM sits in a slot -
+the rarity cap above is a rate-only pass with its own, slightly wider scope: it also
+floors `megararetable`'s branches.)
 
 `--mode` picks how a slot's replacement item is sampled (kept as a flag rather than one
 fixed design, since it's intended to become an Archipelago per-slot option):
@@ -662,6 +816,12 @@ rewrites a JSON table and needs a server restart only, no pack rebuild. Deleting
   the game's own data (`mine.dbrow` rock_output, `trees.dbrow` product,
   `~fish_roll`/`~fish_roll_loc` call-site literals + the big-net wraps), writes the
   JSON table and a spoiler at `engine/tools/gather/gather-seed.json`.
+- `overlays/engine/tools/gather/FishingLevels.ts` - the level side of that pool.
+  Mining and woodcutting state their requirement in a dbrow column; fishing has no
+  product table at all, so this walks the spot scripts' `stat(fishing) < N` /
+  `>= N` guards (including the one that hides behind
+  `~oil_rod_fishing_check_requirements`) and reports the level each fish first
+  becomes catchable at. Only `--mode tiered` uses it.
 - `::apgather <item_debugname>` test command (e.g. `::apgather logs`) - prints what a
   product is randomized into, via the same engine lookup the skill scripts use.
 
@@ -669,7 +829,7 @@ rewrites a JSON table and needs a server restart only, no pack rebuild. Deleting
 
 ```
 cd ../Server/engine
-npx tsx tools/gather/RandomizeGathering.ts [--seed <n>] [--mode shuffle|chaos]
+npx tsx tools/gather/RandomizeGathering.ts [--seed <n>] [--mode shuffle|tiered|chaos]
     [--skills mining,fishing,woodcutting] [--exclude <item,...>]
     [--pin-quest-items] [--no-quest-pins] [--dry-run]
 ```
@@ -677,6 +837,11 @@ npx tsx tools/gather/RandomizeGathering.ts [--seed <n>] [--mode shuffle|chaos]
 - `shuffle` (default): one derangement across the combined ~39-product pool - a
   bijection, so every product is still obtainable from exactly one gathering action
   and nothing maps to itself. Seed 777: 38 swapped, 30 land cross-skill.
+- `tiered`: the same derangement run separately inside each **progression band**
+  (`lvl1-14`, `lvl15-29`, `lvl30-44`, `lvl45-59`, `lvl60-74`, `lvl75+` - see
+  [Progression bands](#progression-bands-mode-tiered)). Still cross-skill and still a
+  bijection, but a level-1 fish can only become a level-1 ore or log and Runite stays
+  behind something you actually need 75+ for. Seed 424242: 38 swapped, 26 cross-skill.
 - `chaos`: every product independently resamples from the pool - duplicates allowed,
   so some products can become unobtainable from gathering entirely.
 - `--skills` restricts which skills join the pool; unselected skills stay vanilla.
@@ -684,9 +849,9 @@ npx tsx tools/gather/RandomizeGathering.ts [--seed <n>] [--mode shuffle|chaos]
 **Quest-critical pinning is mode-aware**, unlike drop randomization's always-on pin:
 the `inv_total`/`inv_del` gating scan flags 16 of the 39 products (every log type,
 most basic ores) because common gathering products gate quests constantly. Shuffle
-mode doesn't pin by default - it's a bijection, everything stays obtainable, a quest
-just needs its item gathered from a different action (the spoiler says which). Chaos
-genuinely can orphan a product, so it pins by default. Override with
+and tiered don't pin by default - they're bijections, everything stays obtainable, a
+quest just needs its item gathered from a different action (the spoiler says which).
+Chaos genuinely can orphan a product, so it pins by default. Override with
 `--pin-quest-items` / `--no-quest-pins`.
 
 ### Scope
@@ -743,7 +908,7 @@ processing.
 
 ```
 cd ../Server/engine
-npx tsx tools/process/RandomizeProcessing.ts [--seed <n>] [--mode shuffle|chaos]
+npx tsx tools/process/RandomizeProcessing.ts [--seed <n>] [--mode shuffle|tiered|chaos]
     [--skills cooking,smithing,crafting,fletching] [--exclude <item,...>]
     [--pin-quest-items] [--no-quest-pins] [--dry-run]
 ```
@@ -751,15 +916,19 @@ npx tsx tools/process/RandomizeProcessing.ts [--seed <n>] [--mode shuffle|chaos]
 - `shuffle` (default): one derangement across the combined ~253-product pool - a
   bijection, so every product is still obtainable from exactly one processing action
   and nothing maps to itself. Seed 777: 253 swapped, 160 land cross-skill.
+- `tiered`: the same derangement run separately inside each **progression band** (see
+  [Progression bands](#progression-bands-mode-tiered)), so a level-1 recipe yields
+  another level-1 product and rune gear stays behind a 75+ recipe. Seed 424242: 252
+  swapped, 148 cross-skill, across bands of 63/41/42/29/27/50 products.
 - `chaos`: every product independently resamples from the pool - duplicates allowed,
   so some products can become unobtainable from processing entirely.
 - `--skills` restricts which skills join the pool; unselected skills stay vanilla.
 
-**Quest-critical pinning is mode-aware**, same reasoning as gathering: shuffle
-doesn't pin by default (it's a bijection - everything stays obtainable, a quest just
-needs its item made by a different recipe), chaos pins by default (independent
-resampling can genuinely orphan a product). Override with `--pin-quest-items` /
-`--no-quest-pins`.
+**Quest-critical pinning is mode-aware**, same reasoning as gathering: shuffle and
+tiered don't pin by default (both are bijections - everything stays obtainable, a
+quest just needs its item made by a different recipe), chaos pins by default
+(independent resampling can genuinely orphan a product). Override with
+`--pin-quest-items` / `--no-quest-pins`.
 
 ### Scope
 
@@ -777,6 +946,136 @@ true final `inv_add` in each of those files. Only the item identity is wrapped -
 quantities are untouched, so a recipe slot that hands out 5 of its product (the
 metal-tier knives, `nails`) still hands out 5 of whatever it got swapped to; same
 "structure stays put, content moves" philosophy as tiered drop randomization.
+
+## Thieving randomization (pickpocketing / stalls / trapped chests)
+
+Shuffles what every thieving source actually hands the player - pick a man's pocket and
+get an adamantite ore, rob the gem stall and get a shark. Same runtime-override design
+as gathering/processing: reseeding rewrites a JSON table and needs a server restart
+only, no pack rebuild. Deleting `engine/data/config/ap-thieving.json` restores vanilla
+thieving.
+
+The survey step the issue asked for came back clean: **all three surfaces are
+dbtable-driven and the reward is a plain scalar item lookup**, not an inline
+`if ($random < N) obj_add(...)` cascade - so this is a runtime-override table, not a
+config mutation. All three reward cascades even live in one file.
+
+### Pieces
+
+- `overlays/engine/src/engine/ApThievingOverrides.ts` - runtime loader for
+  `engine/data/config/ap-thieving.json` (obj id -> obj id). Same vanilla-passthrough-
+  on-miss semantics as `ApGatherOverrides.ts`.
+- `ScriptOpcode.ts` / `ServerOps.ts` - `AP_THIEVING_SWAP = 1913`, declared in
+  `ap/ap.rs2` as `[command,ap_thieving_swap](obj $product)(namedobj)`.
+- A whole-file overlay of `skill_thieving/scripts/thieving.rs2`, with all three
+  reward chokepoints wrapped as `inv_add(inv, ap_thieving_swap($reward), n)`:
+  `pick_pocket_check_for_reward`, `stealing_check_for_reward` and
+  `trapped_chest_check_for_reward` (1 each). Each wrap sits **inside** the vanilla
+  `if ($roll >= $denominator)` rarity branch, so the drop rate still decides *if* you
+  get something and only *what* you get moves - nothing is revealed for loot the
+  player never actually received.
+- `overlays/engine/tools/thieving/RandomizeThieving.ts` - builds the loot pool from
+  the game's own dbtable data (`pickpocket.dbrow`, `stealing.dbrow`,
+  `trapped_chest.dbrow`), writes the JSON table and a spoiler at
+  `engine/tools/thieving/thieving-seed.json`.
+- Tracker "Thieving" tab - rows read `Coins -> steals like -> Adamantite ore`,
+  revealed the first time you actually steal the item (the mimic-style presentation
+  the Bestiary's "smells like" already established).
+- `::apthieving <item_debugname>` test command (e.g. `::apthieving coins`) - prints
+  what a thieving reward is randomized into.
+
+### Usage
+
+```
+cd ../Server/engine
+npx tsx tools/thieving/RandomizeThieving.ts [--seed <n>] [--mode shuffle|tiered|chaos]
+    [--surfaces pickpocket,stalls,chests] [--exclude <item,...>]
+    [--pin-quest-items] [--no-quest-pins] [--dry-run] [--export-pool <path>]
+```
+
+- `shuffle` (default): one derangement across the combined 33-item pool - a bijection,
+  so every item is still stealable from exactly one source and nothing maps to itself.
+  Seed 777: 33 swapped, 18 land cross-surface.
+- `tiered`: the same derangement run separately inside each **progression band** (see
+  [Progression bands](#progression-bands-mode-tiered)), so a level-1 pocket yields
+  another level-1 item and the gem stall stays in the 75+ band. Seed 777 bands:
+  5/2/8/3/5/10 items.
+- `chaos`: every item independently resamples from the pool - duplicates allowed, so
+  some items can become unstealable entirely.
+- `--surfaces` restricts which surfaces join the pool; items only reachable through an
+  unselected surface stay vanilla.
+
+**Quest-critical pinning is mode-aware**, same reasoning as gathering/processing:
+shuffle and tiered don't pin by default (both are bijections), chaos pins by default.
+Override with `--pin-quest-items` / `--no-quest-pins`. Seed 777 with pins forced on:
+8 of 33 pinned (coins, lockpick, bread, earthrune, deathrune, cup_of_tea, silk,
+naturerune).
+
+### Scope
+
+The three loot-bearing surfaces: pickpocketing (13 `pickpocket.dbrow` rows covering
+~50 NPCs), market stalls (9 `stealing.dbrow` rows incl. the two Rellekka viking
+stalls) and trapped/locked chests (6 `trapped_chest.dbrow` rows). Everything else in
+`skill_thieving` stays vanilla by design: `locked_door.dbrow` (thieving doors have no
+loot, they only open), the `chest_steel_arrowtips` lockpick gate (a requirement, not a
+reward - its loot row is in the pool like every other chest), and every failure path
+(stun rolls, guard aggro, "Too late, they're dead.").
+
+Only the item identity moves. The rarity rolls, XP, respawn timers and chest teleport
+traps are untouched, and the stall's `"You steal <message>."` line plus its bread-only
+sound check both still read the **pre-swap** reward on purpose - "You steal some
+silk." while a raw shark lands in your pack is the reveal, exactly like gathering's
+"You manage to mine some coal." Quantities are untouched too, so the 1000-coin
+Ardougne chest hands out 1000 of whatever it got swapped to (`inv_add` fills what
+space there is for a non-stackable); `--exclude coins` is the escape hatch if a run
+wants the big-money rows left alone.
+
+**Not yet modelled in the apworld.** Local/solo mode is complete; the Archipelago fill
+does not yet reason about thieving-sourced items the way it does about
+gathering/processing (`randomizers.py`). `--export-pool` already emits the input that
+port needs - see the open follow-up in `docs/lessons-learned.md`.
+
+## Progression bands (`--mode tiered`)
+
+Gathering, processing and thieving all accept `--mode tiered`, which is shuffle mode
+confined to a level band: still a cross-skill derangement, still a bijection, but a product can
+only turn into a product of a comparable skill level. `overlays/engine/tools/shared/
+SkillTiers.ts` owns the bands and the shuffle all three tools call.
+
+| band | levels | why |
+| --- | --- | --- |
+| `lvl1-14` | 0-14 | bronze/iron era - shrimp, clay, plain logs |
+| `lvl15-29` | 15-29 | steel era - iron ore, oak, trout |
+| `lvl30-44` | 30-44 | mithril era - coal, willow, lobster |
+| `lvl45-59` | 45-59 | adamant era - mithril ore, maple, swordfish |
+| `lvl60-74` | 60-74 | yew/adamantite |
+| `lvl75+` | 75+ | rune era - runite ore, magic logs, shark |
+
+Fixed bands, not the percentile buckets tiered drop randomization uses: "rare" only
+means something relative to the rest of a loot table, but a skill level is an
+absolute number a player already thinks in, and fixed boundaries mean adding a product
+to the corpus can't silently reshuffle which band everything else lands in. Each band
+gets its own PRNG stream (`mulberry32(seed ^ hashKey(band))`), so widening one band
+later doesn't disturb the others.
+
+Every level is read out of the game's own data - `rock_level` / `levelrequired` /
+`level` columns for mining, woodcutting, cooking, smithing, crafting, fletching and
+all three thieving dbrows,
+the level embedded in `fletch_bow_table`'s `shortbow`/`longbow` tuple, and (fishing
+having no product table) the `stat(fishing)` guards in the spot scripts, parsed by
+`FishingLevels.ts`. A product made by several sources takes the LOWEST level that
+yields it - the level it first becomes reachable at. A missing level is a hard error,
+not a default: silently banding a level-85 product as level 1 is exactly the failure
+this mode exists to prevent.
+
+As a side effect this is the strongest mitigation available for the cross-skill quest
+risk: a low-level quest ingredient can only be re-keyed onto another low-level action,
+so no quest ends up gated behind a skill level the player has no business having yet.
+
+In Archipelago mode it's the `tiered` value of `gathering_randomization` /
+`processing_randomization`; the apworld replays the same per-band derangement from the
+`band` each product carries in the exported pool (`randomizers.py`), so its fill knows
+exactly what the server will hand out.
 
 ## Infinite run energy
 
@@ -829,18 +1128,37 @@ persist across reseeds indefinitely) or when reseeding everything for a fresh te
 `--seed` sets a shared default for all three tools; the per-tool `--*-seed` flags
 override it individually.
 
-## Archipelago integration (v1)
+## Archipelago integration (v2: region-aware)
 
 Real archipelago.gg multiworld support - full design in
 [docs/archipelago-integration.md](docs/archipelago-integration.md), apworld
-packaging/usage in [apworld/README.md](apworld/README.md). The moving parts:
+packaging/usage in [apworld/README.md](apworld/README.md).
 
-- `apworld/rs2004scape/` - the Python generation-side world (items, locations,
-  travel-agnostic rules ported from PlacementEngine). Zip it as
-  `rs2004scape.apworld` for an Archipelago install.
+**Two randomizers, one logic.** Local/solo seeds are made by generate-and-test:
+`RandomizeEntrances.ts` shuffles, `ValidateSeed.ts` grades, the loop rerolls
+until the seed is beatable (`--require-perfect`). Archipelago's fill runs once
+and cannot reroll, so AP mode is construct-valid instead - the apworld builds a
+reachability-preserving entrance layout itself and reasons over the same region
+/ gate / quest / item logic the local oracle uses. Both read one exported
+bundle, and `scripts/parity-check.py` fails if they ever disagree. The moving
+parts:
+
+- `apworld/rs2004scape/` - the Python generation-side world. `logic.py` is the
+  region fixpoint (a port of `ValidateSeed.ts`), `entrances.py` the
+  construct-valid entrance shuffle, `randomizers.py` the replay of every other
+  randomizer (gathering, processing, shops, drops, spawn) so the fill knows the
+  world it is filling. Zip it as `rs2004scape.apworld` for an Archipelago
+  install.
 - `overlays/engine/tools/ap/ExportApWorldData.ts` - generates the shared
   datapackage (`ap-archipelago-data.json` / `rs2004_data.json`); ids are
   append-only.
+- `overlays/engine/tools/ap/ExportLogicBundle.ts` - generates the shared logic
+  bundle (`ap-logic-bundle.json` / `rs2004_logic.json`): regions, gated areas,
+  the entrance pool, the item graph, the quest-doability varp model. Everything
+  region-shaped comes from `tools/logic/LogicModel.ts`, the same module
+  `ValidateSeed.ts` imports, so the two cannot drift.
+- `scripts/parity-check.py` - runs both implementations over the same seed and
+  diffs regions / quests / QP / goals.
 - `overlays/engine/src/engine/ApClient.ts` - the runtime AP WebSocket client.
   Enabled by `data/config/ap-archipelago.json` (`{"enabled": true, "host": ...,
   "port": 38281, "slot": "..."}`); inert without it. Fired checks go out as
@@ -850,6 +1168,13 @@ packaging/usage in [apworld/README.md](apworld/README.md). The moving parts:
 In AP mode the local GenerateSeed placement fill must NOT be active - the AP
 server owns all placements (ap-placements.json carries only slot_data's quest
 gates). Solo placement mode is unchanged when ap-archipelago.json is absent.
+
+With the default `region_logic: true`, Archipelago also owns the entrance
+layout: it arrives in `slot_data.entranceOverrides`, the client writes it to
+`data/config/ap-entrances.json` and hot-reloads it, and
+`seedOptions.entrances` arrives as `"off"` so the next seed roll leaves that
+map alone. Set `region_logic: false` to go back to the v1 contract (server-side
+entrance shuffle + travel-agnostic AP rules).
 
 ## License & credits
 

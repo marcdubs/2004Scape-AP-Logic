@@ -1,0 +1,1157 @@
+{
+  "seed": 424242,
+  "gather": {
+    "mode": "shuffle",
+    "table": {
+      "317": 353,
+      "321": 436,
+      "327": 1521,
+      "331": 345,
+      "335": 1515,
+      "341": 442,
+      "345": 383,
+      "349": 1517,
+      "353": 449,
+      "359": 434,
+      "363": 331,
+      "371": 3239,
+      "377": 453,
+      "383": 371,
+      "434": 327,
+      "436": 451,
+      "438": 1519,
+      "440": 349,
+      "442": 321,
+      "444": 1513,
+      "447": 335,
+      "449": 973,
+      "451": 2862,
+      "453": 317,
+      "668": 3211,
+      "973": 2148,
+      "1436": 438,
+      "1511": 3379,
+      "1513": 447,
+      "1515": 444,
+      "1517": 359,
+      "1519": 668,
+      "1521": 341,
+      "2148": 363,
+      "2862": 1436,
+      "3211": 377,
+      "3239": 440,
+      "3379": 1511
+    }
+  },
+  "gatherTiered": {
+    "mode": "tiered",
+    "table": {
+      "317": 1436,
+      "321": 440,
+      "327": 434,
+      "331": 444,
+      "335": 353,
+      "341": 321,
+      "345": 1511,
+      "349": 442,
+      "353": 349,
+      "359": 377,
+      "363": 371,
+      "371": 1517,
+      "377": 331,
+      "383": 1513,
+      "434": 668,
+      "436": 327,
+      "438": 973,
+      "440": 1521,
+      "442": 341,
+      "444": 453,
+      "447": 2148,
+      "449": 1515,
+      "451": 383,
+      "453": 1519,
+      "668": 438,
+      "973": 317,
+      "1436": 3211,
+      "1511": 345,
+      "1513": 451,
+      "1515": 449,
+      "1517": 3239,
+      "1519": 359,
+      "1521": 3379,
+      "2148": 363,
+      "2862": 436,
+      "3211": 2862,
+      "3239": 447,
+      "3379": 335
+    }
+  },
+  "process": {
+    "mode": "chaos",
+    "table": {
+      "39": 1093,
+      "40": 1428,
+      "41": 1289,
+      "42": 1105,
+      "43": 1293,
+      "44": 351,
+      "45": 1335,
+      "46": 3144,
+      "48": 347,
+      "50": 1127,
+      "54": 1371,
+      "56": 1087,
+      "58": 1607,
+      "60": 54,
+      "62": 1345,
+      "64": 1345,
+      "66": 1139,
+      "68": 1420,
+      "70": 1131,
+      "72": 2249,
+      "319": 1781,
+      "325": 1135,
+      "337": 1277,
+      "339": 2323,
+      "347": 1301,
+      "351": 867,
+      "355": 1375,
+      "379": 1137,
+      "385": 1321,
+      "391": 46,
+      "397": 2177,
+      "807": 48,
+      "808": 43,
+      "809": 1159,
+      "810": 1155,
+      "811": 2201,
+      "819": 1607,
+      "820": 1279,
+      "821": 325,
+      "822": 851,
+      "823": 1117,
+      "824": 1205,
+      "839": 1420,
+      "841": 355,
+      "843": 1607,
+      "845": 853,
+      "847": 1213,
+      "849": 821,
+      "851": 1129,
+      "853": 355,
+      "855": 1101,
+      "857": 339,
+      "859": 843,
+      "861": 325,
+      "863": 2323,
+      "864": 3369,
+      "865": 1325,
+      "866": 1359,
+      "867": 1422,
+      "868": 851,
+      "879": 64,
+      "880": 1289,
+      "881": 54,
+      "882": 853,
+      "884": 879,
+      "886": 1071,
+      "888": 66,
+      "890": 1615,
+      "892": 54,
+      "1059": 2489,
+      "1061": 1311,
+      "1063": 1183,
+      "1065": 892,
+      "1067": 1321,
+      "1069": 2495,
+      "1071": 1605,
+      "1073": 1293,
+      "1075": 2497,
+      "1079": 859,
+      "1081": 3381,
+      "1083": 839,
+      "1085": 1209,
+      "1087": 820,
+      "1091": 1083,
+      "1093": 1349,
+      "1095": 1355,
+      "1099": 3100,
+      "1101": 1173,
+      "1103": 821,
+      "1105": 3263,
+      "1109": 1147,
+      "1111": 3263,
+      "1113": 3263,
+      "1115": 1129,
+      "1117": 41,
+      "1119": 1085,
+      "1121": 40,
+      "1123": 1289,
+      "1127": 1865,
+      "1129": 1189,
+      "1131": 1329,
+      "1135": 1073,
+      "1137": 2493,
+      "1139": 39,
+      "1141": 1287,
+      "1143": 1083,
+      "1145": 1105,
+      "1147": 1211,
+      "1153": 1430,
+      "1155": 1117,
+      "1157": 3101,
+      "1159": 1315,
+      "1161": 890,
+      "1163": 1071,
+      "1167": 1355,
+      "1169": 2289,
+      "1173": 41,
+      "1175": 2011,
+      "1177": 1291,
+      "1181": 855,
+      "1183": 1291,
+      "1185": 1113,
+      "1189": 1321,
+      "1191": 881,
+      "1193": 1865,
+      "1197": 43,
+      "1199": 1315,
+      "1201": 1081,
+      "1203": 3101,
+      "1205": 70,
+      "1207": 339,
+      "1209": 385,
+      "1211": 1155,
+      "1213": 892,
+      "1277": 1349,
+      "1279": 3151,
+      "1281": 1607,
+      "1285": 1197,
+      "1287": 46,
+      "1289": 1363,
+      "1291": 1197,
+      "1293": 810,
+      "1295": 2487,
+      "1299": 1197,
+      "1301": 3100,
+      "1303": 1289,
+      "1307": 2489,
+      "1309": 1145,
+      "1311": 1615,
+      "1315": 1430,
+      "1317": 1357,
+      "1319": 2003,
+      "1321": 1428,
+      "1323": 843,
+      "1325": 855,
+      "1329": 809,
+      "1331": 1319,
+      "1333": 1603,
+      "1335": 1432,
+      "1337": 3263,
+      "1339": 855,
+      "1343": 2201,
+      "1345": 40,
+      "1347": 62,
+      "1349": 1143,
+      "1351": 867,
+      "1353": 1307,
+      "1355": 1432,
+      "1357": 879,
+      "1359": 845,
+      "1363": 1317,
+      "1365": 379,
+      "1369": 319,
+      "1371": 1331,
+      "1373": 2493,
+      "1375": 43,
+      "1420": 845,
+      "1422": 1279,
+      "1424": 2201,
+      "1428": 1363,
+      "1430": 1121,
+      "1432": 2197,
+      "1601": 1117,
+      "1603": 1099,
+      "1605": 1339,
+      "1607": 1343,
+      "1611": 325,
+      "1613": 2501,
+      "1615": 1289,
+      "1781": 1353,
+      "1861": 2197,
+      "1865": 1143,
+      "1891": 68,
+      "2003": 1329,
+      "2011": 1209,
+      "2070": 2289,
+      "2092": 1083,
+      "2140": 1430,
+      "2142": 41,
+      "2149": 1201,
+      "2173": 72,
+      "2177": 1073,
+      "2197": 1319,
+      "2201": 1073,
+      "2245": 1099,
+      "2249": 1067,
+      "2289": 68,
+      "2323": 819,
+      "2327": 3101,
+      "2343": 2140,
+      "2370": 1375,
+      "2487": 2197,
+      "2489": 868,
+      "2491": 859,
+      "2493": 1135,
+      "2495": 1213,
+      "2497": 1161,
+      "2499": 2011,
+      "2501": 1279,
+      "2503": 1307,
+      "3095": 1201,
+      "3096": 339,
+      "3097": 1173,
+      "3099": 1083,
+      "3100": 892,
+      "3101": 1075,
+      "3144": 1321,
+      "3146": 1101,
+      "3151": 3099,
+      "3263": 811,
+      "3369": 1295,
+      "3371": 1315,
+      "3373": 2092,
+      "3381": 1865
+    }
+  },
+  "processTiered": {
+    "mode": "tiered",
+    "table": {
+      "39": 864,
+      "40": 3373,
+      "41": 1081,
+      "42": 1159,
+      "43": 1185,
+      "44": 397,
+      "45": 1103,
+      "46": 1115,
+      "48": 806,
+      "50": 2070,
+      "54": 3371,
+      "56": 3381,
+      "58": 1891,
+      "60": 1325,
+      "62": 853,
+      "64": 888,
+      "66": 810,
+      "68": 3099,
+      "70": 1093,
+      "72": 861,
+      "315": 3095,
+      "319": 347,
+      "325": 3146,
+      "329": 351,
+      "333": 1335,
+      "337": 325,
+      "339": 1153,
+      "347": 1611,
+      "351": 1323,
+      "355": 1173,
+      "361": 365,
+      "365": 41,
+      "373": 64,
+      "379": 865,
+      "385": 1079,
+      "391": 2495,
+      "397": 3100,
+      "806": 315,
+      "807": 884,
+      "808": 1207,
+      "809": 1615,
+      "810": 1121,
+      "811": 1163,
+      "819": 1277,
+      "820": 845,
+      "821": 1365,
+      "822": 1343,
+      "823": 1357,
+      "824": 3101,
+      "839": 841,
+      "841": 1422,
+      "843": 56,
+      "845": 1607,
+      "847": 3097,
+      "849": 808,
+      "851": 2149,
+      "853": 2343,
+      "855": 2487,
+      "857": 1109,
+      "859": 1331,
+      "861": 1213,
+      "863": 1087,
+      "864": 3144,
+      "865": 1295,
+      "866": 1329,
+      "867": 1183,
+      "868": 2497,
+      "879": 1781,
+      "880": 1601,
+      "881": 1143,
+      "882": 1205,
+      "884": 1175,
+      "886": 849,
+      "888": 1428,
+      "890": 1071,
+      "892": 859,
+      "1059": 1375,
+      "1061": 1861,
+      "1063": 2201,
+      "1065": 1069,
+      "1067": 58,
+      "1069": 809,
+      "1071": 1211,
+      "1073": 1161,
+      "1075": 1349,
+      "1079": 1432,
+      "1081": 1281,
+      "1083": 1355,
+      "1085": 890,
+      "1087": 329,
+      "1091": 1301,
+      "1093": 2491,
+      "1095": 2327,
+      "1099": 1135,
+      "1101": 1075,
+      "1103": 2173,
+      "1105": 1067,
+      "1109": 1085,
+      "1111": 868,
+      "1113": 824,
+      "1115": 1169,
+      "1117": 3096,
+      "1119": 1065,
+      "1121": 66,
+      "1123": 1147,
+      "1127": 1333,
+      "1129": 2325,
+      "1131": 1279,
+      "1135": 2493,
+      "1137": 1191,
+      "1139": 3228,
+      "1141": 821,
+      "1143": 42,
+      "1145": 2489,
+      "1147": 385,
+      "1153": 1363,
+      "1155": 2249,
+      "1157": 1539,
+      "1159": 866,
+      "1161": 1303,
+      "1163": 72,
+      "1167": 1139,
+      "1169": 1157,
+      "1173": 819,
+      "1175": 54,
+      "1177": 1311,
+      "1181": 881,
+      "1183": 1123,
+      "1185": 1073,
+      "1189": 355,
+      "1191": 1605,
+      "1193": 847,
+      "1197": 1315,
+      "1199": 1201,
+      "1201": 1289,
+      "1203": 1293,
+      "1205": 2177,
+      "1207": 2370,
+      "1209": 1285,
+      "1211": 823,
+      "1213": 43,
+      "1277": 1941,
+      "1279": 339,
+      "1281": 46,
+      "1285": 1083,
+      "1287": 1430,
+      "1289": 1319,
+      "1291": 3151,
+      "1293": 863,
+      "1295": 379,
+      "1299": 1865,
+      "1301": 1127,
+      "1303": 1347,
+      "1307": 2309,
+      "1309": 1613,
+      "1311": 1424,
+      "1315": 1369,
+      "1317": 1373,
+      "1319": 811,
+      "1321": 50,
+      "1323": 1420,
+      "1325": 1141,
+      "1329": 1209,
+      "1331": 2501,
+      "1333": 1371,
+      "1335": 843,
+      "1337": 1059,
+      "1339": 3133,
+      "1343": 851,
+      "1345": 2503,
+      "1347": 1345,
+      "1349": 807,
+      "1351": 3125,
+      "1353": 886,
+      "1355": 1181,
+      "1357": 855,
+      "1359": 867,
+      "1363": 2003,
+      "1365": 1193,
+      "1369": 2011,
+      "1371": 1317,
+      "1373": 1113,
+      "1375": 882,
+      "1420": 333,
+      "1422": 3263,
+      "1424": 60,
+      "1428": 822,
+      "1430": 1197,
+      "1432": 1091,
+      "1539": 1603,
+      "1601": 1105,
+      "1603": 1353,
+      "1605": 820,
+      "1607": 1203,
+      "1609": 1794,
+      "1611": 2197,
+      "1613": 1101,
+      "1615": 1299,
+      "1781": 319,
+      "1794": 1291,
+      "1861": 2092,
+      "1865": 1119,
+      "1891": 3130,
+      "1941": 2140,
+      "2003": 1309,
+      "2011": 1145,
+      "2070": 3127,
+      "2092": 1307,
+      "2140": 1609,
+      "2142": 1129,
+      "2149": 62,
+      "2173": 1189,
+      "2177": 337,
+      "2197": 2245,
+      "2201": 2142,
+      "2245": 45,
+      "2249": 839,
+      "2289": 880,
+      "2309": 1321,
+      "2323": 361,
+      "2325": 1167,
+      "2327": 1117,
+      "2343": 373,
+      "2370": 2323,
+      "2487": 68,
+      "2489": 857,
+      "2491": 70,
+      "2493": 1099,
+      "2495": 892,
+      "2497": 1359,
+      "2499": 1287,
+      "2501": 44,
+      "2503": 1199,
+      "3095": 39,
+      "3096": 1095,
+      "3097": 1339,
+      "3099": 2499,
+      "3100": 391,
+      "3101": 1111,
+      "3125": 1337,
+      "3127": 879,
+      "3130": 1177,
+      "3133": 2289,
+      "3144": 1063,
+      "3146": 48,
+      "3151": 3369,
+      "3228": 1351,
+      "3263": 1155,
+      "3369": 1061,
+      "3371": 1137,
+      "3373": 1131,
+      "3381": 40
+    }
+  },
+  "spawn": {
+    "mode": "city",
+    "home": "0_50_53_13_32",
+    "label": "Varrock"
+  },
+  "shops": [
+    {
+      "npc": "zeke",
+      "was": "scimitarshop",
+      "now": "death_pub"
+    },
+    {
+      "npc": "generalshopkeeper3",
+      "was": "generalshop3",
+      "now": "lathastrainingstore"
+    },
+    {
+      "npc": "generalassistant3",
+      "was": "generalshop3",
+      "now": "shieldshop"
+    },
+    {
+      "npc": "gem_trader",
+      "was": "gemshop2",
+      "now": "axeshop"
+    },
+    {
+      "npc": "louie_legs",
+      "was": "legsshop",
+      "now": "battleaxeshop"
+    },
+    {
+      "npc": "ranael",
+      "was": "skirtshop",
+      "now": "chainmailshop"
+    },
+    {
+      "npc": "silver_merchant",
+      "was": "silverstall",
+      "now": "aprilfoolshorseshop"
+    },
+    {
+      "npc": "gem_merchant",
+      "was": "ardougnegemstall",
+      "now": "archeryshop"
+    },
+    {
+      "npc": "baker_merchant",
+      "was": "bakery",
+      "now": "helmetshop"
+    },
+    {
+      "npc": "spice_merchant",
+      "was": "spicestall",
+      "now": "adventurershop"
+    },
+    {
+      "npc": "fur_merchant",
+      "was": "furshop",
+      "now": "ranging_guild_bowshop"
+    },
+    {
+      "npc": "aemad",
+      "was": "adventurershop",
+      "now": "giannerestaurant"
+    },
+    {
+      "npc": "kortan",
+      "was": "adventurershop",
+      "now": "viking_furshop"
+    },
+    {
+      "npc": "zenesha",
+      "was": "topshop",
+      "now": "gemshop"
+    },
+    {
+      "npc": "fionella",
+      "was": "generallegends",
+      "now": "armourshop"
+    },
+    {
+      "npc": "siegfried_erkle",
+      "was": "legendsguildshop",
+      "now": "bakery"
+    },
+    {
+      "npc": "khazard_shopkeeper",
+      "was": "khazardshop",
+      "now": "ranging_guild_tribalshop"
+    },
+    {
+      "npc": "chadwell",
+      "was": "upassgeneralshop",
+      "now": "maceshop"
+    },
+    {
+      "npc": "peksa",
+      "was": "helmetshop",
+      "now": "generalshop7"
+    },
+    {
+      "npc": "alfonse_the_waiter",
+      "was": "karamja_fishrestaurant",
+      "now": "goldshop"
+    },
+    {
+      "npc": "davon",
+      "was": "amuletshop",
+      "now": "generalshop2"
+    },
+    {
+      "npc": "werewolfshopkeeper1",
+      "was": "werewolfstore1",
+      "now": "championshop"
+    },
+    {
+      "npc": "werewolfshopkeeper2",
+      "was": "werewolfstore2",
+      "now": "generalshop3"
+    },
+    {
+      "npc": "werewolfshopkeeper3",
+      "was": "werewolfgeneralstore",
+      "now": "gnomeshop_heck"
+    },
+    {
+      "npc": "arhein",
+      "was": "arheinstore",
+      "now": "herbloreshop2"
+    },
+    {
+      "npc": "candle_maker",
+      "was": "candleshop",
+      "now": "cookeryshop"
+    },
+    {
+      "npc": "hickton",
+      "was": "archeryshop2",
+      "now": "clotheshop"
+    },
+    {
+      "npc": "harry",
+      "was": "fishingshop2",
+      "now": "magearena_staffshop"
+    },
+    {
+      "npc": "lathas_shopkeeper",
+      "was": "lathastrainingstore",
+      "now": "taxfree"
+    },
+    {
+      "npc": "bedabin",
+      "was": "bedabincampshop",
+      "now": "mcannonshop"
+    },
+    {
+      "npc": "shantay",
+      "was": "shantayshop",
+      "now": "skirtshop"
+    },
+    {
+      "npc": "aprilfoolshorsesalesman",
+      "was": "aprilfoolshorseshop",
+      "now": "viking_weapons_shop"
+    },
+    {
+      "npc": "generalshopkeeper5",
+      "was": "generalshop5",
+      "now": "dragonswordshop"
+    },
+    {
+      "npc": "generalassistant5",
+      "was": "generalshop5",
+      "now": "fancyclothesstore"
+    },
+    {
+      "npc": "oziach",
+      "was": "runeplateshop",
+      "now": "swordshop"
+    },
+    {
+      "npc": "frincos",
+      "was": "herbloreshop2",
+      "now": "generalshop8"
+    },
+    {
+      "npc": "drogo",
+      "was": "miningstore",
+      "now": "ardougnegemstall"
+    },
+    {
+      "npc": "dwarven_shopkeeper",
+      "was": "generaldwarf",
+      "now": "runeplateshop"
+    },
+    {
+      "npc": "nurmof",
+      "was": "pickaxeshop",
+      "now": "generalshop5"
+    },
+    {
+      "npc": "generalshopkeeper4",
+      "was": "generalshop4",
+      "now": "topshop"
+    },
+    {
+      "npc": "generalassistant4",
+      "was": "generalshop4",
+      "now": "gnomeshop_gulluck"
+    },
+    {
+      "npc": "cassie",
+      "was": "shieldshop",
+      "now": "werewolfstore1"
+    },
+    {
+      "npc": "flynn",
+      "was": "maceshop",
+      "now": "bedabincampshop"
+    },
+    {
+      "npc": "wayne",
+      "was": "chainmailshop",
+      "now": "scimitarshop"
+    },
+    {
+      "npc": "herquin",
+      "was": "gemshop",
+      "now": "fishingguild"
+    },
+    {
+      "npc": "blurberrybarmen",
+      "was": "blurberrybar",
+      "now": "legendsguildshop"
+    },
+    {
+      "npc": "gnome_waiter",
+      "was": "giannerestaurant",
+      "now": "magearena_runeshop"
+    },
+    {
+      "npc": "gnome_hudo",
+      "was": "gnomeshop_hudo",
+      "now": "death_pub"
+    },
+    {
+      "npc": "gnome_rometti",
+      "was": "gnomeshop_rometti",
+      "now": "swordshop"
+    },
+    {
+      "npc": "gnome_gulluck",
+      "was": "gnomeshop_gulluck",
+      "now": "adventurershop"
+    },
+    {
+      "npc": "gnome_heckelfunch",
+      "was": "gnomeshop_heck",
+      "now": "fishingshop"
+    },
+    {
+      "npc": "treevillage_shopkeeper1",
+      "was": "gnomeshop",
+      "now": "shantayshop"
+    },
+    {
+      "npc": "generalshopkeeper7",
+      "was": "generalshop7",
+      "now": "generalshop4"
+    },
+    {
+      "npc": "generalassistant7",
+      "was": "generalshop7",
+      "now": "gnomeshop_rometti"
+    },
+    {
+      "npc": "zambo",
+      "was": "boozeshop",
+      "now": "runeshop"
+    },
+    {
+      "npc": "jiminua",
+      "was": "junglestore",
+      "now": "blurberrybar"
+    },
+    {
+      "npc": "jakut",
+      "was": "dragonswordshop",
+      "now": "khazardshop"
+    },
+    {
+      "npc": "irksol",
+      "was": "cheapringshop",
+      "now": "generalshop6"
+    },
+    {
+      "npc": "generalshopkeeper8",
+      "was": "generalshop8",
+      "now": "junglestore"
+    },
+    {
+      "npc": "generalassistant8",
+      "was": "generalshop8",
+      "now": "lighthouseshop"
+    },
+    {
+      "npc": "bob",
+      "was": "axeshop",
+      "now": "shilofishingshop"
+    },
+    {
+      "npc": "generalshopkeeper1",
+      "was": "generalshop1",
+      "now": "werewolfgeneralstore"
+    },
+    {
+      "npc": "generalassistant1",
+      "was": "generalshop1",
+      "now": "tbwt_tamayu_final_inventory"
+    },
+    {
+      "npc": "magearena_runeshop",
+      "was": "magearena_runeshop",
+      "now": "pickaxeshop"
+    },
+    {
+      "npc": "magearena_guardian",
+      "was": "magearena_staffshop",
+      "now": "generalshop7"
+    },
+    {
+      "npc": "wydin",
+      "was": "wydinstore",
+      "now": "herbloreshop"
+    },
+    {
+      "npc": "betty",
+      "was": "magicshop",
+      "now": "runiteshop"
+    },
+    {
+      "npc": "grum",
+      "was": "goldshop",
+      "now": "generalshop8"
+    },
+    {
+      "npc": "gerrant",
+      "was": "fishingshop",
+      "now": "dragonaxeshop"
+    },
+    {
+      "npc": "brian",
+      "was": "battleaxeshop",
+      "now": "silverstall"
+    },
+    {
+      "npc": "generalshopkeeper6",
+      "was": "generalshop6",
+      "now": "ranging_guild_armourshop"
+    },
+    {
+      "npc": "generalassistant6",
+      "was": "generalshop6",
+      "now": "gnomeshop"
+    },
+    {
+      "npc": "shilogeneralstore",
+      "was": "shilojunglestore",
+      "now": "tbwt_tiadeche_final_inventory"
+    },
+    {
+      "npc": "shilofishowner",
+      "was": "shilofishingshop",
+      "now": "magicshop"
+    },
+    {
+      "npc": "gaius",
+      "was": "2handedshop",
+      "now": "viking_general_store"
+    },
+    {
+      "npc": "jatix",
+      "was": "herbloreshop",
+      "now": "magicguildshop"
+    },
+    {
+      "npc": "valaine",
+      "was": "championshop",
+      "now": "werewolfstore2"
+    },
+    {
+      "npc": "scavvo",
+      "was": "runiteshop",
+      "now": "herbloreshopogre"
+    },
+    {
+      "npc": "aubury",
+      "was": "runeshop",
+      "now": "generalshop5"
+    },
+    {
+      "npc": "generalshopkeeper2",
+      "was": "generalshop2",
+      "now": "upassgeneralshop"
+    },
+    {
+      "npc": "generalassistant2",
+      "was": "generalshop2",
+      "now": "cheapringshop"
+    },
+    {
+      "npc": "thessalia",
+      "was": "clotheshop",
+      "now": "generalshopogre"
+    },
+    {
+      "npc": "horvik_the_armourer",
+      "was": "armourshop",
+      "now": "arheinstore"
+    },
+    {
+      "npc": "lowe",
+      "was": "archeryshop",
+      "now": "generalshop1"
+    },
+    {
+      "npc": "tailorp",
+      "was": "fancyclothesstore",
+      "now": "teashop"
+    },
+    {
+      "npc": "swordshop1",
+      "was": "swordshop",
+      "now": "gemshop2"
+    },
+    {
+      "npc": "swordshop2",
+      "was": "swordshop",
+      "now": "viking_clothes_shop"
+    },
+    {
+      "npc": "tea_seller",
+      "was": "teashop",
+      "now": "pizzabaseshop"
+    },
+    {
+      "npc": "fat_tony",
+      "was": "pizzabaseshop",
+      "now": "generalshop4"
+    },
+    {
+      "npc": "noterazzo",
+      "was": "taxfree",
+      "now": "fishingshop2"
+    },
+    {
+      "npc": "magic_store_owner",
+      "was": "magicguildshop",
+      "now": "spicestall"
+    },
+    {
+      "npc": "ogre_trader1",
+      "was": "generalshopogre",
+      "now": "generalshop2"
+    },
+    {
+      "npc": "ogre_merchant",
+      "was": "herbloreshopogre",
+      "now": "viking_fishmonger"
+    },
+    {
+      "npc": "frenita",
+      "was": "cookeryshop",
+      "now": "gnomeshop_hudo"
+    },
+    {
+      "npc": "helemos",
+      "was": "dragonaxeshop",
+      "now": "miningstore"
+    },
+    {
+      "npc": "boardgames_barmaid",
+      "was": "death_pub",
+      "now": "viking_bar"
+    },
+    {
+      "npc": "boardgames_barmaid2",
+      "was": "death_pub",
+      "now": "candleshop"
+    },
+    {
+      "npc": "ranging_guild_armour_salesman",
+      "was": "ranging_guild_armourshop",
+      "now": "legsshop"
+    },
+    {
+      "npc": "ranging_guild_bow_salesman",
+      "was": "ranging_guild_bowshop",
+      "now": "karamja_fishrestaurant"
+    },
+    {
+      "npc": "ranging_guild_tribal_salesman",
+      "was": "ranging_guild_tribalshop",
+      "now": "2handedshop"
+    },
+    {
+      "npc": "death_barman",
+      "was": "death_pub",
+      "now": "furshop"
+    },
+    {
+      "npc": "death_shopkeeper",
+      "was": "death_generalshop",
+      "now": "shilojunglestore"
+    },
+    {
+      "npc": "horror_lighthousekeeeper_well",
+      "was": "lighthouseshop",
+      "now": "generalshop1"
+    },
+    {
+      "npc": "nulodion",
+      "was": "mcannonshop",
+      "now": "death_pub"
+    },
+    {
+      "npc": "tbwt_tiadeche_final",
+      "was": "tbwt_tiadeche_final_inventory",
+      "now": "death_generalshop"
+    },
+    {
+      "npc": "tbwt_tamayu_final",
+      "was": "tbwt_tamayu_final_inventory",
+      "now": "boozeshop"
+    },
+    {
+      "npc": "viking_sigmund",
+      "was": "viking_general_store",
+      "now": "generalshop3"
+    },
+    {
+      "npc": "viking_longhall_barkeep",
+      "was": "viking_bar",
+      "now": "wydinstore"
+    },
+    {
+      "npc": "viking_clothing_shopkeeper",
+      "was": "viking_clothes_shop",
+      "now": "generaldwarf"
+    },
+    {
+      "npc": "viking_weapons_salesman",
+      "was": "viking_weapons_shop",
+      "now": "generalshop6"
+    },
+    {
+      "npc": "viking_fish_monger",
+      "was": "viking_fishmonger",
+      "now": "amuletshop"
+    },
+    {
+      "npc": "viking_fur_monger",
+      "was": "viking_furshop",
+      "now": "archeryshop2"
+    },
+    {
+      "npc": "fishguildshop",
+      "was": "fishingguild",
+      "now": "generallegends"
+    }
+  ]
+}

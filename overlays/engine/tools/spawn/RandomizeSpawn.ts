@@ -5,6 +5,7 @@ import { printInfo, printWarning } from '#/util/Logger.js';
 
 import { CONTENT_ROOT } from '../map/EntranceParser.js';
 import { mulberry32 } from '../shared/Prng.js';
+import { isTutorialMapsquare } from '../shared/TutorialIsland.js';
 
 // Archipelago random spawn/home point (2004Scape-AP-Logic docs/goals-and-checks.md
 // Feature 3, expanded with a second "chunk" mode). Picks one seeded home coordinate
@@ -150,8 +151,9 @@ const WILDERNESS_MAPX_MIN = 46;
 const WILDERNESS_MAPX_MAX = 52;
 const WILDERNESS_MAPZ_MIN = 55;
 
-// Tutorial Island - same protected-mapsquare convention as RandomizeEntrances.ts.
-const PROTECTED_MAPSQUARES: [number, number][] = [[48, 48]];
+// Tutorial Island - the shared footprint (tools/shared/TutorialIsland.ts), same list
+// RandomizeEntrances protects. It is six mapsquares, not the (48,48) this used to
+// assume, so a chunk-mode HOME could land on the island (issue #14).
 
 // Surveyed the full content/maps/*.jm2 file list (483 files) 2026-07-15: mapZ is
 // bimodal - surface mapZ 20 (one outlier, a 4-section-only stub map, not real
@@ -278,7 +280,7 @@ function enumerateChunkCandidates(includeIslands: boolean, includeFarWest: boole
         if (mapX >= WILDERNESS_MAPX_MIN && mapX <= WILDERNESS_MAPX_MAX && mapZ >= WILDERNESS_MAPZ_MIN) {
             continue; // wilderness
         }
-        if (PROTECTED_MAPSQUARES.some(([px, pz]) => px === mapX && pz === mapZ)) {
+        if (isTutorialMapsquare(mapX, mapZ)) {
             continue; // Tutorial Island
         }
         if (mapX >= KARAMJA_MAPX_MIN && mapX <= KARAMJA_MAPX_MAX && mapZ >= KARAMJA_MAPZ_MIN && mapZ <= KARAMJA_MAPZ_MAX) {
@@ -310,18 +312,43 @@ function parseArgs() {
         printWarning(`RandomizeSpawn: unrecognized --mode "${modeArg}", expected "city" or "chunk"`);
         process.exit(1);
     }
+    const poolIdx = args.indexOf('--export-pool');
     return {
         seed,
         mode: modeArg as 'city' | 'chunk',
         dryRun: args.includes('--dry-run'),
         includeIslands: args.includes('--include-islands'),
-        includeFarWest: args.includes('--include-far-west')
+        includeFarWest: args.includes('--include-far-west'),
+        // GitHub #3: dump both candidate lists and exit, so the Archipelago apworld can
+        // make the same pick and feed the resulting home to its region logic (where you
+        // start decides what is reachable at sphere 0).
+        exportPool: poolIdx !== -1 ? (args[poolIdx + 1] ?? 'data/config/ap-spawn-pool.json') : undefined
     };
 }
 
 function main() {
-    const { seed, mode, dryRun, includeIslands, includeFarWest } = parseArgs();
+    const { seed, mode, dryRun, includeIslands, includeFarWest, exportPool } = parseArgs();
     const rand = mulberry32(seed);
+
+    if (exportPool) {
+        // Both pools, in the exact order the picks index into them.
+        const chunk = fs.existsSync(MAPS_DIR)
+            ? enumerateChunkCandidates(includeIslands, includeFarWest).map(c => ({ coord: `0_${c.mapX}_${c.mapZ}_32_32`, label: `mapsquare ${c.mapX},${c.mapZ}` }))
+            : [];
+        const poolOut = {
+            _generated: 'tools/spawn/RandomizeSpawn.ts --export-pool - the candidate home coords',
+            generatedAt: new Date().toISOString(),
+            vanilla: '0_50_50_21_18',
+            city: CITY_SPAWN_POOL.map(l => ({ coord: l.coord, label: l.label })),
+            chunk,
+            includeIslands,
+            includeFarWest
+        };
+        fs.mkdirSync(path.dirname(path.resolve(exportPool)), { recursive: true });
+        fs.writeFileSync(path.resolve(exportPool), JSON.stringify(poolOut, null, 2) + '\n');
+        printInfo(`wrote ${poolOut.city.length} city + ${poolOut.chunk.length} chunk candidate(s) to ${exportPool} (pool only - no table written)`);
+        return;
+    }
 
     let home: string;
     let label: string;

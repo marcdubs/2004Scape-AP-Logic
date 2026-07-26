@@ -2333,6 +2333,22 @@ export default class Player extends PathingEntity {
     }
 
     messageGame(msg: string) {
+        // AP announcements ("Archipelago reward: 25 x Blank rune (no inventory
+        // space, sent to your bank)!", unlock/check receipts) run far wider than
+        // the chatbox, which clips at x=463 with the line starting at x=4 - the
+        // tail was simply invisible (GitHub #9). Wrap here rather than at each
+        // call site: this dialect has no way to measure text, but the engine
+        // holds the very p12 metrics the client draws with, so the break lands
+        // exactly where the clip would have. Every caller benefits - rs2 mes(),
+        // the engine-side Ap* messages, world broadcasts. Messages that already
+        // fit (nearly all of them) keep the single-write fast path.
+        const font = FontType.get(1);
+        if (font && msg.length > 0 && font.stringWidth(msg) > 456) {
+            for (const line of font.split(msg, 456)) {
+                this.write(new MessageGame(line));
+            }
+            return;
+        }
         this.write(new MessageGame(msg));
     }
 

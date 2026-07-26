@@ -36,7 +36,7 @@ export function renderV0(result: SimResult): string[] {
     const lines: string[] = [];
     lines.push(`=== Progression Simulation (spheres -> goals) ===`);
     lines.push(`Spawn: ${result.seedConfig.spawn.label}`);
-    lines.push(`Skill caps: ${result.seedConfig.unlocks.present ? 'seeded (ap-unlocks.json present)' : 'uncapped (vanilla - no ap-unlocks.json)'}`);
+    lines.push(`Skill caps: ${result.seedConfig.unlocks.capsLabel ?? (result.seedConfig.unlocks.present ? 'seeded (ap-unlocks.json present)' : 'uncapped (vanilla - no ap-unlocks.json)')}`);
     lines.push('');
 
     for (const s of result.spheres) {
@@ -132,7 +132,17 @@ export function renderV2(result: SimResult, index: QuestIndex): string[] {
         `You wake up at ${result.seedConfig.spawn.label}${result.seedConfig.spawn.mode === 'vanilla' ? '' : ` (${result.seedConfig.spawn.mode}-mode seeded spawn)`}. The mainland is one connected walkable region under this seed - entrance randomization guarantees every gate pairs both ways and ::home always gets you unstuck, so travel is flavor here, not logic.`
     );
     if (result.seedConfig.unlocks.present) {
-        lines.push(`Your Archipelago unlocks are fixed for this run (this simulator does not yet model mid-run item receipt order - see docs/progression-sim.md roadmap): every skill starts capped at 20, +10 per Progressive item received, giving these ceilings right now: ${Object.entries(result.skillCaps).map(([s, v]) => `${s} ${v}`).join(', ')}.`);
+        // Two shapes here, per SimulateProgression.ts's resolveVanillaUnlocks: the default
+        // end-of-run cap model (the beatability question) and --current-unlocks (the live
+        // snapshot). Either way the counts are FIXED for the whole run - mid-run item
+        // receipt ORDER is still unmodeled (docs/progression-sim.md roadmap).
+        const snapshot = result.seedConfig.unlocks.capsLabel?.startsWith('current');
+        const ceilings = Object.entries(result.skillCaps).map(([s, v]) => `${s} ${v}`).join(', ');
+        lines.push(
+            snapshot
+                ? `Your Archipelago unlocks are read as a right-now snapshot (--current-unlocks): every skill starts capped at 20, +10 per Progressive item received, giving these ceilings from the ap-unlocks.json currently on disk: ${ceilings}. Anything blocked below is blocked AT THIS MOMENT, not for the run.`
+                : `Your Archipelago unlocks are modeled at their end-of-run values - the whole progression pool collected, which is what a finished run delivers (the ap-unlocks.json on disk is a STARTING state; pass --current-unlocks to reason about the counts you hold right now). Every skill starts capped at 20, +10 per Progressive item received, ending at these ceilings: ${ceilings}.`
+        );
     } else {
         lines.push('No ap-unlocks.json for this seed - every skill is free to train to 99, so this is effectively a vanilla-open run.');
     }

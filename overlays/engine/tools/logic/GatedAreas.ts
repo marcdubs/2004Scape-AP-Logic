@@ -20,7 +20,18 @@ import path from 'path';
 // statSatisfied below), not a "current" level - this project models skills as
 // instantly trainable up to their seed-fixed cap (docs/progression-sim.md "central
 // simplification"), matching how tools/sim/Engine.ts treats quest skill requirements.
-export type GatedAreaRequire = { varp: string; gte: number } | { item: string } | { stat: string; gte: number } | { allOf: GatedAreaRequire[] };
+// v1.2 (bit forms, DeriveGatedAreas + subagent pass): many quest doors gate on a single
+// BIT inside a bitfield varp (testbit(%varp, ^bitconst)) rather than a whole-number
+// threshold. `bit` = that bit must be SET (door's testbit(...) = ^true form); `bitClear`
+// = that bit must be CLEAR (the = ^false form). The bit INDEX is the resolved value of the
+// ^constant. Both ValidateSeed (here) and the engine's ApAreaGates.ts must handle them.
+export type GatedAreaRequire =
+    | { varp: string; gte: number }
+    | { varp: string; bit: number }
+    | { varp: string; bitClear: number }
+    | { item: string }
+    | { stat: string; gte: number }
+    | { allOf: GatedAreaRequire[] };
 
 export interface GatedAreaBox {
     level: number;
@@ -35,6 +46,16 @@ export interface GatedArea {
     boxes: GatedAreaBox[];
     require: GatedAreaRequire;
     message?: string;
+    // v1.3 (GitHub #16, Option 3): the exact openable-door loc tiles that isolate this
+    // area, as raw "level_mapX_mapZ_localX_localZ" coords (ScanDoors placementCoords).
+    // When present, the area is gated by REGION MEMBERSHIP (the pocket(s) actually behind
+    // these doors) instead of by bounding box - this is what stops a sprawling/irregular
+    // derived box from spuriously gating unrelated regions that merely fall inside its
+    // rectangle (e.g. the druid cauldron caught by the Black-Knights spy-grill's box).
+    // BuildRegionGraph closes exactly these tiles (not a box margin); ValidateSeed derives
+    // the gated region set by probing behind them. Absent = legacy bbox behavior (the 7
+    // hand-curated guilds, whose tight boxes need no door list).
+    doors?: string[];
 }
 
 export interface GatedAreasConfig {
@@ -47,7 +68,7 @@ function isRequire(x: unknown): x is GatedAreaRequire {
         return false;
     }
     const r = x as Record<string, unknown>;
-    if (typeof r.varp === 'string' && typeof r.gte === 'number') {
+    if (typeof r.varp === 'string' && (typeof r.gte === 'number' || typeof r.bit === 'number' || typeof r.bitClear === 'number')) {
         return true;
     }
     if (typeof r.item === 'string') {
@@ -85,7 +106,8 @@ export function loadGatedAreas(configDir: string): GatedAreasConfig {
                 }
                 boxes.push({ level: b.level as number, x1: b.x1 as number, z1: b.z1 as number, x2: b.x2 as number, z2: b.z2 as number });
             }
-            areas.push({ name: a.name, boxes, require: a.require as GatedAreaRequire, message: typeof a.message === 'string' ? a.message : undefined });
+            const doors = Array.isArray(a.doors) ? a.doors.filter((d): d is string => typeof d === 'string' && DOOR_COORD_RE.test(d)) : undefined;
+            areas.push({ name: a.name, boxes, require: a.require as GatedAreaRequire, message: typeof a.message === 'string' ? a.message : undefined, doors: doors && doors.length > 0 ? doors : undefined });
         }
         return { present: true, areas };
     } catch (err) {
@@ -93,6 +115,34 @@ export function loadGatedAreas(configDir: string): GatedAreasConfig {
         return { present: false, areas: [] };
     }
 }
+
+// ---- door-tile helpers (v1.3 region-membership gating, GitHub #16) ----
+
+export const DOOR_COORD_RE = /^\d+_\d+_\d+_\d+_\d+$/;
+
+export interface DoorTile {
+    level: number;
+    x: number;
+    z: number;
+}
+
+/** Parse a raw "level_mapX_mapZ_localX_localZ" door coord to absolute {level,x,z}. */
+export function parseDoorCoord(raw: string): DoorTile {
+    const [level, mapX, mapZ, localX, localZ] = raw.split('_').map(Number);
+    return { level, x: mapX * 64 + localX, z: mapZ * 64 + localZ };
+}
+
+/** All door tiles for an area (empty if it has no `doors` list). */
+export function areaDoorTiles(area: GatedArea): DoorTile[] {
+    return (area.doors ?? []).map(parseDoorCoord);
+}
+
+// A gated pocket is a small building/cave interior; regions larger than this are the
+// mainland or an open cave (never the isolated side of a door). Kept in sync with
+// DeriveGatedAreas.ts's MAX_POCKET_TILES, which used the same threshold to decide a
+// door isolated a real pocket in the first place - so every derived area's pocket is
+// <= this by construction.
+export const POCKET_TILE_CAP = 4000;
 
 /** True if (level,x,z) falls inside `box` expanded by `margin` tiles on every side. */
 export function tileNearBox(level: number, x: number, z: number, box: GatedAreaBox, margin: number): boolean {
@@ -120,7 +170,14 @@ export function requireSatisfied(req: GatedAreaRequire, ctx: RequireContext): bo
         return req.allOf.every(r => requireSatisfied(r, ctx));
     }
     if ('varp' in req) {
-        return (ctx.varps.get(req.varp) ?? 0) >= req.gte;
+        const val = ctx.varps.get(req.varp) ?? 0;
+        if ('bit' in req) {
+            return ((val >> req.bit) & 1) === 1;
+        }
+        if ('bitClear' in req) {
+            return ((val >> req.bitClear) & 1) === 0;
+        }
+        return val >= req.gte;
     }
     if ('stat' in req) {
         return (ctx.statCaps.get(req.stat.toLowerCase()) ?? 99) >= req.gte;
@@ -133,6 +190,12 @@ export function describeRequire(req: GatedAreaRequire): string {
         return `(${req.allOf.map(describeRequire).join(' AND ')})`;
     }
     if ('varp' in req) {
+        if ('bit' in req) {
+            return `%${req.varp} bit ${req.bit} set`;
+        }
+        if ('bitClear' in req) {
+            return `%${req.varp} bit ${req.bitClear} clear`;
+        }
         return `%${req.varp} >= ${req.gte}`;
     }
     if ('stat' in req) {

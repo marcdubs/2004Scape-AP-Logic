@@ -6,9 +6,11 @@ import { printError, printInfo, printWarning } from '#/util/Logger.js';
 
 import { resolveApproachDestinations } from './ApproachResolver.js';
 import { CONTENT_ROOT, ENTRANCE_DIR, type CoordLiteral, type Entrance, parseFile, parseZanarisDoorText, type Requirement, resolveSameTileRelative } from './EntranceParser.js';
+import { expandAngleKeyedEntrances } from './LocAngleResolver.js';
 import { scanPlacements } from './LocPlacementScanner.js';
 import { execNpxTsx } from '../shared/Npx.js';
 import { derangement, mulberry32 } from '../shared/Prng.js';
+import { isTutorialMapsquare, tutorialMapsquares } from '../shared/TutorialIsland.js';
 
 // Shuffles game entrances and writes a runtime override table
 // (data/config/ap-entrances.json) that the engine's ap_entrance_override command
@@ -65,9 +67,9 @@ const SCAN_LADDER_MIDDLE = 'laddermiddle';
 const LADDER_PAIR_RADIUS = 3;
 
 // mapsquares that must never be touched by the shuffle, regardless of classification -
-// currently just Tutorial Island (48,48), so a brand-new player can never get stranded
-// mid-tutorial.
-const PROTECTED_MAPSQUARES: [number, number][] = [[48, 48]];
+// Tutorial Island, so a brand-new player can never get stranded mid-tutorial. Its
+// footprint is six mapsquares, not the one this used to assume; TutorialIsland.ts reads
+// the real one from the content the game itself checks against (issue #14).
 
 type Indexed<T> = T & { _index: number };
 type Candidate = Indexed<Entrance> & { source: { type: 'literal'; coord: CoordLiteral }; destination: CoordLiteral };
@@ -89,7 +91,7 @@ function overrideKey(coord: CoordLiteral, op: number): string {
 }
 
 function inProtectedMapsquare(coord: CoordLiteral): boolean {
-    return PROTECTED_MAPSQUARES.some(([mx, mz]) => mx === coord.mapX && mz === coord.mapZ);
+    return isTutorialMapsquare(coord.mapX, coord.mapZ);
 }
 
 function isProtected(e: Indexed<Entrance>): boolean {
@@ -323,7 +325,20 @@ function parseArgs() {
     const args = process.argv.slice(2);
     const seedIdx = args.indexOf('--seed');
     const seed = seedIdx !== -1 ? parseInt(args[seedIdx + 1], 10) : Math.floor(Math.random() * 0xffffffff);
-    return { seed, dryRun: args.includes('--dry-run'), rewrite: args.includes('--rewrite'), mixed: args.includes('--mixed'), noValidate: args.includes('--no-validate'), requirePerfect: args.includes('--require-perfect') };
+    const poolIdx = args.indexOf('--export-pool');
+    return {
+        seed,
+        dryRun: args.includes('--dry-run'),
+        rewrite: args.includes('--rewrite'),
+        mixed: args.includes('--mixed'),
+        noValidate: args.includes('--no-validate'),
+        requirePerfect: args.includes('--require-perfect'),
+        // GitHub #3: dump the UNSHUFFLED entrance pool (both sides of every physical
+        // gate + the one-way list) and exit without touching any table. The Archipelago
+        // apworld shuffles this pool itself, reachability-preserving, so AP mode needs
+        // no reroll; local mode keeps calling this tool exactly as before.
+        exportPool: poolIdx !== -1 ? (args[poolIdx + 1] ?? 'data/config/ap-entrance-pool.json') : undefined
+    };
 }
 
 // Runs tools/logic/ValidateSeed.ts against the just-written table (exit 0 = every
@@ -394,7 +409,7 @@ function validateSeed(): boolean | null {
 // true if the caller should reroll with the next seed (validation failed), false once
 // there's nothing left to do (success, dry-run, --no-validate, or --rewrite mode, which
 // never validates/rerolls at all).
-function runAttempt(seed: number, dryRun: boolean, rewrite: boolean, mixed: boolean, noValidate: boolean): boolean {
+function runAttempt(seed: number, dryRun: boolean, rewrite: boolean, mixed: boolean, noValidate: boolean, exportPool?: string): boolean {
     // always (re)derive from the untouched vanilla backup, creating it on first run,
     // so re-randomizing never compounds onto a previous shuffle's output.
     ensureBackup();
@@ -415,10 +430,30 @@ function runAttempt(seed: number, dryRun: boolean, rewrite: boolean, mixed: bool
         textByFile.set(file, fs.readFileSync(backupPath, 'utf8').replace(/\r\n/g, '\n'));
     }
 
+    // give the angle-keyed handlers (Tree Gnome Stronghold wooden spiral stairs, the
+    // angled ship ladders) one concrete entrance per map placement - they carry no
+    // source coord of their own, so without this they never reach the pool at all
+    // (issue #4). Runs before the approach resolver: the ones whose destination is
+    // player-relative come out of here with a literal SOURCE and are resolvable from
+    // there like any other.
+    const angle = expandAngleKeyedEntrances(allEntrances);
+    for (let i = allEntrances.length - 1; i >= 0; i--) {
+        if (angle.consumed.has(allEntrances[i])) {
+            allEntrances.splice(i, 1);
+        }
+    }
+    for (const e of angle.entrances) {
+        allEntrances.push({ ...e, _index: nextIndex++ });
+    }
+    if (angle.handlers > 0) {
+        printInfo(`expanded ${angle.handlers} angle-keyed handler(s) into ${angle.entrances.length} placement(s) (${angle.skippedPlacements} placement angle(s) had no case - left vanilla)`);
+    }
+
     // upgrade player-relative movecoord destinations (Falador smith/pub etc.) to
     // validated literals so they can join the floor-shift pool - see ApproachResolver.
     const approach = resolveApproachDestinations(allEntrances);
     printInfo(`resolved ${approach.resolved} player-relative destination(s) via forceapproach geometry (${approach.failed} left vanilla)`);
+    printInfo(`protected mapsquares (Tutorial Island): ${tutorialMapsquares().map(([mx, mz]) => `${mx},${mz}`).join(' ')}`);
 
     // Workstream B (docs/entrance-logic.md): gated entrances join the shuffle pool with
     // their requirement kept - the patched handlers (see ladders.rs2, mcannon_ladders.rs2,
@@ -498,6 +533,31 @@ function runAttempt(seed: number, dryRun: boolean, rewrite: boolean, mixed: bool
     // on a building staircase breaks the "come back the way you came" guarantee for no
     // real payoff.
     const oneWays: OneWayEntry[] = cross.unpaired.map(e => ({ trigger: e.source.coord, triggerOp: opNum(e), arrival: e.destination, description: e.description }));
+
+    // GitHub #3: --export-pool dumps the pool itself (every physical gate's two sides,
+    // plus the one-ways) and stops. This is the shuffle's INPUT, not its output, so the
+    // Archipelago apworld can run its own reachability-preserving assignment over the
+    // same candidate set the local randomizer uses - one pool definition, two shufflers.
+    if (exportPool) {
+        const side = (s: GateSide) => ({ trigger: s.trigger.raw, op: s.triggerOp, arrival: s.arrival.raw, description: s.description });
+        const requires: Record<string, { require: Requirement; name: string }> = {};
+        for (const e of allEntrances) {
+            if (e.requires && e.source.type === 'literal') {
+                requires[overrideKey(e.source.coord, opNum(e))] = { require: e.requires, name: e.description ?? e.category };
+            }
+        }
+        const poolOut = {
+            _generated: 'tools/map/RandomizeEntrances.ts --export-pool - the UNSHUFFLED candidate set',
+            generatedAt: new Date().toISOString(),
+            gates: [...connectorGates, ...floorGates].map(g => ({ pool: g.pool, scanned: g.scanned ?? false, a: side(g.a), b: side(g.b) })),
+            oneWays: oneWays.map(o => ({ trigger: o.trigger.raw, op: o.triggerOp, arrival: o.arrival.raw, description: o.description })),
+            requires
+        };
+        fs.mkdirSync(path.dirname(path.resolve(exportPool)), { recursive: true });
+        fs.writeFileSync(path.resolve(exportPool), JSON.stringify(poolOut, null, 2) + '\n');
+        printInfo(`wrote ${poolOut.gates.length} gate(s) + ${poolOut.oneWays.length} one-way(s) to ${exportPool} (pool only - no table written)`);
+        return false;
+    }
 
     printInfo(`seed ${seed}: ${connectorGates.length} connector gate(s) (${scanned.gates.length} map-scanned), ${floorGates.length} floor-shift gate(s) (${scannedLadders.gates.length} map-scanned), ${oneWays.length} one-way(s)`);
     printInfo(`left vanilla: ${floor.unpaired.length} unpaired floor-shift(s), ${scanned.skipped + scannedLadders.skipped} unpaired scanned placement(s), ${multiDest.size} multi-destination coord(s)`);
@@ -737,7 +797,13 @@ function main() {
         process.exit(1);
     }
 
-    const { seed: startSeed, dryRun, rewrite, mixed, noValidate, requirePerfect } = parseArgs();
+    const { seed: startSeed, dryRun, rewrite, mixed, noValidate, requirePerfect, exportPool } = parseArgs();
+
+    // --export-pool is a pure read: dump the candidate set, write no table, never reroll.
+    if (exportPool) {
+        runAttempt(startSeed, true, false, mixed, true, exportPool);
+        return;
+    }
 
     // Phase 1 (skipped for --dry-run/--no-validate, which keep legacy behavior):
     // write + spatially grade STRICT_QUEST_ATTEMPTS candidate tables. A table that

@@ -34,9 +34,34 @@ const del = name => {
     }
 };
 
+/** True when ap-entrances.json is the table Archipelago shipped in slot_data. */
+const apBuiltEntranceTable = () => {
+    try {
+        return JSON.parse(fs.readFileSync('data/config/ap-entrances.json', 'utf8')).source === 'archipelago slot_data';
+    } catch {
+        return false;
+    }
+};
+
+// THE seed (GitHub #3). With region_logic on, the apworld rolls gathering, processing,
+// shops and spawn itself so its fill can reason about the real world, then pins the seed
+// it used. Adopting it here makes every tool below reproduce the identical table - the
+// tools are deterministic, and new-run feeds them all one shared $SEED. Overriding SEED
+// this way is the point: an AP run's world is decided by the multiworld, not by us.
+if (Number.isInteger(o.seed)) {
+    set('SEED', o.seed >>> 0);
+}
+
 if (o.entrances === 'off') {
     set('RUN_ENTRANCES', 0);
-    del('ap-entrances.json');
+    // "off" means two different things now. If the apworld built the layout itself
+    // (region_logic on), ApClient has already written that table here and pinned
+    // entrances to "off" so we don't reshuffle it - deleting it would throw away the
+    // exact map the multiworld's fill reasoned over. Only a genuinely vanilla-entrance
+    // run gets the file removed.
+    if (!apBuiltEntranceTable()) {
+        del('ap-entrances.json');
+    }
 } else {
     if (o.entrances === 'mixed') {
         prepend('ENTRANCE_EXTRA', '--mixed');
@@ -62,6 +87,15 @@ if (o.processing === 'off') {
     del('ap-process.json');
 } else if (typeof o.processing === 'string') {
     set('PROCESS_MODE', o.processing);
+}
+// Forward-compatible: the apworld does not emit `thieving` yet (its fill does not model
+// thieving swaps - see docs/lessons-learned.md, GitHub #6 follow-up), so this is a no-op
+// on today's slot data and becomes live the moment the option ships.
+if (o.thieving === 'off') {
+    set('RUN_THIEVING', 0);
+    del('ap-thieving.json');
+} else if (typeof o.thieving === 'string') {
+    set('THIEVING_MODE', o.thieving);
 }
 if (o.spawn === 'off') {
     set('RUN_SPAWN', 0);

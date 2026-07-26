@@ -10,9 +10,17 @@
 # - Items: Progressive gear/tool tiers, Progressive <Skill> Cap (+20 levels
 #   each; the game engine's cap formula is 20 + 10*grant_count and the client
 #   grants +2 per copy), Quest Unlock gates, and Mystery Reward filler.
-# - Rules: a direct port of PlacementEngine.reachableFromState +
-#   Engine.completableQuests (travel-agnostic; the game server independently
-#   guarantees entrance-shuffle reachability - see the design doc).
+# - Rules: the full region/gate/item fixpoint, ported from
+#   tools/logic/ValidateSeed.ts into logic.py and driven by data/rs2004_logic.json
+#   (GitHub #3). Access rules ask "with the items this state holds, can the
+#   player physically get there and complete that?" - the same question the
+#   solo oracle answers, so a multiworld fill can never hide progression behind
+#   a door this seed's entrance layout leaves shut.
+# - Entrances: with region_logic on, THIS WORLD builds the entrance layout
+#   (entrances.py, a reachability-preserving frontier) and ships the finished
+#   override table to the game server in slot_data. No reroll: the layout is
+#   sound by construction. Solo play keeps using RandomizeEntrances.ts's
+#   generate-and-test loop - both modes are first-class, see docs.
 #
 # Quest completions are modeled as events ("Completed: <id>") so rules can
 # require them; QP is summed from completed-quest events inside rule lambdas.
@@ -25,9 +33,13 @@ from Options import OptionError
 from worlds.AutoWorld import WebWorld, World
 from worlds.generic.Rules import set_rule
 
+from .entrances import EntranceShuffler, coverage, vanilla_entrances
+from .logic import LogicEngine, load_bundle
 from .options import Goal, RS2004Options
+from .randomizers import apply_rolls, roll_all
 
 DATA = json.loads(pkgutil.get_data(__name__, "data/rs2004_data.json").decode("utf-8"))
+LOGIC_BUNDLE = load_bundle()
 
 GAME_NAME = DATA["game"]
 
@@ -50,6 +62,17 @@ for _name, _def in ITEMS.items():
         QUEST_UNLOCK_ITEM_BY_ID[_def["grant"][len("quest_"):]] = _name
 
 FILLER_NAME = "Mystery Reward"
+
+# skills a quest locks outright - see types.ts SKILL_QUEST_GATES for the two kinds of
+# entry (Runecrafting is a hard script gate, Herblore a deliberate balance choice).
+SKILL_QUEST_GATES = LOGIC_BUNDLE["meta"].get("skillQuestGates", {})
+
+# How many complete worlds generate_early may roll looking for one whose goals are
+# reachable. Each attempt costs ~2.5s (the entrance frontier dominates). Measured miss
+# rate for the hardest goal (Legends) with every randomizer on, drops on mimic: ~1 roll
+# in 5, so the expected cost is ~1.25 attempts and the chance of exhausting this budget
+# is ~2e-6. A safety net, not a search.
+WORLD_ROLL_ATTEMPTS = 8
 PROGRESSIVE_QUEST_NAME = "Progressive Quest Unlock"
 
 GEAR_ITEM_NAMES = {"Progressive Melee", "Progressive Armour", "Progressive Ranged", "Progressive Magic"}
@@ -67,6 +90,22 @@ GOAL_KEY_BY_NAME = {
     "heroes": "heroes",
     "legends": "legends",
 }
+# ...and back to the id goals.json/the logic bundle uses.
+GOAL_ID_BY_KEY = {
+    "dragon": "dragon_slayer",
+    "barcrawl": "barcrawl",
+    "kbd": "kbd",
+    "heroes": "heroes",
+    "legends": "legends",
+}
+
+# The 10 barcrawl bar checks, in quest_barcrawl.constant order, line up 1:1 with the
+# curated barcrawl anchors in the logic bundle - so bar N's check gates on physically
+# reaching bar N rather than being a free sphere-0 check.
+BARCRAWL_ANCHORS = LOGIC_BUNDLE["goalAnchors"].get("barcrawl", [])
+BARCRAWL_ANCHOR_BY_CHECK = {
+    f"barcrawl_bar_{i + 1}": anchor for i, anchor in enumerate(BARCRAWL_ANCHORS)
+} if len(BARCRAWL_ANCHORS) == 10 else {}
 
 
 def cap_copies_needed(level: int) -> int:
@@ -138,6 +177,43 @@ class RS2004World(World):
     del _loc
 
     # ------------------------------------------------------------------
+    # the logic engine (region_logic on) - see logic.py
+    # ------------------------------------------------------------------
+
+    def _held_quest_unlocks(self, state) -> frozenset:
+        """Gated quests the player can currently start, given the items collected."""
+        if not self.options.quest_unlocks:
+            return frozenset(GATED_QUEST_IDS)
+        if self.options.progressive_quests:
+            held = state.count(PROGRESSIVE_QUEST_NAME, self.player)
+            return frozenset(QUEST_ORDER[:held])
+        return frozenset(
+            qid for qid, item in QUEST_UNLOCK_ITEM_BY_ID.items()
+            if state.has(item, self.player)
+        )
+
+    def _skill_counts(self, state) -> dict:
+        """ap-unlocks.json-shaped grant counts, so logic.py can apply the engine's own
+        cap formula (cap = 20 + 10 * count; each cap item grants 2)."""
+        counts = {}
+        for skill, item in CAP_ITEM_BY_SKILL.items():
+            counts[f"progressive_{skill}"] = state.count(item, self.player) * 2
+        return counts
+
+    def _derive(self, state):
+        """The fixpoint for this collection state (memoized inside LogicEngine)."""
+        caps = self.engine.caps_from_counts(self._skill_counts(state)) if self.options.skill_caps \
+            else self.engine.uncapped()
+        return self.engine.derive(caps, self._held_quest_unlocks(state))
+
+    def _max_state(self):
+        """Everything collected - what the layout can EVER reach. Used to mark
+        locations the region model cannot justify as filler-only rather than letting
+        them break the fill (the same feasibility exclusion GenerateSeed.ts applies in
+        solo mode)."""
+        return self.engine.derive(self.engine.uncapped(), frozenset(GATED_QUEST_IDS))
+
+    # ------------------------------------------------------------------
     # rules (ports of PlacementEngine.reachableFromState semantics)
     # ------------------------------------------------------------------
 
@@ -152,6 +228,18 @@ class RS2004World(World):
         item = CAP_ITEM_BY_SKILL.get(skill)
         return item is not None and state.has(item, self.player, need)
 
+    def _skill_unlocked(self, state, skill) -> bool:
+        """Skills a quest locks outright - Runecrafting behind Rune Mysteries (the
+        essence mine refuses the teleport without it) and Herblore behind Druidic
+        Ritual. Enforced with or without region_logic: it is a property of the game,
+        not of the spatial model."""
+        quest = SKILL_QUEST_GATES.get(skill)
+        if quest is None:
+            return True
+        if self.region_logic:
+            return quest in self._derive(state).completed
+        return self._quest_rule(state, quest)
+
     def _qp(self, state) -> int:
         total = 0
         for qid, quest in QUESTS.items():
@@ -160,6 +248,11 @@ class RS2004World(World):
         return total
 
     def _quest_rule(self, state, qid: str) -> bool:
+        if self.region_logic:
+            # the fixpoint already folds in skills, QP, the prereq chain, the quest-gate
+            # item, gathered/processed item availability AND physical reachability.
+            return qid in self._derive(state).completed
+
         quest = QUESTS[qid]
 
         if qid in GATED_QUEST_IDS and self.options.quest_unlocks:
@@ -199,19 +292,142 @@ class RS2004World(World):
             # DS stage checks collapse to the quest's startability (QP >= 32),
             # same as reachableFromState.
             required_qp = QUESTS["dragon"].get("requiredQp") or 0
-            return self._qp(state) >= required_qp
-        if kind in ("level", "activity"):
+            qp = self._derive(state).qp if self.region_logic else self._qp(state)
+            return qp >= required_qp
+        if kind in ("level", "activity", "first_xp"):
             skill = loc.get("skill")
+            # a skill locked behind a quest yields no XP at all until it is done, so
+            # every check on it - even "first XP" - waits for that quest.
+            if not self._skill_unlocked(state, skill):
+                return False
             level = loc.get("level")
             if skill is None or level is None:
                 return True
             return self._has_cap(state, skill, level)
-        # barcrawl / first_xp / first_kill / music: sphere 0
+        if kind == "barcrawl" and self.region_logic:
+            anchor = BARCRAWL_ANCHOR_BY_CHECK.get(check_id)
+            if anchor is not None:
+                region = self.engine.anchors.get(anchor)
+                return region not in (None, 0) and region in self._derive(state).regions
+            return True
+        # first_xp / first_kill / music (and barcrawl without region logic): sphere 0
         return True
 
     # ------------------------------------------------------------------
     # generation hooks
     # ------------------------------------------------------------------
+
+    def generate_early(self) -> None:
+        """Fix the world layout before any rule runs.
+
+        With region_logic on this is where entrance randomization happens - in the
+        apworld, not on the game server - so every access rule below reasons over the
+        exact map the player will get, and the finished table rides to the server in
+        slot_data. The construct-valid frontier (entrances.py) makes the layout sound
+        without a single reroll, which is the whole point of GitHub #3.
+        """
+        self.region_logic = bool(self.options.region_logic)
+        self.entrance_overrides = {}
+        self.entrance_coverage = (0, 0)
+
+        if not self.region_logic:
+            self.run_seed = self.random.randrange(0x100000000)
+            self.roll = self._roll_world(self.run_seed)
+            self.engine = LogicEngine(LOGIC_BUNDLE, quest_gates=self._unlocked_quests_gate_set())
+            return
+
+        # Roll the whole world - the four server-side randomizers AND the entrance
+        # layout - and keep the first roll whose goals are actually reachable.
+        #
+        # This is NOT the local mode's generate-and-test over item placement (AP's fill
+        # still runs exactly once, over a world already known to be sound). It is a
+        # retry over the WORLD, which is cheap and entirely inside generate_early: a
+        # gathersanity swap can put a goal's quest item behind a skill the region model
+        # cannot reach, and re-rolling the world is a far better answer than making the
+        # whole multiworld fail. Measured ~1 roll in 30 needs a second attempt.
+        last_unreachable: list = []
+        for _ in range(WORLD_ROLL_ATTEMPTS):
+            seed = self.random.randrange(0x100000000)
+            roll = self._roll_world(seed)
+            engine = self._engine_for(roll)
+            mode = self.options.entrance_randomization.current_key
+            if mode == "off":
+                overrides = vanilla_entrances(engine)
+            else:
+                overrides = EntranceShuffler(engine, self.random, mixed=(mode == "mixed")).shuffle()
+
+            max_state = engine.derive(engine.uncapped(), frozenset(GATED_QUEST_IDS))
+            last_unreachable = [key for key in self._goal_keys()
+                                if GOAL_ID_BY_KEY[key] not in max_state.goals]
+            if not last_unreachable:
+                self.run_seed, self.roll, self.engine = seed, roll, engine
+                self.entrance_overrides = overrides
+                # Layout-quality signal, never fatal: a few pool sides sit in areas the
+                # region model does not describe at all (standalone handlers outside the
+                # shuffle's reach), so full coverage is not expected - same status as
+                # ValidateSeed's lint warnings.
+                self.entrance_coverage = coverage(engine, overrides)
+                return
+
+        raise OptionError(
+            f"2004Scape: goal(s) {', '.join(last_unreachable)} stayed unreachable across "
+            f"{WORLD_ROLL_ATTEMPTS} rolled worlds. Pick a different goal, loosen the seed options "
+            f"(gathering/processing/shops/spawn), or set region_logic: false to fall back to "
+            f"travel-agnostic rules."
+        )
+
+    def _roll_world(self, seed: int):
+        """One shared seed, exactly like scripts/new-run.sh: every server-side randomizer
+        derives its own stream from it, so shipping this single number reproduces all of
+        them byte for byte. Rolling them HERE is what lets the fill reason about the real
+        world - which action yields which item, where each shop moved, where you start."""
+        return roll_all(
+            LOGIC_BUNDLE, seed,
+            gathering=self.options.gathering_randomization.current_key,
+            processing=self.options.processing_randomization.current_key,
+            shops=bool(self.options.shop_randomization),
+            spawn=self.options.spawn_randomization.current_key,
+            drops=self.options.drop_randomization.current_key,
+        )
+
+    def _engine_for(self, roll) -> LogicEngine:
+        item_sources = apply_rolls(LOGIC_BUNDLE["itemSources"], LOGIC_BUNDLE["randomizerPools"], roll)
+        return LogicEngine(
+            {**LOGIC_BUNDLE, "itemSources": item_sources},
+            quest_gates=self._unlocked_quests_gate_set(),
+            spawn_region=roll.spawn.region,
+            item_swaps=roll.item_swaps(),
+        )
+
+    def _unlocked_quests_gate_set(self) -> frozenset:
+        """Quest ids the engine should treat as needing a `quest_<id>` unlock item."""
+        return frozenset(GATED_QUEST_IDS) if self.options.quest_unlocks else frozenset()
+
+    def _infeasible_quests(self) -> frozenset:
+        if not self.region_logic:
+            return frozenset()
+        return frozenset(QUESTS) - self._max_state().completed
+
+    def _infeasible_checks(self, infeasible_quests: frozenset) -> frozenset:
+        if not self.region_logic:
+            return frozenset()
+        max_state = self._max_state()
+        out = set()
+        for check_id, loc in LOCATIONS.items():
+            if loc["kind"] == "quest" and loc["questId"] in infeasible_quests:
+                out.add(check_id)
+            elif loc["kind"] == "ds" and "dragon" in infeasible_quests:
+                out.add(check_id)
+            elif SKILL_QUEST_GATES.get(loc.get("skill")) in infeasible_quests:
+                out.add(check_id)  # the skill's gating quest can never be completed
+            elif loc["kind"] == "barcrawl":
+                anchor = BARCRAWL_ANCHOR_BY_CHECK.get(check_id)
+                if anchor is None:
+                    continue
+                region = self.engine.anchors.get(anchor)
+                if region in (None, 0) or region not in max_state.regions:
+                    out.add(check_id)
+        return frozenset(out)
 
     def create_regions(self) -> None:
         menu = Region("Menu", self.player, self.multiworld)
@@ -220,9 +436,19 @@ class RS2004World(World):
         menu.connect(gielinor)
 
         include_music = bool(self.options.music_checks)
+        # Feasibility exclusion (the AP-side twin of GenerateSeed.ts's): a check the
+        # region model cannot justify even with EVERY item collected can never fire in
+        # game either, so putting ANYTHING there - even filler - would lose it forever.
+        # Those locations are not created at all. The model is deliberately conservative
+        # (it only ever claims a place is reachable when it can prove it), which is the
+        # safe direction: at worst a genuinely-reachable check stays out of the pool.
+        self.infeasible_quests = self._infeasible_quests()
+        infeasible = self._infeasible_checks(self.infeasible_quests)
 
         for check_id, loc in LOCATIONS.items():
             if loc["kind"] == "music" and not include_music:
+                continue
+            if check_id in infeasible:
                 continue
             location = RS2004Location(self.player, loc["name"], loc["id"], gielinor)
             if loc.get("fillerOnly"):
@@ -233,6 +459,8 @@ class RS2004World(World):
 
         # quest-completion events, so rules can require "Completed: <id>"
         for qid in QUESTS:
+            if qid in self.infeasible_quests:
+                continue  # an event nothing can ever reach fails AP's accessibility sweep
             event = RS2004Location(self.player, f"Event: Completed {qid}", None, gielinor)
             event.place_locked_item(RS2004Item(f"Completed: {qid}", ItemClassification.progression, None, self.player))
             set_rule(event, lambda state, q=qid: self._quest_rule(state, q))
@@ -263,6 +491,10 @@ class RS2004World(World):
         return keys
 
     def _goal_rule(self, state, key: str) -> bool:
+        if self.region_logic:
+            # goals.json's own definition: skills + QP + quest chain + the curated
+            # anchors and extracted regions the goal needs you to physically stand in.
+            return GOAL_ID_BY_KEY[key] in self._derive(state).goals
         if key == "dragon":
             return state.has("Completed: dragon", self.player)
         if key == "barcrawl":
@@ -315,6 +547,82 @@ class RS2004World(World):
     def get_filler_item_name(self) -> str:
         return FILLER_NAME
 
+    # ------------------------------------------------------------------
+    # spoiler
+    # ------------------------------------------------------------------
+
+    def write_spoiler_header(self, spoiler_handle) -> None:
+        """The world this slot rolled - none of which AP can infer on its own.
+
+        Everything here is decided during generation and reproduced by the game server
+        from the same seed, so the spoiler is the only place a player (or a future
+        session debugging a seed) can see what world the fill actually reasoned over.
+        """
+        spoiler_handle.write(f"\nWorld seed:                      {self.run_seed}\n")
+        if not self.region_logic:
+            spoiler_handle.write("Region logic:                    off (travel-agnostic rules; the game server rolls its own world)\n")
+            return
+        reached, total = self.entrance_coverage
+        spoiler_handle.write(f"Home / spawn:                    {self.roll.spawn.label} ({self.roll.spawn.coord})\n")
+        spoiler_handle.write(f"Entrance layout:                 {len(self.entrance_overrides)} redirect(s), "
+                             f"{reached}/{total} pool sides reachable\n")
+        spoiler_handle.write(f"Gathering swaps:                 {len(self.roll.gather.swaps)} "
+                             f"({self.roll.gather.mode}, {len(self.roll.gather.pinned)} pinned vanilla)\n")
+        spoiler_handle.write(f"Processing swaps:                {len(self.roll.process.swaps)} "
+                             f"({self.roll.process.mode}, {len(self.roll.process.pinned)} pinned vanilla)\n")
+        spoiler_handle.write(f"Shops relocated:                 {self.roll.shops.moved}\n")
+        drops = self.roll.drops
+        if drops.mode == "mimic":
+            spoiler_handle.write(f"Drop tables mimicked:            {len(drops.mimic_map)} monster(s)\n")
+        elif drops.enabled:
+            spoiler_handle.write(f"Drop slots reassigned:           {drops.slots_changed} "
+                                 f"({drops.mode}, + {len(drops.death_drops)} death drop(s))\n")
+        if self.infeasible_quests:
+            spoiler_handle.write(f"Quests excluded (unreachable):   {', '.join(sorted(self.infeasible_quests))}\n")
+
+    def write_spoiler(self, spoiler_handle) -> None:
+        if not self.region_logic:
+            return
+        name = self.multiworld.get_player_name(self.player)
+
+        spoiler_handle.write(f"\n\n2004Scape ({name}) - gathering swaps "
+                             f"[{self.roll.gather.mode}]:\n\n")
+        for was, now in sorted(self.roll.gather.swaps.items()):
+            spoiler_handle.write(f"{was} -> {now}\n")
+
+        spoiler_handle.write(f"\n\n2004Scape ({name}) - processing swaps "
+                             f"[{self.roll.process.mode}]:\n\n")
+        for was, now in sorted(self.roll.process.swaps.items()):
+            spoiler_handle.write(f"{was} -> {now}\n")
+
+        if self.roll.shops.enabled:
+            spoiler_handle.write(f"\n\n2004Scape ({name}) - shop relocations:\n\n")
+            for npc, shop in sorted(self.roll.shops.stocks_now.items()):
+                spoiler_handle.write(f"{npc} now stocks {shop}\n")
+
+        drops = self.roll.drops
+        if drops.mode == "mimic":
+            pool = LOGIC_BUNDLE["randomizerPools"]["drops"]
+            handler = {s["index"]: s["handler"] for s in pool["mimic"]["slots"]}
+            unit = {u["index"]: u["name"] for u in pool["mimic"]["units"]}
+            spoiler_handle.write(f"\n\n2004Scape ({name}) - drop tables [mimic]:\n\n")
+            for slot, borrowed in sorted(drops.mimic_map.items()):
+                spoiler_handle.write(f"{handler[slot]} drops like {unit.get(borrowed, '?')}\n")
+        elif drops.enabled:
+            slots = LOGIC_BUNDLE["randomizerPools"]["drops"]["slots"]
+            spoiler_handle.write(f"\n\n2004Scape ({name}) - drop slots [{drops.mode}]:\n\n")
+            for ref, item in sorted(drops.new_item.items()):
+                slot = slots[ref]
+                if item != slot["item"]:
+                    spoiler_handle.write(f"{slot['npc']} ({slot['bucket']}): {slot['item']} -> {item}\n")
+            spoiler_handle.write(f"\n\n2004Scape ({name}) - guaranteed death drops:\n\n")
+            for npc, item in sorted(drops.death_drops.items()):
+                spoiler_handle.write(f"{npc} -> {item}\n")
+
+        spoiler_handle.write(f"\n\n2004Scape ({name}) - entrances:\n\n")
+        for trigger, arrival in sorted(self.entrance_overrides.items()):
+            spoiler_handle.write(f"{trigger} -> {arrival}\n")
+
     def fill_slot_data(self) -> dict:
         goal_keys = self._goal_keys()
         quest_unlocks = bool(self.options.quest_unlocks.value)
@@ -327,12 +635,26 @@ class RS2004World(World):
             "progressiveQuests": quest_unlocks and bool(self.options.progressive_quests.value),
             "relics": sorted(self.options.relics.value),
             "musicChecks": bool(self.options.music_checks.value),
+            "regionLogic": self.region_logic,
             "infiniteRun": bool(self.options.infinite_run.value),
             "progressiveXpRate": bool(self.options.progressive_xp_rate.value),
+            "gatherSpeed": int(self.options.gather_speed.value),
+            # The finished entrance layout, when this world built it (region_logic on).
+            # The client writes it straight to data/config/ap-entrances.json, so the map
+            # the server serves is the map the fill reasoned over - no reroll, no
+            # server-side shuffle. Absent => the server rolls its own from seedOptions.
+            "entranceOverrides": self.entrance_overrides if self.region_logic else {},
             # seed knobs: the game server adopts these on connect and applies
             # them the next time it rolls a seed (scripts/new-run)
             "seedOptions": {
-                "entrances": self.options.entrance_randomization.current_key,
+                # THE seed. new-run.sh feeds one shared seed to every randomizer, so
+                # pinning it here makes the server reproduce the exact gathering,
+                # processing, shop and spawn tables this world's fill reasoned over.
+                # (Entrances don't need it - their finished table is above.)
+                "seed": self.run_seed,
+                # "off" whenever this world already shipped a table above - re-rolling
+                # entrances server-side would invalidate every rule the fill just used.
+                "entrances": "off" if self.region_logic else self.options.entrance_randomization.current_key,
                 "npcDrip": bool(self.options.npc_drip.value),
                 "shops": bool(self.options.shop_randomization.value),
                 "teleports": bool(self.options.teleport_randomization.value),

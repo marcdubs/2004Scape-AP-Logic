@@ -1,3 +1,8 @@
+// AP: every gathering success roll below goes through ap_gather_random instead of
+// vanilla stat_random - same math, with the ap-options.json "gatherSpeed" percentage
+// folded into the level-interpolated threshold (100 = vanilla, higher = fewer failed
+// cycles). Declared in scripts/ap/ap.rs2; see 2004Scape-AP-Logic GitHub #13. The
+// action delay is untouched, so a resource still takes at least one full swing/cast.
 // normal rocks
 [oploc1,_mining_rock_normal] @mining_firstswing(get_ore_normal);
 [oploc3,_mining_rock_normal] @mining_continue(get_ore_normal);
@@ -146,7 +151,7 @@ if (random($chance) = ^true) {
         $data = db_findnext;
         mes("You just found <~add_article(oc_name(db_getfield($data, gem_cutting_table:cut_gem, 0)))>!");
     }
-} else if (stat_random(mining, db_getfield($data, mining_table:rock_successchance, 0)) = true) {
+} else if (ap_gather_random(mining, db_getfield($data, mining_table:rock_successchance, 0)) = true) {
     // They added a 1t p_delay in this update: https://oldschool.runescape.wiki/w/Update:Special_Attacks
     p_delay(0);
     // deplete
@@ -191,7 +196,7 @@ if (random($chance) = ^true) {
         $data = db_findnext;
         mes("You just found <~add_article(oc_name(db_getfield($data, gem_cutting_table:cut_gem, 0)))>!");
     }
-} else if (stat_random(mining, db_getfield($data, mining_table:rock_successchance, 0)) = true) {
+} else if (ap_gather_random(mining, db_getfield($data, mining_table:rock_successchance, 0)) = true) {
     // deplete
     def_int $respawn = ~scale_by_playercount(db_getfield($data, mining_table:rock_respawnrate, 0));
     // Temp note: dur does not need updated
@@ -234,7 +239,7 @@ if ($neck ! null & oc_category($neck) = category_557 & map_members = ^true) {
     $low = multiply($low, 3);
     $high = multiply($high, 3);
 }
-if (stat_random(mining, $low, $high) = true) {
+if (ap_gather_random(mining, $low, $high) = true) {
     // They added a 1t p_delay in this update: https://oldschool.runescape.wiki/w/Update:Special_Attacks
     // p_delay(0);
     // deplete

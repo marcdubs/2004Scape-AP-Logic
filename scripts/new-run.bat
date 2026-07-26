@@ -54,6 +54,8 @@ set RUN_GATHER=1
 REM gathering swap table (runtime JSON, restart only)
 set RUN_PROCESS=1
 REM processing/recipe swap table (runtime JSON, restart only)
+set RUN_THIEVING=1
+REM thieving loot swap table (runtime JSON, restart only)
 set RUN_SPAWN=1
 REM random home/respawn point (MUST run before entrances - see note above)
 set RUN_ENTRANCES=1
@@ -64,6 +66,8 @@ set REFRESH_REGION_GRAPH=0
 REM only after map/content changes (validator input; slow-ish)
 set REFRESH_WORLDMAP_PNG=0
 REM tracker map images; only after map changes
+set RUN_VALIDATE=1
+REM print the beatability report (spheres + goals + item obtainability) at the end
 
 REM ============================ per-stage knobs ================================
 
@@ -83,19 +87,28 @@ set REGENERATE_EXTRA=
 REM e.g. "--skip-drip" or "--drip-seed 555"
 
 REM RandomizeGathering.ts - what mining/fishing/woodcutting actually yield.
-REM   all params: [--seed <n>] [--mode shuffle|chaos]
+REM   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
 REM               [--skills mining,fishing,woodcutting] [--exclude <item,item>]
 REM               [--pin-quest-items] [--no-quest-pins] [--dry-run]
 set GATHER_MODE=shuffle
-REM shuffle (bijective, everything obtainable) | chaos
+REM shuffle (bijective) | tiered (bijective within level bands) | chaos
 set GATHER_EXTRA=
 
 REM RandomizeProcessing.ts - what cooking/smithing/crafting/fletching produce.
-REM   all params: [--seed <n>] [--mode shuffle|chaos]
+REM   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
 REM               [--skills cooking,smithing,crafting,fletching] [--exclude <item,item>]
 REM               [--pin-quest-items] [--no-quest-pins] [--dry-run]
 set PROCESS_MODE=shuffle
 set PROCESS_EXTRA=
+
+REM RandomizeThieving.ts - what pickpockets/market stalls/trapped chests hand you.
+REM   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
+REM               [--surfaces pickpocket,stalls,chests] [--exclude <item,item>]
+REM               [--pin-quest-items] [--no-quest-pins] [--dry-run] [--export-pool <path>]
+REM   (`--exclude coins` leaves the big-money rows handing out vanilla coins;
+REM    quantity is never rescaled.)
+set THIEVING_MODE=shuffle
+set THIEVING_EXTRA=
 
 REM RandomizeSpawn.ts - the home/respawn point. Runs BEFORE entrances (see note up top).
 REM   all params: [--seed <n>] [--mode city|chunk] [--dry-run] [--include-far-west]
@@ -157,6 +170,12 @@ if "%RUN_PROCESS%"=="1" (
     call npx tsx tools/process/RandomizeProcessing.ts --seed %SEED% --mode %PROCESS_MODE% %PROCESS_EXTRA% || goto :error
 )
 
+if "%RUN_THIEVING%"=="1" (
+    echo.
+    echo ==^> npx tsx tools/thieving/RandomizeThieving.ts --seed %SEED% --mode %THIEVING_MODE% %THIEVING_EXTRA%
+    call npx tsx tools/thieving/RandomizeThieving.ts --seed %SEED% --mode %THIEVING_MODE% %THIEVING_EXTRA% || goto :error
+)
+
 if "%RUN_SPAWN%"=="1" (
     echo.
     echo ==^> npx tsx tools/spawn/RandomizeSpawn.ts --seed %SEED% --mode %SPAWN_MODE% %SPAWN_EXTRA%
@@ -198,12 +217,32 @@ if "%ADOPTED%"=="1" (
     echo ==^> AP run: removed local ap-placements.json - multiworld owns placements; quest gates re-sync on connect
 )
 
+REM Beatability report: sphere-by-sphere reachability incl. the four-source item
+REM obtainability model. --verbose prints every sphere; otherwise just the verdict.
+if "%RUN_VALIDATE%"=="1" (
+    if exist "tools\logic\region-graph.json" (
+        echo.
+        REM tolerate a non-zero (BLOCKED) exit - the report is the point, don't abort the run.
+        if "%VERBOSE%"=="1" (
+            echo ==^> npx tsx tools/logic/ValidateSeed.ts --verbose
+            call npx tsx tools/logic/ValidateSeed.ts --verbose
+        ) else (
+            echo ==^> npx tsx tools/logic/ValidateSeed.ts
+            call npx tsx tools/logic/ValidateSeed.ts
+        )
+    ) else (
+        echo.
+        echo ==^> skipping ValidateSeed: tools\logic\region-graph.json missing - run "npx tsx tools/logic/BuildRegionGraph.ts" once ^(one-time^).
+    )
+)
+
 echo.
 echo ================================================================
 echo New run rolled (seed %SEED%). Now:
 echo   1. RESTART the Windows server.
-echo   2. Walkthrough: npx tsx tools/sim/SimulateProgression.ts --verbosity 2   (solo runs only - AP runs have no local placements)
-echo   3. Sanity:      npx tsx tools/logic/ValidateSeed.ts
+echo   2. Walkthrough: npx tsx tools/sim/SimulateProgression.ts --verbosity 2   (AP runs get the quest-graph report instead: the room owns placements)
+echo                   add --current-unlocks to ask "what can I do RIGHT NOW" with the unlocks already received
+echo   3. Re-validate: npx tsx tools/logic/ValidateSeed.ts --verbose   (ran above unless RUN_VALIDATE=0)
 echo   4. Tracker:     http://localhost:8080/ap/   (?spoiler=1 to see everything)
 echo   5. Testing aids: tools/ap/SetUnlock.ts ^<name^> ^<count^> ^| --clear
 echo ================================================================

@@ -14,6 +14,18 @@ export function mulberry32(seed: number): () => number {
     };
 }
 
+// Java-style 31-hash, used to salt one seed into several independent streams so each
+// bucket/band of a bucketed shuffle gets its own PRNG (`mulberry32(seed ^ hashKey(name))`).
+// Salting by NAME rather than by index means adding or reordering buckets doesn't
+// reshuffle the ones that didn't change.
+export function hashKey(key: string): number {
+    let h = 0;
+    for (let i = 0; i < key.length; i++) {
+        h = (Math.imul(h, 31) + key.charCodeAt(i)) | 0;
+    }
+    return h >>> 0;
+}
+
 export function shuffle<T>(arr: T[], rand: () => number): T[] {
     const out = arr.slice();
     for (let i = out.length - 1; i > 0; i--) {

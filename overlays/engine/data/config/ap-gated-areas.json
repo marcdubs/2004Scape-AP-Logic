@@ -1,76 +1,2824 @@
 {
-    "areas": [
+  "_note": "Re-activated full gated-area set (GitHub #16). Derived areas gate by region membership behind their exact door tiles (doors[]); the 7 curated guilds keep tight boxes. Regenerate region-graph.json + quest-regions.generated.json together whenever this changes.",
+  "areas": [
+    {
+      "name": "Champions' Guild",
+      "boxes": [
         {
-            "name": "Champions' Guild",
-            "derivation": "Door 'championdoor' (id 1805) at 0_49_52_55_35 (abs 3191,3363). Building perimeter = 'brickwall' (id 1902) placements spanning local x51-58,z22-35 on BOTH level 0 and level 1 (m49_52.jm2), +2 tile pad.",
-            "boxes": [
-                { "level": 0, "x1": 3185, "z1": 3348, "x2": 3196, "z2": 3365 },
-                { "level": 1, "x1": 3185, "z1": 3348, "x2": 3196, "z2": 3365 }
-            ],
-            "require": { "varp": "qp", "gte": 32 },
-            "message": "A strange force bars your way. (Champions' Guild: requires 32 Quest Points)"
+          "level": 0,
+          "x1": 3185,
+          "z1": 3348,
+          "x2": 3196,
+          "z2": 3365
         },
         {
-            "name": "Heroes' Guild",
-            "derivation": "Doors 'herodoor_l'/'herodoor_r' at 0_45_54_22_54 / 22_55 (abs 2902,3510-3511). Walled compound = 'castlewall' (id 1911) placements spanning local x8-22,z47-62 on levels 0/1/2 (m45_54.jm2), +2 tile pad.",
-            "boxes": [
-                { "level": 0, "x1": 2886, "z1": 3501, "x2": 2904, "z2": 3520 },
-                { "level": 1, "x1": 2886, "z1": 3501, "x2": 2904, "z2": 3520 },
-                { "level": 2, "x1": 2886, "z1": 3501, "x2": 2904, "z2": 3520 }
-            ],
-            "require": { "varp": "heroquest", "gte": 15 },
-            "message": "A strange force bars your way. (Heroes' Guild: requires completion of the Heroes' Quest)"
-        },
-        {
-            "name": "Legends' Guild",
-            "derivation": "Gate 'legendsguildgatel'/'legendsguildgater' at 0_42_52_40_21 / 41_21 (abs 2728-2729,3349), constants ^legends_guild_gate_west_coord etc. Level 0 = outer fence+building ('timberwall'/'bluepaintedbrickwall_2'/'wallshield3_white') local x29-52,z20-47; level 1 = building only local x34-46,z35-47; level 2 = small upper room ('brickwall') local x35-46,z44-48 (m42_52.jm2), +2 tile pad each.",
-            "boxes": [
-                { "level": 0, "x1": 2715, "z1": 3346, "x2": 2742, "z2": 3377 },
-                { "level": 1, "x1": 2720, "z1": 3361, "x2": 2736, "z2": 3377 },
-                { "level": 2, "x1": 2721, "z1": 3370, "x2": 2736, "z2": 3378 }
-            ],
-            "require": { "varp": "legendsquest", "gte": 75 },
-            "message": "A strange force bars your way. (Legends' Guild: requires completion of the Legends' Quest)"
-        },
-        {
-            "name": "Crafting Guild",
-            "derivation": "Door 'crafting_guild_door' at 0_45_51_53_25 (abs 2933,3289); vanilla check is level 40 Crafting AND worn brown apron (allOf). Level 0 = 'paintedbrickwall_1' local x47-59,z13-29; level 1 = 'paintedbrickwall_2' local x50-56,z17-24 (m45_51.jm2), +2 tile pad each.",
-            "boxes": [
-                { "level": 0, "x1": 2925, "z1": 3275, "x2": 2941, "z2": 3295 },
-                { "level": 1, "x1": 2928, "z1": 3279, "x2": 2938, "z2": 3290 }
-            ],
-            "require": { "allOf": [ { "stat": "crafting", "gte": 40 }, { "item": "brown_apron" } ] },
-            "message": "A strange force bars your way. (Crafting Guild: requires level 40 Crafting and a worn brown apron)"
-        },
-        {
-            "name": "Wizards' Guild",
-            "derivation": "Doors 'magicguild_door_l'/'magicguild_door_r' (two pairs, outer+inner) around local x24-37,z15-16 (m40_48.jm2, abs 2584-2597,3087-3088). Level 0 = tower shell 'bluepaintedbrickwall_1' local x24-37,z9-22; levels 1/2 = 'witcheswallchart' local x25-35,z12-19, +2 tile pad each.",
-            "boxes": [
-                { "level": 0, "x1": 2582, "z1": 3079, "x2": 2599, "z2": 3096 },
-                { "level": 1, "x1": 2583, "z1": 3082, "x2": 2597, "z2": 3093 },
-                { "level": 2, "x1": 2583, "z1": 3082, "x2": 2597, "z2": 3093 }
-            ],
-            "require": { "stat": "magic", "gte": 66 },
-            "message": "A strange force bars your way. (Wizards' Guild: requires level 66 Magic)"
-        },
-        {
-            "name": "Mining Guild",
-            "derivation": "Surface ladder 'miningguildladder' at 0_47_52_10-12_10-12 (Falador mining site, movecoord +6400 z to the underground layer); interior door 'miningguilddoor' at 0_47_152_38_28 (abs 3046,9756). The whole dungeon is self-contained within mapsquare (47,152) - 'cavewall_top'/'cavewall_face1' fill essentially the entire square on levels 0-1, so the box is the full mapsquare (no pad needed/possible - padding would spill into an unrelated adjacent square). NOTE: mining_guild.rs2 is a standalone script, not in the ladders+stairs shuffle pool today - included for forward coverage if workstream B ever adds it.",
-            "boxes": [
-                { "level": 0, "x1": 3008, "z1": 9728, "x2": 3071, "z2": 9791 },
-                { "level": 1, "x1": 3008, "z1": 9728, "x2": 3071, "z2": 9791 }
-            ],
-            "require": { "stat": "mining", "gte": 60 },
-            "message": "A strange force bars your way. (Mining Guild: requires level 60 Mining)"
-        },
-        {
-            "name": "Prayer Guild",
-            "derivation": "Ladder 'monasteryladder' at 0_47_54_38_27 / 49_27 (abs 3046/3057,3483), gated by varp %prayer_guild (set permanently to 1 via Abbot Langley dialogue, itself requiring stat_base(prayer)>=31 at join time - the persistent flag is what the ladder rechecks, so that's what this area gate mirrors). ONLY the upper floor is members-only (ground floor chapel is public) - box covers level 1 only: monastery building 'paintedbrickwall_2' local x35-52,z25-44 (m47_54.jm2), +2 tile pad.",
-            "boxes": [
-                { "level": 1, "x1": 3041, "z1": 3479, "x2": 3062, "z2": 3502 }
-            ],
-            "require": { "varp": "prayer_guild", "gte": 1 },
-            "message": "A strange force bars your way. (Prayer Guild: you must join the Order of Ardougne monks first)"
+          "level": 1,
+          "x1": 3185,
+          "z1": 3348,
+          "x2": 3196,
+          "z2": 3365
         }
-    ]
+      ],
+      "require": {
+        "varp": "qp",
+        "gte": 32
+      },
+      "message": "A strange force bars your way. (Champions' Guild: requires 32 Quest Points)"
+    },
+    {
+      "name": "Heroes' Guild",
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2886,
+          "z1": 3501,
+          "x2": 2904,
+          "z2": 3520
+        },
+        {
+          "level": 1,
+          "x1": 2886,
+          "z1": 3501,
+          "x2": 2904,
+          "z2": 3520
+        },
+        {
+          "level": 2,
+          "x1": 2886,
+          "z1": 3501,
+          "x2": 2904,
+          "z2": 3520
+        }
+      ],
+      "require": {
+        "varp": "heroquest",
+        "gte": 15
+      },
+      "message": "A strange force bars your way. (Heroes' Guild: requires completion of the Heroes' Quest)"
+    },
+    {
+      "name": "Legends' Guild",
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2715,
+          "z1": 3346,
+          "x2": 2742,
+          "z2": 3377
+        },
+        {
+          "level": 1,
+          "x1": 2720,
+          "z1": 3361,
+          "x2": 2736,
+          "z2": 3377
+        },
+        {
+          "level": 2,
+          "x1": 2721,
+          "z1": 3370,
+          "x2": 2736,
+          "z2": 3378
+        }
+      ],
+      "require": {
+        "varp": "legendsquest",
+        "gte": 75
+      },
+      "message": "A strange force bars your way. (Legends' Guild: requires completion of the Legends' Quest)"
+    },
+    {
+      "name": "Crafting Guild",
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2925,
+          "z1": 3275,
+          "x2": 2941,
+          "z2": 3295
+        },
+        {
+          "level": 1,
+          "x1": 2928,
+          "z1": 3279,
+          "x2": 2938,
+          "z2": 3290
+        }
+      ],
+      "require": {
+        "allOf": [
+          {
+            "stat": "crafting",
+            "gte": 40
+          },
+          {
+            "item": "brown_apron"
+          }
+        ]
+      },
+      "message": "A strange force bars your way. (Crafting Guild: requires level 40 Crafting and a worn brown apron)"
+    },
+    {
+      "name": "Wizards' Guild",
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2582,
+          "z1": 3079,
+          "x2": 2599,
+          "z2": 3096
+        },
+        {
+          "level": 1,
+          "x1": 2583,
+          "z1": 3082,
+          "x2": 2597,
+          "z2": 3093
+        },
+        {
+          "level": 2,
+          "x1": 2583,
+          "z1": 3082,
+          "x2": 2597,
+          "z2": 3093
+        }
+      ],
+      "require": {
+        "stat": "magic",
+        "gte": 66
+      },
+      "message": "A strange force bars your way. (Wizards' Guild: requires level 66 Magic)"
+    },
+    {
+      "name": "Mining Guild",
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3008,
+          "z1": 9728,
+          "x2": 3071,
+          "z2": 9791
+        },
+        {
+          "level": 1,
+          "x1": 3008,
+          "z1": 9728,
+          "x2": 3071,
+          "z2": 9791
+        }
+      ],
+      "require": {
+        "stat": "mining",
+        "gte": 60
+      },
+      "message": "A strange force bars your way. (Mining Guild: requires level 60 Mining)"
+    },
+    {
+      "name": "Prayer Guild",
+      "boxes": [
+        {
+          "level": 1,
+          "x1": 3041,
+          "z1": 3479,
+          "x2": 3062,
+          "z2": 3502
+        }
+      ],
+      "require": {
+        "varp": "prayer_guild",
+        "gte": 1
+      },
+      "message": "A strange force bars your way. (Prayer Guild: you must join the Order of Ardougne monks first)"
+    },
+    {
+      "name": "Prison Door (alidoor)",
+      "doors": [
+        "0_48_50_51_43"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3120,
+          "z1": 3239,
+          "x2": 3126,
+          "z2": 3244
+        }
+      ],
+      "require": {
+        "item": "princeskey"
+      },
+      "message": "A strange force bars your way. (Prison Door)"
+    },
+    {
+      "name": "Prison Door (arena_jeremydoor)",
+      "doors": [
+        "0_40_49_57_31"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2613,
+          "z1": 3165,
+          "x2": 2617,
+          "z2": 3171
+        }
+      ],
+      "require": {
+        "item": "khazard_cellkeys"
+      },
+      "message": "A strange force bars your way. (Prison Door)"
+    },
+    {
+      "name": "Prison Door (arena_prisondoor)",
+      "doors": [
+        "0_40_49_29_6",
+        "0_40_49_35_6",
+        "0_40_49_40_6",
+        "0_40_49_57_23",
+        "0_40_49_57_27"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2585,
+          "z1": 3141,
+          "x2": 2592,
+          "z2": 3145
+        },
+        {
+          "level": 0,
+          "x1": 2591,
+          "z1": 3141,
+          "x2": 2597,
+          "z2": 3145
+        },
+        {
+          "level": 0,
+          "x1": 2596,
+          "z1": 3141,
+          "x2": 2602,
+          "z2": 3145
+        },
+        {
+          "level": 0,
+          "x1": 2613,
+          "z1": 3157,
+          "x2": 2617,
+          "z2": 3162
+        },
+        {
+          "level": 0,
+          "x1": 2613,
+          "z1": 3161,
+          "x2": 2617,
+          "z2": 3166
+        }
+      ],
+      "require": {
+        "item": "khazard_cellkeys"
+      },
+      "message": "A strange force bars your way. (Prison Door)"
+    },
+    {
+      "name": "Obstacle pipe (barbarian_obstacle_pipe)",
+      "doors": [
+        "0_39_55_56_39"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2527,
+          "z1": 3541,
+          "x2": 2554,
+          "z2": 3560
+        },
+        {
+          "level": 1,
+          "x1": 2528,
+          "z1": 3541,
+          "x2": 2554,
+          "z2": 3560
+        }
+      ],
+      "require": {
+        "stat": "agility",
+        "gte": 35
+      },
+      "message": "A strange force bars your way. (Obstacle pipe)"
+    },
+    {
+      "name": "Door (baxtorian_door_2_waterfall_quest)",
+      "doors": [
+        "0_39_154_44_44",
+        "0_39_154_46_36",
+        "0_40_154_6_45",
+        "0_40_154_8_37",
+        "0_40_154_44_44",
+        "0_40_154_46_36"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2560,
+          "z1": 9860,
+          "x2": 2596,
+          "z2": 9918
+        },
+        {
+          "level": 0,
+          "x1": 2598,
+          "z1": 9889,
+          "x2": 2609,
+          "z2": 9917
+        }
+      ],
+      "require": {
+        "item": "baxtorian_key_waterfall_quest"
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Tent door (bedabin_tentdoor)",
+      "doors": [
+        "0_49_47_33_38"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3166,
+          "z1": 3045,
+          "x2": 3173,
+          "z2": 3050
+        }
+      ],
+      "require": {
+        "varp": "desertrescue_map_mechanisms",
+        "bit": 11
+      },
+      "message": "A strange force bars your way. (Tent door)"
+    },
+    {
+      "name": "Door (blackarmdoor)",
+      "doors": [
+        "0_49_52_49_60"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3181,
+          "z1": 3387,
+          "x2": 3190,
+          "z2": 3399
+        },
+        {
+          "level": 1,
+          "x1": 3181,
+          "z1": 3382,
+          "x2": 3190,
+          "z2": 3399
+        }
+      ],
+      "require": {
+        "varp": "blackarmgang",
+        "gte": 3
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Prison door (capt_siad_cell_door)",
+      "doors": [
+        "0_51_47_23_26"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3283,
+          "z1": 3031,
+          "x2": 3288,
+          "z2": 3038
+        },
+        {
+          "level": 1,
+          "x1": 3283,
+          "z1": 3030,
+          "x2": 3294,
+          "z2": 3038
+        }
+      ],
+      "require": {
+        "item": "thcelldoorkey"
+      },
+      "message": "A strange force bars your way. (Prison door)"
+    },
+    {
+      "name": "Cage (cave_railings3)",
+      "doors": [
+        "0_37_150_28_5",
+        "0_37_150_29_5",
+        "0_37_150_30_5"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2393,
+          "z1": 9604,
+          "x2": 2395,
+          "z2": 9607
+        },
+        {
+          "level": 0,
+          "x1": 2395,
+          "z1": 9600,
+          "x2": 2399,
+          "z2": 9605
+        }
+      ],
+      "require": {
+        "item": "caverailing"
+      },
+      "message": "A strange force bars your way. (Cage)"
+    },
+    {
+      "name": "Door (cavewitch_door)",
+      "doors": [
+        "1_33_71_46_22"
+      ],
+      "boxes": [
+        {
+          "level": 1,
+          "x1": 2150,
+          "z1": 4563,
+          "x2": 2158,
+          "z2": 4568
+        },
+        {
+          "level": 0,
+          "x1": 2147,
+          "z1": 4560,
+          "x2": 2161,
+          "z2": 4575
+        }
+      ],
+      "require": {
+        "varp": "ibanmulti",
+        "bit": 9
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (chefdoor)",
+      "doors": [
+        "0_49_53_7_52"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3137,
+          "z1": 3443,
+          "x2": 3147,
+          "z2": 3454
+        },
+        {
+          "level": 1,
+          "x1": 3137,
+          "z1": 3445,
+          "x2": 3149,
+          "z2": 3454
+        },
+        {
+          "level": 2,
+          "x1": 3137,
+          "z1": 3445,
+          "x2": 3146,
+          "z2": 3454
+        }
+      ],
+      "require": {
+        "item": "chefs_hat"
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (closet_door)",
+      "doors": [
+        "0_40_50_6_37",
+        "1_41_48_51_13",
+        "0_41_51_48_34",
+        "0_41_51_48_40",
+        "0_41_51_48_41",
+        "0_41_51_48_47",
+        "0_41_51_52_34",
+        "0_41_51_52_40",
+        "0_41_51_52_41",
+        "0_48_52_35_39"
+      ],
+      "boxes": [
+        {
+          "level": 1,
+          "x1": 2674,
+          "z1": 3085,
+          "x2": 2679,
+          "z2": 3089
+        },
+        {
+          "level": 0,
+          "x1": 3107,
+          "z1": 3365,
+          "x2": 3113,
+          "z2": 3369
+        },
+        {
+          "level": 1,
+          "x1": 3091,
+          "z1": 3353,
+          "x2": 3126,
+          "z2": 3374
+        },
+        {
+          "level": 2,
+          "x1": 3103,
+          "z1": 3361,
+          "x2": 3113,
+          "z2": 3371
+        }
+      ],
+      "require": {
+        "item": "closet_key"
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (combodoor)",
+      "doors": [
+        "0_41_51_10_59"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2626,
+          "z1": 3319,
+          "x2": 2634,
+          "z2": 3326
+        }
+      ],
+      "require": {
+        "varp": "handelmort_traps_disabled",
+        "bit": 0
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Gate (ctratgatec)",
+      "doors": [
+        "0_40_150_19_56"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2573,
+          "z1": 9654,
+          "x2": 2579,
+          "z2": 9659
+        }
+      ],
+      "require": {
+        "varp": "cogquest",
+        "bit": 4
+      },
+      "message": "A strange force bars your way. (Gate)"
+    },
+    {
+      "name": "Large door (death_castledoor)",
+      "doors": [
+        "0_45_55_14_46"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2890,
+          "z1": 3566,
+          "x2": 2896,
+          "z2": 3572
+        },
+        {
+          "level": 1,
+          "x1": 2890,
+          "z1": 3566,
+          "x2": 2896,
+          "z2": 3572
+        }
+      ],
+      "require": {
+        "varp": "death_equiproom",
+        "gte": 70
+      },
+      "message": "A strange force bars your way. (Large door)"
+    },
+    {
+      "name": "Door (death_harold_door)",
+      "doors": [
+        "1_45_55_26_23"
+      ],
+      "boxes": [
+        {
+          "level": 1,
+          "x1": 2904,
+          "z1": 3535,
+          "x2": 2908,
+          "z2": 3543
+        }
+      ],
+      "require": {
+        "varp": "death_equiproom",
+        "gte": 20
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Gate (deepdungeondoor)",
+      "doors": [
+        "0_45_153_44_11"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2923,
+          "z1": 9804,
+          "x2": 2926,
+          "z2": 9806
+        }
+      ],
+      "require": {
+        "item": "dusty_key"
+      },
+      "message": "A strange force bars your way. (Gate)"
+    },
+    {
+      "name": "Door (dragon_slayer_magic_door)",
+      "doors": [
+        "0_47_153_43_48"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3050,
+          "z1": 9835,
+          "x2": 3061,
+          "z2": 9845
+        }
+      ],
+      "require": {
+        "varp": "dragon_oracle",
+        "gte": 2
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Wall (dragonsecretdoor)",
+      "doors": [
+        "0_44_150_20_0"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2833,
+          "z1": 9594,
+          "x2": 2835,
+          "z2": 9601
+        }
+      ],
+      "require": {
+        "varp": "dragon_wall",
+        "gte": 0
+      },
+      "message": "A strange force bars your way. (Wall)"
+    },
+    {
+      "name": "Door (dungeonjail)",
+      "doors": [
+        "0_45_151_51_26",
+        "0_45_151_51_30"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2927,
+          "z1": 9682,
+          "x2": 2935,
+          "z2": 9690
+        },
+        {
+          "level": 1,
+          "x1": 2927,
+          "z1": 9682,
+          "x2": 2935,
+          "z2": 9690
+        },
+        {
+          "level": 0,
+          "x1": 2927,
+          "z1": 9694,
+          "x2": 2935,
+          "z2": 9705
+        },
+        {
+          "level": 1,
+          "x1": 2927,
+          "z1": 9694,
+          "x2": 2935,
+          "z2": 9705
+        }
+      ],
+      "require": {
+        "item": "jail_key"
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Storeroom Door (eadgar_storeroomdoor)",
+      "doors": [
+        "0_44_157_53_37"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2850,
+          "z1": 10062,
+          "x2": 2871,
+          "z2": 10085
+        }
+      ],
+      "require": {
+        "varp": "eadgar_quest",
+        "gte": 100
+      },
+      "message": "A strange force bars your way. (Storeroom Door)"
+    },
+    {
+      "name": "Gate (east_ardy_sewer_gate_north)",
+      "doors": [
+        "0_41_151_31_51"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2655,
+          "z1": 9675,
+          "x2": 2684,
+          "z2": 9717
+        }
+      ],
+      "require": {
+        "stat": "thieving",
+        "gte": 31
+      },
+      "message": "A strange force bars your way. (Gate)"
+    },
+    {
+      "name": "Gate (east_ardy_sewer_gate_south)",
+      "doors": [
+        "0_41_151_31_50"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2650,
+          "z1": 9711,
+          "x2": 2665,
+          "z2": 9713
+        }
+      ],
+      "require": {
+        "stat": "thieving",
+        "gte": 31
+      },
+      "message": "A strange force bars your way. (Gate)"
+    },
+    {
+      "name": "Door (elenagateshut)",
+      "doors": [
+        "0_39_151_43_8"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2539,
+          "z1": 9669,
+          "x2": 2543,
+          "z2": 9674
+        }
+      ],
+      "require": {
+        "item": "elenakey"
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Gate (elvarg_gate_left)",
+      "doors": [
+        "0_44_150_31_37"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2846,
+          "z1": 9627,
+          "x2": 2864,
+          "z2": 9647
+        }
+      ],
+      "require": {
+        "varp": "dragonquest",
+        "gte": 9
+      },
+      "message": "A strange force bars your way. (Gate)"
+    },
+    {
+      "name": "Gate (elvarg_gate_right)",
+      "doors": [
+        "0_44_150_31_36"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2846,
+          "z1": 9627,
+          "x2": 2864,
+          "z2": 9647
+        }
+      ],
+      "require": {
+        "varp": "dragonquest",
+        "gte": 9
+      },
+      "message": "A strange force bars your way. (Gate)"
+    },
+    {
+      "name": "Door (fightarena_door1)",
+      "doors": [
+        "0_40_49_25_5",
+        "0_40_49_57_35"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2584,
+          "z1": 3138,
+          "x2": 2620,
+          "z2": 3172
+        }
+      ],
+      "require": {
+        "varp": "arenaquest",
+        "gte": 2
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (fightarena_door2)",
+      "doors": [
+        "0_40_49_46_16"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2584,
+          "z1": 3138,
+          "x2": 2620,
+          "z2": 3172
+        }
+      ],
+      "require": {
+        "varp": "arenaquest",
+        "gte": 9
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Battlement (ganothbattlement)",
+      "doors": [
+        "0_39_47_11_3",
+        "0_39_47_11_4"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2501,
+          "z1": 3012,
+          "x2": 2509,
+          "z2": 3020
+        }
+      ],
+      "require": {
+        "allOf": [
+          {
+            "varp": "itwatchtower_bits",
+            "bit": 10
+          },
+          {
+            "varp": "itwatchtower_bits",
+            "bit": 11
+          }
+        ]
+      },
+      "message": "A strange force bars your way. (Battlement)"
+    },
+    {
+      "name": "Door (garvdoor)",
+      "doors": [
+        "0_43_49_22_51"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2758,
+          "z1": 3187,
+          "x2": 2782,
+          "z2": 3200
+        }
+      ],
+      "require": {
+        "allOf": [
+          {
+            "varp": "heroquest",
+            "gte": 10
+          },
+          {
+            "varp": "blackarmgang",
+            "gte": 4
+          }
+        ]
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (golrie_gate_waterfall_quest)",
+      "doors": [
+        "0_39_149_19_39"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2508,
+          "z1": 9575,
+          "x2": 2520,
+          "z2": 9585
+        }
+      ],
+      "require": {
+        "item": "golrie_key_waterfall_quest"
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Roots (grandtree_rootdoor)",
+      "doors": [
+        "0_38_154_34_48"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2464,
+          "z1": 9904,
+          "x2": 2467,
+          "z2": 9906
+        }
+      ],
+      "require": {
+        "varp": "grandtree",
+        "gte": 160
+      },
+      "message": "A strange force bars your way. (Roots)"
+    },
+    {
+      "name": "Trapdoor (grandtree_trapdoorclosed)",
+      "doors": [
+        "2_38_54_55_8"
+      ],
+      "boxes": [
+        {
+          "level": 2,
+          "x1": 2484,
+          "z1": 3464,
+          "x2": 2489,
+          "z2": 3467
+        }
+      ],
+      "require": {
+        "varp": "grandtree",
+        "gte": 130
+      },
+      "message": "A strange force bars your way. (Trapdoor)"
+    },
+    {
+      "name": "Grotto (grotto_door_druidicspirit)",
+      "doors": [
+        "0_53_52_48_9"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3434,
+          "z1": 3330,
+          "x2": 3446,
+          "z2": 3343
+        }
+      ],
+      "require": {
+        "varp": "druidspirit",
+        "gte": 60
+      },
+      "message": "A strange force bars your way. (Grotto)"
+    },
+    {
+      "name": "Door (grubordoor)",
+      "doors": [
+        "0_43_49_59_34"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2804,
+          "z1": 3166,
+          "x2": 2816,
+          "z2": 3179
+        }
+      ],
+      "require": {
+        "allOf": [
+          {
+            "varp": "heroquest",
+            "gte": 8
+          },
+          {
+            "varp": "blackarmgang",
+            "gte": 4
+          }
+        ]
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Recess (heart_recess_empty)",
+      "doors": [
+        "0_37_73_54_19"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2422,
+          "z1": 4690,
+          "x2": 2425,
+          "z2": 4692
+        },
+        {
+          "level": 1,
+          "x1": 2422,
+          "z1": 4690,
+          "x2": 2425,
+          "z2": 4692
+        }
+      ],
+      "require": {
+        "item": "heartcrystal"
+      },
+      "message": "A strange force bars your way. (Recess)"
+    },
+    {
+      "name": "Door (herokitchendoor)",
+      "doors": [
+        "0_43_49_36_53"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2786,
+          "z1": 3189,
+          "x2": 2800,
+          "z2": 3193
+        }
+      ],
+      "require": {
+        "allOf": [
+          {
+            "varp": "heroquest",
+            "gte": 3
+          },
+          {
+            "varp": "phoenixgang",
+            "gte": 10
+          }
+        ]
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Wall (herokitchenpanel)",
+      "doors": [
+        "0_43_49_35_54"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2786,
+          "z1": 3189,
+          "x2": 2800,
+          "z2": 3193
+        }
+      ],
+      "require": {
+        "varp": "heroquest",
+        "gte": 4
+      },
+      "message": "A strange force bars your way. (Wall)"
+    },
+    {
+      "name": "Strange wall (horror_far_right_door)",
+      "doors": [
+        "1_39_156_20_19",
+        "1_39_72_20_19"
+      ],
+      "boxes": [
+        {
+          "level": 1,
+          "x1": 2506,
+          "z1": 9986,
+          "x2": 2523,
+          "z2": 10006
+        },
+        {
+          "level": 1,
+          "x1": 2506,
+          "z1": 4610,
+          "x2": 2523,
+          "z2": 4630
+        }
+      ],
+      "require": {
+        "allOf": [
+          {
+            "varp": "horrorfire",
+            "gte": 1
+          },
+          {
+            "varp": "horrorwater",
+            "gte": 1
+          },
+          {
+            "varp": "horrorearth",
+            "gte": 1
+          },
+          {
+            "varp": "horrorair",
+            "gte": 1
+          },
+          {
+            "varp": "horrorsword",
+            "gte": 1
+          },
+          {
+            "varp": "horrorarrow",
+            "gte": 1
+          }
+        ]
+      },
+      "message": "A strange force bars your way. (Strange wall)"
+    },
+    {
+      "name": "Doorway (horror_lighthouse_doorway)",
+      "doors": [
+        "0_38_71_13_52",
+        "0_39_56_13_52"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2440,
+          "z1": 4595,
+          "x2": 2449,
+          "z2": 4605
+        },
+        {
+          "level": 1,
+          "x1": 2440,
+          "z1": 4596,
+          "x2": 2449,
+          "z2": 4605
+        },
+        {
+          "level": 0,
+          "x1": 2504,
+          "z1": 3635,
+          "x2": 2513,
+          "z2": 3645
+        },
+        {
+          "level": 1,
+          "x1": 2504,
+          "z1": 3636,
+          "x2": 2513,
+          "z2": 3645
+        }
+      ],
+      "require": {
+        "varp": "horrorquest",
+        "gte": 10
+      },
+      "message": "A strange force bars your way. (Doorway)"
+    },
+    {
+      "name": "Door (ikov_firewarriordoor)",
+      "doors": [
+        "0_41_154_22_14"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2647,
+          "z1": 9869,
+          "x2": 2649,
+          "z2": 9872
+        }
+      ],
+      "require": {
+        "varp": "ikov",
+        "gte": 40
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Lever bracket (ikov_leverbracket)",
+      "doors": [
+        "0_41_153_47_12"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2669,
+          "z1": 9803,
+          "x2": 2671,
+          "z2": 9805
+        }
+      ],
+      "require": {
+        "item": "ikov_lever"
+      },
+      "message": "A strange force bars your way. (Lever bracket)"
+    },
+    {
+      "name": "Door (ikov_luciendoor)",
+      "doors": [
+        "0_49_54_40_25"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3171,
+          "z1": 3473,
+          "x2": 3182,
+          "z2": 3481
+        },
+        {
+          "level": 1,
+          "x1": 3176,
+          "z1": 3473,
+          "x2": 3182,
+          "z2": 3481
+        }
+      ],
+      "require": {
+        "varp": "ikov",
+        "gte": 10
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (ikov_shinykeydoor)",
+      "doors": [
+        "0_41_54_33_40"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2653,
+          "z1": 3488,
+          "x2": 2662,
+          "z2": 3497
+        }
+      ],
+      "require": {
+        "item": "ikov_shinykey"
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Lever (ikov_traplever)",
+      "doors": [
+        "0_41_153_41_63"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2662,
+          "z1": 9855,
+          "x2": 2668,
+          "z2": 9857
+        }
+      ],
+      "require": {
+        "varp": "ikov",
+        "gte": 20
+      },
+      "message": "A strange force bars your way. (Lever)"
+    },
+    {
+      "name": "Door (ikov_trapleverdoor)",
+      "doors": [
+        "0_41_154_24_1"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2638,
+          "z1": 9857,
+          "x2": 2652,
+          "z2": 9871
+        }
+      ],
+      "require": {
+        "varp": "ikov",
+        "gte": 30
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Tunnel entrance (kalphite_chamber_entrance)",
+      "doors": [
+        "2_54_148_53_25"
+      ],
+      "boxes": [
+        {
+          "level": 2,
+          "x1": 3459,
+          "z1": 9474,
+          "x2": 3518,
+          "z2": 9531
+        }
+      ],
+      "require": {
+        "item": "rope"
+      },
+      "message": "A strange force bars your way. (Tunnel entrance)"
+    },
+    {
+      "name": "Door (khazard_stronghold_door)",
+      "doors": [
+        "0_39_50_6_50"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2499,
+          "z1": 3250,
+          "x2": 2513,
+          "z2": 3260
+        }
+      ],
+      "require": {
+        "varp": "treequest",
+        "gte": 4
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Crumbled wall (khazzacklowwall)",
+      "doors": [
+        "0_39_50_13_53"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2499,
+          "z1": 3250,
+          "x2": 2513,
+          "z2": 3260
+        }
+      ],
+      "require": {
+        "varp": "treequest",
+        "gte": 5
+      },
+      "message": "A strange force bars your way. (Crumbled wall)"
+    },
+    {
+      "name": "Shimmering field (legendsquest_force_barrier)",
+      "doors": [
+        "0_37_73_52_18",
+        "0_37_73_53_18"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2418,
+          "z1": 4687,
+          "x2": 2420,
+          "z2": 4691
+        },
+        {
+          "level": 0,
+          "x1": 2421,
+          "z1": 4687,
+          "x2": 2423,
+          "z2": 4691
+        }
+      ],
+      "require": {
+        "varp": "legendsquest",
+        "gte": 18
+      },
+      "message": "A strange force bars your way. (Shimmering field)"
+    },
+    {
+      "name": "Marked wall (lgancientwalldoor)",
+      "doors": [
+        "0_43_145_24_23",
+        "0_43_145_27_25"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2776,
+          "z1": 9302,
+          "x2": 2779,
+          "z2": 9304
+        },
+        {
+          "level": 2,
+          "x1": 2774,
+          "z1": 9300,
+          "x2": 2779,
+          "z2": 9305
+        },
+        {
+          "level": 0,
+          "x1": 2777,
+          "z1": 9304,
+          "x2": 2779,
+          "z2": 9307
+        },
+        {
+          "level": 1,
+          "x1": 2777,
+          "z1": 9304,
+          "x2": 2779,
+          "z2": 9307
+        }
+      ],
+      "require": {
+        "varp": "legends_bits",
+        "bit": 11
+      },
+      "message": "A strange force bars your way. (Marked wall)"
+    },
+    {
+      "name": "Door (loc_2550)",
+      "doors": [
+        "0_41_51_50_41"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2672,
+          "z1": 3298,
+          "x2": 2676,
+          "z2": 3304
+        },
+        {
+          "level": 1,
+          "x1": 2670,
+          "z1": 3298,
+          "x2": 2676,
+          "z2": 3302
+        }
+      ],
+      "require": {
+        "stat": "thieving",
+        "gte": 1
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (loc_2551)",
+      "doors": [
+        "0_41_51_50_40"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2672,
+          "z1": 3298,
+          "x2": 2676,
+          "z2": 3304
+        },
+        {
+          "level": 1,
+          "x1": 2670,
+          "z1": 3298,
+          "x2": 2676,
+          "z2": 3302
+        }
+      ],
+      "require": {
+        "stat": "thieving",
+        "gte": 16
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (loc_2554)",
+      "doors": [
+        "0_40_52_5_28"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2559,
+          "z1": 3354,
+          "x2": 2565,
+          "z2": 3359
+        },
+        {
+          "level": 2,
+          "x1": 2560,
+          "z1": 3354,
+          "x2": 2564,
+          "z2": 3358
+        }
+      ],
+      "require": {
+        "stat": "thieving",
+        "gte": 46
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (loc_2555)",
+      "doors": [
+        "1_40_51_12_24",
+        "1_40_51_12_41"
+      ],
+      "boxes": [
+        {
+          "level": 1,
+          "x1": 2570,
+          "z1": 3283,
+          "x2": 2590,
+          "z2": 3294
+        },
+        {
+          "level": 2,
+          "x1": 2573,
+          "z1": 3286,
+          "x2": 2587,
+          "z2": 3307
+        },
+        {
+          "level": 1,
+          "x1": 2569,
+          "z1": 3299,
+          "x2": 2590,
+          "z2": 3309
+        },
+        {
+          "level": 2,
+          "x1": 2573,
+          "z1": 3286,
+          "x2": 2587,
+          "z2": 3307
+        }
+      ],
+      "require": {
+        "stat": "thieving",
+        "gte": 61
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (loc_2556)",
+      "doors": [
+        "0_40_51_50_52"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2608,
+          "z1": 3317,
+          "x2": 2612,
+          "z2": 3321
+        },
+        {
+          "level": 1,
+          "x1": 2609,
+          "z1": 3313,
+          "x2": 2619,
+          "z2": 3320
+        }
+      ],
+      "require": {
+        "stat": "thieving",
+        "gte": 13
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (loc_2557)",
+      "doors": [
+        "0_49_61_54_53",
+        "0_49_61_55_59"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3186,
+          "z1": 3957,
+          "x2": 3195,
+          "z2": 3963
+        }
+      ],
+      "require": {
+        "allOf": [
+          {
+            "stat": "thieving",
+            "gte": 23
+          },
+          {
+            "item": "lockpick"
+          }
+        ]
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (loc_2558)",
+      "doors": [
+        "0_47_61_30_52",
+        "0_47_61_33_55",
+        "0_47_61_36_52"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3037,
+          "z1": 3953,
+          "x2": 3039,
+          "z2": 3955
+        },
+        {
+          "level": 1,
+          "x1": 3037,
+          "z1": 3948,
+          "x2": 3045,
+          "z2": 3960
+        },
+        {
+          "level": 0,
+          "x1": 3037,
+          "z1": 3948,
+          "x2": 3045,
+          "z2": 3960
+        },
+        {
+          "level": 1,
+          "x1": 3037,
+          "z1": 3948,
+          "x2": 3045,
+          "z2": 3960
+        }
+      ],
+      "require": {
+        "allOf": [
+          {
+            "stat": "thieving",
+            "gte": 39
+          },
+          {
+            "item": "lockpick"
+          }
+        ]
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (loc_2559)",
+      "doors": [
+        "0_40_148_41_10"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2598,
+          "z1": 9481,
+          "x2": 2601,
+          "z2": 9484
+        }
+      ],
+      "require": {
+        "allOf": [
+          {
+            "stat": "thieving",
+            "gte": 82
+          },
+          {
+            "item": "lockpick"
+          }
+        ]
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Spiders' nest (loc_2653)",
+      "doors": [
+        "1_42_55_52_54"
+      ],
+      "boxes": [
+        {
+          "level": 1,
+          "x1": 2740,
+          "z1": 3573,
+          "x2": 2743,
+          "z2": 3576
+        }
+      ],
+      "require": {
+        "varp": "murderquest",
+        "gte": 1
+      },
+      "message": "A strange force bars your way. (Spiders' nest)"
+    },
+    {
+      "name": "Wall (loc_2854)",
+      "doors": [
+        "1_40_51_12_6"
+      ],
+      "boxes": [
+        {
+          "level": 1,
+          "x1": 2570,
+          "z1": 3270,
+          "x2": 2573,
+          "z2": 3272
+        },
+        {
+          "level": 2,
+          "x1": 2570,
+          "z1": 3268,
+          "x2": 2574,
+          "z2": 3272
+        }
+      ],
+      "require": {
+        "allOf": [
+          {
+            "varp": "hazeelcultquest",
+            "gte": 6
+          },
+          {
+            "varp": "hazeelcult_side",
+            "gte": 1
+          }
+        ]
+      },
+      "message": "A strange force bars your way. (Wall)"
+    },
+    {
+      "name": "Door (mcannondoor)",
+      "doors": [
+        "0_47_53_7_61"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3007,
+          "z1": 3448,
+          "x2": 3015,
+          "z2": 3455
+        }
+      ],
+      "require": {
+        "varp": "mcannon",
+        "gte": 9
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (mcannondoor1)",
+      "doors": [
+        "0_40_54_16_5"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2575,
+          "z1": 3460,
+          "x2": 2577,
+          "z2": 3463
+        }
+      ],
+      "require": {
+        "varp": "mcannon",
+        "gte": 6
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Railing (mcannonplain)",
+      "doors": [
+        "0_39_54_57_21",
+        "0_39_54_57_22",
+        "0_39_54_57_23",
+        "0_39_54_57_24",
+        "0_39_54_58_21",
+        "0_39_54_58_25",
+        "0_39_54_59_9",
+        "0_39_54_59_12",
+        "0_39_54_59_20",
+        "0_39_54_59_26",
+        "0_39_54_60_8",
+        "0_39_54_60_13",
+        "0_39_54_60_18",
+        "0_39_54_61_14",
+        "0_39_54_61_15",
+        "0_39_54_61_17",
+        "0_39_54_62_7",
+        "0_39_54_63_4",
+        "0_39_54_63_5",
+        "0_40_54_0_4",
+        "0_40_54_1_4",
+        "0_40_54_2_5",
+        "0_40_54_3_4",
+        "0_40_54_5_2",
+        "0_40_54_5_3",
+        "0_40_54_6_2",
+        "0_40_54_9_2",
+        "0_40_54_10_2",
+        "0_40_54_11_3",
+        "0_40_54_13_4",
+        "0_40_54_14_3",
+        "0_40_54_15_0",
+        "0_40_54_15_1",
+        "0_40_54_15_2",
+        "0_40_54_16_0",
+        "0_40_54_17_0",
+        "0_40_54_18_0",
+        "0_40_54_19_0",
+        "0_40_54_20_0"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2552,
+          "z1": 3480,
+          "x2": 2554,
+          "z2": 3482
+        },
+        {
+          "level": 0,
+          "x1": 2553,
+          "z1": 3481,
+          "x2": 2555,
+          "z2": 3483
+        },
+        {
+          "level": 0,
+          "x1": 2559,
+          "z1": 3459,
+          "x2": 2561,
+          "z2": 3461
+        },
+        {
+          "level": 0,
+          "x1": 2571,
+          "z1": 3458,
+          "x2": 2574,
+          "z2": 3460
+        }
+      ],
+      "require": {
+        "varp": "mcannon",
+        "gte": 0
+      },
+      "message": "A strange force bars your way. (Railing)"
+    },
+    {
+      "name": "Door (melzardoor)",
+      "doors": [
+        "0_45_50_61_48"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2921,
+          "z1": 3237,
+          "x2": 2941,
+          "z2": 3258
+        },
+        {
+          "level": 1,
+          "x1": 2921,
+          "z1": 3241,
+          "x2": 2941,
+          "z2": 3259
+        },
+        {
+          "level": 2,
+          "x1": 2921,
+          "z1": 3237,
+          "x2": 2941,
+          "z2": 3259
+        }
+      ],
+      "require": {
+        "item": "melzarkey"
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (merlinworkshop)",
+      "doors": [
+        "1_43_54_12_47"
+      ],
+      "boxes": [
+        {
+          "level": 1,
+          "x1": 2764,
+          "z1": 3496,
+          "x2": 2769,
+          "z2": 3506
+        },
+        {
+          "level": 2,
+          "x1": 2745,
+          "z1": 3489,
+          "x2": 2769,
+          "z2": 3518
+        }
+      ],
+      "require": {
+        "varp": "grail",
+        "gte": 1
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Gate (miningcampgateclosedl)",
+      "doors": [
+        "0_51_47_9_21"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3273,
+          "z1": 3013,
+          "x2": 3305,
+          "z2": 3040
+        }
+      ],
+      "require": {
+        "item": "metal_key"
+      },
+      "message": "A strange force bars your way. (Gate)"
+    },
+    {
+      "name": "Gate (miningcampgateclosedr)",
+      "doors": [
+        "0_51_47_9_20"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3273,
+          "z1": 3013,
+          "x2": 3305,
+          "z2": 3040
+        }
+      ],
+      "require": {
+        "item": "metal_key"
+      },
+      "message": "A strange force bars your way. (Gate)"
+    },
+    {
+      "name": "Gate (mournerquaters_gatel)",
+      "doors": [
+        "1_39_51_55_62"
+      ],
+      "boxes": [
+        {
+          "level": 1,
+          "x1": 2551,
+          "z1": 3324,
+          "x2": 2555,
+          "z2": 3327
+        }
+      ],
+      "require": {
+        "item": "mournerkeytw"
+      },
+      "message": "A strange force bars your way. (Gate)"
+    },
+    {
+      "name": "Gate (mournerquaters_gater)",
+      "doors": [
+        "1_39_51_55_61"
+      ],
+      "boxes": [
+        {
+          "level": 1,
+          "x1": 2551,
+          "z1": 3324,
+          "x2": 2555,
+          "z2": 3327
+        }
+      ],
+      "require": {
+        "item": "mournerkeytw"
+      },
+      "message": "A strange force bars your way. (Gate)"
+    },
+    {
+      "name": "Door (mournerstewdoorup)",
+      "doors": [
+        "1_39_51_51_61"
+      ],
+      "boxes": [
+        {
+          "level": 1,
+          "x1": 2541,
+          "z1": 3323,
+          "x2": 2547,
+          "z2": 3328
+        }
+      ],
+      "require": {
+        "item": "doctor_gown"
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Obstacle pipe (obstical_pipe4)",
+      "doors": [
+        "0_40_148_13_34",
+        "0_40_148_16_34"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2574,
+          "z1": 9505,
+          "x2": 2576,
+          "z2": 9507
+        }
+      ],
+      "require": {
+        "stat": "agility",
+        "gte": 49
+      },
+      "message": "A strange force bars your way. (Obstacle pipe)"
+    },
+    {
+      "name": "Door (pete_sidedoor)",
+      "doors": [
+        "0_43_49_29_61"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2779,
+          "z1": 3196,
+          "x2": 2783,
+          "z2": 3199
+        }
+      ],
+      "require": {
+        "item": "misc_key"
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (pete_treasuredoor)",
+      "doors": [
+        "0_43_49_12_61"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2763,
+          "z1": 3195,
+          "x2": 2773,
+          "z2": 3200
+        }
+      ],
+      "require": {
+        "item": "grip_keys"
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (phoenixdoor)",
+      "doors": [
+        "0_50_152_47_51"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3239,
+          "z1": 9779,
+          "x2": 3249,
+          "z2": 9786
+        }
+      ],
+      "require": {
+        "varp": "phoenixgang",
+        "gte": 9
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (phoenixdoor2)",
+      "doors": [
+        "0_50_52_51_57"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3249,
+          "z1": 3381,
+          "x2": 3253,
+          "z2": 3386
+        },
+        {
+          "level": 1,
+          "x1": 3241,
+          "z1": 3379,
+          "x2": 3253,
+          "z2": 3387
+        },
+        {
+          "level": 2,
+          "x1": 3242,
+          "z1": 3382,
+          "x2": 3252,
+          "z2": 3386
+        }
+      ],
+      "require": {
+        "item": "phoenixkey2"
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Cell door (pip_prisondoor)",
+      "doors": [
+        "2_53_54_23_33"
+      ],
+      "boxes": [
+        {
+          "level": 2,
+          "x1": 3415,
+          "z1": 3482,
+          "x2": 3419,
+          "z2": 3495
+        }
+      ],
+      "require": {
+        "varp": "priestperil",
+        "gte": 6
+      },
+      "message": "A strange force bars your way. (Cell door)"
+    },
+    {
+      "name": "Holy barrier (pip_underground_wall_side_withportal)",
+      "doors": [
+        "0_53_154_48_30"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3402,
+          "z1": 9880,
+          "x2": 3442,
+          "z2": 9907
+        },
+        {
+          "level": 1,
+          "x1": 3401,
+          "z1": 9879,
+          "x2": 3444,
+          "z2": 9909
+        }
+      ],
+      "require": {
+        "varp": "priestperil",
+        "gte": 61
+      },
+      "message": "A strange force bars your way. (Holy barrier)"
+    },
+    {
+      "name": "Tent flap (regicide_tent_door)",
+      "doors": [
+        "0_34_49_10_8"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2172,
+          "z1": 3132,
+          "x2": 2228,
+          "z2": 3197
+        }
+      ],
+      "require": {
+        "varp": "regicide_quest",
+        "gte": 12
+      },
+      "message": "A strange force bars your way. (Tent flap)"
+    },
+    {
+      "name": "Fungus covered Cavern wall (rogues_purse_cave_full)",
+      "doors": [
+        "0_44_148_34_4",
+        "0_44_148_53_20",
+        "0_44_148_53_45"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2821,
+          "z1": 9475,
+          "x2": 2877,
+          "z2": 9533
+        },
+        {
+          "level": 1,
+          "x1": 2848,
+          "z1": 9503,
+          "x2": 2850,
+          "z2": 9506
+        },
+        {
+          "level": 0,
+          "x1": 2866,
+          "z1": 9516,
+          "x2": 2868,
+          "z2": 9518
+        }
+      ],
+      "require": {
+        "varp": "junglepotion",
+        "gte": 9
+      },
+      "message": "A strange force bars your way. (Fungus covered Cavern wall)"
+    },
+    {
+      "name": "Old wall (scorpionwall)",
+      "doors": [
+        "0_44_153_59_7"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2873,
+          "z1": 9792,
+          "x2": 2881,
+          "z2": 9801
+        }
+      ],
+      "require": {
+        "varp": "scorpcatcher",
+        "gte": 2
+      },
+      "message": "A strange force bars your way. (Old wall)"
+    },
+    {
+      "name": "Bamboo Door (tbwt_bamboo_door)",
+      "doors": [
+        "0_43_47_30_49",
+        "0_43_47_40_46",
+        "0_43_47_50_50"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2778,
+          "z1": 3055,
+          "x2": 2783,
+          "z2": 3060
+        },
+        {
+          "level": 1,
+          "x1": 2777,
+          "z1": 3054,
+          "x2": 2783,
+          "z2": 3060
+        },
+        {
+          "level": 0,
+          "x1": 2788,
+          "z1": 3051,
+          "x2": 2793,
+          "z2": 3057
+        },
+        {
+          "level": 0,
+          "x1": 2798,
+          "z1": 3054,
+          "x2": 2803,
+          "z2": 3059
+        }
+      ],
+      "require": {
+        "varp": "tbwt_main",
+        "gte": 6
+      },
+      "message": "A strange force bars your way. (Bamboo Door)"
+    },
+    {
+      "name": "Cell Door (troll_celldoor_eadgar)",
+      "doors": [
+        "0_44_157_16_34"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2823,
+          "z1": 10080,
+          "x2": 2832,
+          "z2": 10085
+        },
+        {
+          "level": 1,
+          "x1": 2822,
+          "z1": 10048,
+          "x2": 2863,
+          "z2": 10110
+        },
+        {
+          "level": 2,
+          "x1": 2826,
+          "z1": 10077,
+          "x2": 2833,
+          "z2": 10085
+        }
+      ],
+      "require": {
+        "item": "troll_key_eadgar"
+      },
+      "message": "A strange force bars your way. (Cell Door)"
+    },
+    {
+      "name": "Cell Door (troll_celldoor_godric)",
+      "doors": [
+        "0_44_157_16_30"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2823,
+          "z1": 10076,
+          "x2": 2832,
+          "z2": 10081
+        },
+        {
+          "level": 1,
+          "x1": 2822,
+          "z1": 10048,
+          "x2": 2863,
+          "z2": 10110
+        },
+        {
+          "level": 2,
+          "x1": 2820,
+          "z1": 10048,
+          "x2": 2863,
+          "z2": 10111
+        }
+      ],
+      "require": {
+        "item": "troll_key_godric"
+      },
+      "message": "A strange force bars your way. (Cell Door)"
+    },
+    {
+      "name": "Cave Entrance (troll_mad_eadgar_entrance)",
+      "doors": [
+        "0_45_57_12_24"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2832,
+          "z1": 3652,
+          "x2": 2917,
+          "z2": 3712
+        }
+      ],
+      "require": {
+        "varp": "troll_freed_eadgar",
+        "gte": 1
+      },
+      "message": "A strange force bars your way. (Cave Entrance)"
+    },
+    {
+      "name": "Stronghold (troll_stronghold_door)",
+      "doors": [
+        "0_44_57_23_41"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2832,
+          "z1": 3652,
+          "x2": 2917,
+          "z2": 3712
+        }
+      ],
+      "require": {
+        "varp": "troll_entered_stronghold",
+        "gte": 0
+      },
+      "message": "A strange force bars your way. (Stronghold)"
+    },
+    {
+      "name": "Secret Door (troll_stronghold_entrance)",
+      "doors": [
+        "0_44_56_11_63"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2821,
+          "z1": 3628,
+          "x2": 2835,
+          "z2": 3647
+        }
+      ],
+      "require": {
+        "varp": "troll_quest",
+        "gte": 40
+      },
+      "message": "A strange force bars your way. (Secret Door)"
+    },
+    {
+      "name": "Prison Door (troll_stronghold_prison_door_closed)",
+      "doors": [
+        "1_44_157_32_59"
+      ],
+      "boxes": [
+        {
+          "level": 1,
+          "x1": 2847,
+          "z1": 10103,
+          "x2": 2858,
+          "z2": 10111
+        },
+        {
+          "level": 2,
+          "x1": 2820,
+          "z1": 10048,
+          "x2": 2863,
+          "z2": 10111
+        }
+      ],
+      "require": {
+        "item": "troll_key_prison"
+      },
+      "message": "A strange force bars your way. (Prison Door)"
+    },
+    {
+      "name": "Cave entrance (upass_caveentrance2)",
+      "doors": [
+        "0_38_51_1_49"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2432,
+          "z1": 3306,
+          "x2": 2444,
+          "z2": 3313
+        }
+      ],
+      "require": {
+        "varp": "biohazard",
+        "gte": 16
+      },
+      "message": "A strange force bars your way. (Cave entrance)"
+    },
+    {
+      "name": "Door (viking_bard_backstage_door)",
+      "doors": [
+        "0_41_57_43_35"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2654,
+          "z1": 3681,
+          "x2": 2667,
+          "z2": 3686
+        },
+        {
+          "level": 2,
+          "x1": 2654,
+          "z1": 3681,
+          "x2": 2664,
+          "z2": 3686
+        }
+      ],
+      "require": {
+        "item": "viking_enchanted_strung_lyre"
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (viking_seers_door1)",
+      "doors": [
+        "0_41_57_7_19"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2628,
+          "z1": 3658,
+          "x2": 2634,
+          "z2": 3667
+        },
+        {
+          "level": 1,
+          "x1": 2628,
+          "z1": 3659,
+          "x2": 2639,
+          "z2": 3666
+        },
+        {
+          "level": 2,
+          "x1": 2628,
+          "z1": 3659,
+          "x2": 2639,
+          "z2": 3666
+        }
+      ],
+      "require": {
+        "varp": "viking",
+        "gte": 10
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (viking_seers_door2)",
+      "doors": [
+        "0_41_57_12_19"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2633,
+          "z1": 3658,
+          "x2": 2639,
+          "z2": 3667
+        },
+        {
+          "level": 1,
+          "x1": 2628,
+          "z1": 3659,
+          "x2": 2639,
+          "z2": 3666
+        },
+        {
+          "level": 2,
+          "x1": 2628,
+          "z1": 3659,
+          "x2": 2639,
+          "z2": 3666
+        }
+      ],
+      "require": {
+        "item": "viking_key"
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Ledge (waterfall_ledge_door)",
+      "doors": [
+        "0_39_54_15_8"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2510,
+          "z1": 3462,
+          "x2": 2512,
+          "z2": 3464
+        },
+        {
+          "level": 1,
+          "x1": 2509,
+          "z1": 3462,
+          "x2": 2513,
+          "z2": 3464
+        }
+      ],
+      "require": {
+        "item": "glarials_amulet_waterfall_quest"
+      },
+      "message": "A strange force bars your way. (Ledge)"
+    },
+    {
+      "name": "Door (witchbackdoor)",
+      "doors": [
+        "0_45_54_21_9"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2900,
+          "z1": 3465,
+          "x2": 2908,
+          "z2": 3477
+        },
+        {
+          "level": 1,
+          "x1": 2899,
+          "z1": 3465,
+          "x2": 2908,
+          "z2": 3476
+        }
+      ],
+      "require": {
+        "varp": "ballquest",
+        "gte": 3
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Grill (witchgrill)",
+      "doors": [
+        "0_45_151_40_21",
+        "0_47_54_17_51"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2880,
+          "z1": 9670,
+          "x2": 2970,
+          "z2": 9854
+        },
+        {
+          "level": 0,
+          "x1": 3025,
+          "z1": 3504,
+          "x2": 3028,
+          "z2": 3508
+        },
+        {
+          "level": 2,
+          "x1": 3020,
+          "z1": 3504,
+          "x2": 3031,
+          "z2": 3517
+        },
+        {
+          "level": 3,
+          "x1": 3026,
+          "z1": 3504,
+          "x2": 3032,
+          "z2": 3509
+        }
+      ],
+      "require": {
+        "varp": "spy",
+        "gte": 1
+      },
+      "message": "A strange force bars your way. (Grill)"
+    },
+    {
+      "name": "Door (witchhousedoor)",
+      "doors": [
+        "0_45_54_21_17"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2900,
+          "z1": 3465,
+          "x2": 2908,
+          "z2": 3477
+        },
+        {
+          "level": 1,
+          "x1": 2899,
+          "z1": 3465,
+          "x2": 2908,
+          "z2": 3476
+        }
+      ],
+      "require": {
+        "item": "witches_doorkey"
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Mouse hole (witchmousehole)",
+      "doors": [
+        "0_45_54_23_10"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2903,
+          "z1": 3465,
+          "x2": 2909,
+          "z2": 3468
+        }
+      ],
+      "require": {
+        "item": "cheese"
+      },
+      "message": "A strange force bars your way. (Mouse hole)"
+    },
+    {
+      "name": "Door (witchsheddoor)",
+      "doors": [
+        "0_45_54_54_7"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 2933,
+          "z1": 3458,
+          "x2": 2938,
+          "z2": 3467
+        }
+      ],
+      "require": {
+        "varp": "ballquest",
+        "gte": 6
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (wydindoor)",
+      "doors": [
+        "0_47_50_4_4"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3008,
+          "z1": 3203,
+          "x2": 3012,
+          "z2": 3210
+        },
+        {
+          "level": 1,
+          "x1": 3008,
+          "z1": 3202,
+          "x2": 3017,
+          "z2": 3210
+        }
+      ],
+      "require": {
+        "allOf": [
+          {
+            "varp": "hunt_store_employed",
+            "bit": 1
+          },
+          {
+            "item": "white_apron"
+          }
+        ]
+      },
+      "message": "A strange force bars your way. (Door)"
+    },
+    {
+      "name": "Door (zanarisdoor)",
+      "doors": [
+        "0_50_49_2_33"
+      ],
+      "boxes": [
+        {
+          "level": 0,
+          "x1": 3201,
+          "z1": 3167,
+          "x2": 3205,
+          "z2": 3170
+        }
+      ],
+      "require": {
+        "item": "dramen_staff"
+      },
+      "message": "A strange force bars your way. (Door)"
+    }
+  ]
 }

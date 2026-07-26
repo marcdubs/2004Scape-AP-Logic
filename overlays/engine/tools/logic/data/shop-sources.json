@@ -1,0 +1,2042 @@
+{
+ "_note": "item -> shop-owner npc debugnames that SELL it (from *.inv stock + owned_shop params, shopsanity-baked). Resolved to regions via npc-spawns.json for the BUY obtainability source.",
+ "bronze_2h_sword": [
+  "dwarven_shopkeeper",
+  "lowe",
+  "zenesha"
+ ],
+ "iron_2h_sword": [
+  "dwarven_shopkeeper",
+  "lowe",
+  "zenesha"
+ ],
+ "steel_2h_sword": [
+  "dwarven_shopkeeper",
+  "lowe",
+  "zenesha"
+ ],
+ "black_2h_sword": [
+  "dwarven_shopkeeper",
+  "lowe",
+  "zenesha"
+ ],
+ "mithril_2h_sword": [
+  "dwarven_shopkeeper",
+  "lowe",
+  "zenesha"
+ ],
+ "adamant_2h_sword": [
+  "dwarven_shopkeeper",
+  "lowe",
+  "zenesha"
+ ],
+ "vial_water": [
+  "bedabin",
+  "generalassistant7",
+  "generalassistant8",
+  "noterazzo",
+  "tbwt_tiadeche_final",
+  "viking_fur_monger"
+ ],
+ "bronze_pickaxe": [
+  "fionella",
+  "generalassistant5",
+  "generalassistant6",
+  "generalassistant7",
+  "gnome_heckelfunch",
+  "harry",
+  "noterazzo",
+  "shilofishowner",
+  "tbwt_tiadeche_final",
+  "viking_clothing_shopkeeper",
+  "viking_fur_monger",
+  "zeke"
+ ],
+ "iron_axe": [
+  "dwarven_shopkeeper",
+  "generalassistant7",
+  "noterazzo",
+  "tbwt_tiadeche_final",
+  "viking_clothing_shopkeeper",
+  "viking_fur_monger",
+  "zenesha"
+ ],
+ "cooked_meat": [
+  "generalassistant5",
+  "generalassistant7",
+  "generalassistant8",
+  "gnome_heckelfunch",
+  "noterazzo",
+  "tbwt_tiadeche_final",
+  "viking_fur_monger"
+ ],
+ "tinderbox": [
+  "aubury",
+  "bedabin",
+  "blurberrybarmen",
+  "cassie",
+  "death_shopkeeper",
+  "fat_tony",
+  "fionella",
+  "gem_trader",
+  "generalassistant5",
+  "generalassistant7",
+  "generalassistant8",
+  "generalshopkeeper1",
+  "gnome_gulluck",
+  "gnome_heckelfunch",
+  "harry",
+  "jiminua",
+  "kortan",
+  "lathas_shopkeeper",
+  "noterazzo",
+  "nulodion",
+  "nurmof",
+  "oziach",
+  "regicidegeneralshopkeeper",
+  "scavvo",
+  "shilofishowner",
+  "shilogeneralstore",
+  "tbwt_tiadeche_final",
+  "tea_seller",
+  "treevillage_shopkeeper1",
+  "viking_fur_monger",
+  "werewolfshopkeeper2",
+  "werewolfshopkeeper3",
+  "zambo"
+ ],
+ "ball_of_wool": [
+  "generalassistant7",
+  "viking_fur_monger"
+ ],
+ "bronze_arrow": [
+  "dwarven_shopkeeper",
+  "generalassistant5",
+  "generalassistant7",
+  "gnome_heckelfunch",
+  "grum",
+  "hickton",
+  "thessalia",
+  "viking_fur_monger",
+  "zenesha"
+ ],
+ "rope": [
+  "bedabin",
+  "generalassistant7",
+  "generalassistant8",
+  "gnome_heckelfunch",
+  "harry",
+  "noterazzo",
+  "shilofishowner",
+  "tbwt_tiadeche_final",
+  "viking_fur_monger"
+ ],
+ "papyrus": [
+  "generalassistant7",
+  "noterazzo",
+  "tbwt_tiadeche_final",
+  "viking_fur_monger"
+ ],
+ "blessedstar": [
+  "khazard_shopkeeper"
+ ],
+ "amulet_of_magic": [
+  "khazard_shopkeeper"
+ ],
+ "amulet_of_defence": [
+  "khazard_shopkeeper"
+ ],
+ "amulet_of_strength": [
+  "khazard_shopkeeper"
+ ],
+ "amulet_of_power": [
+  "khazard_shopkeeper"
+ ],
+ "horsey_brown": [
+  "generalshopkeeper2"
+ ],
+ "horsey_white": [
+  "generalshopkeeper2"
+ ],
+ "horsey_black": [
+  "generalshopkeeper2"
+ ],
+ "horsey_grey": [
+  "generalshopkeeper2"
+ ],
+ "iron_arrow": [
+  "grum",
+  "hickton",
+  "thessalia"
+ ],
+ "steel_arrow": [
+  "grum",
+  "hickton",
+  "ranging_guild_bow_salesman",
+  "thessalia"
+ ],
+ "bolt": [
+  "dwarven_shopkeeper",
+  "grum",
+  "thessalia",
+  "zenesha"
+ ],
+ "shortbow": [
+  "dwarven_shopkeeper",
+  "grum",
+  "hickton",
+  "thessalia",
+  "zenesha"
+ ],
+ "longbow": [
+  "dwarven_shopkeeper",
+  "gnome_heckelfunch",
+  "grum",
+  "hickton",
+  "thessalia",
+  "zenesha"
+ ],
+ "oak_shortbow": [
+  "grum",
+  "hickton",
+  "thessalia"
+ ],
+ "oak_longbow": [
+  "grum",
+  "hickton",
+  "thessalia"
+ ],
+ "crossbow": [
+  "dwarven_shopkeeper",
+  "grum",
+  "thessalia",
+  "zenesha"
+ ],
+ "mithril_arrow": [
+  "grum",
+  "hickton"
+ ],
+ "adamant_arrow": [
+  "grum",
+  "hickton"
+ ],
+ "rune_arrow": [
+  "grum",
+  "hickton"
+ ],
+ "bronze_arrowheads": [
+  "dwarven_shopkeeper",
+  "grum",
+  "hickton",
+  "zenesha"
+ ],
+ "iron_arrowheads": [
+  "dwarven_shopkeeper",
+  "grum",
+  "hickton",
+  "zenesha"
+ ],
+ "steel_arrowheads": [
+  "dwarven_shopkeeper",
+  "grum",
+  "hickton",
+  "zenesha"
+ ],
+ "mithril_arrowheads": [
+  "dwarven_shopkeeper",
+  "grum",
+  "hickton",
+  "zenesha"
+ ],
+ "adamant_arrowheads": [
+  "grum",
+  "hickton"
+ ],
+ "rune_arrowheads": [
+  "grum",
+  "hickton"
+ ],
+ "studded_body": [
+  "brian",
+  "grum",
+  "tbwt_tamayu_final"
+ ],
+ "studded_chaps": [
+  "brian",
+  "grum",
+  "tbwt_tamayu_final"
+ ],
+ "sapphire": [
+  "ogre_trader1",
+  "spice_merchant",
+  "viking_longhall_barkeep"
+ ],
+ "emerald": [
+  "ogre_trader1",
+  "spice_merchant",
+  "viking_longhall_barkeep"
+ ],
+ "ruby": [
+  "ogre_trader1",
+  "spice_merchant",
+  "viking_longhall_barkeep"
+ ],
+ "diamond": [
+  "ogre_trader1",
+  "spice_merchant",
+  "viking_longhall_barkeep"
+ ],
+ "bucket_empty": [
+  "aubury",
+  "bedabin",
+  "blurberrybarmen",
+  "death_shopkeeper",
+  "fat_tony",
+  "fishguildshop",
+  "gem_trader",
+  "generalassistant5",
+  "generalassistant8",
+  "generalshopkeeper1",
+  "gnome_gulluck",
+  "gnome_heckelfunch",
+  "harry",
+  "jiminua",
+  "kortan",
+  "lathas_shopkeeper",
+  "nulodion",
+  "nurmof",
+  "oziach",
+  "scavvo",
+  "shilofishowner",
+  "shilogeneralstore",
+  "tea_seller",
+  "treevillage_shopkeeper1",
+  "werewolfshopkeeper2",
+  "werewolfshopkeeper3",
+  "zambo"
+ ],
+ "bowl_empty": [
+  "cassie",
+  "fishguildshop",
+  "harry"
+ ],
+ "cake_tin": [
+  "cassie",
+  "harry"
+ ],
+ "chisel": [
+  "aubury",
+  "bedabin",
+  "blurberrybarmen",
+  "death_shopkeeper",
+  "dommik",
+  "fat_tony",
+  "fionella",
+  "gem_trader",
+  "generalassistant5",
+  "generalassistant8",
+  "generalshopkeeper1",
+  "gnome_gulluck",
+  "harry",
+  "jiminua",
+  "kortan",
+  "lathas_shopkeeper",
+  "noterazzo",
+  "nulodion",
+  "nurmof",
+  "oziach",
+  "rommik",
+  "scavvo",
+  "shilofishowner",
+  "shilogeneralstore",
+  "tbwt_tiadeche_final",
+  "tea_seller",
+  "treevillage_shopkeeper1",
+  "werewolfshopkeeper2",
+  "werewolfshopkeeper3",
+  "zambo"
+ ],
+ "hammer": [
+  "aubury",
+  "bedabin",
+  "blurberrybarmen",
+  "death_shopkeeper",
+  "fat_tony",
+  "fionella",
+  "fishguildshop",
+  "gem_trader",
+  "generalassistant5",
+  "generalassistant6",
+  "generalassistant8",
+  "generalshopkeeper1",
+  "gnome_gulluck",
+  "gnome_heckelfunch",
+  "harry",
+  "jiminua",
+  "kortan",
+  "lathas_shopkeeper",
+  "noterazzo",
+  "nulodion",
+  "nurmof",
+  "oziach",
+  "scavvo",
+  "shilofishowner",
+  "shilogeneralstore",
+  "tbwt_tiadeche_final",
+  "tea_seller",
+  "treevillage_shopkeeper1",
+  "werewolfshopkeeper2",
+  "werewolfshopkeeper3",
+  "zambo"
+ ],
+ "pot_empty": [
+  "aubury",
+  "bedabin",
+  "blurberrybarmen",
+  "cassie",
+  "death_shopkeeper",
+  "fat_tony",
+  "fionella",
+  "gem_trader",
+  "generalassistant5",
+  "generalassistant8",
+  "generalshopkeeper1",
+  "gnome_gulluck",
+  "gnome_heckelfunch",
+  "harry",
+  "jiminua",
+  "kortan",
+  "lathas_shopkeeper",
+  "noterazzo",
+  "nulodion",
+  "nurmof",
+  "oziach",
+  "regicidegeneralshopkeeper",
+  "scavvo",
+  "shilofishowner",
+  "shilogeneralstore",
+  "tbwt_tiadeche_final",
+  "tea_seller",
+  "treevillage_shopkeeper1",
+  "werewolfshopkeeper2",
+  "werewolfshopkeeper3",
+  "zambo"
+ ],
+ "bronze_chainbody": [
+  "brian",
+  "generalshopkeeper4"
+ ],
+ "iron_chainbody": [
+  "brian",
+  "generalshopkeeper4"
+ ],
+ "steel_chainbody": [
+  "brian",
+  "generalshopkeeper4"
+ ],
+ "mithril_chainbody": [
+  "brian",
+  "generalshopkeeper4"
+ ],
+ "bronze_platebody": [
+  "brian",
+  "horvik_the_armourer"
+ ],
+ "iron_platebody": [
+  "brian",
+  "horvik_the_armourer"
+ ],
+ "steel_platebody": [
+  "brian",
+  "horvik_the_armourer"
+ ],
+ "mithril_platebody": [
+  "brian",
+  "horvik_the_armourer"
+ ],
+ "black_platebody": [
+  "brian",
+  "horvik_the_armourer"
+ ],
+ "iron_platelegs": [
+  "brian",
+  "ogre_merchant"
+ ],
+ "bronze_axe": [
+  "fionella",
+  "noterazzo",
+  "tbwt_tiadeche_final",
+  "viking_clothing_shopkeeper"
+ ],
+ "steel_axe": [
+  "dwarven_shopkeeper",
+  "viking_clothing_shopkeeper",
+  "zenesha"
+ ],
+ "iron_battleaxe": [
+  "dwarven_shopkeeper",
+  "viking_clothing_shopkeeper",
+  "viking_sigmund",
+  "zenesha"
+ ],
+ "steel_battleaxe": [
+  "dwarven_shopkeeper",
+  "viking_clothing_shopkeeper",
+  "viking_sigmund",
+  "zenesha"
+ ],
+ "mithril_battleaxe": [
+  "dwarven_shopkeeper",
+  "viking_clothing_shopkeeper",
+  "viking_sigmund",
+  "zenesha"
+ ],
+ "bread": [
+  "boardgames_barmaid2",
+  "chadwell",
+  "generalassistant8",
+  "gnome_heckelfunch",
+  "noterazzo",
+  "regicidegeneralshopkeeper",
+  "tbwt_tiadeche_final"
+ ],
+ "cake": [
+  "chadwell"
+ ],
+ "chocolate_slice": [
+  "chadwell"
+ ],
+ "bronze_battleaxe": [
+  "viking_sigmund"
+ ],
+ "black_battleaxe": [
+  "viking_sigmund"
+ ],
+ "adamant_battleaxe": [
+  "viking_sigmund"
+ ],
+ "water_skin4": [
+  "fishguildshop",
+  "flynn"
+ ],
+ "water_skin0": [
+  "fishguildshop",
+  "flynn"
+ ],
+ "jug_water": [
+  "bedabin",
+  "fishguildshop",
+  "flynn"
+ ],
+ "bowl_water": [
+  "fishguildshop",
+  "flynn"
+ ],
+ "bucket_water": [
+  "bedabin",
+  "fishguildshop",
+  "flynn",
+  "generalassistant8"
+ ],
+ "knife": [
+  "bedabin",
+  "fishguildshop",
+  "flynn",
+  "oziach",
+  "ranging_guild_armour_salesman",
+  "swordshop2",
+  "tbwt_tiadeche_final"
+ ],
+ "premade_blurberry_special": [
+  "herquin"
+ ],
+ "premade_choc_saturday": [
+  "herquin"
+ ],
+ "premade_drunk_dragon": [
+  "herquin"
+ ],
+ "premade_fruit_blast": [
+  "herquin"
+ ],
+ "premade_pineapple_punch": [
+  "herquin"
+ ],
+ "premade_sgg": [
+  "herquin"
+ ],
+ "premade_wizard_blizzard": [
+  "herquin"
+ ],
+ "beer": [
+  "generalshopkeeper7",
+  "magearena_runeshop"
+ ],
+ "karamja_rum": [
+  "magearena_runeshop"
+ ],
+ "jug_wine": [
+  "magearena_runeshop"
+ ],
+ "unlit_candle": [
+  "bedabin",
+  "generalassistant4",
+  "generalassistant8",
+  "noterazzo",
+  "tbwt_tiadeche_final"
+ ],
+ "black_chainbody": [
+  "generalshopkeeper4"
+ ],
+ "adamant_chainbody": [
+  "generalshopkeeper4"
+ ],
+ "blue_cape": [
+  "aemad",
+  "generalshopkeeper3"
+ ],
+ "black_full_helm": [
+  "aemad"
+ ],
+ "black_platelegs": [
+  "aemad",
+  "ogre_merchant"
+ ],
+ "adamant_platebody": [
+  "aemad"
+ ],
+ "ruby_ring": [
+  "candle_maker",
+  "drogo"
+ ],
+ "white_apron": [
+  "generalassistant1"
+ ],
+ "leather_armour": [
+  "generalassistant1",
+  "noterazzo",
+  "tbwt_tamayu_final",
+  "tbwt_tiadeche_final"
+ ],
+ "leather_gloves": [
+  "generalassistant1",
+  "gnome_waiter",
+  "noterazzo",
+  "tbwt_tiadeche_final"
+ ],
+ "leather_boots": [
+  "generalassistant1",
+  "gnome_heckelfunch",
+  "gnome_waiter",
+  "noterazzo",
+  "tbwt_tiadeche_final"
+ ],
+ "brown_apron": [
+  "generalassistant1",
+  "gnome_waiter"
+ ],
+ "pink_skirt": [
+  "generalassistant1",
+  "gnome_waiter"
+ ],
+ "black_skirt": [
+  "generalassistant1",
+  "gnome_waiter"
+ ],
+ "blue_skirt": [
+  "generalassistant1",
+  "gnome_waiter"
+ ],
+ "red_cape": [
+  "generalassistant1",
+  "generalshopkeeper3",
+  "gnome_waiter"
+ ],
+ "silk": [
+  "generalassistant1"
+ ],
+ "priest_robe": [
+  "generalassistant1",
+  "gnome_waiter"
+ ],
+ "priest_gown": [
+  "generalassistant1",
+  "gnome_waiter"
+ ],
+ "piedish": [
+  "cassie"
+ ],
+ "cooking_apple": [
+  "cassie"
+ ],
+ "potato": [
+  "boardgames_barmaid2",
+  "cassie",
+  "generalassistant8",
+  "ranging_guild_armour_salesman"
+ ],
+ "jug_empty": [
+  "aubury",
+  "bedabin",
+  "blurberrybarmen",
+  "cassie",
+  "death_shopkeeper",
+  "fat_tony",
+  "fionella",
+  "fishguildshop",
+  "gem_trader",
+  "generalassistant5",
+  "generalshopkeeper1",
+  "gnome_gulluck",
+  "jiminua",
+  "kortan",
+  "lathas_shopkeeper",
+  "nulodion",
+  "nurmof",
+  "oziach",
+  "regicidegeneralshopkeeper",
+  "scavvo",
+  "shilofishowner",
+  "shilogeneralstore",
+  "tea_seller",
+  "treevillage_shopkeeper1",
+  "werewolfshopkeeper2",
+  "werewolfshopkeeper3",
+  "zambo"
+ ],
+ "chocolate_bar": [
+  "boardgames_barmaid2",
+  "cassie",
+  "ranging_guild_armour_salesman",
+  "swordshop2"
+ ],
+ "pot_flour": [
+  "boardgames_barmaid2",
+  "cassie",
+  "ranging_guild_armour_salesman",
+  "shilofishowner"
+ ],
+ "ring_mould": [
+  "dommik",
+  "rommik"
+ ],
+ "necklace_mould": [
+  "dommik",
+  "rommik"
+ ],
+ "amulet_mould": [
+  "dommik",
+  "rommik"
+ ],
+ "needle": [
+  "dommik",
+  "gnome_waiter",
+  "rommik",
+  "shilogeneralstore"
+ ],
+ "thread": [
+  "dommik",
+  "gnome_waiter",
+  "rommik",
+  "shilogeneralstore"
+ ],
+ "holy_symbol_mould": [
+  "dommik",
+  "rommik"
+ ],
+ "sickle_mould": [
+  "dommik",
+  "rommik"
+ ],
+ "shears": [
+  "aubury",
+  "blurberrybarmen",
+  "death_shopkeeper",
+  "fat_tony",
+  "gem_trader",
+  "generalassistant5",
+  "generalshopkeeper1",
+  "gnome_gulluck",
+  "jiminua",
+  "kortan",
+  "lathas_shopkeeper",
+  "nulodion",
+  "nurmof",
+  "regicidegeneralshopkeeper",
+  "scavvo",
+  "shilofishowner",
+  "tea_seller",
+  "treevillage_shopkeeper1",
+  "werewolfshopkeeper2",
+  "werewolfshopkeeper3",
+  "zambo"
+ ],
+ "asgarnian_ale": [
+  "generalshopkeeper6",
+  "valaine",
+  "werewolfshopkeeper1"
+ ],
+ "wizards_mind_bomb": [
+  "bedabin",
+  "generalshopkeeper6",
+  "valaine",
+  "werewolfshopkeeper1"
+ ],
+ "dwarven_stout": [
+  "bedabin",
+  "generalshopkeeper6",
+  "valaine",
+  "werewolfshopkeeper1"
+ ],
+ "dragon_battleaxe": [
+  "viking_fish_monger"
+ ],
+ "dragon_mace": [
+  "viking_fish_monger"
+ ],
+ "dragon_longsword": [
+  "gnome_rometti"
+ ],
+ "dragon_dagger": [
+  "gnome_rometti"
+ ],
+ "rotten_tomato": [
+  "duel_fadli"
+ ],
+ "chefs_hat": [
+  "gnome_waiter"
+ ],
+ "bluewizhat": [
+  "gnome_waiter",
+  "magic_store_owner"
+ ],
+ "yellow_cape": [
+  "generalshopkeeper3",
+  "gnome_waiter"
+ ],
+ "grey_wolf_fur": [
+  "generalassistant2",
+  "gerrant",
+  "gnome_waiter"
+ ],
+ "fur": [
+  "generalassistant2",
+  "gerrant",
+  "gnome_waiter"
+ ],
+ "eye_patch": [
+  "gnome_waiter"
+ ],
+ "fishing_bait": [
+  "alfonse_the_waiter",
+  "bob",
+  "gaius",
+  "helemos",
+  "swordshop1"
+ ],
+ "feather": [
+  "alfonse_the_waiter",
+  "bob",
+  "fishguildshop",
+  "gaius",
+  "swordshop1"
+ ],
+ "raw_cod": [
+  "alfonse_the_waiter",
+  "helemos",
+  "swordshop1"
+ ],
+ "raw_mackerel": [
+  "alfonse_the_waiter",
+  "helemos",
+  "swordshop1"
+ ],
+ "raw_bass": [
+  "alfonse_the_waiter",
+  "helemos",
+  "swordshop1"
+ ],
+ "raw_tuna": [
+  "alfonse_the_waiter",
+  "gaius",
+  "helemos",
+  "swordshop1"
+ ],
+ "raw_lobster": [
+  "alfonse_the_waiter",
+  "gaius",
+  "helemos",
+  "swordshop1"
+ ],
+ "raw_swordfish": [
+  "alfonse_the_waiter",
+  "gaius",
+  "helemos",
+  "swordshop1"
+ ],
+ "cod": [
+  "alfonse_the_waiter",
+  "gnome_hudo"
+ ],
+ "mackerel": [
+  "alfonse_the_waiter"
+ ],
+ "bass": [
+  "alfonse_the_waiter"
+ ],
+ "tuna": [
+  "alfonse_the_waiter",
+  "gnome_hudo"
+ ],
+ "lobster": [
+  "alfonse_the_waiter",
+  "gnome_hudo"
+ ],
+ "swordfish": [
+  "alfonse_the_waiter",
+  "gnome_hudo",
+  "ranging_guild_bow_salesman"
+ ],
+ "net": [
+  "gaius",
+  "helemos",
+  "swordshop1"
+ ],
+ "fishing_rod": [
+  "bob",
+  "gaius",
+  "helemos",
+  "swordshop1"
+ ],
+ "fly_fishing_rod": [
+  "bob",
+  "gaius",
+  "swordshop1"
+ ],
+ "harpoon": [
+  "gaius",
+  "helemos",
+  "swordshop1"
+ ],
+ "lobster_pot": [
+  "gaius",
+  "helemos",
+  "swordshop1"
+ ],
+ "raw_shrimp": [
+  "gaius",
+  "helemos",
+  "swordshop1"
+ ],
+ "raw_sardine": [
+  "gaius",
+  "helemos",
+  "swordshop1"
+ ],
+ "raw_herring": [
+  "gaius",
+  "helemos",
+  "swordshop1"
+ ],
+ "raw_anchovies": [
+  "gaius",
+  "helemos",
+  "swordshop1"
+ ],
+ "raw_trout": [
+  "bob",
+  "gaius",
+  "jakut",
+  "swordshop1"
+ ],
+ "raw_pike": [
+  "bob",
+  "gaius",
+  "jakut",
+  "swordshop1"
+ ],
+ "raw_salmon": [
+  "bob",
+  "gaius",
+  "jakut",
+  "swordshop1"
+ ],
+ "big_net": [
+  "helemos",
+  "swordshop1"
+ ],
+ "raw_shark": [
+  "helemos",
+  "jakut",
+  "swordshop1"
+ ],
+ "herring": [
+  "alfonse_the_waiter",
+  "gnome_hudo"
+ ],
+ "uncut_sapphire": [
+  "spice_merchant",
+  "viking_longhall_barkeep"
+ ],
+ "uncut_emerald": [
+  "spice_merchant",
+  "viking_longhall_barkeep"
+ ],
+ "uncut_ruby": [
+  "spice_merchant",
+  "viking_longhall_barkeep"
+ ],
+ "uncut_diamond": [
+  "spice_merchant",
+  "viking_longhall_barkeep"
+ ],
+ "apple_pie": [
+  "ranging_guild_bow_salesman"
+ ],
+ "3dose1attack": [
+  "ranging_guild_bow_salesman"
+ ],
+ "newcomer_map": [
+  "tea_seller",
+  "treevillage_shopkeeper1"
+ ],
+ "premade_vegetable_batta": [
+  "generalassistant3"
+ ],
+ "premade_worm_batta": [
+  "generalassistant3"
+ ],
+ "premade_toad_batta": [
+  "generalassistant3"
+ ],
+ "premade_fruit_batta": [
+  "generalassistant3"
+ ],
+ "premade_cheese+tom_batta": [
+  "generalassistant3"
+ ],
+ "premade_worm_hole": [
+  "generalassistant3"
+ ],
+ "premade_tangled_toads_legs": [
+  "generalassistant3"
+ ],
+ "premade_veg_ball": [
+  "generalassistant3"
+ ],
+ "premade_chocolate_bomb": [
+  "generalassistant3"
+ ],
+ "premade_worm_crunchies": [
+  "generalassistant3"
+ ],
+ "premade_toad_crunchies": [
+  "generalassistant3"
+ ],
+ "premade_chocchip_crunchies": [
+  "generalassistant3"
+ ],
+ "premade_spicy_crunchies": [
+  "generalassistant3"
+ ],
+ "pearl_bolt": [
+  "zenesha"
+ ],
+ "brandy": [
+  "bedabin",
+  "swordshop2"
+ ],
+ "gin": [
+  "bedabin",
+  "swordshop2"
+ ],
+ "vodka": [
+  "bedabin",
+  "swordshop2"
+ ],
+ "whisky": [
+  "bedabin",
+  "swordshop2"
+ ],
+ "pineapple": [
+  "ranging_guild_armour_salesman",
+  "swordshop2"
+ ],
+ "equa_leaves": [
+  "ranging_guild_armour_salesman",
+  "swordshop2"
+ ],
+ "orange": [
+  "ranging_guild_armour_salesman",
+  "swordshop2"
+ ],
+ "lemon": [
+  "ranging_guild_armour_salesman",
+  "swordshop2"
+ ],
+ "lime": [
+  "ranging_guild_armour_salesman",
+  "swordshop2"
+ ],
+ "dwellberries": [
+  "ranging_guild_armour_salesman",
+  "swordshop2"
+ ],
+ "cocktail_shaker": [
+  "ranging_guild_armour_salesman",
+  "swordshop2"
+ ],
+ "chocolate_dust": [
+  "ranging_guild_armour_salesman",
+  "swordshop2"
+ ],
+ "pot_of_cream": [
+  "ranging_guild_armour_salesman",
+  "swordshop2"
+ ],
+ "bucket_milk": [
+  "ranging_guild_armour_salesman",
+  "swordshop2"
+ ],
+ "cocktail_guide": [
+  "swordshop2"
+ ],
+ "gianne_dough": [
+  "ranging_guild_armour_salesman"
+ ],
+ "gnome_spice": [
+  "ranging_guild_armour_salesman"
+ ],
+ "onion": [
+  "ranging_guild_armour_salesman"
+ ],
+ "cabbage": [
+  "boardgames_barmaid2",
+  "generalassistant8",
+  "ranging_guild_armour_salesman"
+ ],
+ "tomato": [
+  "boardgames_barmaid2",
+  "ranging_guild_armour_salesman"
+ ],
+ "cheese": [
+  "boardgames_barmaid2",
+  "ranging_guild_armour_salesman"
+ ],
+ "giannes_cook_book": [
+  "ranging_guild_armour_salesman"
+ ],
+ "gnome_robebottoms_pink": [
+  "siegfried_erkle"
+ ],
+ "gnome_robebottoms_green": [
+  "siegfried_erkle"
+ ],
+ "gnome_robebottoms_blue": [
+  "siegfried_erkle"
+ ],
+ "gnome_robebottoms_cream": [
+  "siegfried_erkle"
+ ],
+ "gnome_robebottoms_turquoise": [
+  "siegfried_erkle"
+ ],
+ "gnome_hat_pink": [
+  "siegfried_erkle"
+ ],
+ "gnome_hat_green": [
+  "siegfried_erkle"
+ ],
+ "gnome_hat_blue": [
+  "siegfried_erkle"
+ ],
+ "gnome_hat_cream": [
+  "siegfried_erkle"
+ ],
+ "gnome_hat_turquoise": [
+  "siegfried_erkle"
+ ],
+ "gnome_robetop_pink": [
+  "siegfried_erkle"
+ ],
+ "gnome_robetop_green": [
+  "siegfried_erkle"
+ ],
+ "gnome_robetop_blue": [
+  "siegfried_erkle"
+ ],
+ "gnome_robetop_cream": [
+  "siegfried_erkle"
+ ],
+ "gnome_robetop_turquoise": [
+  "siegfried_erkle"
+ ],
+ "gnome_boots_pink": [
+  "siegfried_erkle"
+ ],
+ "gnome_boots_green": [
+  "siegfried_erkle"
+ ],
+ "gnome_boots_blue": [
+  "siegfried_erkle"
+ ],
+ "gnome_boots_cream": [
+  "siegfried_erkle"
+ ],
+ "gnome_boots_turquoise": [
+  "siegfried_erkle"
+ ],
+ "gold_ring": [
+  "drogo"
+ ],
+ "sapphire_ring": [
+  "drogo"
+ ],
+ "emerald_ring": [
+  "drogo"
+ ],
+ "diamond_ring": [
+  "drogo"
+ ],
+ "gold_necklace": [
+  "drogo"
+ ],
+ "sapphire_necklace": [
+  "drogo"
+ ],
+ "emerald_necklace": [
+  "drogo"
+ ],
+ "ruby_necklace": [
+  "drogo"
+ ],
+ "diamond_necklace": [
+  "drogo"
+ ],
+ "strung_gold_amulet": [
+  "drogo"
+ ],
+ "strung_sapphire_amulet": [
+  "drogo"
+ ],
+ "strung_emerald_amulet": [
+  "drogo"
+ ],
+ "strung_ruby_amulet": [
+  "drogo"
+ ],
+ "strung_diamond_amulet": [
+  "drogo"
+ ],
+ "bronze_med_helm": [
+  "horror_lighthousekeeeper_well"
+ ],
+ "iron_med_helm": [
+  "horror_lighthousekeeeper_well"
+ ],
+ "steel_med_helm": [
+  "horror_lighthousekeeeper_well"
+ ],
+ "mithril_med_helm": [
+  "horror_lighthousekeeeper_well"
+ ],
+ "adamant_med_helm": [
+  "horror_lighthousekeeeper_well"
+ ],
+ "bronze_full_helm": [
+  "horror_lighthousekeeeper_well"
+ ],
+ "iron_full_helm": [
+  "horror_lighthousekeeeper_well"
+ ],
+ "steel_full_helm": [
+  "horror_lighthousekeeeper_well"
+ ],
+ "mithril_full_helm": [
+  "horror_lighthousekeeeper_well"
+ ],
+ "adamant_full_helm": [
+  "horror_lighthousekeeeper_well"
+ ],
+ "vial_empty": [
+  "arhein",
+  "bedabin",
+  "generalassistant8",
+  "irksol",
+  "noterazzo",
+  "ranael",
+  "tbwt_tiadeche_final"
+ ],
+ "pestle_and_mortar": [
+  "arhein",
+  "bedabin",
+  "generalassistant8",
+  "irksol",
+  "noterazzo",
+  "ranael",
+  "tbwt_tiadeche_final"
+ ],
+ "eye_of_newt": [
+  "arhein",
+  "irksol",
+  "magic_store_owner",
+  "ranael"
+ ],
+ "torch_unlit": [
+  "noterazzo",
+  "tbwt_tiadeche_final"
+ ],
+ "3doseantipoison": [
+  "tbwt_tiadeche_final"
+ ],
+ "charcoal": [
+  "noterazzo",
+  "tbwt_tiadeche_final"
+ ],
+ "machette": [
+  "noterazzo",
+  "tbwt_tiadeche_final"
+ ],
+ "spade": [
+  "bedabin",
+  "generalassistant8",
+  "noterazzo",
+  "tbwt_tiadeche_final"
+ ],
+ "bronze_bar": [
+  "fishguildshop",
+  "generalassistant6",
+  "noterazzo",
+  "tbwt_tiadeche_final"
+ ],
+ "tbwt_cooked_karambwan": [
+  "gnome_hudo"
+ ],
+ "bucket_bailing": [
+  "shilofishowner"
+ ],
+ "swamppaste": [
+  "shilofishowner"
+ ],
+ "mithril_seed": [
+  "generalshopkeeper8"
+ ],
+ "dusty_key": [
+  "generalshopkeeper8"
+ ],
+ "silverlight": [
+  "generalshopkeeper8"
+ ],
+ "melzarkey": [
+  "generalshopkeeper8"
+ ],
+ "dragonshield_b": [
+  "generalshopkeeper8"
+ ],
+ "cape_of_legends": [
+  "generalshopkeeper8"
+ ],
+ "bronze_platelegs": [
+  "ogre_merchant"
+ ],
+ "steel_platelegs": [
+  "ogre_merchant"
+ ],
+ "mithril_platelegs": [
+  "ogre_merchant"
+ ],
+ "adamant_platelegs": [
+  "ogre_merchant"
+ ],
+ "poison": [
+  "bedabin"
+ ],
+ "grog": [
+  "bedabin"
+ ],
+ "greenmans_ale": [
+  "bedabin"
+ ],
+ "bronze_mace": [
+  "viking_weapons_salesman"
+ ],
+ "iron_mace": [
+  "viking_weapons_salesman"
+ ],
+ "steel_mace": [
+  "viking_weapons_salesman"
+ ],
+ "mithril_mace": [
+  "viking_weapons_salesman"
+ ],
+ "adamant_mace": [
+  "viking_weapons_salesman"
+ ],
+ "firerune": [
+  "baker_merchant",
+  "death_barman",
+  "frincos",
+  "magic_store_owner"
+ ],
+ "waterrune": [
+  "baker_merchant",
+  "death_barman",
+  "frincos",
+  "magic_store_owner"
+ ],
+ "airrune": [
+  "baker_merchant",
+  "death_barman",
+  "frincos",
+  "magic_store_owner"
+ ],
+ "earthrune": [
+  "baker_merchant",
+  "death_barman",
+  "frincos",
+  "magic_store_owner"
+ ],
+ "mindrune": [
+  "baker_merchant",
+  "death_barman",
+  "frincos",
+  "magic_store_owner"
+ ],
+ "bodyrune": [
+  "baker_merchant",
+  "death_barman",
+  "frincos",
+  "magic_store_owner"
+ ],
+ "naturerune": [
+  "baker_merchant",
+  "death_barman"
+ ],
+ "chaosrune": [
+  "baker_merchant",
+  "death_barman",
+  "frincos",
+  "magic_store_owner"
+ ],
+ "lawrune": [
+  "baker_merchant",
+  "death_barman"
+ ],
+ "cosmicrune": [
+  "death_barman"
+ ],
+ "deathrune": [
+  "baker_merchant",
+  "death_barman",
+  "frincos",
+  "magic_store_owner"
+ ],
+ "saradomin_staff": [
+  "wayne"
+ ],
+ "guthix_staff": [
+  "wayne"
+ ],
+ "zamorak_staff": [
+  "wayne"
+ ],
+ "soulrune": [
+  "baker_merchant"
+ ],
+ "battlestaff": [
+  "baker_merchant",
+  "zaff"
+ ],
+ "staff_of_air": [
+  "baker_merchant",
+  "zaff"
+ ],
+ "staff_of_water": [
+  "baker_merchant",
+  "zaff"
+ ],
+ "staff_of_earth": [
+  "baker_merchant",
+  "zaff"
+ ],
+ "staff_of_fire": [
+  "baker_merchant",
+  "zaff"
+ ],
+ "bloodrune": [
+  "baker_merchant"
+ ],
+ "blackwizhat": [
+  "magic_store_owner"
+ ],
+ "twpart1": [
+  "boardgames_barmaid"
+ ],
+ "twpart2": [
+  "boardgames_barmaid"
+ ],
+ "twpart3": [
+  "boardgames_barmaid"
+ ],
+ "twpart4": [
+  "boardgames_barmaid"
+ ],
+ "mcannonbook": [
+  "boardgames_barmaid"
+ ],
+ "ammo_mould": [
+  "boardgames_barmaid"
+ ],
+ "plainstaff": [
+  "zaff"
+ ],
+ "magic_staff": [
+  "zaff"
+ ],
+ "copper_ore": [
+  "generalassistant6"
+ ],
+ "tin_ore": [
+  "generalassistant6"
+ ],
+ "iron_ore": [
+  "generalassistant6"
+ ],
+ "coal": [
+  "generalassistant6"
+ ],
+ "iron_bar": [
+  "generalassistant6"
+ ],
+ "gold_bar": [
+  "generalassistant6"
+ ],
+ "iron_pickaxe": [
+  "zeke"
+ ],
+ "steel_pickaxe": [
+  "zeke"
+ ],
+ "mithril_pickaxe": [
+  "zeke"
+ ],
+ "adamant_pickaxe": [
+  "zeke"
+ ],
+ "rune_pickaxe": [
+  "zeke"
+ ],
+ "pizza_base": [
+  "davon"
+ ],
+ "hardleather_body": [
+  "tbwt_tamayu_final"
+ ],
+ "leather_chaps": [
+  "tbwt_tamayu_final"
+ ],
+ "coif": [
+  "silver_merchant",
+  "tbwt_tamayu_final"
+ ],
+ "leather_cowl": [
+  "tbwt_tamayu_final"
+ ],
+ "leather_vambraces": [
+  "tbwt_tamayu_final"
+ ],
+ "arrow_shaft": [
+  "hickton"
+ ],
+ "willow_shortbow": [
+  "hickton"
+ ],
+ "willow_longbow": [
+  "hickton"
+ ],
+ "bronze_javelin": [
+  "peksa"
+ ],
+ "iron_javelin": [
+  "peksa"
+ ],
+ "steel_javelin": [
+  "peksa"
+ ],
+ "mithril_javelin": [
+  "peksa"
+ ],
+ "adamant_javelin": [
+  "peksa"
+ ],
+ "rune_javelin": [
+  "peksa"
+ ],
+ "bronze_thrownaxe": [
+  "peksa"
+ ],
+ "iron_thrownaxe": [
+  "peksa"
+ ],
+ "steel_thrownaxe": [
+  "peksa"
+ ],
+ "mithril_thrownaxe": [
+  "peksa"
+ ],
+ "adamnt_thrownaxe": [
+  "peksa"
+ ],
+ "rune_thrownaxe": [
+  "peksa"
+ ],
+ "bronze_halberd": [
+  "regicidegeneralshopkeeper"
+ ],
+ "iron_halberd": [
+  "regicidegeneralshopkeeper"
+ ],
+ "steel_halberd": [
+  "regicidegeneralshopkeeper"
+ ],
+ "black_halberd": [
+  "regicidegeneralshopkeeper"
+ ],
+ "mithril_halberd": [
+  "regicidegeneralshopkeeper"
+ ],
+ "adamant_halberd": [
+  "regicidegeneralshopkeeper"
+ ],
+ "rune_halberd": [
+  "regicidegeneralshopkeeper"
+ ],
+ "dragon_halberd": [
+  "regicidegeneralshopkeeper"
+ ],
+ "rune_platebody": [
+  "fur_merchant"
+ ],
+ "dragonhide_body": [
+  "fur_merchant"
+ ],
+ "rune_plateskirt": [
+  "silver_merchant"
+ ],
+ "rune_platelegs": [
+  "silver_merchant"
+ ],
+ "rune_mace": [
+  "silver_merchant"
+ ],
+ "rune_chainbody": [
+  "silver_merchant"
+ ],
+ "rune_longsword": [
+  "silver_merchant"
+ ],
+ "rune_sword": [
+  "silver_merchant"
+ ],
+ "dragonhide_chaps": [
+  "silver_merchant"
+ ],
+ "dragon_vambraces": [
+  "silver_merchant"
+ ],
+ "bronze_scimitar": [
+  "frenita"
+ ],
+ "iron_scimitar": [
+  "frenita"
+ ],
+ "steel_scimitar": [
+  "frenita"
+ ],
+ "mithril_scimitar": [
+  "frenita"
+ ],
+ "desert_shirt": [
+  "fishguildshop"
+ ],
+ "desert_robe": [
+  "fishguildshop"
+ ],
+ "desert_boots": [
+  "fishguildshop"
+ ],
+ "shantay_pass": [
+  "fishguildshop"
+ ],
+ "wooden_shield": [
+  "gem_merchant"
+ ],
+ "bronze_sq_shield": [
+  "gem_merchant"
+ ],
+ "bronze_kiteshield": [
+  "gem_merchant"
+ ],
+ "iron_sq_shield": [
+  "gem_merchant"
+ ],
+ "iron_kiteshield": [
+  "gem_merchant"
+ ],
+ "steel_sq_shield": [
+  "gem_merchant"
+ ],
+ "steel_kiteshield": [
+  "gem_merchant"
+ ],
+ "mithril_sq_shield": [
+  "gem_merchant"
+ ],
+ "nostringstar": [
+  "magearena_guardian"
+ ],
+ "silver_ore": [
+  "magearena_guardian"
+ ],
+ "silver_bar": [
+  "magearena_guardian"
+ ],
+ "bronze_plateskirt": [
+  "generalshopkeeper5"
+ ],
+ "iron_plateskirt": [
+  "generalshopkeeper5"
+ ],
+ "steel_plateskirt": [
+  "generalshopkeeper5"
+ ],
+ "black_plateskirt": [
+  "generalshopkeeper5"
+ ],
+ "mithril_plateskirt": [
+  "generalshopkeeper5"
+ ],
+ "adamant_plateskirt": [
+  "generalshopkeeper5"
+ ],
+ "spicespot": [
+  "shantay"
+ ],
+ "bronze_sword": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "iron_sword": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "steel_sword": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "black_sword": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "mithril_sword": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "adamant_sword": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "bronze_longsword": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "iron_longsword": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "steel_longsword": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "black_longsword": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "mithril_longsword": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "adamant_longsword": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "bronze_dagger": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "iron_dagger": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "steel_dagger": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "black_dagger": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "mithril_dagger": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "adamant_dagger": [
+  "betty",
+  "ranging_guild_tribal_salesman"
+ ],
+ "tbwt_bronze_spear_kp": [
+  "tailorp"
+ ],
+ "tbwt_iron_spear_kp": [
+  "tailorp"
+ ],
+ "tbwt_steel_spear_kp": [
+  "tailorp"
+ ],
+ "tbwt_mithril_spear_kp": [
+  "tailorp"
+ ],
+ "tbwt_adamant_spear_kp": [
+  "tailorp"
+ ],
+ "tbwt_rune_spear_kp": [
+  "tailorp"
+ ],
+ "tbwt_cleaning_cloth": [
+  "tailorp"
+ ],
+ "tbwt_raw_karambwan": [
+  "aprilfoolshorsesalesman"
+ ],
+ "tbwt_karambwan_vessel": [
+  "aprilfoolshorsesalesman"
+ ],
+ "cup_of_tea": [
+  "louie_legs"
+ ],
+ "salmon": [
+  "gnome_heckelfunch"
+ ],
+ "meat_pie": [
+  "gnome_heckelfunch"
+ ],
+ "viking_tankard_full": [
+  "generalshopkeeper7"
+ ],
+ "keg_of_beer": [
+  "generalshopkeeper7"
+ ],
+ "viking_top_blue": [
+  "wydin"
+ ],
+ "viking_top_red": [
+  "wydin"
+ ],
+ "viking_top_darkbrown": [
+  "wydin"
+ ],
+ "viking_top_green": [
+  "wydin"
+ ],
+ "viking_top_beige": [
+  "wydin"
+ ],
+ "vikingrobetop": [
+  "wydin"
+ ],
+ "vikingrobebottom": [
+  "wydin"
+ ],
+ "vikinghat": [
+  "wydin"
+ ],
+ "vikingboots": [
+  "wydin"
+ ],
+ "vikinggloves": [
+  "wydin"
+ ],
+ "viking_cloak_brown": [
+  "wydin"
+ ],
+ "viking_cloak_lightbrown": [
+  "wydin"
+ ],
+ "viking_cloak_darkbrown": [
+  "wydin"
+ ],
+ "viking_cloak_green": [
+  "wydin"
+ ],
+ "viking_cloak_red": [
+  "wydin"
+ ],
+ "viking_cloak_grey": [
+  "wydin"
+ ],
+ "viking_cloak_tangerine": [
+  "wydin"
+ ],
+ "viking_cloak_ocean": [
+  "wydin"
+ ],
+ "viking_cloak_purple": [
+  "wydin"
+ ],
+ "viking_cloak_pink": [
+  "wydin"
+ ],
+ "viking_cloak_black": [
+  "wydin"
+ ],
+ "egg": [
+  "generalassistant8"
+ ],
+ "bronze_warhammer": [
+  "jatix"
+ ],
+ "iron_warhammer": [
+  "jatix"
+ ],
+ "steel_warhammer": [
+  "jatix"
+ ],
+ "black_warhammer": [
+  "jatix"
+ ],
+ "mithril_warhammer": [
+  "jatix"
+ ],
+ "adamnt_warhammer": [
+  "jatix"
+ ],
+ "rune_warhammer": [
+  "jatix"
+ ],
+ "viking_helmet_range": [
+  "jatix"
+ ],
+ "viking_helmet_crush": [
+  "jatix"
+ ],
+ "viking_helmet_slash": [
+  "jatix"
+ ],
+ "viking_helmet_magic": [
+  "jatix"
+ ],
+ "empty_dye_bottle": [
+  "shilogeneralstore"
+ ],
+ "raw_beef": [
+  "boardgames_barmaid2",
+  "jakut"
+ ],
+ "raw_chicken": [
+  "boardgames_barmaid2",
+  "jakut"
+ ],
+ "raw_rat_meat": [
+  "jakut"
+ ],
+ "raw_bear_meat": [
+  "jakut"
+ ],
+ "wolfenboots_grey": [
+  "generalshopkeeper3"
+ ],
+ "wolfenrobetop_grey": [
+  "generalshopkeeper3"
+ ],
+ "wolfenrobebottom_grey": [
+  "generalshopkeeper3"
+ ],
+ "wolfenhat_grey": [
+  "generalshopkeeper3"
+ ],
+ "wolfengloves_grey": [
+  "generalshopkeeper3"
+ ],
+ "wolfenboots_crimson": [
+  "generalshopkeeper3"
+ ],
+ "wolfenrobetop_crimson": [
+  "generalshopkeeper3"
+ ],
+ "wolfenrobebottom_crimson": [
+  "generalshopkeeper3"
+ ],
+ "wolfenhat_crimson": [
+  "generalshopkeeper3"
+ ],
+ "wolfengloves_crimson": [
+  "generalshopkeeper3"
+ ],
+ "wolfenboots_tangerine": [
+  "generalshopkeeper3"
+ ],
+ "wolfenrobetop_tangerine": [
+  "generalshopkeeper3"
+ ],
+ "wolfenrobebottom_tangerine": [
+  "generalshopkeeper3"
+ ],
+ "wolfenhat_tangerine": [
+  "generalshopkeeper3"
+ ],
+ "wolfengloves_tangerine": [
+  "generalshopkeeper3"
+ ],
+ "wolfenboots_ocean": [
+  "generalshopkeeper3"
+ ],
+ "wolfenrobetop_ocean": [
+  "generalshopkeeper3"
+ ],
+ "wolfenrobebottom_ocean": [
+  "generalshopkeeper3"
+ ],
+ "wolfenhat_ocean": [
+  "generalshopkeeper3"
+ ],
+ "wolfengloves_ocean": [
+  "generalshopkeeper3"
+ ],
+ "wolfenboots_purple": [
+  "generalshopkeeper3"
+ ],
+ "wolfenrobetop_purple": [
+  "generalshopkeeper3"
+ ],
+ "wolfenrobebottom_purple": [
+  "generalshopkeeper3"
+ ],
+ "wolfenhat_purple": [
+  "generalshopkeeper3"
+ ],
+ "wolfengloves_purple": [
+  "generalshopkeeper3"
+ ],
+ "black_cape": [
+  "generalshopkeeper3"
+ ],
+ "green_cape": [
+  "generalshopkeeper3"
+ ],
+ "banana": [
+  "boardgames_barmaid2"
+ ],
+ "redberries": [
+  "boardgames_barmaid2"
+ ]
+}

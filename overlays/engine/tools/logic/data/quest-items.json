@@ -1,0 +1,858 @@
+{
+ "_note": "Quest -> items the player must SUPPLY (extracted from quest scripts via subagent pass). obtained = vanilla acquisition (gather/process/buy/drop/quest/given). NOTE: gating on these needs the full 4-source obtainability model (gather/process/BUY-shop-reachable/drop-monster-reachable) - see problems.txt #16; a gather/process-only gate over-blocks buyable items.",
+ "dragon": {
+  "items": [
+   {
+    "item": "bowl_unfired",
+    "qty": 1,
+    "obtained": "process",
+    "note": "magic door"
+   }
+  ]
+ },
+ "arena": {
+  "items": []
+ },
+ "arthur": {
+  "items": [
+   {
+    "item": "bread",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "lady of lake"
+   }
+  ]
+ },
+ "ball": {
+  "items": [
+   {
+    "item": "leather_gloves",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "worn"
+   }
+  ]
+ },
+ "biohazard": {
+  "items": []
+ },
+ "blackarmgang": {
+  "items": []
+ },
+ "blackknight": {
+  "items": [
+   {
+    "item": "cabbage",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "cauldron"
+   }
+  ]
+ },
+ "chompybird": {
+  "items": [
+   {
+    "item": "achey_tree_logs",
+    "qty": 2,
+    "obtained": "gather",
+    "note": "ogre arrows (self-fletch required)"
+   }
+  ]
+ },
+ "cog": {
+  "items": [
+   {
+    "item": "bucket_water",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "cool cog (or ice_gloves)"
+   }
+  ]
+ },
+ "cook": {
+  "items": [
+   {
+    "item": "egg",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "chicken"
+   },
+   {
+    "item": "bucket_milk",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "cow"
+   },
+   {
+    "item": "pot_flour",
+    "qty": 1,
+    "obtained": "process",
+    "note": "wheat"
+   }
+  ]
+ },
+ "crest": {
+  "items": [
+   {
+    "item": "swordfish",
+    "qty": 1,
+    "obtained": "process",
+    "note": "salad (or buy cooked)"
+   },
+   {
+    "item": "bass",
+    "qty": 1,
+    "obtained": "process",
+    "note": "salad"
+   },
+   {
+    "item": "tuna",
+    "qty": 1,
+    "obtained": "process",
+    "note": "salad"
+   },
+   {
+    "item": "salmon",
+    "qty": 1,
+    "obtained": "process",
+    "note": "salad"
+   },
+   {
+    "item": "shrimp",
+    "qty": 1,
+    "obtained": "process",
+    "note": "salad"
+   }
+  ]
+ },
+ "death": {
+  "items": [
+   {
+    "item": "trout",
+    "qty": 10,
+    "obtained": "process",
+    "note": "Tenzing (or buy)"
+   },
+   {
+    "item": "iron_bar",
+    "qty": 1,
+    "obtained": "process",
+    "note": "spiked boots (or buy)"
+   }
+  ]
+ },
+ "demon": {
+  "items": [
+   {
+    "item": "bucket_water",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "sink"
+   }
+  ]
+ },
+ "desertrescue": {
+  "items": [
+   {
+    "item": "bronze_bar",
+    "qty": 1,
+    "obtained": "process",
+    "note": "dart tip (or buy)"
+   }
+  ]
+ },
+ "doric": {
+  "items": [
+   {
+    "item": "clay",
+    "qty": 6,
+    "obtained": "gather",
+    "note": "mined, given to Doric"
+   },
+   {
+    "item": "copper_ore",
+    "qty": 4,
+    "obtained": "gather",
+    "note": "mined"
+   },
+   {
+    "item": "iron_ore",
+    "qty": 2,
+    "obtained": "gather",
+    "note": "mined"
+   }
+  ]
+ },
+ "druid": {
+  "items": []
+ },
+ "druidspirit": {
+  "items": [
+   {
+    "item": "silver_sickle",
+    "qty": 1,
+    "obtained": "process",
+    "note": "cast silver bar"
+   }
+  ]
+ },
+ "drunkmonk": {
+  "items": [
+   {
+    "item": "logs",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "cart"
+   }
+  ]
+ },
+ "eadgar": {
+  "items": [
+   {
+    "item": "logs",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "scarecrow (any log)"
+   }
+  ]
+ },
+ "elemental_workshop": {
+  "items": [
+   {
+    "item": "coal",
+    "qty": 4,
+    "obtained": "gather",
+    "note": "elemental bar (or buy)"
+   }
+  ]
+ },
+ "elena": {
+  "items": [
+   {
+    "item": "bucket_milk",
+    "qty": 1,
+    "obtained": "process",
+    "note": "cure (or buy)"
+   }
+  ]
+ },
+ "fishingcompo": {
+  "items": []
+ },
+ "fluffs": {
+  "items": [
+   {
+    "item": "raw_sardine",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "lure (or buy)"
+   },
+   {
+    "item": "bucket_milk",
+    "qty": 1,
+    "obtained": "process",
+    "note": "cat"
+   }
+  ]
+ },
+ "gobdip": {
+  "items": []
+ },
+ "grail": {
+  "items": []
+ },
+ "grandtree": {
+  "items": []
+ },
+ "haunted": {
+  "items": [
+   {
+    "item": "spade",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "dig"
+   }
+  ]
+ },
+ "hazeelcult": {
+  "items": []
+ },
+ "hero": {
+  "items": [
+   {
+    "item": "harralander",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "blamish oil (Herblore 25)"
+   }
+  ]
+ },
+ "hetty": {
+  "items": [
+   {
+    "item": "onion",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "potion"
+   },
+   {
+    "item": "burnt_meat",
+    "qty": 1,
+    "obtained": "process",
+    "note": "overcook meat"
+   }
+  ]
+ },
+ "horror": {
+  "items": [
+   {
+    "item": "swamp_tar",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "torch"
+   },
+   {
+    "item": "molten_glass",
+    "qty": 1,
+    "obtained": "process",
+    "note": "lens"
+   }
+  ]
+ },
+ "hunt": {
+  "items": [
+   {
+    "item": "banana",
+    "qty": 10,
+    "obtained": "gather",
+    "note": "crate"
+   },
+   {
+    "item": "white_apron",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "worn, own supply"
+   }
+  ]
+ },
+ "ikov": {
+  "items": [
+   {
+    "item": "limpwurt_root",
+    "qty": 20,
+    "obtained": "drop",
+    "note": "teleport"
+   }
+  ]
+ },
+ "imp": {
+  "items": [
+   {
+    "item": "black_bead",
+    "qty": 1,
+    "obtained": "drop",
+    "note": "imps"
+   },
+   {
+    "item": "red_bead",
+    "qty": 1,
+    "obtained": "drop",
+    "note": "imps"
+   },
+   {
+    "item": "white_bead",
+    "qty": 1,
+    "obtained": "drop",
+    "note": "imps"
+   },
+   {
+    "item": "yellow_bead",
+    "qty": 1,
+    "obtained": "drop",
+    "note": "imps"
+   }
+  ]
+ },
+ "itexam": {
+  "items": [
+   {
+    "item": "opal",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "pan+cut"
+   },
+   {
+    "item": "arcenia_root",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "explosive"
+   }
+  ]
+ },
+ "itgronigen": {
+  "items": [
+   {
+    "item": "bronze_bar",
+    "qty": 1,
+    "obtained": "process",
+    "note": "tube (or buy)"
+   },
+   {
+    "item": "molten_glass",
+    "qty": 1,
+    "obtained": "process",
+    "note": "lens"
+   }
+  ]
+ },
+ "itwatchtower": {
+  "items": [
+   {
+    "item": "guam_leaf",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "potion"
+   },
+   {
+    "item": "jangerberries",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "potion"
+   },
+   {
+    "item": "gold_bar",
+    "qty": 1,
+    "obtained": "process",
+    "note": "ogre toll (or buy)"
+   }
+  ]
+ },
+ "junglepotion": {
+  "items": []
+ },
+ "legends": {
+  "items": [
+   {
+    "item": "gold_bar",
+    "qty": 2,
+    "obtained": "process",
+    "note": "golden bowl (Smith 50)"
+   },
+   {
+    "item": "ardrigal",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "bravery potion"
+   },
+   {
+    "item": "snake_weed",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "bravery potion"
+   }
+  ]
+ },
+ "mcannon": {
+  "items": []
+ },
+ "mortton": {
+  "items": [
+   {
+    "item": "ashes",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "burn logs"
+   },
+   {
+    "item": "limestonebrick",
+    "qty": 15,
+    "obtained": "process",
+    "note": "carve limestone"
+   },
+   {
+    "item": "logs",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "pyre"
+   }
+  ]
+ },
+ "murder": {
+  "items": [
+   {
+    "item": "pot_empty",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "flour"
+   }
+  ]
+ },
+ "priest": {
+  "items": []
+ },
+ "priestperil": {
+  "items": [
+   {
+    "item": "bucket_empty",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "blessed water"
+   }
+  ]
+ },
+ "prince": {
+  "items": [
+   {
+    "item": "bronze_bar",
+    "qty": 1,
+    "obtained": "process",
+    "note": "princeskey (or buy)"
+   },
+   {
+    "item": "redberries",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "skin paste"
+   },
+   {
+    "item": "ashes",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "skin paste"
+   },
+   {
+    "item": "ball_of_wool",
+    "qty": 3,
+    "obtained": "process",
+    "note": "wig"
+   }
+  ]
+ },
+ "regicide": {
+  "items": [
+   {
+    "item": "coal",
+    "qty": 4,
+    "obtained": "gather",
+    "note": "still fuel (mining 30, or buy)"
+   },
+   {
+    "item": "limestone",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "quicklime (mining 10)"
+   },
+   {
+    "item": "ball_of_wool",
+    "qty": 4,
+    "obtained": "process",
+    "note": "fuse cloth"
+   },
+   {
+    "item": "cooked_rabbit",
+    "qty": 1,
+    "obtained": "process",
+    "note": "distract guard"
+   }
+  ]
+ },
+ "romeojuliet": {
+  "items": [
+   {
+    "item": "cadavaberries",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "cadava bush"
+   }
+  ]
+ },
+ "runemysteries": {
+  "items": []
+ },
+ "scorpcatcher": {
+  "items": []
+ },
+ "seaslug": {
+  "items": [
+   {
+    "item": "swamp_tar",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "swamp"
+   }
+  ]
+ },
+ "sheep": {
+  "items": [
+   {
+    "item": "ball_of_wool",
+    "qty": 20,
+    "obtained": "process",
+    "note": "shear+spin"
+   }
+  ]
+ },
+ "sheepherder": {
+  "items": [
+   {
+    "item": "coins",
+    "qty": 100,
+    "obtained": "buy",
+    "note": "plague suit"
+   }
+  ]
+ },
+ "squire": {
+  "items": [
+   {
+    "item": "redberry_pie",
+    "qty": 1,
+    "obtained": "process",
+    "note": "given to Thurgo"
+   },
+   {
+    "item": "blurite_ore",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "mine in ice-giant dungeon"
+   },
+   {
+    "item": "iron_bar",
+    "qty": 2,
+    "obtained": "process",
+    "note": "forge sword"
+   }
+  ]
+ },
+ "tbwt": {
+  "items": [
+   {
+    "item": "tbwt_jogre_bones",
+    "qty": 1,
+    "obtained": "drop",
+    "note": "kill jogres"
+   },
+   {
+    "item": "tbwt_monkey_corpse",
+    "qty": 1,
+    "obtained": "drop",
+    "note": "kill monkey"
+   },
+   {
+    "item": "seaweed",
+    "qty": 2,
+    "obtained": "gather",
+    "note": "sandwich"
+   },
+   {
+    "item": "banana",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "karamja rum"
+   },
+   {
+    "item": "4dose1agility",
+    "qty": 4,
+    "obtained": "process",
+    "note": "agility potion for Tamayu"
+   }
+  ]
+ },
+ "totem": {
+  "items": []
+ },
+ "tree": {
+  "items": [
+   {
+    "item": "logs",
+    "qty": 6,
+    "obtained": "gather",
+    "note": "battlements"
+   }
+  ]
+ },
+ "troll": {
+  "items": [
+   {
+    "item": "death_climbingboots",
+    "qty": 1,
+    "obtained": "quest",
+    "note": "from Death Plateau"
+   }
+  ]
+ },
+ "upass": {
+  "items": [
+   {
+    "item": "rope",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "swing"
+   },
+   {
+    "item": "woodplank",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "trap"
+   },
+   {
+    "item": "spade",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "dig"
+   },
+   {
+    "item": "shortbow",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "fire arrow"
+   },
+   {
+    "item": "bronze_arrow",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "fire arrow"
+   }
+  ]
+ },
+ "vampire": {
+  "items": [
+   {
+    "item": "beer",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "Dr Harlow"
+   },
+   {
+    "item": "hammer",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "stake"
+   },
+   {
+    "item": "garlic",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "weaken count"
+   }
+  ]
+ },
+ "viking": {
+  "items": [
+   {
+    "item": "knife",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "carve lyre"
+   },
+   {
+    "item": "raw_shark",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "Fossegrimen altar (or turtle/manta)"
+   },
+   {
+    "item": "cabbage",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "stone soup"
+   },
+   {
+    "item": "potato",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "stone soup"
+   },
+   {
+    "item": "onion",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "stone soup"
+   }
+  ]
+ },
+ "waterfall": {
+  "items": [
+   {
+    "item": "rope",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "crossing"
+   },
+   {
+    "item": "airrune",
+    "qty": 6,
+    "obtained": "buy",
+    "note": "pillars"
+   },
+   {
+    "item": "earthrune",
+    "qty": 6,
+    "obtained": "buy",
+    "note": "pillars"
+   },
+   {
+    "item": "waterrune",
+    "qty": 6,
+    "obtained": "buy",
+    "note": "pillars"
+   }
+  ]
+ },
+ "zanaris": {
+  "items": [
+   {
+    "item": "bronze_axe",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "any axe, chop dramen tree (36 WC)"
+   },
+   {
+    "item": "knife",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "carve staff (31 Craft)"
+   }
+  ]
+ },
+ "zombiequeen": {
+  "items": [
+   {
+    "item": "spade",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "dig"
+   },
+   {
+    "item": "rope",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "descend"
+   },
+   {
+    "item": "chisel",
+    "qty": 1,
+    "obtained": "buy",
+    "note": "bone key"
+   },
+   {
+    "item": "bronzecraftwire",
+    "qty": 1,
+    "obtained": "process",
+    "note": "beads of dead"
+   },
+   {
+    "item": "charcoal",
+    "qty": 1,
+    "obtained": "gather",
+    "note": "copy inscriptions"
+   },
+   {
+    "item": "bones",
+    "qty": 3,
+    "obtained": "drop",
+    "note": "tomb door"
+   }
+  ]
+ }
+}

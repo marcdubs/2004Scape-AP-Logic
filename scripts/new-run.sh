@@ -47,11 +47,13 @@ done
 RUN_CONTENT=1             # drip + shops + drops + teleports via RegenerateAll (INCLUDES the ~1:30 pack rebuild)
 RUN_GATHER=1              # gathering swap table (runtime JSON, restart only)
 RUN_PROCESS=1             # processing/recipe swap table (runtime JSON, restart only)
+RUN_THIEVING=1            # thieving loot swap table (runtime JSON, restart only)
 RUN_SPAWN=1               # random home/respawn point (MUST run before entrances - see note above)
 RUN_ENTRANCES=1           # entrance shuffle + automatic logic validation/reroll
 RUN_PLACEMENT=1           # AP placement: checks contain the unlocks (RESETS run progress!)
 REFRESH_REGION_GRAPH=0    # only after map/content changes (validator input; slow-ish)
 REFRESH_WORLDMAP_PNG=0    # tracker map images; only after map changes
+RUN_VALIDATE=1            # print the beatability report (spheres + goals + item obtainability) at the end
 
 # ============================ per-stage knobs ================================
 
@@ -69,18 +71,27 @@ DROPS_MODE=mimic          # tiered | chaos | mimic ("chicken runs the green drag
 REGENERATE_EXTRA=""       # e.g. "--skip-drip" or "--drip-seed 555"
 
 # RandomizeGathering.ts - what mining/fishing/woodcutting actually yield.
-#   all params: [--seed <n>] [--mode shuffle|chaos]
+#   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
 #               [--skills mining,fishing,woodcutting] [--exclude <item,item>]
 #               [--pin-quest-items] [--no-quest-pins] [--dry-run]
-GATHER_MODE=shuffle       # shuffle (bijective, everything obtainable) | chaos
+GATHER_MODE=shuffle       # shuffle (bijective) | tiered (bijective within level bands) | chaos
 GATHER_EXTRA=""
 
 # RandomizeProcessing.ts - what cooking/smithing/crafting/fletching produce.
-#   all params: [--seed <n>] [--mode shuffle|chaos]
+#   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
 #               [--skills cooking,smithing,crafting,fletching] [--exclude <item,item>]
 #               [--pin-quest-items] [--no-quest-pins] [--dry-run]
 PROCESS_MODE=shuffle
 PROCESS_EXTRA=""
+
+# RandomizeThieving.ts - what pickpockets/market stalls/trapped chests hand you.
+#   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
+#               [--surfaces pickpocket,stalls,chests] [--exclude <item,item>]
+#               [--pin-quest-items] [--no-quest-pins] [--dry-run] [--export-pool <path>]
+#   (`--exclude coins` leaves the big-money rows - 1000-coin Ardougne chest, hero/
+#    paladin pockets - handing out vanilla coins; quantity is never rescaled.)
+THIEVING_MODE=shuffle
+THIEVING_EXTRA=""
 
 # RandomizeSpawn.ts - the home/respawn point. Runs BEFORE entrances (see note up top).
 #   all params: [--seed <n>] [--mode city|chunk] [--dry-run] [--include-far-west]
@@ -124,6 +135,7 @@ run() { echo; echo "==> npx tsx $*"; npx tsx "$@"; }
 [ "$RUN_CONTENT" = 1 ]   && run tools/RegenerateAll.ts --seed "$SEED" --mode "$DROPS_MODE" $REGENERATE_EXTRA
 [ "$RUN_GATHER" = 1 ]    && run tools/gather/RandomizeGathering.ts --seed "$SEED" --mode "$GATHER_MODE" $GATHER_EXTRA
 [ "$RUN_PROCESS" = 1 ]   && run tools/process/RandomizeProcessing.ts --seed "$SEED" --mode "$PROCESS_MODE" $PROCESS_EXTRA
+[ "$RUN_THIEVING" = 1 ]  && run tools/thieving/RandomizeThieving.ts --seed "$SEED" --mode "$THIEVING_MODE" $THIEVING_EXTRA
 [ "$RUN_SPAWN" = 1 ]     && run tools/spawn/RandomizeSpawn.ts --seed "$SEED" --mode "$SPAWN_MODE" $SPAWN_EXTRA
 [ "$RUN_ENTRANCES" = 1 ] && run tools/map/RandomizeEntrances.ts --seed "$SEED" $ENTRANCE_EXTRA
 [ "$REFRESH_REGION_GRAPH" = 1 ] && run tools/logic/BuildRegionGraph.ts
@@ -140,12 +152,25 @@ if [ "$ADOPTED" = 1 ]; then
   echo "==> AP run: removed local ap-placements.json (multiworld owns placements; quest gates re-sync on connect)"
 fi
 
+# Beatability report: sphere-by-sphere reachability incl. the four-source item
+# obtainability model. --verbose prints every sphere; otherwise just the verdict.
+# (Skips gracefully if region-graph.json isn't built yet - see the one-time note.)
+if [ "$RUN_VALIDATE" = 1 ]; then
+  if [ -f tools/logic/region-graph.json ]; then
+    # tolerate a non-zero (BLOCKED) exit - the report is the point, don't abort the run.
+    if [ "$VERBOSE" = 1 ]; then npx tsx tools/logic/ValidateSeed.ts --verbose || true; else npx tsx tools/logic/ValidateSeed.ts || true; fi
+  else
+    echo; echo "==> skipping ValidateSeed: tools/logic/region-graph.json missing - run 'npx tsx tools/logic/BuildRegionGraph.ts' once (one-time)."
+  fi
+fi
+
 echo
 echo "================================================================"
 echo "New run rolled (seed $SEED). Now:"
 echo "  1. RESTART the Windows server."
-echo "  2. Walkthrough: npx tsx tools/sim/SimulateProgression.ts --verbosity 2   (solo runs only - AP runs have no local placements)"
-echo "  3. Sanity:      npx tsx tools/logic/ValidateSeed.ts"
+echo "  2. Walkthrough: npx tsx tools/sim/SimulateProgression.ts --verbosity 2   (AP runs get the quest-graph report instead: the room owns placements)"
+echo "                  add --current-unlocks to ask 'what can I do RIGHT NOW' with the unlocks already received"
+echo "  3. Re-validate: npx tsx tools/logic/ValidateSeed.ts --verbose   (ran above unless RUN_VALIDATE=0)"
 echo "  4. Tracker:     http://localhost:8080/ap/   (?spoiler=1 to see everything)"
 echo "  5. Testing aids: tools/ap/SetUnlock.ts <name> <count> | --clear"
 echo "================================================================"

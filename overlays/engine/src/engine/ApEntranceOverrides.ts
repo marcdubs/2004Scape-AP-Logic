@@ -61,6 +61,15 @@ function load(): Map<string, number> {
     return table;
 }
 
+/**
+ * Drops the cached table so the next lookup re-reads the file. ApClient calls this after
+ * adopting an Archipelago-built entrance layout from slot_data (GitHub #3) - the table
+ * is a plain JSON read, so a live swap needs no restart.
+ */
+export function reloadEntranceOverrides(): void {
+    overrides = null;
+}
+
 // returns the override destination as a packed coord, or -1 (script null) on miss.
 export function getEntranceOverride(packedCoord: number, op: number): number {
     if (overrides === null) {

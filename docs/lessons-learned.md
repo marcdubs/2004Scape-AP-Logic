@@ -168,7 +168,11 @@ reasoning:
   angle`. Loc ids resolve via `content/pack/loc.pack` (id=name) and category
   membership via `category=` in `.loc` configs. A placement scanner is the next
   logical tool.
-- Tutorial Island is mapsquare (48,48); `PROTECTED_MAPSQUARES` hard-excludes it.
+- Tutorial Island is SIX mapsquares - (47,47) (47,48) (48,47) (48,48) (49,48) and the
+  underground (48,148) - not just (48,48). `tools/shared/TutorialIsland.ts` derives that
+  list from `content/scripts/tutorial/configs/tutorial_island.dbrow` (the coord_pair
+  table behind `~in_tutorial_island`), and every tool that has to keep off the island
+  asks it: `RandomizeEntrances`, `DeriveGatedAreas`, `RandomizeSpawn`. See issue #14.
 - Same seed number does NOT reproduce the same layout across algorithm changes (the
   dedupe fix changed the candidate list, which changed what seed 1803231336
   produces). Treat seeds as valid only within one tool version.
@@ -1872,8 +1876,9 @@ checks green incl. [queue,player_death] carrying opcode 1907. NOT in-game tested
   writes data/config/ap-spawn.json (reseed = rewrite + restart). City = 1 of the 7
   vanilla spellbook landmarks (tool cross-checks live magic_spells.dbrow and warns
   loudly if the teleport shuffle deranged it - home uses vanilla coords regardless).
-  Chunk = random mainland square from 127 candidates (surface, mapX>=40, mapZ<=62
-  core band, no Tutorial Island/wilderness/Karamja; wilderness boundary VERIFIED:
+  Chunk = random mainland square from ~110 candidates (surface, mapX>=40, mapZ<=62
+  core band, no Tutorial Island/wilderness/Karamja - the tutorial exclusion dropped 4
+  more squares once it used the real six-square footprint; wilderness boundary VERIFIED:
   x in [2944,3392) & z in [3520,6400), 3520 = mapsquare edge 55, confirmed by both
   Player.isInWilderness() and move.rs2's [mapzone,0_46_55]; >=8 LOCs or >=1 NPC to
   skip ocean; --include-far-west opens mapX<40 back up). death.rs2 overlay = 2-line
@@ -2548,6 +2553,11 @@ addon items"; hard-won bits for future sessions:
   PlacementEngine.loadApOptions (generator/validator/sim), and rs2 via the
   ap_option command (opcode 1910). New toggles: add to ApOptions DEFAULTS +
   shipped json; tools loader only if the toggle affects the location catalog.
+  **Numeric keys** (2026-07-26, #13) go in NUMERIC_DEFAULTS instead, with a
+  {value, min, max} - load() clamps and warns, and ap_option returns the number
+  (booleans still return 1/0, unknown names still fail open to 1). A FOURTH
+  place to sync for AP-adopted options: ApClient.applySlotData + the apworld's
+  options.py/fill_slot_data + its test_seed_options assertions.
 - **::command args**: the cheat line is lowercased and space-split; a
   (string $x) debugproc receives ONE word. ::apnpctp therefore matches
   multi-word NPC names by first word/substring only.
@@ -3143,3 +3153,921 @@ tool run, the rest are `public/ap/` refresh or `install.js`):
   running a tsx tool FROM WSL needs the **linux** binary - the shared node_modules only
   had win32. Fix that worked: `npm install --no-save --force @esbuild/linux-x64` (after
   `rm -rf node_modules/@esbuild/.win32-x64-*` to clear a stale rename temp).
+
+## Session-end addendum: entrance/area-gate expansion + item obtainability logic (2026-07-24)
+
+Two big logic layers landed (feat/v2 branch, PR #2). Both turn a randomizer from
+"probably fine" into "provably beatable" by feeding real data into `ValidateSeed`.
+
+### Gated-area expansion 7 → 97 (problems.txt #8/#9)
+
+- **`tools/map/ScanDoors.ts`** — deterministic scan of every passage-controlling
+  loc. Completeness argument: for blocking geometry to open it must EITHER have an
+  `[oploc*,X]` handler OR be spawned/removed by `loc_add/change/del` — both
+  greppable, so the union is the whole universe. "Gated" is a STRUCTURAL property
+  (open-op behind an `if` on a gate-signal), not a name guess. Separates passages
+  from containers (op1=Open is shared by chests) — watch the `outdoorfurniture_*`
+  substring trap where "door" hides inside the model name. Found 157 gated
+  passages vs the 7 hand-curated.
+- **`tools/logic/DeriveGatedAreas.ts`** — turns ScanDoors output into
+  `ap-gated-areas.json` entries: exact boxes via region flood-fill
+  (`BuildRegionGraph.ts --extra-closed-doors` isolates each pocket), requires
+  parsed/normalised. Oversized (sprawling-cave) boxes are flagged, not trusted —
+  a bbox over-captures an irregular region. 10 large-dungeon boxes held back.
+- The 59 hard requires (bitfield gates, Thieving-level locked doors, `!`/compound
+  conditions) were resolved by a **5-way subagent pass** over the quest scripts →
+  `ap-gated-areas.requires.json`. Subagents also correctly EXCLUDED non-gates:
+  agility-obstacle cooldowns (`%..._pipe_used >= map_clock`), board-game rank
+  gates, intra-quest puzzle levers, non-door interactables.
+- New **`{varp,bit}` / `{varp,bitClear}` require forms** in `GatedAreas.ts`
+  (validator) and `ApAreaGates.ts` (runtime) for `testbit(%varp, ^bit)` gates.
+- **Quest-doability model** (`ValidateSeed.ts` `resolveVarp`): a quest-progress
+  varp gate is satisfiable when its quest is DOABLE (non-region prereqs met), NOT
+  complete. This breaks circular deadlock (a quest's own interior door needs the
+  quest, which needs the door) and can't false-pass. The mid-vs-complete SPLIT
+  (heroquest/blackarmgang/phoenixgang/legendsquest) keeps guild gates
+  completion-safe while interior doors open mid-quest. Data-driven varp
+  enumeration over the gated-areas config. THIS WAS THE FIX that made 97 areas
+  validate — a naive completion-gate deadlocked Shield-of-Arrav / Legends.
+- **Barcrawl pubs are now hard region anchors** (was just "karamja"): all 10 bars'
+  bartender spawn coords → region anchors in `quest-regions.json`. Blurberry's
+  (Grand Tree, its own region) and the two Karamja bars are shuffle-sensitive.
+
+### Four-source item obtainability (problems.txt #16) — see [item-logic.md](item-logic.md)
+
+- `heldItems()` was narrative-only (`() => true`). Now it's a real fixpoint over
+  four OR'd sources (gather/process skill-gated, buy/drop region-gated), so quest
+  item needs gate on actual obtainability. See item-logic.md for the full design.
+- Data via subagent passes: `item-sources.json`, `quest-items.json` (63 quests),
+  `shop-sources.json` (489 buyable), `drop-sources.json` (259 dropped),
+  `npc-spawns.json` (1114, via `BuildNpcSpawns.ts`).
+
+### Hard-won lessons this session
+
+- **"Buy" is NOT a free pass under shopsanity.** Treating buyable items as always
+  obtainable is the same mistake as treating gathered items as free — the shop's
+  accessibility is itself a region-reachability question (shopsanity relocates the
+  owner). The correct model takes the OR over ALL sources, each with its
+  randomizer-adjusted accessibility. Every "is X free?" assumption in a randomizer
+  logic layer deserves this scrutiny.
+- **`ValidateSeed` reads the runtime `ap-unlocks.json` as its STARTING cap state.**
+  A stale mid-playthrough `ap-unlocks.json` (non-zero counts) makes validation run
+  against inflated skill caps — too lenient. A fresh seed is all-caps-20
+  (`GenerateSeed.ts` writes it zeroed). Bit us when analysing sphere depth; zero it
+  before a true fresh-seed check. Entrance-reroll validation shares this gotcha.
+- **Sphere depth is a BALANCING signal, not a logic bug.** Even at the correct
+  cap-20 start, quests bunched into ~3 spheres because skill-milestone checks that
+  grant cap items are densely reachable, cascading caps upward fast. Deeper spheres
+  come from tighter item-gating, not from the logic being wrong.
+- **The reroll-until-valid loop (`--require-perfect`) is a workaround** for the
+  beatability logic living in THIS repo instead of Archipelago. The endgame is the
+  apworld owning reachability (AP fill = construct-valid, no reroll). All this
+  logic data is the groundwork for that migration.
+
+## Session-end addendum: re-activating all gated areas via region-membership (GitHub #16, 2026-07-24)
+
+Fixed the "97-area expansion strands ~33 quests" bug and re-activated the full
+gated-area set (107 areas: 7 curated guilds + 100 auto-derived). The user's decision
+was **Option 3** (gate by the true enclosed region set, not a bounding rectangle) —
+explicitly NOT the cheap "seal a safe subset" path. See [[dont-revert-build-proper-solution]].
+
+### The "33 stranded" number was mostly a methodology confound — verify this first
+
+`quest-regions.generated.json` bakes **region ids** resolved against a specific
+`region-graph.json`. Rebuilding the graph (different gating ⇒ different flood-fill ⇒
+**different region ids**) without ALSO re-running `ExtractQuestRegions.ts` leaves every
+requirement group pointing at stale ids that no longer match the reachable set → dozens
+of spurious "extracted region group(s) unreachable". The issue's repro
+(`cp 97-file … && BuildRegionGraph && ValidateSeed`) omitted the extractor re-run, so
+most of its 33 were phantom. **Rule: `ap-gated-areas.json`, `region-graph.json`, and
+`quest-regions.generated.json` are a matched TRIPLE — regenerate all three together, or
+validation lies.** With a consistent triple, the 97 already passed all goals; the only
+real gated-area failure was `druid` (one bbox over-capture). Always sanity-check a
+"stranded quest" by resolving its evidence tile in the CURRENT graph before trusting it.
+
+### The real bug: bbox over-capture (what Option 3 fixes)
+
+`witchgrill` (Black Knights' Fortress spy-grill, `%spy=1`, a reused loc placed in two
+unrelated spots) derived a **16 835-tile sprawling box** that happened to enclose the
+druid cauldron pocket (region 4301) — a region *disconnected* from the grill, merely
+inside the rectangle. Box-membership gated it on an unsatisfiable `spy` → cauldron
+stranded → druid unbeatable.
+
+### The fix (region-membership keyed on door tiles)
+
+Door tile coords are the only **graph-independent** gate key. Derived areas now carry
+`doors: ["level_mapX_mapZ_localX_localZ", …]` (`GatedArea.doors`, from ScanDoors
+`placementCoords`). Then:
+
+- **BuildRegionGraph** closes EXACTLY those door tiles (no box margin) for areas with
+  `doors`; the 7 curated guilds keep margin-2 box closing (they have tight boxes, no
+  door list). This dropped doors-kept-closed from 507 (margin sweep of sprawling boxes,
+  which fragmented innocent buildings) to 164.
+- **ValidateSeed `resolveDoorGatedArea`** probes each door tile's neighborhood: small
+  (≤ `POCKET_TILE_CAP` = 4000) non-mainland neighbors are the gated INSIDE pockets;
+  everything adjacent is a reconnection trigger. A disconnected island (cauldron) is
+  never door-adjacent, so it is never gated. Multi-floor interiors reconnect via the
+  internal-stair script edge (already require-guarded since commit d4940b9).
+- **Gates are SYMMETRIC.** Deep dungeon gates (Elvarg's lair, Golrie's cell) have small
+  pockets on BOTH sides and NO mainland neighbor → the old "outside must be reachable"
+  test produced `outside={}` and never fired, stranding Dragon Slayer. Fix: the trigger
+  set is *all* door-adjacent regions, so reaching either side (e.g. the approach pocket
+  via a script-teleport) + requirement met opens the crossing. This was the subtle
+  regression that appeared the moment box-membership was replaced — watch for it.
+
+Result: 107 areas validate identically to the 7 curated (all goals reachable, no
+stranded progression, 62/63 quests — the lone `hunt` block is pre-existing and
+unrelated, it fails on the 7-curated baseline too). Runtime `ApAreaGates` still uses
+`boxes` (ignores `doors`); it does not choke on the new field.
+
+### Known follow-up (out of scope for #16)
+
+Derived `boxes` are still cut against `region-graph.gated.json` (all-doors-closed), so
+some remain sprawling (witchgrill, the troll-stronghold doors). The **validator** now
+ignores boxes for `doors`-carrying areas, but the **runtime** `ApAreaGates` bounce still
+uses them, so a shuffled entrance landing inside a sprawling box could be spuriously
+gated. Tightening runtime boxes to the pocket bbox (or teaching ApAreaGates region
+membership) is the remaining polish. `witchgrill`'s `%spy` gate is genuinely mis-derived
+(quest-internal spy state, not an area lockout) — a candidate for the requires-exclude
+list, but harmless to beatability now.
+
+## SimulateProgression's false blockers: `ap-unlocks.json` is a STARTING state (2026-07-24)
+
+**Symptom.** `npx tsx tools/sim/SimulateProgression.ts --verbosity 2` printed a wall of
+blockers — `attack capped at 20 by unlocks; needs 40` and friends, recursed through the
+whole Heroes'/Legends' chain — on a seed `GenerateSeed`'s own fill *and* `ValidateSeed`
+both called beatable. Easy to misread as a logic/gating regression (it surfaced while
+testing #16); it is neither. Nothing about area gating was involved.
+
+**Reproduce it.** Take any config dir with an `ap-unlocks.json` and *no*
+`ap-placements.json`, then run the sim. The presence/absence of that one file is what
+picks the code path:
+
+```
+placements present, non-empty  -> placement sphere loop (collects items as it walks)  OK
+placements absent/empty        -> vanilla path (single fixpoint at fixed caps)         <- the trap
+```
+
+**Root cause.** The vanilla path reads `ap-unlocks.json` as its permanent cap set, which
+progression-sim.md justified as "the counts an AP client would have delivered by *the
+end*". Placement mode silently changed what that file contains: `GenerateSeed` writes a
+**locked, all-zero starting** table, and during a live AP run it holds only what the
+multiworld has delivered so far. Every skill therefore reads as capped at 20 forever, and
+a beatability tool reported the entire quest graph dead. A doc-vs-data drift, not a bug in
+the reachability engine — and the blocker text was specific enough to look authoritative.
+
+**Fix.** The vanilla path now models **end-of-run** caps (`PlacementEngine.endOfRunCounts`
+— built by *applying `buildItemPool` itself*, so it cannot drift from the real pool), and
+prints which model it used in the `Skill caps:` header. `--current-unlocks` opts back into
+the disk snapshot, which is what you want alongside `tools/ap/SetUnlock.ts` ("what can I do
+right now"). An `ap-placements.json` with zero item placements — the AP-multiworld shape,
+since `new-run` deletes the local file and `ApClient` rewrites it with `questGates` only —
+now takes that vanilla path with a printed note instead of running the sphere loop over an
+empty item map and "proving" every goal unreachable.
+
+**Generalizable lesson.** When a file grows a second writer, re-check every *reader*'s
+assumption about what it means. The engine's `ApUnlockOverrides` and placement mode both
+treat `ap-unlocks.json` as "received so far" (correct); only the vanilla-path sim treated
+it as "will have received" — and it was the one place nothing tested after placement mode
+landed, because the file simply didn't exist back when that path was validated.
+
+**Verification trio for this change.** (1) Placement path byte-identical before/after on
+two seeds (the change must not touch solo runs). (2) All four config shapes exercised:
+no-unlocks (uncapped label), unlocks+no-placements (end-of-run, all goals reachable),
+`--current-unlocks` (old snapshot blockers preserved verbatim), empty-placements
+(fallback + note). (3) `npx tsc --noEmit -p .` clean, and `GenerateSeed` still passes
+`ValidateSeed` on attempt 0 for seeds 1/42/777/12345/98765 — confirming generation was
+never the broken half.
+
+## Tutorial Island is six mapsquares, not one (GitHub #14, 2026-07-25)
+
+**The bug.** A random entrance turned up on Tutorial Island: `0_49_48_3_6`, a ladder that
+should never have been in the pool. `RandomizeEntrances.PROTECTED_MAPSQUARES` was
+`[[48, 48]]` — a single mapsquare — but the island's footprint spills east into (49,48),
+so the ladder was, as far as the tool could see, ordinary mainland.
+
+**The real footprint, and where to get it.** Don't eyeball the maps: the content already
+answers this. `content/scripts/tutorial/configs/tutorial_island.dbrow` is the coord_pair
+table behind `~in_tutorial_island(coord)`, which the game itself uses to decide what
+counts as tutorial ground. Six mapsquares:
+
+```
+(47,47) (47,48) (48,47) (48,48) (49,48)   surface
+(48,148)                                   underground (the mining/smithing cave)
+```
+
+Note (48,148) is the underground layer of (48,48) (`mapZ + 100`, the +6400-tile Z
+convention). Its neighbours (47,148)/(49,148)/(48,149) exist as map files but are NOT
+tutorial — that region is Lumbridge-side cave, so don't be tempted to extend the
+underground band by symmetry. The dbrow is authoritative; derive, don't guess.
+
+**The fix.** `tools/shared/TutorialIsland.ts` parses the dbrow once and exports
+`isTutorialMapsquare(mapX, mapZ)` / `isTutorialTile(x, z)` / `tutorialMapsquares()`. It
+throws rather than falling back to a hardcoded list if the dbrow is missing — a silent
+fallback is exactly how the footprint shrank unnoticed in the first place. Three tools
+consume it, and there were three, not the two the issue named:
+
+- `RandomizeEntrances.ts` — entrance shuffle pool (also logs the protected squares now).
+- `DeriveGatedAreas.ts` — tutorial doors are onboarding, never an AP area gate.
+- `RandomizeSpawn.ts` — **found while fixing the other two**: chunk mode had the same
+  `[[48, 48]]` copy, so a chunk-mode HOME could be placed on Tutorial Island.
+
+**Generalizable lesson.** A constant that encodes a fact about the game world will be
+copy-pasted into the next tool that needs it, and then only one copy gets corrected. If
+the content defines the fact (dbrow / config / script table), read it at runtime; a
+grep for the constant's *value* (`48, 48`) — not its name — is what turned up the third
+copy.
+
+**Verification.** (1) `--export-pool` before/after: exactly one gate removed, the
+reported `0_49_48_3_6` ladder and its `1_49_48_3_6` top, nothing else added or dropped
+(366 → 365 gates), and zero pool entries left in any of the six squares. (2)
+`DeriveGatedAreas` output byte-identical (110 areas, 7 tutorial skips) — no behaviour
+change today, drift closed for tomorrow. (3) `RandomizeSpawn --mode chunk` candidate
+pool 114 → 110: the four newly-protected surface squares really were live HOME
+candidates. (4) `npx tsc --noEmit -p .` clean.
+## The apworld gets the whole logic, and local mode keeps its reroll (GitHub #3, 2026-07-25)
+
+The framing that mattered. Issue #3 originally read "move beatability out of this repo
+and into the apworld, delete `--require-perfect`". That was wrong, and rewriting it
+first was the highest-leverage thing in the session: `--require-perfect` and the reroll
+loop are the *mechanism the local randomizer needs*, and local play is a supported
+product, not a stepping stone. The right goal is **one logic source, two consumers**:
+generate-and-test for solo seeds (AP can't reroll - its fill runs once), construct-valid
+for Archipelago. Everything below follows from that.
+
+### What was built
+
+1. **`tools/logic/LogicModel.ts`** - the shared model, carved out of `ValidateSeed.ts`
+   verbatim: gated-area resolution (bbox + the GitHub #16 door-probe path), open-area
+   membership, the curated `quest-regions.json` shape, and the quest-doability varp
+   model (`VARP_TO_QUEST` / `SPLIT_VARPS` / `resolveVarp`). ValidateSeed now imports it.
+   This is the anti-drift move: the exporter and the oracle reason over the *same
+   objects*, not two hand-synced copies.
+2. **`tools/ap/ExportLogicBundle.ts`** -> `ap-logic-bundle.json` (542 KB), the logic half
+   of the apworld contract (`ExportApWorldData.ts` is the catalog half). Region-id based
+   and seed-INDEPENDENT: the shape of the world, not one shuffle of it.
+3. **`RandomizeEntrances.ts --export-pool`** - dumps the shuffle's *input* (366 gates x 2
+   sides + 4 one-ways + gate requirements), so AP can run its own assignment over the
+   same candidate set. It writes no table and never rerolls.
+4. **`apworld/rs2004scape/logic.py`** - the sphere fixpoint in Python, same order, same
+   rules, memoized on (caps, held quest gates). ~10ms per derive.
+5. **`apworld/rs2004scape/entrances.py`** - reachability-preserving frontier assignment.
+6. **Rules rewired** - quest/goal/barcrawl access now asks the fixpoint. `ApClient`
+   accepts `slot_data.entranceOverrides`, writes `ap-entrances.json` and hot-reloads it.
+7. **Parity** - `scripts/parity-check.py` (live TS vs Python) and `test_parity.py` (the
+   frozen fixture, no engine checkout needed).
+
+### The result worth remembering
+
+The Python port matched `ValidateSeed.ts` **exactly on the first run** - 5273/5273
+regions, 62/62 quests, 130/130 QP, same 5 goals - and again under zeroed caps
+(5017 regions, 29 quests). That is the payoff for exporting a *resolved* bundle: every
+spatial judgment call (which pocket is behind which door, which regions an open area
+covers) was made once, in TypeScript, against the region graph. Python only had to
+re-implement the fixpoint loop, which is ~120 lines. **Port the algorithm, not the data
+resolution.**
+
+And the frontier shuffle needs no reroll at all: every seed tried (1, 2, 3, 7, 99, 12345)
+reached all 63 quests and all 5 goals, at 709/736 pool sides covered, in ~2.5s. The
+*vanilla* layout only manages 650/736 and strands 2 quests in the model - so AP's
+construct-valid layouts are strictly better than the map the game ships with.
+
+### Judgment calls a future session should know about
+
+- **No AP `Region` objects, and that is deliberate.** The obvious reading of the issue is
+  "build the region graph as AP Regions and call `worlds/generic/randomize_entrances`".
+  The graph is 16541 flood-fill regions; the endpoint set alone (entrance sides, gated
+  interiors, anchors, open-area members, extracted evidence) is 5916. But AP Regions buy
+  exactly one thing - telling the fill which *locations* are reachable - and our 287
+  checks are not spatially placed per region at all (a `LocationDef` has kind/skill/level/
+  questId, no coordinate). Spatial reasoning only ever affects *quest completability*,
+  which the fixpoint answers directly. So AP Regions would have been pure overhead, and
+  the frontier algorithm was reimplemented over the bundle graph instead (same shape:
+  connect a reachable exit, prefer partners that open new ground, re-derive).
+- **Feasibility exclusion must DELETE the location, not exclude it.**
+  `LocationProgressType.EXCLUDED` only means "no progression here" - the location must
+  still be *reachable* or AP's accessibility sweep fails. A check the region model can
+  never justify is not created at all; likewise the `Completed: <quest>` event for a quest
+  that can never complete (that one cost a test failure: `Unreachable locations: [Quest:
+  Pirate's Treasure, Event: Completed hunt]`).
+- **The model is conservative in both directions and that is the safe design.** Under the
+  *vanilla* layout it strands `demon` (an unreachable extracted coord) and `prince`
+  (redberries' buy/gather regions unreachable). Those are model gaps, not real ones. Since
+  the model only ever claims reachability it can prove, the failure mode is "a real check
+  sits out of the pool", never "an unreachable check holds someone's progression".
+- **`seedOptions.entrances` is pinned to `"off"` in AP mode.** If the server re-rolled
+  entrances after generation it would invalidate every rule the fill just used. The
+  override table in slot_data is the authority; two tests assert this both ways.
+- **Run the apworld tests with the Archipelago checkout's own interpreter**
+  (`~/Archipelago/venv/bin/python`). The system python is missing `schema` and the failure
+  looks like a broken world, not a missing dependency.
+
+### Still open
+
+Gathersanity/processsanity/shopsanity/spawn randomization are rolled server-side *after*
+generation, so the `itemSources` graph the fill reasons over is the vanilla one.
+`LogicEngine(item_swaps=...)` already accepts a swap table - the apworld just has no
+reason to build one until it rolls those tables itself, the way it now rolls entrances.
+
+### Follow-up (same day): the apworld rolls the rest of the world too
+
+The gap left above - "gathersanity/processsanity/shopsanity/spawn are rolled server-side
+*after* generation, so the item graph the fill reasons over is the vanilla one" - is
+closed. The mechanism is worth remembering because it is *not* the same one entrances use:
+
+- **Entrances ship a table.** The engine reads `ap-entrances.json` at runtime, so AP can
+  hand over a finished layout.
+- **The other four ship a SEED.** Shopsanity rewrites `.npc` params and needs a pack
+  rebuild, so there is no table to hand over. Instead AP picks the seed, and the
+  deterministic TS tools reproduce the identical table server-side. `new-run.sh` already
+  feeds one shared `$SEED` to every randomizer, so **one number pins all four**
+  (`slot_data.seedOptions.seed` -> `seed-options-to-env.cjs` emits `SEED=`).
+
+For that to be worth anything the apworld must *know* those tables during generation, so
+each tool grew a `--export-pool` flag (the candidate list, i.e. the shuffle's input) and
+`randomizers.py` replays the shuffle over it. That needed `prng.py`, a byte-exact port of
+`mulberry32`/`shuffle`/`derangement` - watch `Math.imul` (32-bit *signed* multiply) and
+the `>>>`/`|0` mix; it matched on the first try and is pinned by vectors in
+`test_randomizers.py`, alongside vectors of the real `ap-gather.json` / `ap-process.json`
+/ `ap-spawn.json` / `shop-seed.json` for seed 424242.
+
+Three things this shook out that a future session should not have to rediscover:
+
+- **Key shop ownership by BUNDLE, not by shop id.** Several NPCs can share one shop id
+  (two barmaids, one pub inventory), so "who owns shop S now" is ambiguous and does not
+  reduce to the identity when shopsanity is off - the first attempt silently *added* buy
+  regions (cabbage gained region 16534 from a second barmaid). Ask instead "who took over
+  this particular shopkeeper's stock", which is a bijection. A test pins that the
+  shopsanity-off path and a relocation under identity ownership agree exactly.
+- **Retry the WORLD, not the fill.** With all four randomizers live, ~1 rolled world in 30
+  leaves a configured goal unreachable (a gathersanity swap puts a goal quest's item behind
+  a skill the region model can't justify). Failing the whole multiworld for that is
+  ridiculous, so `generate_early` rolls another world (up to 6). This is not
+  generate-and-test creeping back in: AP's fill still runs exactly once, over a world
+  already known sound; the retry is over the map, at ~2.5s a go, entirely inside
+  `generate_early`.
+- **Turning on real logic breaks tests that assumed everything is reachable.** Three had to
+  learn about feasibility exclusion: "every catalog location exists" (now minus the
+  excluded ones), "every gated quest is completable with its unlock item" (skip quests this
+  world excluded), and the exact-`seedOptions` dict (now carries `seed`). None were wrong
+  before; they were asserting the old contract.
+
+Also added `write_spoiler_header` / `write_spoiler`. A world whose locations all sit in one
+AP region gets a spoiler that says nothing about what was randomized - now it prints the
+world seed, home/spawn, entrance coverage, and the full gathering/processing/shop/entrance
+tables. That is the only readable record of the rolled world.
+
+**Still unmodelled: drop randomization.** `drop-sources.json` describes vanilla loot, so a
+`drop`-sourced item can read as obtainable when the shuffle moved it. Closing it means
+porting `MimicTransform.ts` (544 lines).
+
+### Follow-up 2: drop randomization modelled too (MimicTransform ported)
+
+The last unmodelled randomizer is done. All three designs are replayed in `randomizers.py`
+from the pool `RandomizeDrops.ts --export-pool` emits:
+
+- **tiered/chaos** rewrite each weighted loot slot's item (per-bucket or corpus-wide
+  sampling, `mulberry32(seed ^ hashKey(bucket))`), plus a derangement of the guaranteed
+  `death_drop` npc params.
+- **mimic** leaves items alone and points each monster's death handler at another
+  monster's whole table - a *unit-level* derangement, not an index-level one (all four
+  goblin variants run `goblin_drop_table`, so an index swap between them would change
+  nothing in game; the TS tool reshuffles until no slot keeps its own unit, and the port
+  does the same).
+
+Two things that cost real debugging time:
+
+- **Export what the tool SORTS, already sorted.** `RandomizeDrops` orders slots with
+  `file.localeCompare(...)`, and JS locale collation is not reproducible from Python in
+  general. Rather than gamble on ASCII paths agreeing, the pool export ships each bucket's
+  slot list and universe in the tool's own finished order. Same trick would apply to any
+  future port.
+- **Relocation must be a DELTA, not a recomputation.** `itemSources`' vanilla drop regions
+  come from `drop-sources.json`; the weighted-loot corpus is a *different* extraction -
+  broader in places (bespoke handlers, scripted gives), narrower in others. Recomputing
+  drop regions from the corpus invented regions the vanilla entry never claimed (ashes
+  gained three, big_bones five) and the identity test caught it immediately. The fix: per
+  item, take the monsters that stopped dropping it and the ones that started, and move only
+  those regions - keeping a region if some monster that still drops the item stands there.
+  Unrolled = exactly the identity, pinned by a test. **When two datasets describe the same
+  thing at different resolutions, apply changes as a delta against the authoritative one;
+  never recompute the authoritative one from the coarser one.**
+
+Also worth knowing: capturing tiered/chaos vectors with `--dry-run` against a
+mimic-transformed live corpus only records ~half the swaps (the tool can't find the lines
+to edit and says so). The *mapping* is unaffected - it comes from the pristine backup - so
+the fixture is a documented, verified subset, while mimic and death-drop vectors are
+complete and order-exact. Getting a full tiered vector would mean restoring the drop-script
+backup, i.e. mutating the user's content and forcing a pack rebuild; not worth it.
+
+With drops modelled the world-roll miss rate rose from ~1 in 30 to ~1 in 5 for Legends
+(mimic moves whole loot tables, so a quest item lands behind a monster the region model
+can't reach), so `WORLD_ROLL_ATTEMPTS` went 6 -> 8: expected cost ~1.25 attempts, chance of
+exhausting the budget ~2e-6.
+
+### Skill-quest gates: Runecrafting and Herblore (2026-07-25, from play)
+
+Reported from a spoiler log: the seed wanted 20 Runecrafting before Rune Mysteries. It
+was right to complain - `reachableFromState` treated `first_xp` as unconditionally
+reachable ("every skill starts trainable") and `level_*` as cap-only, so nothing knew
+some skills are quest-locked. This affected BOTH modes (solo GenerateSeed placement and
+the AP fill), so the fix went in the shared model.
+
+`tools/sim/types.ts` now owns `SKILL_QUEST_GATES` + `skillUnlocked`, consumed by
+`PlacementEngine.reachableFromState`, `ItemGraph.computeObtainable`, the bundle exporter
+and `logic.py`. **Two kinds of entry, and the distinction is written into the table's
+doc comment so nobody "corrects" the second one:**
+
+- `runecraft -> runemysteries` is a HARD SCRIPT GATE. Verified in
+  `skill_runecraft/scripts/essence_mine.rs2:2`: the teleport refuses without the quest,
+  and nothing else in the corpus yields `blankrune` (no shop entry, no drop table). So
+  literally every point of Runecrafting XP is behind that quest.
+- `herblore -> druid` is a DELIBERATE BALANCE CHOICE (user call). This revision's
+  herblore scripts carry no Druidic Ritual check - I checked all of
+  `skill_herblore/scripts/` before adding it - so it is technically trainable from
+  scratch; it's gated because doing so is miserable in practice.
+
+Two mechanisms, because a skill gate isn't only about checks:
+
+1. **Checks**: `first_xp` / `level` / `activity` locations on a gated skill require the
+   quest. Note `first_xp` too - a quest-locked skill yields *no* XP, so even the first
+   point waits.
+2. **Item sources**: `computeObtainable` now takes the completed-quest set. Two ways a
+   source can be quest-locked - the skill itself (`skillUnlocked`), or the specific
+   ACTION (`QUEST_GATED_GATHER_ITEMS`, currently just `blankrune`). The action stamp goes
+   on the SOURCE object, not the item, so it survives gathersanity: the swap re-keys each
+   source under whatever the action now delivers, and the gate travels with it. That is
+   the correct reading - the essence *mine* is what's locked, no matter what mining it
+   hands you after a shuffle.
+
+Parity stayed green and all 139 tests passed, because in the spatial-only parity config
+the gating quests complete early anyway - the gate changes check ORDER, not final
+reachability. The regression test is `test_skill_gates.py`, which asserts both directions
+(no check on a gated skill is reachable empty-handed; all of them are once everything is
+collected) plus that ungated `first_xp` stayed free.
+
+## Bug sweep: all four open `bug` issues (GitHub #4/#8/#9/#12, 2026-07-26)
+
+One branch, four unrelated fixes. The through-line worth keeping: three of the four were
+"the data already says which case this is, nobody had read it" - the map's LOC angles,
+the p12 font metrics, and the .ob2 vertex bounds were each sitting there unused while the
+tool guessed or gave up.
+
+### #9 - long AP messages were clipped, not wrapped
+
+`mes()` writes one `MessageGame`, and the client draws it at x=4 inside a clip at x=463.
+Anything wider than ~456px just lost its tail. The issue proposed a two-line rs2 proc
+because "this dialect has no way to measure a string" - true of rs2, but **the engine has
+the very p12 metrics the client draws with** (`FontType.get(1)`, already used by
+`wrappedMessageGame` and by `split_init`). So the fix is four lines in
+`Player.messageGame`: if `font.stringWidth(msg) > 456`, write `font.split(msg, 456)`
+instead. One choke point covers rs2 `mes()`, every engine-side `Ap*.ts` message and world
+broadcasts, and messages that already fit keep the single-write path byte-identical.
+
+Measured against the real offenders: `Archipelago reward: 25 x Amulet of accuracy (no
+inventory space, sent to your bank)!` is 481px and now breaks after "your"; the skill-cap
+lines sit at 450px and were only just surviving (they wrap once a cap goes 3-digit).
+
+**Lesson: before writing a fixed-format workaround in rs2, check whether the engine can
+answer the question exactly.** It usually can - it loads the same cache the client does.
+
+### #4 - the Tree Gnome Stronghold wooden stairs never reached the pool
+
+`EntranceParser` emits three source shapes; `switch_int (loc_angle)` produced
+`source: {type:'angle'}`, which every downstream stage drops because it needs a literal
+source coord. The destinations are `movecoord(loc_coord, dx, dy, dz)`.
+
+The whole thing is determined by map data: a `.jm2` LOC line carries the placement's coord
+AND its angle, the angle picks the case, and `loc_coord` IS the placement coord
+(`LOC_COORD` pushes `activeLoc`'s own tile - no player position, no forceapproach
+geometry, no inference). `LocAngleResolver.ts` expands each angle-keyed handler into one
+concrete entrance per placement, before `ApproachResolver` runs so that the handlers whose
+destination is `movecoord(coord, ...)` (the angled ship ladders) come out with a literal
+SOURCE and get resolved from there under the existing reciprocal-validation gate.
+
+Result: +37 gates, 0 removed. All 21 wooden spiral staircases pair, with arrivals exactly
+matching what the vanilla script computes; the 16 angled ship-ladder gates come free from
+the same expansion. A full validated run landed a zero-stranded table on attempt 5.
+
+**Lesson: "the parser can't produce a concrete destination" is worth re-checking against
+the map data, not just the script text.** Two of the three shapes here needed geometry
+inference; this one needed a lookup.
+
+### #12 - tracker spoiler mode rendered nothing
+
+`web.ts` was already emitting the full override table under `spoiler.entrances`, keyed
+`"coord:op" -> destCoord` - *identically* to `discoveries.entrances`. Nothing in `app.js`
+read it: `buildSites`, the entrances list and `trackerSignature` all went straight to
+`discoveries`, so in spoiler mode every pin reported "not yet explored". One
+`knownEntrances(data)` helper that merges spoiler under discoveries (discoveries win on
+collision) populates the map lines, the site panel and the list at once. Counters stay
+honest about what was actually walked and say "· showing all" instead.
+
+**Lesson: when a feature "has the plumbing but doesn't work", diff the two payload shapes
+before designing a synthesis step.** They were already the same shape.
+
+### #8 - glitchy NPCs: read the .ob2, stop waiting for reports
+
+The drip exclusion list had been grown one user report at a time ("Betty is invisible",
+"the Monks have no legs", "everyone has demon hands"). Every entry turned out to be a
+model that is not a general-purpose substitute for its category - and that is *visible in
+the data*, if something reads it. `ModelGeometry.ts` now parses .ob2 vertex bounds (the
+last 18 bytes are the trailer; vertices are delta-encoded with the CLIENT's `gsmarts`,
+which is a **different encoding from the engine's `Packet.gsmarts`** - that one bites).
+
+Three derived rules replace the hand-curation, each validated against the whole 381-model
+universe:
+
+1. **Layered accessory** - worn in vanilla but never the only value of its category in any
+   block, scoped to coverage categories (an `*extra` piece is layered by definition).
+   Reproduces `man_torso_backpack` / `man_legs_stitches` / `man_legs_model_270` from data,
+   and newly catches `man_legs_combats` (thigh-only, layered in all 12 of its blocks - a
+   direct cause of "no legs") and `man_head_viking_helmet` + `_basic`, which are a
+   **two-piece helmet**: they only ever appear together, so either alone is half a helmet
+   with no head inside it.
+2. **Does not reach the category's ground line** (>30 above the category's median floor).
+   Across all six coverage categories this selects exactly three models - the same
+   `combats` and `stitches`, plus `man_legs_viking_wounded`, the prone injured-Jossik pose
+   (floating hips, nothing below) - and nothing else. The shortest *legitimate* piece,
+   `man_legs_viking`, stops 20 above the floor, so the margin is real.
+3. **Torso mesh that includes a head** - reaches >15% past the category's median top AND
+   every vanilla wearer has no head model. Both signals are noisy alone (viking boots and
+   viking horns are legitimately tall; `man_torso_vampire`'s one wearer just happens to be
+   configured headless), together they select exactly `man_torso_hunchback_baldhead`,
+   whose sole wearer `tbwt_lubufu` has no head model *because this piece supplies it*.
+   Dropped into an ordinary NPC's torso slot it grafts a second bald head onto their
+   shoulders, above and inside their real head and hat. **That is the "null dwarf guy on
+   their head" report.**
+
+`AuditDripModels.ts` is the standing version of that investigation - run it bare for the
+per-category geometry plus everything the rules drop and everything still in the pool that
+looks unusual (currently: nothing), or `--npc <debugname>` to get one NPC's vanilla ->
+current assignment with each model's geometry, which is the "which slot broke this NPC"
+question the old reports needed a whole session to answer.
+
+**Two methodology traps, both hit during this work:**
+
+- **`content/scripts` is the RANDOMIZED tree.** The first usage audit ran against it and
+  concluded `man_legs_combats` was a normal sole-worn model in 24 blocks. It is layered in
+  all 12 of its *vanilla* blocks; the 24 came from a previous shuffle's output. Vanilla
+  lives in `content/.ap-backup/scripts` - `loadVanillaUsage()` reads there when it exists.
+  Grading a randomized tree against itself is how a bad value justifies itself.
+- **A geometric threshold alone is not a rule.** The 1.15x oversize test flags viking
+  boots, viking horns and a hooded cloak alongside the real culprit. Every rule here needs
+  a second, independent signal (vanilla usage) agreeing before it excludes anything;
+  single-signal outliers go in the audit's *review* list for a human, not in the gate.
+
+### Testing note: `../Server` had an older branch installed
+
+`../Server/engine` was missing `tools/shared/TutorialIsland.ts`, i.e. it predated the #14
+merge - the opposite of the usual warning but the same rule applies. Everything was tested
+by copying only the touched files in, running from there, then restoring from a scratchpad
+backup (including `data/config/ap-entrances.json`). `../Server` was left exactly as found
+and needs `node scripts/install.js` before in-game testing.
+
+One casualty worth knowing about: a `RandomizeDrip.ts --dry-run` overwrote
+`engine/tools/npc/drip-seed.json`, which is a human-readable spoiler with no programmatic
+consumers - but it was the only record of the drip seed the installed `.npc` files came
+from. The file now says `"dryRun": true`, so it is obvious it no longer describes the
+installed content. **Back up per-tool spoiler outputs too, not just the config the tool
+writes.**
+
+## Tracker "Checks" tab (GitHub #19) - what the payload split taught us
+
+Full design in `docs/tracker-map.md` ("Checks tab"); the reusable bits:
+
+- **`/ap/tracker.json` is a 5s poll - do not put static tables on it.** The check
+  catalog is 517 names and never changes within a run, so it got its own
+  `GET /ap/checks.json` route fetched once at load (and again on tab open, which is
+  what picks up the one genuinely dynamic input: an Archipelago connect). Fired
+  state, which *does* change, stays on the poll as `discoveries.checks`. Any future
+  tab with a big static catalog should split the same way.
+- **`data/config/ap-archipelago-data.json` is a general-purpose catalog, not just
+  the AP client's datapackage.** It ships with the overlay and holds all 517
+  locations with the ids/names/kinds the multiworld, the spoiler log and (now) the
+  tracker all use. Reach for it before hand-listing checks anywhere engine-side -
+  `tools/sim/PlacementEngine.ts` is tooling and must not be imported from `src/`.
+- **"Can't do it yet" and "can't ever do it" must not render alike.** A check the
+  seed never generated (apworld feasibility exclusion / `musicChecks: false`) has to
+  be visibly out of the run *and* out of the denominator, or the list becomes a
+  to-do with impossible entries and an unreachable 100%. Two sources feed it:
+  `Connected`'s `missing_locations + checked_locations` in AP mode (ApClient now
+  keeps them), and a new `infeasibleChecks` array in `ap-placements.json` in solo
+  mode. Both are allowed to be absent - then nothing is marked, which is the safe
+  failure direction.
+- **`fillerOnly` is not "unobtainable".** It means "never holds progression" (clue
+  trails: acquisition is drop RNG; music: deliberate). Tag it, don't exclude it.
+  Conflating the two would have crossed out 233 perfectly reachable checks.
+- **Spoiler contents are mode-scoped.** Unfired contents come from
+  `ap-placements.json`, which in AP mode is a *stale solo artifact* - `?spoiler=1`
+  returns `{}` there rather than presenting last run's answers as this run's.
+
+## Tracker map + "what's left" lists (same session as #19)
+
+- **Two map layers, one canvas.** The Surface/Underground switch was hiding half the
+  world and made cross-layer connections undrawable. They can't share one transform
+  (underground mapsquares are `mapZ+100`, so their absolute-Z band is 9216-10367 vs
+  the surface's 1280-4991), so each layer keeps its own bounds and gets a pixel
+  OFFSET into a shared canvas - `worldLayout()` in `app.js`, surface on top,
+  underground below, aligned on world X. Everything downstream (`coordToPixel`, pins,
+  labels, selection lines, `panToRaw`) takes the coord's own layer instead of a global
+  `state.layer`, which is now gone. If a third layer ever appears, it's one more entry
+  in `worldLayout`.
+- **Open where the player is.** The map opens centered on `ap-spawn.json`'s home at 2x
+  with a white home pin, not at the top-left of a 3584x9848 canvas. `tracker.json`
+  carries the home coord for it - the least secret thing in a seed.
+- **"Nothing here" and "nothing found yet" look identical in a discovery journal.**
+  The four swap tabs (gathering/recipes/bestiary/teleports) only listed hits, so the
+  counter was the only hint of what remained. They now also list their un-hit sources
+  from a new `sources` block on `tracker.json` (each override table's key set, plus
+  the seven teleport spell names hardcoded to match `teleport.rs2`'s `ap_track` keys).
+  This inherits the map's hollow-pin contract exactly: naming a source reveals no more
+  than the existing discovered/total counter did, and never what it now yields. Keep
+  that split - the moment a "not yet found" row shows its answer outside `?spoiler=1`,
+  the whole journal premise is gone.
+- **`names` must be widened with any new id list.** The id -> name maps in
+  `buildApTrackerResponse` were scoped to discovered (+ spoiler) ids; adding the
+  sources block without also feeding those ids into `itemIds` / `dropSlotIds` renders
+  a page full of `item_317`. `tracker.json` is ~84 KB per 5s poll after this - fine
+  for a localhost single-user tracker, but it is the reason the 517-entry check
+  catalog got its own fetch-once route instead.
+
+## Tiered gather/process randomization (GitHub #15, 2026-07-26)
+
+- **The issue's premise was half right: "the data is already parsed" wasn't true.**
+  Every *processing* table states its requirement (`levelrequired` on cooking /
+  smithing / leather, `level` on gem + the four fletching dbrows, and
+  `fletch_bow_table` hides it INSIDE the product tuple - `data=shortbow,<obj>,<level>,
+  <exp>`), and mining/woodcutting do too (`rock_level`, `levelrequired`). **Fishing has
+  no product config at all.** Its levels are plain `stat(fishing) < N` / `>= N` guards
+  in the spot scripts, which is why `tools/gather/FishingLevels.ts` exists. Confirm the
+  level field before designing a bucketing feature - that check was the actual work.
+- **Two indirections in the fishing scan, both real, both one hop.** (1) The big-net
+  fish are literals inside `[proc,fish_roll_big_net]`, which is only ever called from
+  labels gated at `< 16`, so a proc inherits the lowest level its CALL SITES were
+  reachable at. (2) Lava eels are the reverse - the label never mentions
+  `stat(fishing)`, it early-returns on `~oil_rod_fishing_check_requirements`, whose
+  `< 53` lives inside the proc; so a `if (~p = false)` guard raises its CALLER's floor
+  to whatever `p`'s own gates demand. Miss (2) and lava eel silently bands as level 1,
+  which is the exact bug tiered mode exists to prevent. Both are deliberately
+  single-step, keyed on the `= false` shape - propagating every proc's exit floor to
+  every caller would have banded the big-net fish at 46.
+- **Fixed level bands, not percentile ones.** Drops' tiered mode buckets by rarity
+  percentile because "rare" is only meaningful relative to a table. A skill level is
+  absolute, so `lvl1-14 / 15-29 / 30-44 / 45-59 / 60-74 / 75+` (the equipment tiers a
+  player already thinks in) beats percentiles, and fixed boundaries mean adding one
+  product can't reshuffle which band everything ELSE lands in.
+- **Export the derived value, don't re-derive it.** The apworld does NOT own a copy of
+  the band table: `--export-pool` stamps each product with its `band` and ships the
+  band order, and `randomizers.py` groups by those strings. Every duplicated table
+  between the TS tools and the Python port is a drift risk, and a drifted band means
+  the apworld's fill reasons about swaps the server never made. Same reasoning that
+  made `prng.py` a byte-exact port pinned by vectors.
+- **A product made by several sources takes the LOWEST level that yields it**
+  (`minLevels`) - limestone sits on three rocks, pearl bolt tips come from small OR big
+  oyster pearls. The band should model "when does this first become reachable".
+- **A missing level is fatal, not a default.** `readDbrowProducts` throws rather than
+  banding an unparsed product at level 1 - the same discipline as the existing
+  "product not found in obj.pack - parser drift?" check.
+- **Regression-check the flat modes by REPLAYING the old spoiler seed.** Both tools'
+  `shuffle` output had to stay byte-identical after the loaders changed shape from
+  `string[]` to `{item, level}[]`; re-running the seed recorded in the backed-up
+  `gather-seed.json` / `process-seed.json` and diffing the swap list caught that
+  cheaply. (Back those spoilers up first - see the tool-output rule above.)
+- **Option values are append-only.** `option_tiered = 3` sits after `chaos = 2` rather
+  than next to `shuffle`, because a YAML that wrote the number would otherwise silently
+  change mode.
+
+## Thieving randomization (GitHub #6, 2026-07-26)
+
+The issue asked for a survey pass first, and the survey is the whole story: **all three
+thieving surfaces are dbtable-driven with a scalar item lookup, and all three reward
+cascades live in ONE file.** `skill_thieving/scripts/thieving.rs2` holds
+`pick_pocket_check_for_reward` / `stealing_check_for_reward` /
+`trapped_chest_check_for_reward`, each a descending-denominator rarity walk over its
+dbrow's `data=loot,<obj>,<min>,<max>,<rarity>[,<msg>]` tuples ending in exactly one
+`inv_add(inv, $reward, n)`. No inline `if ($random < N) obj_add(...)` cascade anywhere,
+so the issue's own decision rule ("runtime-override table if the reward is a scalar item
+lookup, else config mutation") settled the design before a line was written. Three
+one-token wraps + `AP_THIEVING_SWAP = 1913` = the entire content change. Survey the
+chokepoints before designing; this one was a 2-hour feature because the answer was
+"gathering, again", not a new shape.
+
+- **Wrap INSIDE the rarity branch, not around the whole cascade.** The wrap runs only
+  after `if ($roll >= $reward_rarity_denominator)` has already passed, so the vanilla
+  drop rate still decides *if* you get something. That matters for more than fidelity:
+  `recordDiscovery` fires from the swap lookup, so a wrap placed any earlier would leak
+  tracker rows for loot the player never actually received. Same reasoning applies to
+  any future randomizer whose chokepoint sits near a probability roll.
+- **The pre-swap `$reward` is deliberately still read by two things** in
+  `stealing_check_for_reward`: the `if ($reward = bread) sound_synth(pick, ...)` check
+  and the `"You steal <$reward_message>."` line (the message is a *sixth tuple field*,
+  not derived from the item). Leaving both vanilla is the feature - "You steal some
+  silk." while a raw shark lands in your pack is the mimic-style reveal, exactly like
+  gathering's "You manage to mine some coal." That is also the answer to the issue's
+  "Steals like `<x>` - cosmetic or reflecting swapped loot?" question: the *tracker* names
+  it explicitly (`Coins → steals like → Adamantite ore`, the Bestiary's "smells like"
+  idiom), the *game* only hints it.
+- **`renderItemSwapTab` took an optional 6th arg rather than a fourth copy.** The
+  Gathering/Recipes/Thieving tabs are the same obj-id -> obj-id render; the only
+  difference is the arrow label. One parameter beat a new function, and the "what's
+  left" list, spoiler mode and the discovered/total counter all came along free.
+- **Quantity is the one place thieving stresses the shared philosophy harder than
+  gathering/processing did.** Those tools' non-1 quantities top out at 5 (knives,
+  `nails`); thieving has `coins,1000,1000` (Ardougne castle chest), `coins,500,500`
+  (blood rune chest), `coins,200,300` (hero). Kept untouched anyway - "structure stays
+  put, content moves" is load-bearing across four randomizers now, and `inv_add` simply
+  fills what space exists for a non-stackable. `--exclude coins` is the escape hatch,
+  and it is documented in `new-run.sh`'s knob comment rather than buried in the tool.
+  If a future session does add a clamp, do it for all four tools at once.
+- **33 distinct loot items across 13 pickpocket rows / 9 stalls / 6 chests**, and the
+  bands populate well (5/2/8/3/5/10) because all three dbrows carry a plain `level`
+  column - `readDbrowProducts(file, { product: 'loot', level: 'level' })` fit all three
+  with no per-surface special casing, which is the payoff from #15 having generalized
+  `SkillTiers.ts`. Contrast fishing, which needed a bespoke `FishingLevels.ts`.
+- **`bread` and `uncut_sapphire` show a surface/level mismatch in the spoiler log**
+  (e.g. `pickpocket bread (lvl 5)` - bread's *surface* is pickpocket because that dbrow
+  is walked first, its *level* is 5 from the baker's stall). That's `minLevels` working
+  as designed (lowest level that yields it) next to a first-occurrence surface label.
+  Cosmetic; `RandomizeProcessing` behaves the same way. Don't "fix" it into a per-source
+  level - the band must model "when does this first become reachable".
+- **Deliberately out of scope**: `locked_door.dbrow` (thieving doors have no loot, they
+  only open) and the `chest_steel_arrowtips` lockpick gate (a requirement, not a reward -
+  its loot row is in the pool like every other chest).
+- **`src/web.ts` is CRLF too - not just content files.** CLAUDE.md's line-ending rule
+  names `.rs2`/config files, but the engine's `web.ts` is CRLF as well, and a bulk edit
+  via Python's `open(path, encoding='utf8')` (universal newlines) followed by a write
+  with `newline=''` silently rewrote all 2079 lines to LF. Caught by `git diff --stat`
+  reading absurdly large before the commit - always sanity-check the stat line against
+  what you think you changed. `open(path, 'rb')` / byte-level replace, or `newline=''`
+  on the READ too, avoids it entirely.
+- **Verified offline**: engine typecheck clean, pack build clean (`pack: 2:05.181`), a
+  `ScriptProvider.getByName()` decompile check confirming opcode 1913 compiled into all
+  three reward procs + `[debugproc,ap_thieving]`, loader round-trip 33/33 with
+  passthrough on miss, spoiler<->JSON consistency, bijection with 0 fixed points, and
+  every id/name matching `obj.pack`. All four modes and the error paths dry-run clean.
+  The live Server checkout now has thieving seed 777 (shuffle).
+
+### Still open (deliberate, not forgotten)
+
+**The apworld does not model thieving swaps.** `randomizers.py`/`options.py` still roll
+only gather+process, so an AP fill can't reason about a quest item that moved onto a
+pickpocket. Local/solo mode is complete and correct. `--export-pool` already emits the
+exact input a port needs (items, surfaces, obj ids, levels, and the *exported* band
+strings - never re-derive those, see #15), and `seed-options-to-env.cjs` already honours
+an `o.thieving` slot option, so the server side is forward-compatible the day the option
+ships. What's left is the Python side: a `thieving` option, a `roll_skill_swaps` call,
+the `ExportLogicBundle` pool wiring, and a parity fixture.
+
+## Drop-rarity cap: every slot at least 1/32 (GitHub #11, 2026-07-26)
+
+A rate-only pass (`tools/drops/CapDropRarity.ts`), orthogonal to every existing drop
+randomizer: it rewrites cascade thresholds and never touches which item sits in a slot.
+The design work was all in one question the issue could not answer from the code -
+**where the extra probability comes from** - and the answer only became obvious after
+measuring the corpus instead of reasoning about one table.
+
+- **Survey first, and the survey killed the issue's own suggested fix.** The issue
+  proposed "floor each slot's weight at ceil(total/32), and if the summed weights exceed
+  total, raise total (widen the denominator) to preserve non-boosted rates." Widening
+  doesn't preserve anything - it divides every non-boosted slot's rate by the same factor
+  it divides the boosted ones, and `ceil(total/32)` grows with `total`, so the floor
+  chases its own tail. The real numbers: 721 of 1212 branches are below 1/32, and
+  `sum(max(p, 1/32))` exceeds 1 in **46 of 63 cascades** - 9 of them (black demon,
+  blue/green/red dragon, imp, fire giant, guard, chaos dwarf, kalphite queen) have zero
+  no-drop tail to spend because their cascades already cover the full denominator. So
+  there is no arrangement that floors everything AND leaves common rates untouched. The
+  user picked the only faithful option after seeing those numbers: spend the no-drop tail
+  first, then take the rest proportionally out of the above-floor branches (never pushing
+  one below the floor). Common slots shrink ~15-25% in a typical table; rarity ORDER is
+  preserved because donors give in proportion to their surplus.
+- **The floor is feasible iff `dropBranches * ceil(total/32) <= total`, i.e. at most 32
+  branches.** The corpus maxes out at exactly 32 (imp.rs2), which is why no vanilla
+  cascade needs its denominator widened at 1/32 - every edit lands inside the original
+  `random(128)`/`random(512)`. imp's table therefore comes out perfectly uniform at
+  4/128 per branch: that's the arithmetic limit, not a bug. `planCascade()` still
+  implements widening (scale the whole cascade by the floor's denominator) for a coarser
+  `--min-rate`, and refuses (warns, leaves vanilla) when even that can't fit.
+- **The unit of PROBABILITY is the branch; the unit of ITEM identity is the DropSlot.**
+  They are not the same object: a `map_members`-gated branch holds two mutually-exclusive
+  `obj_add` calls at one shared weight, so `parseDropSlots()` yields two slots for one
+  roll. Capping per slot would double-count those. `parseDropCascades()` was added for
+  this and `parseDropSlots()` is now derived from it (verified byte-identical on both the
+  backup and live trees - 1127 slots, same items/qtys/lines).
+- **A branch whose body is empty once comments are stripped is not a drop.** guard.rs2's
+  `if ($random < 8) { // nothing dropped }` is vanilla's explicit "roll this range and
+  get nothing" - flooring it would raise the odds of receiving nothing. It's exempt from
+  the floor and donates like any above-floor branch. Detecting it by "has no obj_add"
+  would have been wrong: `megararetable`'s branches assign `$drop = rune_spear;` and
+  obj_add nothing, yet are absolutely drops.
+- **Only `def_int $var = random(N)` counts as a cascade, which quietly decides scope.**
+  `randomherb`/`randomjewel`/`ultrarare_getitem` declare `def_int $random = 0;` and
+  assign `$random = random(128);` later (randomjewel even picks between `random(65)` and
+  `random(128)` for one shared branch chain, so it has no single denominator), so they're
+  invisible to the parser and stay vanilla. `megararetable` uses the `def_int` form and
+  does get capped. That asymmetry is a consequence of the existing parser's shape, not a
+  scoping decision - worth knowing before someone "fixes" the parser and silently widens
+  the cap's blast radius.
+- **Edits are applied by absolute character offset, right-to-left, not by line replace.**
+  Thresholds share their line with everything else (`} else if ($random < 128) {`, and in
+  werewolf.rs2 the entire brace-less branch body). `parseDropCascades()` records each
+  threshold's exact offset/length in the LF-normalized text; applying the rewrites in
+  descending offset order keeps every earlier offset valid as digit counts change. Cap
+  runs AFTER RandomizeDrops in `RegenerateAll.ts` because in mimic mode the loot tables
+  that actually run live in the generated `ap_mimic.rs2`, which doesn't exist until the
+  drops pass has run (the cascades left in the handlers are the no-override fallback and
+  get capped too).
+- **Idempotent by construction**: a cascade with no deficit plans no edits, so a second
+  run over its own output changes nothing and a reseed can't compound the boost. This is
+  what makes it safe to run unconditionally in the pipeline.
+- **Verified offline** (all against throwaway COPIES of the corpus, never the live tree -
+  see docs/testing-checklist.md §9): parser regression byte-identical (1127 slots, backup
+  AND live), 0 of 1211 drop branches left below 1/32, thresholds monotonic and within the
+  denominator, no zero-weight branches, only threshold digits differ (line count and CRLF
+  intact, every `obj_add(...)` byte-identical), slot list unchanged, second pass 0
+  changes, plus synthetic fixtures for the widening (`random(6)` -> `random(24)` at
+  `--min-rate 1/4`) and impossible (5 branches at 1/4 - warns, stays vanilla) paths.
+  Engine typecheck clean, and a full `tools/pack/Build.ts` on the capped live corpus
+  completed clean (`pack: 1:31.888`) before the live tree was restored byte-identical and
+  rebuilt. **Not verified in-game** - the user's Server checkout was left exactly as
+  found (mimic seed, vanilla rates); `node scripts/install.js` + `RegenerateAll.ts` is
+  what turns this on.
+
+### Addendum: the drop simulator (same session)
+
+`tools/drops/SimulateDrops.ts` came out of the user asking, reasonably, whether the whole
+cap was overcomplicated and whether biasing the roll toward low numbers would do the same
+job. Two things settled it, and both are worth keeping:
+
+- **Cascade branch ORDER carries no reliable rarity signal.** Exactly 1 of 61 cascades
+  (>=4 branches) has monotonic weights; the rarest branch averages position 0.21 but sits
+  in the second half in 7 tables, barbarian.rs2 ends with eight consecutive weight-1
+  branches AFTER its 42-weight coin branch, and guard.rs2's FIRST branch is "nothing
+  dropped". So a low-biased roll boosts a position range, not rare items. Simulated
+  against the real corpus: min-of-2 rolls lift only 128 of the 721 sub-1/32 branches to
+  1/32 while making 450 branches rarer than vanilla; min-of-5 gets 254 and makes 579
+  worse. A bias is monotone in position; rarity isn't. Kept as the answer if this comes
+  up again.
+- **The simulator simulates BOTH columns from one parse.** Vanilla weights and the
+  in-memory `planCascade()` weights, same seed, same roll loop - so the printed
+  difference can only be the table, never two hand-copied tables drifting. It writes
+  nothing (safe on a live tree) and `--live` reads installed content including
+  `ap_mimic.rs2`, which makes it the "did the install actually take" check too.
+- **Verified independently**: a separate re-implementation of the roll loop over all 63
+  tables x 200,000 kills with capped weights - worst |observed - table| = 0.236pp, and
+  the rarest OBSERVED drop rate anywhere in the corpus was 1/33.4 (sampling noise around
+  the 1/32 floor). That is the empirical form of the guarantee the cap makes on paper.
+
+## Session (2026-07-26): configurable gathering speed (GitHub #13)
+
+The ask: mining/woodcutting/fishing hand out resources at 2004 rates while
+`progressiveXpRate` hands out levels at 10x-640x, so raw materials are the
+bottleneck for every downstream skill. Shipped as one knob, `gatherSpeed`.
+
+- **A NEW opcode, not a patched STAT_RANDOM.** The success roll is
+  `stat_random(stat, low, high)` (opcode in vanilla PlayerOps: interpolate
+  `low..high` by level into a 1..256 threshold, compare against
+  `floor(JavaRandom.nextDouble() * 256)`, succeed if `threshold > roll`).
+  Scaling it in place would also move cooking burn chance, fletching, thieving
+  and every other caller. `AP_GATHER_RANDOM` (1914, `ap_gather_random` in rs2)
+  duplicates those four lines and applies `apGatherThreshold()`; the content
+  change is then a one-token swap at the 8 roll sites in the three gathersanity
+  whole-file overlays (fishing 4, mining 3, woodcut 1). PlayerOps.ts stays
+  untouched and un-overlaid.
+- **Scale the threshold, don't floor it.** `min(max(floor(value * pct / 100), 1),
+  256)`. 256 always succeeds (`threshold > roll`, roll <= 255) and the floor of 1
+  keeps vanilla's "never actually impossible" property in the slow-down
+  direction. A flat "always succeed" would erase the tool-tier and level curve
+  entirely; scaling shifts it up and keeps its shape. `pct === 100` short-
+  circuits to the untouched value, so vanilla is bit-for-bit vanilla.
+- **The action delay is the real ceiling, and it is untouched.** Mining is
+  `%action_delay = calc(map_clock + oc_param($pickaxe, mining_rate))`,
+  woodcutting a flat `+3`. gatherSpeed only removes FAILED cycles, so throughput
+  saturates at one resource per swing (3-8 ticks) somewhere around 400. Worth
+  saying out loud in the option docs - "why isn't 1000 ten times faster" is the
+  obvious question.
+- **ApOptions grew numeric keys**: `NUMERIC_DEFAULTS` ({value, min, max}, clamped
+  + warned on load), `getApOptionInt` / `setApOptionInt`, and `load()` now
+  populates two caches and returns void (both are invalidated together on
+  write). `ap_option` switched to `getApOptionInt`, which is backward compatible
+  - booleans still come back 1/0 and unknown names still fail open to 1, so
+  every existing `ap_option("addonX") = 1` call site is unaffected.
+- **Default 200, not 100** - same call as progressiveXpRate defaulting on: the
+  randomizer's pacing assumes supplies keep up. `gatherSpeed: 100` is the
+  authentic-rates escape hatch, documented in both docs/ap-yaml-options.md and
+  the option comment.
+- **The tools loader needed nothing.** `PlacementEngine.loadApOptions` reads
+  exactly `musicChecks` and ignores every other key, so a numeric value in the
+  file can't break the generator/validator - only options that change the
+  LOCATION CATALOG have to be taught to that loader.
+- **Verified offline**: engine typecheck clean, `tools/pack/Build.ts` clean
+  (1:59, which is what proves the new command declaration and all 8 call sites
+  compile), full apworld suite 152 passed / 7763 subtests (run from
+  ~/Archipelago with `./venv/bin/python` - the SYSTEM python3 there lacks
+  `schema` and every test errors at collection; also move
+  `custom_worlds/rs2004scape.apworld` aside first). **Not in-game tested** -
+  user checklist: boot and confirm the `AP options:` log line prints
+  `gatherSpeed=200`, mine copper at level 1 (should pay out roughly twice as
+  often, still not every swing), chop a normal tree, net-fish shrimp; then set
+  `gatherSpeed` to 100 in `data/config/ap-options.json`, restart, and confirm
+  the rates feel vanilla again.

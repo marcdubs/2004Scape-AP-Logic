@@ -1,3 +1,8 @@
+// AP: every gathering success roll below goes through ap_gather_random instead of
+// vanilla stat_random - same math, with the ap-options.json "gatherSpeed" percentage
+// folded into the level-interpolated threshold (100 = vanilla, higher = fewer failed
+// cycles). Declared in scripts/ap/ap.rs2; see 2004Scape-AP-Logic GitHub #13. The
+// action delay is untouched, so a resource still takes at least one full swing/cast.
 // when you use your equipment on the wrong fishing spot
 // example: net -> harpoon spot
 [label,fishing_wrong_spot_message](obj $item)
@@ -45,7 +50,7 @@ if (npc_param(is_whirlpool) = ^true) {
 
 if ($fish2 ! null) {
     def_struct $struct2 = oc_param($fish2, fishing_struct);
-    if (stat_random(fishing, struct_param($struct2, success_low), struct_param($struct2, success_high)) = true) {
+    if (ap_gather_random(fishing, struct_param($struct2, success_low), struct_param($struct2, success_high)) = true) {
         if ($bait ! null) {
             inv_del(inv, $bait, 1);
         }
@@ -58,7 +63,7 @@ if ($fish2 ! null) {
 
 if ($fish1 ! null) {
     def_struct $struct1 = oc_param($fish1, fishing_struct);
-    if (stat_random(fishing, struct_param($struct1, success_low), struct_param($struct1, success_high)) = true) {
+    if (ap_gather_random(fishing, struct_param($struct1, success_low), struct_param($struct1, success_high)) = true) {
         if ($bait ! null) {
             inv_del(inv, $bait, 1);
         }
@@ -72,7 +77,7 @@ if ($fish1 ! null) {
 [proc,fish_roll_loc](namedobj $fish1, namedobj $fish2, namedobj $bait)
 if ($fish2 ! null) { // if fish2 isnt null and roll for 2nd fish passes
     def_struct $struct2 = oc_param($fish2, fishing_struct);
-    if (stat_random(fishing, struct_param($struct2, success_low), struct_param($struct2, success_high)) = true) {
+    if (ap_gather_random(fishing, struct_param($struct2, success_low), struct_param($struct2, success_high)) = true) {
         if ($bait ! null) {
             // delete bait
             inv_del(inv, $bait, 1);
@@ -86,7 +91,7 @@ if ($fish2 ! null) { // if fish2 isnt null and roll for 2nd fish passes
 }
 if ($fish1 ! null) { // else if fish1 isnt null and roll for 1st fish passes
     def_struct $struct1 = oc_param($fish1, fishing_struct);
-    if (stat_random(fishing, struct_param($struct1, success_low), struct_param($struct1, success_high)) = true) {
+    if (ap_gather_random(fishing, struct_param($struct1, success_low), struct_param($struct1, success_high)) = true) {
         if ($bait ! null) {
             // delete bait
             inv_del(inv, $bait, 1);
