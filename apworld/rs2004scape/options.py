@@ -138,24 +138,31 @@ class DropRandomization(Choice):
 
 class GatheringRandomization(Choice):
     """What mining/fishing/woodcutting actually yield (seed option*).
-    shuffle: bijective - everything stays obtainable; chaos: independent
+    shuffle: bijective - everything stays obtainable; tiered: bijective
+    within progression bands, so a level-1 fish becomes a level-1 ore or
+    log and Runite stays a high-level catch; chaos: independent
     resampling, duplicates allowed."""
 
     display_name = "Gathering Randomization"
     option_off = 0
     option_shuffle = 1
     option_chaos = 2
+    # tiered is 3, not slotted in next to shuffle: these values are what a YAML that
+    # wrote the NUMBER rather than the name resolves to, so they are append-only.
+    option_tiered = 3
     default = 1
 
 
 class ProcessingRandomization(Choice):
     """What cooking/smithing/crafting/fletching produce (seed option*).
-    Same shuffle/chaos semantics as gathering."""
+    Same shuffle/tiered/chaos semantics as gathering - tiered keeps a
+    recipe's output at roughly the level the recipe itself demands."""
 
     display_name = "Processing Randomization"
     option_off = 0
     option_shuffle = 1
     option_chaos = 2
+    option_tiered = 3
     default = 1
 
 

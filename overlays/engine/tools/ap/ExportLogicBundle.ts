@@ -111,7 +111,9 @@ function loadEntrancePool(): PoolFile {
 
 interface SkillProductPool {
     skills: string[];
-    products: { item: string; skill: string; objId: number }[];
+    /** progression band names in band order - `--mode tiered` groups products by these. */
+    bands: string[];
+    products: { item: string; skill: string; objId: number; level: number; band: string }[];
     hardExcluded: Record<string, string>;
     questCritical: string[];
 }

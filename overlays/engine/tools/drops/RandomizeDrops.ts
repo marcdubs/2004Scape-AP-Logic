@@ -20,7 +20,7 @@ import {
     restoreDropScriptBackup
 } from './DropTableParser.js';
 import { AP_DROPS_JSON, applyMimicTransform, liveCorpusIsMimicTransformed, parseMimic, removeMimicArtifacts } from './MimicTransform.js';
-import { derangement, mulberry32, shuffle } from '../shared/Prng.js';
+import { derangement, hashKey, mulberry32, shuffle } from '../shared/Prng.js';
 
 // Drop randomization: reassigns which item sits in each weighted loot-drop slot across
 // the monster drop-table corpus (content/scripts/drop tables/scripts/*.rs2), plus a
@@ -107,14 +107,6 @@ function pickDifferent(pool: string[], avoid: string, rand: () => number): strin
         candidate = pool[Math.floor(rand() * pool.length)];
     }
     return candidate;
-}
-
-function hashKey(key: string): number {
-    let h = 0;
-    for (let i = 0; i < key.length; i++) {
-        h = (Math.imul(h, 31) + key.charCodeAt(i)) | 0;
-    }
-    return h >>> 0;
 }
 
 function randomizeDropSlots(seed: number, mode: 'tiered' | 'chaos', exclude: string[], dryRun: boolean) {

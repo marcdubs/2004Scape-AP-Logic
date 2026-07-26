@@ -68,6 +68,36 @@ class TestRollsMatchTheGameServer(unittest.TestCase):
         roll = roll_skill_swaps(POOLS["process"], ROLLS["seed"], ROLLS["process"]["mode"])
         self.assertEqual(roll.table, ROLLS["process"]["table"])
 
+    def test_tiered_tables(self) -> None:
+        """GitHub #15: tiered deranges inside each progression band, one PRNG stream per
+        band. It has its own vectors because getting the band ORDER or the per-band salt
+        wrong still produces a plausible-looking table - just not the server's."""
+        for pool_key, vector_key in (("gather", "gatherTiered"), ("process", "processTiered")):
+            with self.subTest(pool=pool_key):
+                roll = roll_skill_swaps(POOLS[pool_key], ROLLS["seed"], "tiered")
+                self.assertEqual(roll.table, ROLLS[vector_key]["table"])
+
+    def test_tiered_stays_inside_its_band(self) -> None:
+        """The whole point of the mode: a product can only become a product of the same
+        band, and (being a per-band derangement) never itself."""
+        for pool_key in ("gather", "process"):
+            with self.subTest(pool=pool_key):
+                pool = POOLS[pool_key]
+                band_of = {entry["item"]: entry["band"] for entry in pool["products"]}
+                roll = roll_skill_swaps(pool, ROLLS["seed"], "tiered")
+                self.assertTrue(roll.swaps)
+                for was, now in roll.swaps.items():
+                    self.assertEqual(band_of[was], band_of[now], f"{was} -> {now} crossed a band")
+                    self.assertNotEqual(was, now)
+
+    def test_tiered_is_a_bijection_per_band(self) -> None:
+        """Bijective like shuffle, so nothing is orphaned - every swapped product is still
+        handed out by exactly one action."""
+        for pool_key in ("gather", "process"):
+            with self.subTest(pool=pool_key):
+                roll = roll_skill_swaps(POOLS[pool_key], ROLLS["seed"], "tiered")
+                self.assertEqual(sorted(roll.swaps), sorted(roll.swaps.values()))
+
     def test_spawn_pick(self) -> None:
         roll = roll_spawn(POOLS["spawn"], ROLLS["seed"], ROLLS["spawn"]["mode"])
         self.assertEqual(roll.coord, ROLLS["spawn"]["home"])

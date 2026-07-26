@@ -85,15 +85,15 @@ set REGENERATE_EXTRA=
 REM e.g. "--skip-drip" or "--drip-seed 555"
 
 REM RandomizeGathering.ts - what mining/fishing/woodcutting actually yield.
-REM   all params: [--seed <n>] [--mode shuffle|chaos]
+REM   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
 REM               [--skills mining,fishing,woodcutting] [--exclude <item,item>]
 REM               [--pin-quest-items] [--no-quest-pins] [--dry-run]
 set GATHER_MODE=shuffle
-REM shuffle (bijective, everything obtainable) | chaos
+REM shuffle (bijective) | tiered (bijective within level bands) | chaos
 set GATHER_EXTRA=
 
 REM RandomizeProcessing.ts - what cooking/smithing/crafting/fletching produce.
-REM   all params: [--seed <n>] [--mode shuffle|chaos]
+REM   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
 REM               [--skills cooking,smithing,crafting,fletching] [--exclude <item,item>]
 REM               [--pin-quest-items] [--no-quest-pins] [--dry-run]
 set PROCESS_MODE=shuffle

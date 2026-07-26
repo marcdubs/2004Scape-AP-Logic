@@ -120,9 +120,12 @@ added this). All are static game data — regenerate only if content changes.
 
 ## Scope & known limitations (for the next session)
 
-- **Shuffle vs chaos:** the model is fully safe for the default **shuffle**
-  (bijection) gathersanity/processsanity modes — every item stays obtainable at
-  *some* level, so the gate verifies without false-blocking. In **chaos** mode
+- **Shuffle/tiered vs chaos:** the model is fully safe for the bijective
+  gathersanity/processsanity modes — **shuffle** (default) and **tiered** (GitHub
+  #15, shuffle confined to a level band) — because every item stays obtainable at
+  *some* level, so the gate verifies without false-blocking. Tiered additionally
+  keeps a low-level quest ingredient re-keyed onto another low-level action, which
+  is the strongest available mitigation for the cross-skill risk below. In **chaos** mode
   (independent resampling can *orphan* an item from gathering), the buy/drop
   sources are what rescue a buyable orphan — so populating shop/drop sources is
   not optional there.

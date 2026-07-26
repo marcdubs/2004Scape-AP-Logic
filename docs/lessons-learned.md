@@ -3786,3 +3786,49 @@ Full design in `docs/tracker-map.md` ("Checks tab"); the reusable bits:
   a page full of `item_317`. `tracker.json` is ~84 KB per 5s poll after this - fine
   for a localhost single-user tracker, but it is the reason the 517-entry check
   catalog got its own fetch-once route instead.
+
+## Tiered gather/process randomization (GitHub #15, 2026-07-26)
+
+- **The issue's premise was half right: "the data is already parsed" wasn't true.**
+  Every *processing* table states its requirement (`levelrequired` on cooking /
+  smithing / leather, `level` on gem + the four fletching dbrows, and
+  `fletch_bow_table` hides it INSIDE the product tuple - `data=shortbow,<obj>,<level>,
+  <exp>`), and mining/woodcutting do too (`rock_level`, `levelrequired`). **Fishing has
+  no product config at all.** Its levels are plain `stat(fishing) < N` / `>= N` guards
+  in the spot scripts, which is why `tools/gather/FishingLevels.ts` exists. Confirm the
+  level field before designing a bucketing feature - that check was the actual work.
+- **Two indirections in the fishing scan, both real, both one hop.** (1) The big-net
+  fish are literals inside `[proc,fish_roll_big_net]`, which is only ever called from
+  labels gated at `< 16`, so a proc inherits the lowest level its CALL SITES were
+  reachable at. (2) Lava eels are the reverse - the label never mentions
+  `stat(fishing)`, it early-returns on `~oil_rod_fishing_check_requirements`, whose
+  `< 53` lives inside the proc; so a `if (~p = false)` guard raises its CALLER's floor
+  to whatever `p`'s own gates demand. Miss (2) and lava eel silently bands as level 1,
+  which is the exact bug tiered mode exists to prevent. Both are deliberately
+  single-step, keyed on the `= false` shape - propagating every proc's exit floor to
+  every caller would have banded the big-net fish at 46.
+- **Fixed level bands, not percentile ones.** Drops' tiered mode buckets by rarity
+  percentile because "rare" is only meaningful relative to a table. A skill level is
+  absolute, so `lvl1-14 / 15-29 / 30-44 / 45-59 / 60-74 / 75+` (the equipment tiers a
+  player already thinks in) beats percentiles, and fixed boundaries mean adding one
+  product can't reshuffle which band everything ELSE lands in.
+- **Export the derived value, don't re-derive it.** The apworld does NOT own a copy of
+  the band table: `--export-pool` stamps each product with its `band` and ships the
+  band order, and `randomizers.py` groups by those strings. Every duplicated table
+  between the TS tools and the Python port is a drift risk, and a drifted band means
+  the apworld's fill reasons about swaps the server never made. Same reasoning that
+  made `prng.py` a byte-exact port pinned by vectors.
+- **A product made by several sources takes the LOWEST level that yields it**
+  (`minLevels`) - limestone sits on three rocks, pearl bolt tips come from small OR big
+  oyster pearls. The band should model "when does this first become reachable".
+- **A missing level is fatal, not a default.** `readDbrowProducts` throws rather than
+  banding an unparsed product at level 1 - the same discipline as the existing
+  "product not found in obj.pack - parser drift?" check.
+- **Regression-check the flat modes by REPLAYING the old spoiler seed.** Both tools'
+  `shuffle` output had to stay byte-identical after the loaders changed shape from
+  `string[]` to `{item, level}[]`; re-running the seed recorded in the backed-up
+  `gather-seed.json` / `process-seed.json` and diffing the swap list caught that
+  cheaply. (Back those spoilers up first - see the tool-output rule above.)
+- **Option values are append-only.** `option_tiered = 3` sits after `chaos = 2` rather
+  than next to `shuffle`, because a YAML that wrote the number would otherwise silently
+  change mode.

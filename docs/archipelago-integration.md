@@ -203,7 +203,13 @@ That matters because the apworld needs to *know* those tables while its fill run
 Each roll mirrors its TypeScript original exactly: the same ordered candidate pool
 (exported by that tool's own `--export-pool`, into `bundle.randomizerPools`), the same
 PRNG (`prng.py` is a byte-exact port of `Prng.ts`), the same pin rules (quest-critical
-products pinned in chaos, not in shuffle), the same mode semantics.
+products pinned in chaos, not in the bijective shuffle/tiered modes), the same mode
+semantics. Gathersanity/processsanity's `tiered` mode is the one place the apworld is
+handed a *derived* value rather than deriving it: the TS tool stamps each product with
+its progression band and exports the band order alongside, and `randomizers.py` groups
+by those strings instead of re-deriving the boundaries - a band table duplicated on
+both sides is a band table that can drift, and a drifted band means the apworld's logic
+describes swaps the server never made.
 `test_randomizers.py` pins both layers against vectors captured from the real tools -
 raw `mulberry32` / `derangement` output, and the actual `ap-gather.json` /
 `ap-process.json` / `ap-spawn.json` / `shop-seed.json` / `drop-seed.json` written for
