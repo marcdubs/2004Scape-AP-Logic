@@ -176,6 +176,16 @@ zeroed unlock state, and cleared check/tracker ledgers. The GenerateSeed stage
 placed items locally, so that's the whole setup: skip steps 4-5, boot the
 server, and play.
 
+It is **spoiler-free by default** - every stage prints counts, not tables, so
+you can watch it run without learning your own seed. Add `--verbose` (or
+`VERBOSE=1`) to print the swap tables, the rolled home, the goal list and the
+sphere-by-sphere walkthrough. Either way each randomizer writes its complete
+table to a spoiler file next to the tool (`tools/gather/gather-seed.json`,
+`tools/process/process-seed.json`, `tools/thieving/thieving-seed.json`,
+`tools/map/entrance-seed.json`, `tools/map/teleport-seed.json`,
+`tools/drops/drop-seed.json`, `data/config/ap-spawn.json`), so nothing is lost
+by keeping the console quiet.
+
 **Archipelago run? Don't roll yet.** The seed roll must happen AFTER the game
 server has connected to the multiworld (step 5) - connecting is what delivers
 your YAML's randomization options to the server. Rolling first silently uses

@@ -55,7 +55,8 @@ import { LEVEL_BANDS, type ProductLevel, bandFor, minLevels, readDbrowProducts, 
 // Usage (run from ../Server/engine):
 //   npx tsx tools/thieving/RandomizeThieving.ts [--seed <n>] [--mode shuffle|tiered|chaos]
 //       [--surfaces pickpocket,stalls,chests] [--exclude <item,item,...>]
-//       [--pin-quest-items] [--no-quest-pins] [--dry-run] [--export-pool <path>]
+//       [--pin-quest-items] [--no-quest-pins] [--dry-run] [--quiet]
+//       [--export-pool <path>]
 //
 // - shuffle (default): one derangement across the combined loot pool - a bijection, so
 //   every item is still stealable from exactly one source, and nothing maps to itself.
@@ -121,6 +122,10 @@ function parseArgs(argv: string[]) {
         exclude: new Set<string>(),
         questPins: null as boolean | null, // null = decide by mode (shuffle/tiered off, chaos on)
         dryRun: false,
+        // --quiet suppresses the per-swap listing (the spoiler) and keeps the counts.
+        // The full table always lands in the spoiler JSON either way, so nothing is
+        // lost - this only decides whether it scrolls past the player rolling a seed.
+        quiet: false,
         // GitHub #3 convention: dump the candidate pool and exit, so an Archipelago
         // apworld port can replay the same roll before the server ever runs this tool.
         exportPool: null as string | null
@@ -170,6 +175,8 @@ function parseArgs(argv: string[]) {
             args.questPins = false;
         } else if (arg === '--dry-run') {
             args.dryRun = true;
+        } else if (arg === '--quiet') {
+            args.quiet = true;
         } else if (arg === '--export-pool') {
             args.exportPool = argv[++i] ?? 'data/config/ap-thieving-pool.json';
         } else {
@@ -311,11 +318,15 @@ function main() {
     for (const note of bandNotes) {
         console.log(`  ${note}`);
     }
-    for (const s of swaps) {
-        console.log(`  ${s.wasSurface.padEnd(10)} ${s.was} (lvl ${s.wasLevel}) -> ${s.now} (lvl ${s.nowLevel})${s.wasSurface !== s.nowSurface ? ` [${s.nowSurface}]` : ''}`);
-    }
-    for (const [item, reason] of pins) {
-        console.log(`  pinned     ${item} (${reason})`);
+    if (args.quiet) {
+        console.log(`  (${swaps.length} swap(s) + ${pins.size} pin(s) not printed - --quiet; full table in ${SPOILER_PATH})`);
+    } else {
+        for (const s of swaps) {
+            console.log(`  ${s.wasSurface.padEnd(10)} ${s.was} (lvl ${s.wasLevel}) -> ${s.now} (lvl ${s.nowLevel})${s.wasSurface !== s.nowSurface ? ` [${s.nowSurface}]` : ''}`);
+        }
+        for (const [item, reason] of pins) {
+            console.log(`  pinned     ${item} (${reason})`);
+        }
     }
     console.log(`${crossSurface}/${swaps.length} swaps land cross-surface`);
 

@@ -41,11 +41,20 @@ REM pin it to re-roll the exact same run: `set SEED=12345` in the console first
 REM (or hardcode a number here). RANDOM*32768+RANDOM = uniform 0..2^30-1.
 if not defined SEED set /a SEED=%RANDOM% * 32768 + %RANDOM%
 
-REM Spoiler-free by default: the placement stage only prints counts. Run
-REM `scripts\new-run.bat --verbose` (or `set VERBOSE=1` first) to print the
-REM goal list and the full sphere-by-sphere walkthrough.
+REM Spoiler-free by default: every stage prints counts only. Run
+REM `scripts\new-run.bat --verbose` (or `set VERBOSE=1` first) to also print the
+REM gathering/processing/thieving swap tables, the rolled home, the goal list and
+REM the full sphere-by-sphere walkthrough.
+REM
+REM "Counts only" is a console decision, not a data one: every randomizer writes
+REM its complete table to a spoiler file next to the tool (tools\gather\
+REM gather-seed.json, tools\map\entrance-seed.json, ...) on every run, verbose or
+REM not. Read those when you want the answers.
 if not defined VERBOSE set VERBOSE=0
 if "%~1"=="--verbose" set VERBOSE=1
+REM Passed to the randomizers that would otherwise dump their whole table.
+set QUIET_FLAG=--quiet
+if "%VERBOSE%"=="1" set QUIET_FLAG=
 
 REM --- stage toggles: 1 = run, 0 = skip (skipped stages keep their current state) ---
 set RUN_CONTENT=1
@@ -89,7 +98,7 @@ REM e.g. "--skip-drip" or "--drip-seed 555"
 REM RandomizeGathering.ts - what mining/fishing/woodcutting actually yield.
 REM   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
 REM               [--skills mining,fishing,woodcutting] [--exclude <item,item>]
-REM               [--pin-quest-items] [--no-quest-pins] [--dry-run]
+REM               [--pin-quest-items] [--no-quest-pins] [--dry-run] [--quiet]
 set GATHER_MODE=shuffle
 REM shuffle (bijective) | tiered (bijective within level bands) | chaos
 set GATHER_EXTRA=
@@ -97,21 +106,21 @@ set GATHER_EXTRA=
 REM RandomizeProcessing.ts - what cooking/smithing/crafting/fletching produce.
 REM   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
 REM               [--skills cooking,smithing,crafting,fletching] [--exclude <item,item>]
-REM               [--pin-quest-items] [--no-quest-pins] [--dry-run]
+REM               [--pin-quest-items] [--no-quest-pins] [--dry-run] [--quiet]
 set PROCESS_MODE=shuffle
 set PROCESS_EXTRA=
 
 REM RandomizeThieving.ts - what pickpockets/market stalls/trapped chests hand you.
 REM   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
 REM               [--surfaces pickpocket,stalls,chests] [--exclude <item,item>]
-REM               [--pin-quest-items] [--no-quest-pins] [--dry-run] [--export-pool <path>]
+REM               [--pin-quest-items] [--no-quest-pins] [--dry-run] [--quiet] [--export-pool <path>]
 REM   (`--exclude coins` leaves the big-money rows handing out vanilla coins;
 REM    quantity is never rescaled.)
 set THIEVING_MODE=shuffle
 set THIEVING_EXTRA=
 
 REM RandomizeSpawn.ts - the home/respawn point. Runs BEFORE entrances (see note up top).
-REM   all params: [--seed <n>] [--mode city|chunk] [--dry-run] [--include-far-west]
+REM   all params: [--seed <n>] [--mode city|chunk] [--dry-run] [--quiet] [--include-far-west]
 set SPAWN_MODE=city
 REM city (7 spellbook landmarks) | chunk (random mainland square)
 set SPAWN_EXTRA=
@@ -127,8 +136,9 @@ set ENTRANCE_EXTRA=
 REM e.g. "--mixed" to pool cross-map + floor-shift together
 
 REM GenerateSeed.ts - AP placement (checks contain the unlocks). Writes
-REM ap-placements.json + a locked starting ap-unlocks.json, CLEARS fired checks +
-REM tracker (a placement seed IS a new run), and refuses to ship an unbeatable seed.
+REM ap-placements.json + a locked starting ap-unlocks.json, CLEARS the run state
+REM (fired checks, tracker, and the AP client's ap-session.json - a placement seed
+REM IS a new run), and refuses to ship an unbeatable seed.
 REM   all params: [--seed N] [--pool per-skill|groups] [--dry-run] [--spoiler]
 REM               [--max-progression-level N] [--retry-budget N] [--config-dir <dir>]
 set POOL=per-skill
@@ -160,26 +170,26 @@ if "%RUN_CONTENT%"=="1" (
 
 if "%RUN_GATHER%"=="1" (
     echo.
-    echo ==^> npx tsx tools/gather/RandomizeGathering.ts --seed %SEED% --mode %GATHER_MODE% %GATHER_EXTRA%
-    call npx tsx tools/gather/RandomizeGathering.ts --seed %SEED% --mode %GATHER_MODE% %GATHER_EXTRA% || goto :error
+    echo ==^> npx tsx tools/gather/RandomizeGathering.ts --seed %SEED% --mode %GATHER_MODE% %QUIET_FLAG% %GATHER_EXTRA%
+    call npx tsx tools/gather/RandomizeGathering.ts --seed %SEED% --mode %GATHER_MODE% %QUIET_FLAG% %GATHER_EXTRA% || goto :error
 )
 
 if "%RUN_PROCESS%"=="1" (
     echo.
-    echo ==^> npx tsx tools/process/RandomizeProcessing.ts --seed %SEED% --mode %PROCESS_MODE% %PROCESS_EXTRA%
-    call npx tsx tools/process/RandomizeProcessing.ts --seed %SEED% --mode %PROCESS_MODE% %PROCESS_EXTRA% || goto :error
+    echo ==^> npx tsx tools/process/RandomizeProcessing.ts --seed %SEED% --mode %PROCESS_MODE% %QUIET_FLAG% %PROCESS_EXTRA%
+    call npx tsx tools/process/RandomizeProcessing.ts --seed %SEED% --mode %PROCESS_MODE% %QUIET_FLAG% %PROCESS_EXTRA% || goto :error
 )
 
 if "%RUN_THIEVING%"=="1" (
     echo.
-    echo ==^> npx tsx tools/thieving/RandomizeThieving.ts --seed %SEED% --mode %THIEVING_MODE% %THIEVING_EXTRA%
-    call npx tsx tools/thieving/RandomizeThieving.ts --seed %SEED% --mode %THIEVING_MODE% %THIEVING_EXTRA% || goto :error
+    echo ==^> npx tsx tools/thieving/RandomizeThieving.ts --seed %SEED% --mode %THIEVING_MODE% %QUIET_FLAG% %THIEVING_EXTRA%
+    call npx tsx tools/thieving/RandomizeThieving.ts --seed %SEED% --mode %THIEVING_MODE% %QUIET_FLAG% %THIEVING_EXTRA% || goto :error
 )
 
 if "%RUN_SPAWN%"=="1" (
     echo.
-    echo ==^> npx tsx tools/spawn/RandomizeSpawn.ts --seed %SEED% --mode %SPAWN_MODE% %SPAWN_EXTRA%
-    call npx tsx tools/spawn/RandomizeSpawn.ts --seed %SEED% --mode %SPAWN_MODE% %SPAWN_EXTRA% || goto :error
+    echo ==^> npx tsx tools/spawn/RandomizeSpawn.ts --seed %SEED% --mode %SPAWN_MODE% %QUIET_FLAG% %SPAWN_EXTRA%
+    call npx tsx tools/spawn/RandomizeSpawn.ts --seed %SEED% --mode %SPAWN_MODE% %QUIET_FLAG% %SPAWN_EXTRA% || goto :error
 )
 
 if "%RUN_ENTRANCES%"=="1" (

@@ -4197,3 +4197,32 @@ side of `clearRunState` it lives on. State that mirrors something the room can
 resend belongs in the cleared list; only credentials and the room's own
 downstream config (`ap-archipelago.json`, `ap-options.json`) should survive a
 roll.
+
+## `new-run` was spoiler-free in name only (2026-07-26)
+
+The script's header has claimed "spoiler-free by default" since it was written,
+but that only ever covered the placement stage (`GenerateSeed --spoiler` behind
+`VERBOSE`). The randomizers in the middle printed their entire tables
+unconditionally - ~330 lines of `coal (lvl 30) -> charcoal` across
+gathering/processing/thieving, plus a three-line banner naming the rolled home.
+Rolling a seed told you the seed.
+
+**Fix**: a `--quiet` flag on the four offenders (gather, process, thieving,
+spawn) that keeps the header + counts and drops the per-entry listing;
+`new-run.{sh,bat}` pass it unless `--verbose`. Standalone defaults are
+unchanged - running a tool directly still prints its table, which is what you
+want when you are debugging that tool.
+
+Two things worth carrying forward:
+
+- **The console was never the source of truth.** Every randomizer already wrote
+  its full table to a spoiler JSON next to itself (`tools/gather/
+  gather-seed.json`, `tools/map/entrance-seed.json`, ...) on every run. That is
+  why suppressing output costs nothing, and it is the pattern any new
+  randomizer should follow: write the spoiler file, print counts.
+- **Spoilers leak across stages.** `RandomizeSpawn.verifyCityCoordsAgainstDbrow`
+  prints a per-landmark MISMATCH warning whose "live" coord *is*
+  RandomizeTeleports' derangement - a different randomizer's table, spoiled from
+  an unrelated stage. `--quiet` keeps the count and drops the coords. When
+  adding a cross-check that reads another tool's output, assume the diff is a
+  spoiler.

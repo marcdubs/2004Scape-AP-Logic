@@ -35,13 +35,22 @@ cd "$ENGINE_DIR"
 # (or hardcode a number here). RANDOM*32768+RANDOM = uniform 0..2^30-1.
 SEED="${SEED:-$((RANDOM * 32768 + RANDOM))}"
 
-# Spoiler-free by default: the placement stage only prints counts. Pass
-# --verbose (or VERBOSE=1) to print the goal list and the full sphere-by-sphere
-# walkthrough. (GenerateSeed.ts --dry-run always prints it - nothing committed.)
+# Spoiler-free by default: every stage prints counts only. Pass --verbose (or
+# VERBOSE=1) to also print the gathering/processing/thieving swap tables, the
+# rolled home, the goal list and the full sphere-by-sphere walkthrough.
+# (GenerateSeed.ts --dry-run always prints it - nothing committed.)
+#
+# "Counts only" is a console decision, not a data one: every randomizer writes
+# its complete table to a spoiler file next to the tool (tools/gather/
+# gather-seed.json, tools/map/entrance-seed.json, ...) on every run, verbose or
+# not. Read those when you want the answers.
 VERBOSE="${VERBOSE:-0}"
 for arg in "$@"; do
   [ "$arg" = "--verbose" ] && VERBOSE=1
 done
+# Passed to the randomizers that would otherwise dump their whole table.
+QUIET_FLAG="--quiet"
+[ "$VERBOSE" = 1 ] && QUIET_FLAG=""
 
 # --- stage toggles: 1 = run, 0 = skip (skipped stages keep their current state) ---
 RUN_CONTENT=1             # drip + shops + drops + teleports via RegenerateAll (INCLUDES the ~1:30 pack rebuild)
@@ -73,28 +82,28 @@ REGENERATE_EXTRA=""       # e.g. "--skip-drip" or "--drip-seed 555"
 # RandomizeGathering.ts - what mining/fishing/woodcutting actually yield.
 #   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
 #               [--skills mining,fishing,woodcutting] [--exclude <item,item>]
-#               [--pin-quest-items] [--no-quest-pins] [--dry-run]
+#               [--pin-quest-items] [--no-quest-pins] [--dry-run] [--quiet]
 GATHER_MODE=shuffle       # shuffle (bijective) | tiered (bijective within level bands) | chaos
 GATHER_EXTRA=""
 
 # RandomizeProcessing.ts - what cooking/smithing/crafting/fletching produce.
 #   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
 #               [--skills cooking,smithing,crafting,fletching] [--exclude <item,item>]
-#               [--pin-quest-items] [--no-quest-pins] [--dry-run]
+#               [--pin-quest-items] [--no-quest-pins] [--dry-run] [--quiet]
 PROCESS_MODE=shuffle
 PROCESS_EXTRA=""
 
 # RandomizeThieving.ts - what pickpockets/market stalls/trapped chests hand you.
 #   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
 #               [--surfaces pickpocket,stalls,chests] [--exclude <item,item>]
-#               [--pin-quest-items] [--no-quest-pins] [--dry-run] [--export-pool <path>]
+#               [--pin-quest-items] [--no-quest-pins] [--dry-run] [--quiet] [--export-pool <path>]
 #   (`--exclude coins` leaves the big-money rows - 1000-coin Ardougne chest, hero/
 #    paladin pockets - handing out vanilla coins; quantity is never rescaled.)
 THIEVING_MODE=shuffle
 THIEVING_EXTRA=""
 
 # RandomizeSpawn.ts - the home/respawn point. Runs BEFORE entrances (see note up top).
-#   all params: [--seed <n>] [--mode city|chunk] [--dry-run] [--include-far-west]
+#   all params: [--seed <n>] [--mode city|chunk] [--dry-run] [--quiet] [--include-far-west]
 SPAWN_MODE=city           # city (7 spellbook landmarks) | chunk (random mainland square)
 SPAWN_EXTRA=""            # chunk mode: "--include-far-west" opens mapX<40 back up
 
@@ -107,8 +116,9 @@ SPAWN_EXTRA=""            # chunk mode: "--include-far-west" opens mapX<40 back 
 ENTRANCE_EXTRA=""         # e.g. "--mixed" to pool cross-map + floor-shift together
 
 # GenerateSeed.ts - AP placement (checks contain the unlocks). Writes
-# ap-placements.json + a locked starting ap-unlocks.json, CLEARS fired checks +
-# tracker (a placement seed IS a new run), and refuses to ship an unbeatable seed.
+# ap-placements.json + a locked starting ap-unlocks.json, CLEARS the run state
+# (fired checks, tracker, and the AP client's ap-session.json - a placement seed
+# IS a new run), and refuses to ship an unbeatable seed.
 #   all params: [--seed N] [--pool per-skill|groups] [--dry-run] [--spoiler]
 #               [--max-progression-level N] [--retry-budget N] [--config-dir <dir>]
 POOL=per-skill            # per-skill (72 "+20 <Skill> cap" items) | groups (32 chunky items)
@@ -133,10 +143,10 @@ fi
 run() { echo; echo "==> npx tsx $*"; npx tsx "$@"; }
 
 [ "$RUN_CONTENT" = 1 ]   && run tools/RegenerateAll.ts --seed "$SEED" --mode "$DROPS_MODE" $REGENERATE_EXTRA
-[ "$RUN_GATHER" = 1 ]    && run tools/gather/RandomizeGathering.ts --seed "$SEED" --mode "$GATHER_MODE" $GATHER_EXTRA
-[ "$RUN_PROCESS" = 1 ]   && run tools/process/RandomizeProcessing.ts --seed "$SEED" --mode "$PROCESS_MODE" $PROCESS_EXTRA
-[ "$RUN_THIEVING" = 1 ]  && run tools/thieving/RandomizeThieving.ts --seed "$SEED" --mode "$THIEVING_MODE" $THIEVING_EXTRA
-[ "$RUN_SPAWN" = 1 ]     && run tools/spawn/RandomizeSpawn.ts --seed "$SEED" --mode "$SPAWN_MODE" $SPAWN_EXTRA
+[ "$RUN_GATHER" = 1 ]    && run tools/gather/RandomizeGathering.ts --seed "$SEED" --mode "$GATHER_MODE" $QUIET_FLAG $GATHER_EXTRA
+[ "$RUN_PROCESS" = 1 ]   && run tools/process/RandomizeProcessing.ts --seed "$SEED" --mode "$PROCESS_MODE" $QUIET_FLAG $PROCESS_EXTRA
+[ "$RUN_THIEVING" = 1 ]  && run tools/thieving/RandomizeThieving.ts --seed "$SEED" --mode "$THIEVING_MODE" $QUIET_FLAG $THIEVING_EXTRA
+[ "$RUN_SPAWN" = 1 ]     && run tools/spawn/RandomizeSpawn.ts --seed "$SEED" --mode "$SPAWN_MODE" $QUIET_FLAG $SPAWN_EXTRA
 [ "$RUN_ENTRANCES" = 1 ] && run tools/map/RandomizeEntrances.ts --seed "$SEED" $ENTRANCE_EXTRA
 [ "$REFRESH_REGION_GRAPH" = 1 ] && run tools/logic/BuildRegionGraph.ts
 [ "$REFRESH_WORLDMAP_PNG" = 1 ] && run tools/map/RenderWorldmapPng.ts

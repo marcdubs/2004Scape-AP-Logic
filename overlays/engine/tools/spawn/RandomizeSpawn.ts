@@ -14,7 +14,7 @@ import { isTutorialMapsquare } from '../shared/TutorialIsland.js';
 // Reseed = re-run + restart the server - no content rebuild, same pattern as
 // RandomizeEntrances.ts.
 //
-// Usage: npx tsx tools/spawn/RandomizeSpawn.ts [--seed <number>] [--mode city|chunk] [--dry-run]
+// Usage: npx tsx tools/spawn/RandomizeSpawn.ts [--seed <number>] [--mode city|chunk] [--dry-run] [--quiet]
 // Run from Server/engine (same convention as every other AP tool - CONTENT_ROOT
 // resolves '../content' relative to process.cwd()).
 
@@ -96,7 +96,7 @@ const SPELL_ROW_LABEL: Record<string, string> = {
 // deranged the destinations. Home intentionally keeps using the hardcoded vanilla
 // table regardless (see comment above), so this is a visibility check, not a
 // dependency: continuing is always correct.
-function verifyCityCoordsAgainstDbrow(): void {
+function verifyCityCoordsAgainstDbrow(quiet: boolean): void {
     if (!fs.existsSync(MAGIC_SPELLS_DBROW)) {
         printWarning(`RandomizeSpawn: ${MAGIC_SPELLS_DBROW} not found - cannot cross-check the vanilla city table, proceeding with it blind`);
         return;
@@ -124,12 +124,19 @@ function verifyCityCoordsAgainstDbrow(): void {
             printWarning(`RandomizeSpawn: could not find tele_coord for ${label} in magic_spells.dbrow (row renamed?) - using hardcoded coord ${coord}`);
         } else if (live !== coord) {
             mismatches++;
-            printWarning(`RandomizeSpawn: *** MISMATCH *** ${label} tele_coord is ${live} live but the vanilla table says ${coord}.`);
+            // The live coord IS the teleport derangement - printing it here would spoil
+            // RandomizeTeleports' table from an unrelated stage, so --quiet keeps the
+            // count and drops the coords (tools/map/teleport-seed.json has them).
+            if (!quiet) {
+                printWarning(`RandomizeSpawn: *** MISMATCH *** ${label} tele_coord is ${live} live but the vanilla table says ${coord}.`);
+            }
         }
     }
 
     if (mismatches > 0) {
-        printWarning(`RandomizeSpawn: *** ${mismatches}/7 landmark coord(s) diverge from the live dbrow - RandomizeTeleports.ts has probably run. City-mode home STILL uses the vanilla table above on purpose (see docs/goals-and-checks.md Feature 3). ***`);
+        printWarning(
+            `RandomizeSpawn: *** ${mismatches}/7 landmark coord(s) diverge from the live dbrow - RandomizeTeleports.ts has probably run. City-mode home STILL uses the vanilla table on purpose (see docs/goals-and-checks.md Feature 3). ***`
+        );
     } else {
         printInfo('RandomizeSpawn: all 7 city landmark coords verified against magic_spells.dbrow (vanilla, unshuffled).');
     }
@@ -317,6 +324,10 @@ function parseArgs() {
         seed,
         mode: modeArg as 'city' | 'chunk',
         dryRun: args.includes('--dry-run'),
+        // --quiet hides the picked home from the console (it still goes to
+        // ap-spawn.json and the tracker). Home is the loudest single spoiler a seed
+        // roll can print, so scripts/new-run passes this unless asked for --verbose.
+        quiet: args.includes('--quiet'),
         includeIslands: args.includes('--include-islands'),
         includeFarWest: args.includes('--include-far-west'),
         // GitHub #3: dump both candidate lists and exit, so the Archipelago apworld can
@@ -327,7 +338,7 @@ function parseArgs() {
 }
 
 function main() {
-    const { seed, mode, dryRun, includeIslands, includeFarWest, exportPool } = parseArgs();
+    const { seed, mode, dryRun, quiet, includeIslands, includeFarWest, exportPool } = parseArgs();
     const rand = mulberry32(seed);
 
     if (exportPool) {
@@ -355,11 +366,13 @@ function main() {
     const extra: Record<string, unknown> = {};
 
     if (mode === 'city') {
-        verifyCityCoordsAgainstDbrow();
+        verifyCityCoordsAgainstDbrow(quiet);
         const pick = CITY_SPAWN_POOL[Math.floor(rand() * CITY_SPAWN_POOL.length)];
         home = pick.coord;
         label = pick.label;
-        printInfo(`seed ${seed}: city mode picked ${label} (${home})`);
+        if (!quiet) {
+            printInfo(`seed ${seed}: city mode picked ${label} (${home})`);
+        }
     } else {
         if (!fs.existsSync(MAPS_DIR)) {
             printWarning(`RandomizeSpawn: maps directory not found: ${MAPS_DIR}`);
@@ -383,7 +396,9 @@ function main() {
             // (death.rs2, ::apspawn) is the final walkability safety net.
             home = `0_${pick.mapX}_${pick.mapZ}_32_32`;
             label = `mapsquare ${pick.mapX},${pick.mapZ}`;
-            printInfo(`seed ${seed}: chunk mode picked ${label} (${home}) - ${pick.locCount} LOC placement(s), ${pick.npcCount} NPC(s)`);
+            if (!quiet) {
+                printInfo(`seed ${seed}: chunk mode picked ${label} (${home}) - ${pick.locCount} LOC placement(s), ${pick.npcCount} NPC(s)`);
+            }
         }
     }
 
@@ -391,9 +406,13 @@ function main() {
 
     // spoiler line, printed prominently regardless of --dry-run - home matters more
     // than any other single seed choice (it's where death sends you, repeatedly).
-    printInfo('================================================================');
-    printInfo(`AP HOME: ${label}  (${home})  [mode=${mode} seed=${seed}]`);
-    printInfo('================================================================');
+    if (quiet) {
+        printInfo(`AP HOME: rolled [mode=${mode} seed=${seed}] - destination hidden (--quiet); it is in ${OUTPUT_PATH}`);
+    } else {
+        printInfo('================================================================');
+        printInfo(`AP HOME: ${label}  (${home})  [mode=${mode} seed=${seed}]`);
+        printInfo('================================================================');
+    }
 
     if (!dryRun) {
         fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
