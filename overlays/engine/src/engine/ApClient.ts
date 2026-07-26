@@ -37,6 +37,7 @@ const DATA_PATH = 'data/config/ap-archipelago-data.json';
 const SESSION_PATH = 'data/config/ap-session.json';
 const FIRED_PATH = 'data/config/ap-checks-fired.json'; // ApChecks' ledger, read (never written) for resync
 const PLACEMENTS_PATH = 'data/config/ap-placements.json';
+const UNLOCKS_PATH = 'data/config/ap-unlocks.json'; // zeroed (never deleted) by the clearLocalRun wipe
 
 const RECONNECT_BASE_MS = 5000;
 const RECONNECT_MAX_MS = 60000;
@@ -53,6 +54,13 @@ interface ApConfig {
     port: number;
     slot: string;
     password: string | null;
+    /**
+     * One-shot: "the local (solo) run on disk is finished - wipe it on the next
+     * connect instead of refusing". Set from the tracker's Archipelago tab, consumed
+     * and written back to false the moment it fires, so a mid-run reconnect (or the
+     * automatic reconnect loop) can never wipe an AP run's progress.
+     */
+    clearLocalRun: boolean;
 }
 
 interface ExportedItem {
@@ -127,7 +135,8 @@ function loadConfig(): ApConfig | null {
             host: typeof parsed.host === 'string' && parsed.host.length > 0 ? parsed.host : 'localhost',
             port: typeof parsed.port === 'number' && Number.isInteger(parsed.port) ? parsed.port : 38281,
             slot: typeof parsed.slot === 'string' && parsed.slot.length > 0 ? parsed.slot : 'Player',
-            password: typeof parsed.password === 'string' ? parsed.password : null
+            password: typeof parsed.password === 'string' ? parsed.password : null,
+            clearLocalRun: parsed.clearLocalRun === true
         };
     } catch (err) {
         printWarning(`AP client: failed to parse ${CONFIG_PATH}, staying offline (${err instanceof Error ? err.message : err})`);
@@ -288,13 +297,110 @@ function checkGoal(): void {
     }
 }
 
+// ---------------------------------------------------------------------------
+// one-shot local-run wipe (tracker checkbox -> ap-archipelago.json clearLocalRun)
+// ---------------------------------------------------------------------------
+
+/**
+ * Clears everything a SOLO run left on disk so this connect can own the slot:
+ * the local fill, the progress it produced, and our own session bookkeeping.
+ * Mirrors tools/ap/GenerateSeed.ts's clearRunState (a placement seed IS a new
+ * run) with one difference - ap-unlocks.json is ZEROED rather than deleted,
+ * because grantUnlock refuses to work without a table on disk and would drop
+ * every item the room sends us.
+ *
+ * Runs from applySlotData, i.e. after Connected and before sendFullResync, so
+ * the wiped session is what the resync and the room's item replay see.
+ */
+function clearLocalRunState(): string[] {
+    const cleared: string[] = [];
+
+    if (fs.existsSync(PLACEMENTS_PATH)) {
+        fs.rmSync(PLACEMENTS_PATH);
+        cleared.push('ap-placements.json (local fill)');
+    }
+    if (fs.existsSync(SESSION_PATH)) {
+        fs.rmSync(SESSION_PATH);
+        cleared.push('ap-session.json');
+    }
+
+    // zero, don't delete - see the doc comment above
+    if (fs.existsSync(UNLOCKS_PATH)) {
+        try {
+            const parsed = JSON.parse(fs.readFileSync(UNLOCKS_PATH, 'utf8')) as { unlocks?: Record<string, unknown> };
+            const zeroed: Record<string, number> = {};
+            for (const key of Object.keys(parsed.unlocks ?? {})) {
+                zeroed[key] = 0;
+            }
+            if (Object.keys(zeroed).length > 0) {
+                fs.writeFileSync(UNLOCKS_PATH, JSON.stringify({ unlocks: zeroed }, null, 4) + '\n', 'utf8');
+                cleared.push(`ap-unlocks.json (${Object.keys(zeroed).length} unlock(s) zeroed)`);
+            }
+        } catch (err) {
+            printWarning(`AP client: could not zero ap-unlocks.json (${err instanceof Error ? err.message : err}) - clear it by hand`);
+        }
+    }
+
+    // Fired ledger and tracker discoveries live in module-level caches that are
+    // authoritative over their files, so they need their own resets (dynamic import:
+    // both modules import ApClient, a static back-edge would be a cycle). Fire and
+    // forget - the files are already gone from the player's point of view either way.
+    void import('#/engine/ApChecks.js')
+        .then(m => m.resetFiredLedger())
+        .catch(err => printWarning(`AP client: failed to reset the fired ledger (${err instanceof Error ? err.message : err})`));
+    void import('#/engine/ApTracker.js')
+        .then(m => m.resetTrackerState())
+        .catch(err => printWarning(`AP client: failed to reset tracker discoveries (${err instanceof Error ? err.message : err})`));
+    cleared.push('ap-checks-fired.json', 'ap-tracker.json');
+
+    // in-memory state has to go with the files, or the next persist writes it back
+    session = { receivedCount: 0, sentChecks: [], goalSent: false, pending: [] };
+    sentChecks = new Set<string>();
+
+    return cleared;
+}
+
+/** Consumes the one-shot flag so the next (re)connect cannot wipe an AP run. */
+function disarmClearLocalRun(): void {
+    if (config !== null) {
+        config.clearLocalRun = false;
+    }
+    try {
+        if (!fs.existsSync(CONFIG_PATH)) {
+            return;
+        }
+        const parsed = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')) as Record<string, unknown>;
+        if (parsed.clearLocalRun !== true) {
+            return;
+        }
+        parsed.clearLocalRun = false;
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(parsed, null, 2) + '\n', 'utf8');
+    } catch (err) {
+        printWarning(`AP client: failed to disarm clearLocalRun in ${CONFIG_PATH} (${err instanceof Error ? err.message : err})`);
+    }
+}
+
 // Writes slot_data's questGates into ap-placements.json (placements empty) so
 // ApQuestGates + the quest-tab hiding work unchanged in AP mode. Never
 // overwrites a file that already has real placements (solo placement mode) -
-// that's a misconfiguration worth screaming about instead.
+// that's a misconfiguration worth screaming about instead, unless the tracker's
+// "clear local run state on connect" box armed the one-shot wipe below.
 function applySlotData(slotData: Record<string, unknown> | undefined): void {
     if (!slotData) {
         return;
+    }
+
+    // One-shot wipe, armed from the tracker's Archipelago tab. Runs before anything
+    // below reads or writes run state, and disarms itself immediately so the
+    // reconnect loop can never repeat it.
+    if (config?.clearLocalRun === true) {
+        try {
+            const cleared = clearLocalRunState();
+            printInfo(`AP client: cleared local run state on connect (${cleared.join(', ')})`);
+        } catch (err) {
+            printWarning(`AP client: clearLocalRun failed (${err instanceof Error ? err.message : err}) - clear data/config/ap-placements.json by hand`);
+        }
+        disarmClearLocalRun();
     }
 
     // "goals" (array, all must be completed) is preferred; single "goal" is the
@@ -423,7 +529,9 @@ function applySlotData(slotData: Record<string, unknown> | undefined): void {
             existing = JSON.parse(fs.readFileSync(PLACEMENTS_PATH, 'utf8')) as typeof existing;
         }
         if (existing.placements && Object.keys(existing.placements).length > 0) {
-            printWarning('AP client: ap-placements.json holds a SOLO placement seed while AP mode is on - refusing to touch it. Clear local run state before connecting to Archipelago.');
+            printWarning(
+                'AP client: ap-placements.json holds a SOLO placement seed while AP mode is on - refusing to touch it. Tick "Clear local run state on connect" in the tracker\'s Archipelago tab and reconnect (or delete data/config/ap-placements.json by hand).'
+            );
             return;
         }
         const current = JSON.stringify(existing.questGates ?? []);

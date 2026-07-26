@@ -263,6 +263,15 @@ first thing to attach to a bug report.
    `ap-placements.json` with just the seed's quest gates (the multiworld owns
    item placements), and writes your YAML's randomization options to
    `data/config/ap-seed-options.json` for the seed roll to pick up.
+
+   Coming from a solo run? Connecting will warn that
+   `ap-placements.json holds a SOLO placement seed ... refusing to touch it`
+   and stop there - it will not silently destroy a local run. Tick **Clear
+   local run state on connect** on the same tab and hit **Save & Connect**
+   again: the server deletes that local fill, zeroes `ap-unlocks.json`, and
+   forgets fired checks, tracker discoveries and its own session, then unticks
+   the box so a reconnect can never wipe an Archipelago run. (By hand:
+   delete `Server/engine/data/config/ap-placements.json`.)
 3. **Roll the world**: `bash scripts/new-run.sh` (Windows:
    `scripts\new-run.bat`) - both auto-adopt `ap-seed-options.json`, overriding
    their own knobs, so the world matches what the YAML asked for. The roll
@@ -342,6 +351,14 @@ placement, which in AP mode the room owns - so it detects the item-less
 instead of pretending everything is unreachable. The AP-mode sanity check is
 `npx tsx tools/logic/ValidateSeed.ts` (the spatial layer); item-layer soundness
 is Archipelago's own generation.
+
+`ValidateSeed` handles the same AP shape the same way. With no local placements
+it models **end-of-run** skill caps - every progression item the room holds does
+eventually arrive - and says so on its `Skill caps:` line. Reading the zeroed
+starting `ap-unlocks.json` literally instead would report a wall of "capped at
+20 by unlocks" and `BLOCKED` on a seed the generator just validated. Pass
+`--current-unlocks` for the raw on-disk snapshot ("what can I reach RIGHT NOW"),
+which is the mode for poking at a live run, not for judging a fresh roll.
 
 Full details: [docs/archipelago-integration.md](docs/archipelago-integration.md)
 and [apworld/README.md](apworld/README.md).

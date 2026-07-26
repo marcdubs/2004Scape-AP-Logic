@@ -129,6 +129,25 @@ export function getTrackerState(): Record<string, Record<string, string>> {
     }
 }
 
+// Forgets every discovery, in memory AND on disk - a new run's world is a different
+// world, so last run's map knowledge is wrong, not merely stale. Called by ApClient's
+// one-shot clearLocalRun wipe; the in-memory state has to go too, or the pending
+// flush would write the old discoveries straight back over the deleted file.
+export function resetTrackerState(): void {
+    state = new Map<string, Map<string, string>>();
+    if (flushTimer !== null) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
+    }
+    try {
+        if (fs.existsSync(TRACKER_PATH)) {
+            fs.rmSync(TRACKER_PATH);
+        }
+    } catch (err) {
+        printWarning(`AP tracker: failed to remove ${TRACKER_PATH} (${err instanceof Error ? err.message : err})`);
+    }
+}
+
 // Number of discoveries recorded so far in one category (0 if none/unknown category).
 export function getDiscoveryCount(category: string): number {
     try {

@@ -1620,6 +1620,9 @@
         document.getElementById('ap-port').value = config.port || 38281;
         document.getElementById('ap-slot').value = config.slot || '';
         document.getElementById('ap-password').value = config.password || '';
+        // one-shot: the server unticks this itself once it has fired, so always mirror
+        // what is actually on disk rather than leaving a stale tick in the form.
+        document.getElementById('ap-clear-local-run').checked = !!config.clearLocalRun;
         apFormFilled = true;
     }
 
@@ -1681,7 +1684,8 @@
             host: document.getElementById('ap-host').value.trim(),
             port: parseInt(document.getElementById('ap-port').value, 10) || 38281,
             slot: document.getElementById('ap-slot').value.trim(),
-            password: document.getElementById('ap-password').value
+            password: document.getElementById('ap-password').value,
+            clearLocalRun: document.getElementById('ap-clear-local-run').checked
         };
     }
 
@@ -1728,7 +1732,11 @@
                 .then(function (res) { return res.json(); })
                 .then(function (result) {
                     if (result.ok) {
-                        apMsg('ap-form-msg', values.enabled ? 'Saved - connecting…' : 'Saved (disabled).', 'ok');
+                        var savedMsg = values.enabled ? 'Saved - connecting…' : 'Saved (disabled).';
+                        if (values.clearLocalRun && values.enabled) {
+                            savedMsg += ' Local run state will be cleared on connect.';
+                        }
+                        apMsg('ap-form-msg', savedMsg, 'ok');
                         fillApForm(result.config || values);
                         renderApStatus(result.status);
                     } else {

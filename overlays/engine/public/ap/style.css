@@ -796,6 +796,27 @@ main#app {
     accent-color: var(--accent);
 }
 
+/* full-width checkbox row + its explanatory note, aligned with the inputs above
+   (.ap-field's 7.5rem right-aligned label column is for short field names only) */
+.ap-field-wide {
+    margin-left: 8.25rem;
+    gap: 0.5rem;
+}
+
+.ap-field-wide span {
+    width: auto;
+    text-align: left;
+    color: var(--text);
+}
+
+.ap-hint {
+    margin: 0.1rem 0 0 8.25rem;
+    max-width: 38rem;
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+
 .ap-buttons {
     display: flex;
     gap: 0.5rem;

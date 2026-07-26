@@ -384,6 +384,25 @@ export function resetWatchCache(): void {
     watchesByVarp = null;
 }
 
+// Forgets every fired check, in memory AND on disk. Same dynamic-import caller as
+// resetWatchCache (ApClient, on the one-shot clearLocalRun wipe): deleting
+// ap-checks-fired.json alone would not do it, because the in-memory `fired` set is
+// authoritative and the next debounced persist would write it straight back.
+export function resetFiredLedger(): void {
+    fired = new Set<string>();
+    if (persistTimer !== null) {
+        clearTimeout(persistTimer);
+        persistTimer = null;
+    }
+    try {
+        if (fs.existsSync(FIRED_PATH)) {
+            fs.rmSync(FIRED_PATH);
+        }
+    } catch (err) {
+        printWarning(`AP checks: failed to remove ${FIRED_PATH} (${err instanceof Error ? err.message : err})`);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Public hooks (frozen signatures - called from Player.ts)
 // ---------------------------------------------------------------------------

@@ -199,6 +199,8 @@
                 <label class="ap-field"><span>Port</span><input type="number" id="ap-port" min="1" max="65535" placeholder="38281"></label>
                 <label class="ap-field"><span>Slot name</span><input type="text" id="ap-slot" placeholder="your player name in the multiworld"></label>
                 <label class="ap-field"><span>Password</span><input type="text" id="ap-password" placeholder="(leave empty if none)"></label>
+                <label class="ap-field ap-field-wide"><input type="checkbox" id="ap-clear-local-run"><span>Clear local run state on connect</span></label>
+                <p class="ap-hint">Tick this if connecting warns that <code>ap-placements.json</code> holds a SOLO placement seed. On the next connect the server deletes that local fill, zeroes <code>ap-unlocks.json</code>, and forgets fired checks, tracker discoveries and its own session &mdash; the multiworld owns placement, so it re-sends everything. <strong>It ends any solo run in progress</strong>, then unticks itself so a reconnect can never wipe an Archipelago run.</p>
                 <div class="ap-buttons">
                     <button id="ap-test" class="ap-btn" type="button">Test connection</button>
                     <button id="ap-save" class="ap-btn primary" type="button">Save &amp; Connect</button>

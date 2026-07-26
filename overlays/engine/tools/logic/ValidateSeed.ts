@@ -19,7 +19,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { allSkillCaps, loadSeedConfig } from '../sim/ConfigLoader.js';
-import { applyPlacementItem, applyQuestGates, buildLocationCatalog, capsFromCounts, loadApOptions, loadPlacements, reachableFromState } from '../sim/PlacementEngine.js';
+import { applyPlacementItem, applyQuestGates, buildLocationCatalog, capsFromCounts, endOfRunCounts, loadApOptions, loadPlacements, reachableFromState } from '../sim/PlacementEngine.js';
 import { Goal, QuestReq, StatName } from '../sim/types.js';
 
 import { WorldTile, parseRawCoord } from './Coords.js';
@@ -50,6 +50,9 @@ function argVal(flag: string): string | undefined {
 const CONFIG_DIR = argVal('--config-dir') ?? 'data/config';
 const JSON_OUT = argVal('--json');
 const VERBOSE = argv.includes('--verbose') || argv.includes('-v');
+// Opt out of the end-of-run cap model below - "what can I reach RIGHT NOW with the
+// unlocks actually delivered so far", the mode for poking at a live AP run.
+const CURRENT_UNLOCKS = argv.includes('--current-unlocks');
 // RandomizeEntrances's reroll loop validates BEFORE placements are (re)generated for
 // the new layout - stranded progression against the stale table is expected there and
 // must not fail the roll. GenerateSeed's staged validation stays strict (no flag).
@@ -198,7 +201,20 @@ function main(): void {
     const placementVisited = new Set<string>();
     const placementFindsLog: { sphere: number; location: string; item: string; display: string }[] = [];
 
-    let statCaps: Record<StatName, number> = allSkillCaps(seedConfig.unlocks) as Record<StatName, number>;
+    // No placements + an ap-unlocks.json on disk is the ARCHIPELAGO shape: the room owns
+    // item placement, and scripts/new-run deletes the local fill right after GenerateSeed
+    // writes the zeroed STARTING unlock table. Read literally, that table says every skill
+    // is capped at 20 forever, so this tool would call a seed the generator just validated
+    // 5/5 "BLOCKED - goal(s) unreachable" with a wall of "capped at 20 by unlocks" - a pure
+    // artifact, on every AP roll. Same false-blocker class SimulateProgression hit
+    // (docs/lessons-learned.md, 2026-07-24) and the same fix: model the caps the run ENDS
+    // with, since every progression item the room holds does eventually arrive. This tool's
+    // job in AP mode is the SPATIAL question - can you physically get everywhere - and that
+    // is exactly the question end-of-run caps ask. --current-unlocks keeps the raw snapshot.
+    const apModeCaps = !placementsFile.present && seedConfig.unlocks.present && !CURRENT_UNLOCKS;
+    const effectiveUnlocks = apModeCaps ? { present: true as const, unlocks: endOfRunCounts('per-skill'), capsLabel: 'end-of-run' } : seedConfig.unlocks;
+
+    let statCaps: Record<StatName, number> = allSkillCaps(effectiveUnlocks) as Record<StatName, number>;
     let statCapsLower = new Map<string, number>(Object.entries(statCaps).map(([k, v]) => [k.toLowerCase(), v]));
 
     const { edges: entranceEdges, present: entrancesPresent } = loadEntranceEdges(CONFIG_DIR, graph);
@@ -551,7 +567,17 @@ function main(): void {
     );
     console.log(`Entrances table: ${entrancesPresent ? `${entranceEdges.length} edge(s)` : 'ABSENT (vanilla entrances)'}`);
     console.log(`Gated areas table: ${gated.present ? `${gated.areas.length} area(s)` : 'ABSENT (no area gates)'}`);
-    console.log(`Skill caps: ${placementsFile.present ? `from ap-placements.json (growing - ${placementFindsLog.length} progression item(s) collected this run)` : seedConfig.unlocks.present ? 'from ap-unlocks.json' : 'uncapped (vanilla - no ap-unlocks.json)'}`);
+    console.log(
+        `Skill caps: ${
+            placementsFile.present
+                ? `from ap-placements.json (growing - ${placementFindsLog.length} progression item(s) collected this run)`
+                : apModeCaps
+                  ? 'end-of-run model (no local placements = Archipelago owns them; ap-unlocks.json is a STARTING state, --current-unlocks for the raw snapshot)'
+                  : seedConfig.unlocks.present
+                    ? 'from ap-unlocks.json (raw on-disk snapshot)'
+                    : 'uncapped (vanilla - no ap-unlocks.json)'
+        }`
+    );
     console.log(`Placements table: ${placementsFile.present ? `${placementsFile.placements.size} location(s), pool ${placementsFile.pool}` : 'ABSENT (vanilla check rewards, no unlock gating from checks)'}`);
     console.log(`Region graph: ${graph.meta.regionCount} regions total, mainland id=${graph.meta.mainlandRegionId}`);
     const groupCount = [...generatedGroups.values()].reduce((a, g) => a + g.length, 0);

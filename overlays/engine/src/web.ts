@@ -378,7 +378,9 @@ function readApConnectionConfig(): Record<string, unknown> {
         host: typeof parsed?.host === 'string' ? parsed.host : 'localhost',
         port: typeof parsed?.port === 'number' ? parsed.port : 38281,
         slot: typeof parsed?.slot === 'string' ? parsed.slot : '',
-        password: typeof parsed?.password === 'string' ? parsed.password : ''
+        password: typeof parsed?.password === 'string' ? parsed.password : '',
+        // one-shot: ApClient consumes this on the next connect and writes it back false
+        clearLocalRun: parsed?.clearLocalRun === true
     };
 }
 
@@ -392,6 +394,7 @@ function writeApConnectionConfig(body: unknown): { ok: boolean; error?: string }
     const port = typeof raw.port === 'number' && Number.isInteger(raw.port) && raw.port > 0 && raw.port <= 65535 ? raw.port : NaN;
     const slot = typeof raw.slot === 'string' ? raw.slot.trim() : '';
     const password = typeof raw.password === 'string' && raw.password.length > 0 ? raw.password : null;
+    const clearLocalRun = raw.clearLocalRun === true;
 
     if (enabled && (host.length === 0 || Number.isNaN(port) || slot.length === 0)) {
         return { ok: false, error: 'host, port and slot are required to enable' };
@@ -399,7 +402,11 @@ function writeApConnectionConfig(body: unknown): { ok: boolean; error?: string }
 
     try {
         fs.mkdirSync(path.dirname(AP_CONNECTION_PATH), { recursive: true });
-        fs.writeFileSync(AP_CONNECTION_PATH, JSON.stringify({ enabled, host: host || 'localhost', port: Number.isNaN(port) ? 38281 : port, slot: slot || 'Player', password }, null, 2) + '\n', 'utf8');
+        fs.writeFileSync(
+            AP_CONNECTION_PATH,
+            JSON.stringify({ enabled, host: host || 'localhost', port: Number.isNaN(port) ? 38281 : port, slot: slot || 'Player', password, clearLocalRun }, null, 2) + '\n',
+            'utf8'
+        );
         return { ok: true };
     } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err) };

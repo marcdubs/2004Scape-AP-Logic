@@ -4254,3 +4254,66 @@ capture only stdout (`eval "$(node ...)"` in sh, `for /f ... in (`node ...`)` in
 bat), so anything on stderr reaches the console without ever entering the eval.
 That is the way to make a helper that emits shell assignments also talk to the
 human running it.
+
+## ValidateSeed inherited the false-blocker bug the sim already fixed (2026-07-26)
+
+A real AP roll ended with `RESULT: BLOCKED - goal(s) unreachable`, 29/63 quests
+"completed", `Goals: 1/5`, and a wall of `attack: capped at 20 by unlocks` -
+minutes after GenerateSeed's own staged run of the same validator reported
+`ValidateSeed PASSED` and `Goals reached in logic: 5/5` on that exact seed.
+
+**Cause**: the ordering inside `scripts/new-run`. GenerateSeed validates with
+placements present (its scratch dir), then the AP branch deletes the local
+`ap-placements.json` because the multiworld owns placement - and the tail
+`ValidateSeed` then runs against *no placements + the zeroed starting
+`ap-unlocks.json`*. Read literally that table says every skill is capped at 20
+forever, with nothing on disk that could ever raise it.
+
+This is exactly the false-blocker class documented for SimulateProgression
+(2026-07-24, "`ap-unlocks.json` is a STARTING state"). The fix there -
+`resolveVanillaUnlocks` substituting `endOfRunCounts(pool)` - was never applied
+to ValidateSeed, because at the time the no-placements path was only reached by
+solo/vanilla runs. AP mode made it the *normal* path and nobody re-checked.
+
+**Fix**: when placements are absent but an unlocks table exists, ValidateSeed
+now models end-of-run caps (`endOfRunCounts('per-skill')`) and labels the
+`Skill caps:` line accordingly; `--current-unlocks` keeps the raw snapshot.
+That is the right model for what this tool answers in AP mode - the SPATIAL
+question, "can you physically get everywhere once the room has delivered
+everything". Verified by reproducing the exact shape (live config dir with
+`ap-placements.json` removed): 29/63 -> 63/63 quests, `Goals: 1/5` -> `5/5`,
+and `--current-unlocks` still reproduces the old numbers on demand.
+
+**The generalization**: when a fix is described as "the vanilla/no-X path", check
+whether some *other* mode also reaches that path. A defaulting rule that was
+safe when only one caller hit it becomes a bug the moment a second one does -
+and the second caller here was the flagship mode.
+
+## "Clear local run state on connect" (2026-07-26)
+
+Connecting to a room with a solo fill on disk hits ApClient's guard - it refuses
+to overwrite `ap-placements.json` and stops - which is correct (that file is
+somebody's run) but left the user with a console warning and no route forward
+except deleting files by hand. Now a checkbox on the tracker's Archipelago tab
+sets `clearLocalRun` in `ap-archipelago.json`, and ApClient consumes it at the
+top of `applySlotData`.
+
+Design points worth keeping:
+
+- **One-shot, self-disarming.** The flag is cleared in memory *and* written back
+  to the file the moment it fires, so neither the reconnect-with-backoff loop
+  nor a later `reconfigure()` can repeat the wipe on a live AP run. A "clear on
+  every connect" flag would eventually eat somebody's progress.
+- **Zero `ap-unlocks.json`, never delete it.** `grantUnlock` refuses to work
+  with no table on disk (placement mode's contract is that the generator always
+  writes a starting table), so deleting the file would silently drop every item
+  the room sends. Zeroing preserves the key set the current pool uses.
+- **Files are not the state.** `ApChecks.fired` and `ApTracker.state` are
+  module-level caches that are authoritative over their files - deleting
+  `ap-checks-fired.json`/`ap-tracker.json` alone would have been undone by the
+  next debounced flush. Both modules got explicit `resetFiredLedger()` /
+  `resetTrackerState()` exports (dynamic-imported by ApClient, since both import
+  ApClient and a static back-edge would be a cycle), and `session`/`sentChecks`
+  are reset in place for the same reason. Clearing happens inside
+  `applySlotData`, i.e. after `Connected` and before `sendFullResync`, so the
+  wiped session is what the resync and the room's item replay see.
