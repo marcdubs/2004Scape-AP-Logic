@@ -176,10 +176,15 @@ The finished table rides to the game server in `slot_data.entranceOverrides`;
 `slot_data.seedOptions.entrances` is pinned to `"off"` so the next
 `scripts/new-run` cannot reshuffle the map the fill reasoned over.
 
-Measured (bundle of 2026-07-25, 366 gates + 4 one-ways): the vanilla layout
-leaves 650/736 pool sides reachable and strands 2 quests in the model; every
-frontier layout tried reached 709/736, all 63 quests and all 5 goals, in ~2.5s,
+Measured (bundle of 2026-07-26, 402 gates + 4 one-ways): the vanilla layout
+leaves 730/808 pool sides reachable and strands 2 quests in the model; every
+frontier layout tried reached 777/808, all 63 quests and all 5 goals, in ~3s,
 with zero rerolls.
+
+The pool grew from 366 gates to 402 on 2026-07-26 - not new content, but the
+angle-keyed handlers GitHub #4 added finally reaching the exported bundle. Any
+figure here quoted against 736 sides predates that; see
+`docs/lessons-learned.md`, "The bundle export reuses stale pool dumps".
 
 ### `randomizers.py`: the rest of the seed, rolled during generation
 

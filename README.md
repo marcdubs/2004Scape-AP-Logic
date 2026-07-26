@@ -24,11 +24,14 @@ boot the game server, open the tracker, connect, play. Steps 1-2 are one-time.
 ### 1. One-time: game-server setup
 
 Prereqs: the `Server/` [LostCityRS](https://github.com/LostCityRS) checkout as a **sibling** of this repo (set up
-the normal [LostCityRS](https://github.com/LostCityRS) way), Node 20+, and Python 3.10+ for the Archipelago
-server. Use **revision 274** for the checkout - it's the only revision this
-project has been tested against; other revisions may work, but you use them at
-your own risk. Any OS works; the game server and the Archipelago server can be the
-same machine or different ones.
+the normal [LostCityRS](https://github.com/LostCityRS) way), **Node 24+** (the engine declares
+`"engines": { "node": ">=24" }`; this project's `.nvmrc` pins 24.18.0), and
+**Python 3.11+** for the Archipelago server - 3.12 is what this is developed
+against, and the Archipelago version pinned here refuses anything outside
+`3.11 <= x < 3.14` outright. Use **revision 274** for the checkout - it's the
+only revision this project has been tested against; other revisions may work,
+but you use them at your own risk. Any OS works; the game server and the
+Archipelago server can be the same machine or different ones.
 
 ```
 node scripts/install.js                             # deploy this repo's overlays -> ../Server
@@ -67,7 +70,26 @@ pace; see the "Game-server tweaks" section of
 ### 2. One-time: Archipelago server setup
 
 The archipelago.gg website can't generate for custom worlds, so self-host.
-Clone anywhere you like, then follow the guide for your OS.
+
+**The short way - a prebuilt image.**
+[marchipelago](https://github.com/marcdubs/marchipelago) is an Archipelago
+WebHost image with this world already baked in and Archipelago pinned to the
+exact commit its test suite is validated against, so there is no venv, no
+`requirements.txt`, and no apworld to copy:
+
+```
+docker run -d --name marchipelago -p 8080:8080 -p 38281-38380:38281-38380 \
+    -e GAME_PORTS=38281-38380 -v marchipelago-data:/home/container \
+    ghcr.io/marcdubs/marchipelago:latest
+```
+
+Open `http://localhost:8080`, upload the YAML below on the player-options page,
+and generate from the host page - then skip to step 3. (The image is rebuilt
+from this repo's `main`, and also ships a Pterodactyl/Pelican egg.) Note it
+serves the WebHost on 8080, the same default the game server's tracker uses -
+put them on different machines, or move one of the two ports.
+
+**The manual way.** Clone anywhere you like, then follow the guide for your OS.
 
 **macOS / Linux (or WSL):**
 
@@ -181,7 +203,7 @@ of which Archipelago could report on its own:
 ```
 World seed:                      2769643227
 Home / spawn:                    Varrock (0_50_53_13_32)
-Entrance layout:                 736 redirect(s), 709/736 pool sides reachable
+Entrance layout:                 808 redirect(s), 777/808 pool sides reachable
 Gathering swaps:                 38 (shuffle, 1 pinned vanilla)
 Processing swaps:                252 (shuffle, 0 pinned vanilla)
 Shops relocated:                 113
