@@ -236,15 +236,21 @@
 
     // ---- render: shared table helper ----
 
-    function renderTable(tableId, emptyId, discovered, spoilerFull, rowBuilder) {
+    // Three passes, in this order: what you've found, then (spoiler mode only) the
+    // answers you haven't found, then - if the tab's "show not-yet-discovered" box is
+    // ticked - a placeholder row per remaining source. That last pass is the list
+    // equivalent of the map's hollow pins: it names the thing still out there without
+    // saying what it turned into.
+    function renderTable(tableId, emptyId, discovered, spoilerFull, rowBuilder, undiscoveredKeys, undiscoveredBuilder) {
         var table = document.getElementById(tableId);
         var tbody = table.querySelector('tbody');
         var emptyEl = document.getElementById(emptyId);
         tbody.innerHTML = '';
 
         var discoveredKeys = Object.keys(discovered || {});
+        var pending = undiscoveredKeys || [];
 
-        if (discoveredKeys.length === 0 && (!spoilerFull || Object.keys(spoilerFull).length === 0)) {
+        if (discoveredKeys.length === 0 && pending.length === 0 && (!spoilerFull || Object.keys(spoilerFull).length === 0)) {
             table.style.display = 'none';
             emptyEl.hidden = false;
             return;
@@ -260,6 +266,7 @@
             }
         });
 
+        var shownBySpoiler = {};
         if (spoilerFull) {
             Object.keys(spoilerFull).forEach(function (key) {
                 if (Object.prototype.hasOwnProperty.call(discovered || {}, key)) {
@@ -268,10 +275,39 @@
                 var tr = rowBuilder(key, spoilerFull[key], true);
                 if (tr) {
                     tr.classList.add('spoiler-row');
+                    shownBySpoiler[key] = true;
                     tbody.appendChild(tr);
                 }
             });
         }
+
+        if (undiscoveredBuilder) {
+            pending.forEach(function (key) {
+                // never duplicate a row the spoiler pass already answered
+                if (shownBySpoiler[key] || Object.prototype.hasOwnProperty.call(discovered || {}, key)) {
+                    return;
+                }
+                var tr = undiscoveredBuilder(key);
+                if (tr) {
+                    tr.classList.add('undiscovered-row');
+                    tbody.appendChild(tr);
+                }
+            });
+        }
+    }
+
+    // Sources for a category that haven't been discovered yet, name-sorted so the
+    // "still to find" block reads as a checklist. Returns [] when the tab's toggle is
+    // off or the server predates the sources block.
+    function pendingSources(category, discovered, toggleId, labelFor) {
+        var box = document.getElementById(toggleId);
+        if (box && !box.checked) {
+            return [];
+        }
+        var all = (state.data && state.data.sources && state.data.sources[category]) || [];
+        return all
+            .filter(function (key) { return !Object.prototype.hasOwnProperty.call(discovered || {}, key); })
+            .sort(function (a, b) { return labelFor(a).localeCompare(labelFor(b)); });
     }
 
     function makeRow(a, arrow, b) {
@@ -291,7 +327,7 @@
 
     // ---- render: gathering / recipes (obj id -> obj id, via names.items) ----
 
-    function renderItemSwapTab(category, tableId, emptyId, counterId) {
+    function renderItemSwapTab(category, tableId, emptyId, counterId, toggleId) {
         var data = state.data;
         if (!data) {
             return;
@@ -300,13 +336,14 @@
         var spoilerFull = data.spoiler ? data.spoiler[category] : null;
         var names = (data.names && data.names.items) || {};
         var total = (data.totals && data.totals[category]) || 0;
+        var itemName = function (key) { return names[key] || ('item_' + key); };
 
         document.getElementById(counterId).textContent = '(' + Object.keys(discovered).length + ' / ' + total + ' discovered)';
 
         renderTable(tableId, emptyId, discovered, spoilerFull, function (key, value) {
-            var fromName = names[key] || ('item_' + key);
-            var toName = names[value] || ('item_' + value);
-            return makeRow(fromName, '→', toName);
+            return makeRow(itemName(key), '→', itemName(value));
+        }, pendingSources(category, discovered, toggleId, itemName), function (key) {
+            return makeRow(itemName(key), '→', 'not yet discovered');
         });
     }
 
@@ -323,12 +360,15 @@
         var units = (data.names && data.names.dropUnits) || {};
         var total = (data.totals && data.totals.drops) || 0;
 
+        var monsterName = function (slot) { return slots[slot] || ('slot_' + slot); };
+
         document.getElementById('bestiary-counter').textContent = '(' + Object.keys(discovered).length + ' / ' + total + ' discovered)';
 
         renderTable('bestiary-table', 'bestiary-empty', discovered, spoilerFull, function (slot, unit) {
-            var monster = slots[slot] || ('slot_' + slot);
             var table = units[unit] || ('unit_' + unit);
-            return makeRow(monster, '→ smells like', table);
+            return makeRow(monsterName(slot), '→ smells like', table);
+        }, pendingSources('drops', discovered, 'bestiary-show-undiscovered', monsterName), function (slot) {
+            return makeRow(monsterName(slot), '→', 'not yet killed');
         });
     }
 
@@ -350,6 +390,8 @@
                 ? (coord.layer === 'underground' ? 'underground, ' : '') + 'tile (' + coord.absX + ', ' + coord.absZ + ') level ' + coord.level
                 : coordStr;
             return makeRow(spell, '→', label);
+        }, pendingSources('teleports', discovered, 'teleports-show-undiscovered', function (spell) { return spell; }), function (spell) {
+            return makeRow(spell, '→', 'not yet cast');
         });
     }
 
@@ -521,6 +563,21 @@
     function initEntranceSearch() {
         var input = document.getElementById('entrances-search');
         input.addEventListener('input', renderEntrancesTab);
+    }
+
+    // "Show not-yet-discovered" on the four swap tabs - each just re-renders its own tab
+    function initUndiscoveredToggles() {
+        [
+            ['gathering-show-undiscovered', function () { renderItemSwapTab('gather', 'gathering-table', 'gathering-empty', 'gathering-counter', 'gathering-show-undiscovered'); }],
+            ['recipes-show-undiscovered', function () { renderItemSwapTab('process', 'recipes-table', 'recipes-empty', 'recipes-counter', 'recipes-show-undiscovered'); }],
+            ['bestiary-show-undiscovered', renderBestiaryTab],
+            ['teleports-show-undiscovered', renderTeleportsTab]
+        ].forEach(function (pair) {
+            var box = document.getElementById(pair[0]);
+            if (box) {
+                box.addEventListener('change', pair[1]);
+            }
+        });
     }
 
     function initShowLockedToggle() {
@@ -1684,8 +1741,8 @@
     // ---- render all ----
 
     function renderAll() {
-        renderItemSwapTab('gather', 'gathering-table', 'gathering-empty', 'gathering-counter');
-        renderItemSwapTab('process', 'recipes-table', 'recipes-empty', 'recipes-counter');
+        renderItemSwapTab('gather', 'gathering-table', 'gathering-empty', 'gathering-counter', 'gathering-show-undiscovered');
+        renderItemSwapTab('process', 'recipes-table', 'recipes-empty', 'recipes-counter', 'recipes-show-undiscovered');
         renderBestiaryTab();
         renderTeleportsTab();
         renderEntrancesTab();
@@ -1702,6 +1759,7 @@
         initMapControls();
         initEntranceSearch();
         initChecksControls();
+        initUndiscoveredToggles();
         initShowLockedToggle();
         initArchipelagoTab();
         fetchMeta();

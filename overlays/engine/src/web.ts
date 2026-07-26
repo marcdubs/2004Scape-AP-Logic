@@ -207,6 +207,21 @@ function collectEntranceCoords(map: Record<string, string> | undefined, coords: 
     }
 }
 
+// The 7 spellbook teleports wired to ap_track in teleport.rs2, keyed exactly as that
+// script passes them ("<City> Teleport" - see the @magic_teleport call sites). Static
+// vanilla knowledge, not seed data: it's the spell list on the standard spellbook.
+const TELEPORT_SPELLS = ['Varrock Teleport', 'Lumbridge Teleport', 'Falador Teleport', 'Camelot Teleport', 'Ardougne Teleport', 'Watchtower Teleport', 'Trollheim Teleport'];
+
+// Every key in a randomizer's override table, i.e. the full set of things that COULD
+// be discovered in that category. Same "hollow pin" contract the map's entranceSources
+// already established: naming the source (this rock/this recipe/this monster is in the
+// shuffle) reveals no more than the tab's own discovered/total counter already did,
+// and never says what it now yields - that still takes actually finding it.
+function tableSourceKeys(filePath: string): string[] {
+    const map = readJsonFile<{ map?: Record<string, unknown> }>(filePath)?.map;
+    return map ? Object.keys(map) : [];
+}
+
 type ApSpoilerTables = { entrances: Record<string, string>; gather: Record<string, string>; process: Record<string, string>; drops: Record<string, string> };
 
 let spoilerTablesCache: ApSpoilerTables | null = null;
@@ -400,6 +415,28 @@ function buildApTrackerResponse(spoilerMode: boolean): unknown {
     collectIds(discoveries.process, itemIds);
     collectDropIds(discoveries.drops, dropSlotIds, dropUnitIds);
 
+    // "what's left to find" lists for the gathering/recipes/bestiary/teleports tabs
+    const sources = {
+        gather: tableSourceKeys('data/config/ap-gather.json'),
+        process: tableSourceKeys('data/config/ap-process.json'),
+        drops: tableSourceKeys('data/config/ap-drops.json'),
+        teleports: TELEPORT_SPELLS
+    };
+    // those sources are rendered by name, so they need naming too (the id -> name maps
+    // below are otherwise scoped to what's been discovered)
+    for (const id of [...sources.gather, ...sources.process]) {
+        const n = Number(id);
+        if (Number.isInteger(n)) {
+            itemIds.add(n);
+        }
+    }
+    for (const id of sources.drops) {
+        const n = Number(id);
+        if (Number.isInteger(n)) {
+            dropSlotIds.add(n);
+        }
+    }
+
     let spoiler: ApSpoilerTables | null = null;
     if (spoilerMode) {
         spoiler = loadSpoilerTables();
@@ -462,6 +499,7 @@ function buildApTrackerResponse(spoilerMode: boolean): unknown {
     return {
         discoveries,
         entranceSources,
+        sources,
         spawn,
         unlocks: buildUnlocksPanel(),
         names: { items, dropSlots, dropUnits, places },
@@ -470,11 +508,10 @@ function buildApTrackerResponse(spoilerMode: boolean): unknown {
             gather: getGatherOverrideCount(),
             process: getProcessOverrideCount(),
             drops: getDropOverrideCount(),
-            // stable code fact, not a spoiler - exactly 7 spellbook teleport spells
-            // are wired to ap_track in teleport.rs2 (Varrock/Lumbridge/Falador/
-            // Camelot/Ardougne/Watchtower/Trollheim); there's no JSON override table
-            // to size this from the way the other three categories have.
-            teleports: 7
+            // stable code fact, not a spoiler - the spellbook teleports wired to
+            // ap_track in teleport.rs2; there's no JSON override table to size this
+            // from the way the other three categories have.
+            teleports: TELEPORT_SPELLS.length
         },
         spoiler
     };

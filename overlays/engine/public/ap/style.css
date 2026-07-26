@@ -665,6 +665,29 @@ main#app {
     opacity: 0.55;
 }
 
+/* "still out there" rows: the list equivalent of the map's hollow pins. Dimmed and
+   hollow-dotted so they never read as a result you've already seen. */
+.discovery-table .undiscovered-row {
+    opacity: 0.62;
+}
+
+.discovery-table .undiscovered-row td:first-child::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 8px;
+    border-radius: 50%;
+    background: #201a12;
+    border: 1px solid #9a865e;
+    vertical-align: middle;
+}
+
+.discovery-table .undiscovered-row td:last-child {
+    color: var(--text-dim);
+    font-style: italic;
+}
+
 .discovery-table .spoiler-row td:last-child::after {
     content: ' (undiscovered)';
     color: var(--warn);
