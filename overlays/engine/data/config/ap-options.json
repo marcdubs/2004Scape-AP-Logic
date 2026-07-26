@@ -3,5 +3,6 @@
     "addonBankBox": true,
     "addonTreeCompass": true,
     "addonTeleportingFocus": true,
-    "addonNpcTeleport": true
+    "addonNpcTeleport": true,
+    "gatherSpeed": 200
 }

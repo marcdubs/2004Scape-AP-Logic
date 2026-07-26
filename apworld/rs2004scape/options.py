@@ -1,7 +1,7 @@
 # Options for the 2004Scape Archipelago world (docs/archipelago-integration.md).
 from dataclasses import dataclass
 
-from Options import Choice, DefaultOnToggle, OptionSet, PerGameCommonOptions, Toggle
+from Options import Choice, DefaultOnToggle, OptionSet, PerGameCommonOptions, Range, Toggle
 
 GOAL_NAMES = ("dragon_slayer", "barcrawl", "kbd", "heroes", "legends")
 
@@ -196,6 +196,21 @@ class ProgressiveXpRate(DefaultOnToggle):
     display_name = "Progressive XP Rate Multiplier"
 
 
+class GatherSpeed(Range):
+    """Mining / Woodcutting / Fishing success rate, as a percentage of vanilla.
+    100 is untouched 2004 behaviour; 300 means roughly three times as many
+    swings pay out, so far fewer wasted cycles at low levels and with low-tier
+    tools. It scales the roll rather than forcing a success, so a better tool
+    and a higher level still matter - and the per-swing animation delay is
+    unchanged, so one resource per swing remains the ceiling. Applies live on
+    connect (server-side knob, no reseed needed)."""
+
+    display_name = "Gathering Speed"
+    range_start = 25
+    range_end = 1000
+    default = 200
+
+
 class Relics(OptionSet):
     """Which relic reward items are allowed to roll from "Mystery Reward"
     filler. A relic keeps working once delivered; unticking one only stops it
@@ -241,3 +256,4 @@ class RS2004Options(PerGameCommonOptions):
     spawn_randomization: SpawnRandomization
     infinite_run: InfiniteRun
     progressive_xp_rate: ProgressiveXpRate
+    gather_speed: GatherSpeed

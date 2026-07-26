@@ -22,7 +22,8 @@ import { getEntranceOverride } from '#/engine/ApEntranceOverrides.js';
 import { applyAllBankedXp, getUnlockCount } from '#/engine/ApUnlockOverrides.js';
 import { recordDiscovery } from '#/engine/ApTracker.js';
 import * as ApNpcTeleport from '#/engine/ApNpcTeleport.js';
-import { getApOption } from '#/engine/ApOptions.js';
+import { apGatherThreshold, getApOptionInt } from '#/engine/ApOptions.js';
+import JavaRandom from '#/util/JavaRandom.js';
 import { getHomeCoord } from '#/engine/ApSpawnOverrides.js';
 import { randomizeAppearance } from '#/engine/ApNewPlayer.js';
 import { applyAreaGate } from '#/engine/ApAreaGates.js';
@@ -597,12 +598,29 @@ const ServerOps: CommandHandlers = {
     },
 
     // custom: Archipelago user-facing option lookup (ap-options.json via
-    // ApOptions.getApOption). Unknown names fail open to 1 (enabled).
+    // ApOptions.getApOptionInt). Booleans come back as 1/0, numeric tuning knobs
+    // (gatherSpeed, ...) as their value. Unknown names fail open to 1 (enabled).
     [ScriptOpcode.AP_OPTION]: state => {
         const name = state.popString();
 
-        state.pushInt(getApOption(name) ? 1 : 0);
+        state.pushInt(getApOptionInt(name));
     },
+
+    // custom: Archipelago gathering success roll - vanilla STAT_RANDOM with the
+    // gatherSpeed percentage folded into the interpolated threshold. Kept as its
+    // own opcode rather than patching STAT_RANDOM so only the gathering skills
+    // move: cooking burn, fletching, thieving et al. share STAT_RANDOM and must
+    // stay at vanilla odds.
+    [ScriptOpcode.AP_GATHER_RANDOM]: checkedHandler(ActivePlayer, state => {
+        const [stat, low, high] = state.popInts(3);
+
+        const level = state.activePlayer.levels[stat];
+        const clampedLevel = Math.min(level, 99);
+        const value = Math.floor((low * (99 - clampedLevel)) / 98) + Math.floor((high * (clampedLevel - 1)) / 98) + 1;
+        const chance = Math.floor(JavaRandom.nextDouble() * 256);
+
+        state.pushInt(apGatherThreshold(value) > chance ? 1 : 0);
+    }),
 
     // custom: Archipelago NPC Teleport addon lookups (ApNpcTeleport registry,
     // recency-ordered - index 0 = most recently talked to). Name returns ''

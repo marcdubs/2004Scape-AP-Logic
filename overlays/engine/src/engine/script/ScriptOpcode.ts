@@ -134,6 +134,13 @@ export const enum ScriptOpcode {
     // AP_ENTRANCE_OVERRIDE above.
     AP_THIEVING_SWAP = 1913,
 
+    // custom: Archipelago gathering-speed knob - STAT_RANDOM with the
+    // ap-options.json "gatherSpeed" percentage applied to the interpolated
+    // success threshold. Only the mining/woodcutting/fishing roll sites call it,
+    // so no other skill's odds move - same explicit-numbering reasoning as
+    // AP_ENTRANCE_OVERRIDE above.
+    AP_GATHER_RANDOM = 1914,
+
     // Player ops (2000-2499)
     AFK_EVENT = 2000,
     ALLOWDESIGN,
@@ -596,6 +603,7 @@ export const ScriptOpcodeMap: Map<string, number> = new Map([
     ['AP_NPCTP_NAME', ScriptOpcode.AP_NPCTP_NAME],
     ['AP_NPCTP_COORD', ScriptOpcode.AP_NPCTP_COORD],
     ['AP_THIEVING_SWAP', ScriptOpcode.AP_THIEVING_SWAP],
+    ['AP_GATHER_RANDOM', ScriptOpcode.AP_GATHER_RANDOM],
 
     ['AFK_EVENT', ScriptOpcode.AFK_EVENT],
     ['ALLOWDESIGN', ScriptOpcode.ALLOWDESIGN],

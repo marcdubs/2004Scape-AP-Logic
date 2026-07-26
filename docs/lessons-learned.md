@@ -2553,6 +2553,11 @@ addon items"; hard-won bits for future sessions:
   PlacementEngine.loadApOptions (generator/validator/sim), and rs2 via the
   ap_option command (opcode 1910). New toggles: add to ApOptions DEFAULTS +
   shipped json; tools loader only if the toggle affects the location catalog.
+  **Numeric keys** (2026-07-26, #13) go in NUMERIC_DEFAULTS instead, with a
+  {value, min, max} - load() clamps and warns, and ap_option returns the number
+  (booleans still return 1/0, unknown names still fail open to 1). A FOURTH
+  place to sync for AP-adopted options: ApClient.applySlotData + the apworld's
+  options.py/fill_slot_data + its test_seed_options assertions.
 - **::command args**: the cheat line is lowercased and space-split; a
   (string $x) debugproc receives ONE word. ::apnpctp therefore matches
   multi-word NPC names by first word/substring only.
@@ -4012,3 +4017,57 @@ job. Two things settled it, and both are worth keeping:
   tables x 200,000 kills with capped weights - worst |observed - table| = 0.236pp, and
   the rarest OBSERVED drop rate anywhere in the corpus was 1/33.4 (sampling noise around
   the 1/32 floor). That is the empirical form of the guarantee the cap makes on paper.
+
+## Session (2026-07-26): configurable gathering speed (GitHub #13)
+
+The ask: mining/woodcutting/fishing hand out resources at 2004 rates while
+`progressiveXpRate` hands out levels at 10x-640x, so raw materials are the
+bottleneck for every downstream skill. Shipped as one knob, `gatherSpeed`.
+
+- **A NEW opcode, not a patched STAT_RANDOM.** The success roll is
+  `stat_random(stat, low, high)` (opcode in vanilla PlayerOps: interpolate
+  `low..high` by level into a 1..256 threshold, compare against
+  `floor(JavaRandom.nextDouble() * 256)`, succeed if `threshold > roll`).
+  Scaling it in place would also move cooking burn chance, fletching, thieving
+  and every other caller. `AP_GATHER_RANDOM` (1914, `ap_gather_random` in rs2)
+  duplicates those four lines and applies `apGatherThreshold()`; the content
+  change is then a one-token swap at the 8 roll sites in the three gathersanity
+  whole-file overlays (fishing 4, mining 3, woodcut 1). PlayerOps.ts stays
+  untouched and un-overlaid.
+- **Scale the threshold, don't floor it.** `min(max(floor(value * pct / 100), 1),
+  256)`. 256 always succeeds (`threshold > roll`, roll <= 255) and the floor of 1
+  keeps vanilla's "never actually impossible" property in the slow-down
+  direction. A flat "always succeed" would erase the tool-tier and level curve
+  entirely; scaling shifts it up and keeps its shape. `pct === 100` short-
+  circuits to the untouched value, so vanilla is bit-for-bit vanilla.
+- **The action delay is the real ceiling, and it is untouched.** Mining is
+  `%action_delay = calc(map_clock + oc_param($pickaxe, mining_rate))`,
+  woodcutting a flat `+3`. gatherSpeed only removes FAILED cycles, so throughput
+  saturates at one resource per swing (3-8 ticks) somewhere around 400. Worth
+  saying out loud in the option docs - "why isn't 1000 ten times faster" is the
+  obvious question.
+- **ApOptions grew numeric keys**: `NUMERIC_DEFAULTS` ({value, min, max}, clamped
+  + warned on load), `getApOptionInt` / `setApOptionInt`, and `load()` now
+  populates two caches and returns void (both are invalidated together on
+  write). `ap_option` switched to `getApOptionInt`, which is backward compatible
+  - booleans still come back 1/0 and unknown names still fail open to 1, so
+  every existing `ap_option("addonX") = 1` call site is unaffected.
+- **Default 200, not 100** - same call as progressiveXpRate defaulting on: the
+  randomizer's pacing assumes supplies keep up. `gatherSpeed: 100` is the
+  authentic-rates escape hatch, documented in both docs/ap-yaml-options.md and
+  the option comment.
+- **The tools loader needed nothing.** `PlacementEngine.loadApOptions` reads
+  exactly `musicChecks` and ignores every other key, so a numeric value in the
+  file can't break the generator/validator - only options that change the
+  LOCATION CATALOG have to be taught to that loader.
+- **Verified offline**: engine typecheck clean, `tools/pack/Build.ts` clean
+  (1:59, which is what proves the new command declaration and all 8 call sites
+  compile), full apworld suite 152 passed / 7763 subtests (run from
+  ~/Archipelago with `./venv/bin/python` - the SYSTEM python3 there lacks
+  `schema` and every test errors at collection; also move
+  `custom_worlds/rs2004scape.apworld` aside first). **Not in-game tested** -
+  user checklist: boot and confirm the `AP options:` log line prints
+  `gatherSpeed=200`, mine copper at level 1 (should pay out roughly twice as
+  often, still not every swing), chop a normal tree, net-fish shrimp; then set
+  `gatherSpeed` to 100 in `data/config/ap-options.json`, restart, and confirm
+  the rates feel vanilla again.

@@ -1,3 +1,8 @@
+// AP: every gathering success roll below goes through ap_gather_random instead of
+// vanilla stat_random - same math, with the ap-options.json "gatherSpeed" percentage
+// folded into the level-interpolated threshold (100 = vanilla, higher = fewer failed
+// cycles). Declared in scripts/ap/ap.rs2; see 2004Scape-AP-Logic GitHub #13. The
+// action delay is untouched, so a resource still takes at least one full swing/cast.
 [oploc1,_tree] @attempt_cut_tree;
 // "hidden" op
 [oploc3,_tree] @cut_tree;
@@ -127,7 +132,7 @@ if ($respawnrate = 0) {
     $respawnrate = add(120, random(80));
     $deplete_chance = 0;
 }
-if (stat_random(woodcutting, $tree_chance_low, $tree_chance_high) = true) {
+if (ap_gather_random(woodcutting, $tree_chance_low, $tree_chance_high) = true) {
     def_namedobj $product = db_getfield($data, woodcutting_trees:product, 0);
     mes("You get some <lowercase(oc_name($product))>.");
     stat_advance(woodcutting, db_getfield($data, woodcutting_trees:productexp, 0));
