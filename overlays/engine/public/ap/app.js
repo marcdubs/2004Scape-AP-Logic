@@ -14,7 +14,9 @@
     var state = {
         data: null,
         meta: null,
-        layer: 'surface',
+        checks: null,       // /ap/checks.json catalog (fetched separately, see fetchChecks)
+        checksOpen: {},     // group key -> expanded, sticky across re-renders
+        centered: false,    // has the map been auto-centered on home yet (once per load)
         selectedSite: null
     };
 
@@ -49,10 +51,57 @@
         };
     }
 
-    function coordToPixel(coord, bounds, pxPerTile) {
+    // ---- one continuous world space for BOTH layers ----
+    // The two rendered PNGs live in wildly different absolute-Z bands (surface
+    // 1280-4991, underground 9216-10367, because underground mapsquares are mapZ+100),
+    // so they can't share a single coordinate transform. Instead each layer keeps its
+    // own bounds and gets a pixel OFFSET into a shared canvas: surface on top,
+    // underground directly below it, both aligned on world X so a tile at absX 3200 is
+    // at the same screen column on either. That turns a cross-layer ladder into an
+    // ordinary line on one page instead of something you had to switch layers to chase.
+
+    var LAYER_GAP_PX = 120; // breathing room + room for the "UNDERGROUND" caption
+
+    var layoutCache = null;
+
+    function worldLayout(meta) {
+        if (layoutCache && layoutCache.meta === meta) {
+            return layoutCache;
+        }
+        var px = meta.pxPerTile || 2;
+        var surface = meta.surface;
+        var underground = meta.underground;
+        // shared X origin so the two images line up by world coordinate
+        var minAbsX = Math.min(surface ? surface.minAbsX : Infinity, underground ? underground.minAbsX : Infinity);
+
+        var offsets = {};
+        var width = 0;
+        var height = 0;
+        if (surface) {
+            offsets.surface = { x: (surface.minAbsX - minAbsX) * px, y: 0 };
+            width = Math.max(width, offsets.surface.x + surface.widthPx);
+            height = surface.heightPx;
+        }
+        if (underground) {
+            offsets.underground = { x: (underground.minAbsX - minAbsX) * px, y: height + (surface ? LAYER_GAP_PX : 0) };
+            width = Math.max(width, offsets.underground.x + underground.widthPx);
+            height = offsets.underground.y + underground.heightPx;
+        }
+
+        layoutCache = { meta: meta, px: px, offsets: offsets, width: width, height: height };
+        return layoutCache;
+    }
+
+    function coordToPixel(coord, meta) {
+        var layout = worldLayout(meta);
+        var bounds = meta[coord.layer];
+        var offset = layout.offsets[coord.layer];
+        if (!bounds || !offset) {
+            return null;
+        }
         return {
-            x: (coord.absX - bounds.minAbsX) * pxPerTile,
-            y: (bounds.maxAbsZ - coord.absZ) * pxPerTile
+            x: (coord.absX - bounds.minAbsX) * layout.px + offset.x,
+            y: (bounds.maxAbsZ - coord.absZ) * layout.px + offset.y
         };
     }
 
@@ -101,6 +150,33 @@
             });
     }
 
+    // The check catalog is per-seed static (517 names), so it rides its own route
+    // instead of being re-shipped on every 5s tracker poll - fired state already comes
+    // down with tracker.json as discoveries.checks. Refetched when the Checks tab is
+    // opened, which is enough to pick up the one thing that does move: connecting to an
+    // Archipelago room teaches the server which locations this slot actually has.
+    function fetchChecks() {
+        var url = '/ap/checks.json' + (spoilerMode ? '?spoiler=1' : '');
+        return fetch(url, { cache: 'no-store' })
+            .then(function (res) {
+                if (!res.ok) {
+                    throw new Error('HTTP ' + res.status);
+                }
+                return res.json();
+            })
+            .then(function (catalog) {
+                state.checks = catalog;
+                lastChecksKey = null; // a fresh catalog may change flags without changing counts
+                (catalog.groups || []).forEach(function (group) {
+                    if (!Object.prototype.hasOwnProperty.call(state.checksOpen, group.key)) {
+                        state.checksOpen[group.key] = !!group.open;
+                    }
+                });
+                renderChecksTab();
+            })
+            .catch(function () { /* main status pill already reports the server being down */ });
+    }
+
     function fetchMeta() {
         fetch('worldmap-meta.json', { cache: 'no-store' })
             .then(function (res) {
@@ -139,6 +215,9 @@
                 btn.classList.add('active');
                 document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
                 document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+                if (btn.dataset.tab === 'checks') {
+                    fetchChecks();
+                }
             });
         });
     }
@@ -157,15 +236,21 @@
 
     // ---- render: shared table helper ----
 
-    function renderTable(tableId, emptyId, discovered, spoilerFull, rowBuilder) {
+    // Three passes, in this order: what you've found, then (spoiler mode only) the
+    // answers you haven't found, then - if the tab's "show not-yet-discovered" box is
+    // ticked - a placeholder row per remaining source. That last pass is the list
+    // equivalent of the map's hollow pins: it names the thing still out there without
+    // saying what it turned into.
+    function renderTable(tableId, emptyId, discovered, spoilerFull, rowBuilder, undiscoveredKeys, undiscoveredBuilder) {
         var table = document.getElementById(tableId);
         var tbody = table.querySelector('tbody');
         var emptyEl = document.getElementById(emptyId);
         tbody.innerHTML = '';
 
         var discoveredKeys = Object.keys(discovered || {});
+        var pending = undiscoveredKeys || [];
 
-        if (discoveredKeys.length === 0 && (!spoilerFull || Object.keys(spoilerFull).length === 0)) {
+        if (discoveredKeys.length === 0 && pending.length === 0 && (!spoilerFull || Object.keys(spoilerFull).length === 0)) {
             table.style.display = 'none';
             emptyEl.hidden = false;
             return;
@@ -181,6 +266,7 @@
             }
         });
 
+        var shownBySpoiler = {};
         if (spoilerFull) {
             Object.keys(spoilerFull).forEach(function (key) {
                 if (Object.prototype.hasOwnProperty.call(discovered || {}, key)) {
@@ -189,10 +275,39 @@
                 var tr = rowBuilder(key, spoilerFull[key], true);
                 if (tr) {
                     tr.classList.add('spoiler-row');
+                    shownBySpoiler[key] = true;
                     tbody.appendChild(tr);
                 }
             });
         }
+
+        if (undiscoveredBuilder) {
+            pending.forEach(function (key) {
+                // never duplicate a row the spoiler pass already answered
+                if (shownBySpoiler[key] || Object.prototype.hasOwnProperty.call(discovered || {}, key)) {
+                    return;
+                }
+                var tr = undiscoveredBuilder(key);
+                if (tr) {
+                    tr.classList.add('undiscovered-row');
+                    tbody.appendChild(tr);
+                }
+            });
+        }
+    }
+
+    // Sources for a category that haven't been discovered yet, name-sorted so the
+    // "still to find" block reads as a checklist. Returns [] when the tab's toggle is
+    // off or the server predates the sources block.
+    function pendingSources(category, discovered, toggleId, labelFor) {
+        var box = document.getElementById(toggleId);
+        if (box && !box.checked) {
+            return [];
+        }
+        var all = (state.data && state.data.sources && state.data.sources[category]) || [];
+        return all
+            .filter(function (key) { return !Object.prototype.hasOwnProperty.call(discovered || {}, key); })
+            .sort(function (a, b) { return labelFor(a).localeCompare(labelFor(b)); });
     }
 
     function makeRow(a, arrow, b) {
@@ -212,7 +327,7 @@
 
     // ---- render: gathering / recipes (obj id -> obj id, via names.items) ----
 
-    function renderItemSwapTab(category, tableId, emptyId, counterId) {
+    function renderItemSwapTab(category, tableId, emptyId, counterId, toggleId) {
         var data = state.data;
         if (!data) {
             return;
@@ -221,13 +336,14 @@
         var spoilerFull = data.spoiler ? data.spoiler[category] : null;
         var names = (data.names && data.names.items) || {};
         var total = (data.totals && data.totals[category]) || 0;
+        var itemName = function (key) { return names[key] || ('item_' + key); };
 
         document.getElementById(counterId).textContent = '(' + Object.keys(discovered).length + ' / ' + total + ' discovered)';
 
         renderTable(tableId, emptyId, discovered, spoilerFull, function (key, value) {
-            var fromName = names[key] || ('item_' + key);
-            var toName = names[value] || ('item_' + value);
-            return makeRow(fromName, '→', toName);
+            return makeRow(itemName(key), '→', itemName(value));
+        }, pendingSources(category, discovered, toggleId, itemName), function (key) {
+            return makeRow(itemName(key), '→', 'not yet discovered');
         });
     }
 
@@ -244,12 +360,15 @@
         var units = (data.names && data.names.dropUnits) || {};
         var total = (data.totals && data.totals.drops) || 0;
 
+        var monsterName = function (slot) { return slots[slot] || ('slot_' + slot); };
+
         document.getElementById('bestiary-counter').textContent = '(' + Object.keys(discovered).length + ' / ' + total + ' discovered)';
 
         renderTable('bestiary-table', 'bestiary-empty', discovered, spoilerFull, function (slot, unit) {
-            var monster = slots[slot] || ('slot_' + slot);
             var table = units[unit] || ('unit_' + unit);
-            return makeRow(monster, '→ smells like', table);
+            return makeRow(monsterName(slot), '→ smells like', table);
+        }, pendingSources('drops', discovered, 'bestiary-show-undiscovered', monsterName), function (slot) {
+            return makeRow(monsterName(slot), '→', 'not yet killed');
         });
     }
 
@@ -271,6 +390,8 @@
                 ? (coord.layer === 'underground' ? 'underground, ' : '') + 'tile (' + coord.absX + ', ' + coord.absZ + ') level ' + coord.level
                 : coordStr;
             return makeRow(spell, '→', label);
+        }, pendingSources('teleports', discovered, 'teleports-show-undiscovered', function (spell) { return spell; }), function (spell) {
+            return makeRow(spell, '→', 'not yet cast');
         });
     }
 
@@ -444,10 +565,232 @@
         input.addEventListener('input', renderEntrancesTab);
     }
 
+    // "Show not-yet-discovered" on the four swap tabs - each just re-renders its own tab
+    function initUndiscoveredToggles() {
+        [
+            ['gathering-show-undiscovered', function () { renderItemSwapTab('gather', 'gathering-table', 'gathering-empty', 'gathering-counter', 'gathering-show-undiscovered'); }],
+            ['recipes-show-undiscovered', function () { renderItemSwapTab('process', 'recipes-table', 'recipes-empty', 'recipes-counter', 'recipes-show-undiscovered'); }],
+            ['bestiary-show-undiscovered', renderBestiaryTab],
+            ['teleports-show-undiscovered', renderTeleportsTab]
+        ].forEach(function (pair) {
+            var box = document.getElementById(pair[0]);
+            if (box) {
+                box.addEventListener('change', pair[1]);
+            }
+        });
+    }
+
     function initShowLockedToggle() {
         var box = document.getElementById('unlocks-show-locked');
         if (box) {
             box.addEventListener('change', renderUnlocksTab);
+        }
+    }
+
+    // ---- render: checks (GitHub #19 - "which of the 517 checks have I fired?") ----
+    // Catalog from /ap/checks.json, fired state from the tracker ledger
+    // (data.discoveries.checks, written by ApChecks.fireCheck in both the solo and the
+    // Archipelago paths). A fired check's recorded value is what it gave you, so
+    // showing it is a discovery, not a spoiler; unfired contents only appear under
+    // ?spoiler=1, and only in solo placement mode where the server knows them.
+
+    function checkStatus(check, firedValue) {
+        if (firedValue !== undefined) {
+            return { cls: 'done', label: 'done' };
+        }
+        if (check.excluded) {
+            return { cls: 'gone', label: 'not in this seed' };
+        }
+        if (check.luck) {
+            return { cls: 'luck', label: 'luck-gated' };
+        }
+        return { cls: 'todo', label: 'not yet' };
+    }
+
+    function checkRow(check, firedValue, spoilerContents) {
+        var status = checkStatus(check, firedValue);
+        var tr = document.createElement('tr');
+        tr.className = 'check-row check-' + status.cls;
+
+        var tdName = document.createElement('td');
+        tdName.className = 'icon-cell';
+        var dot = document.createElement('span');
+        dot.className = 'check-dot ' + status.cls;
+        tdName.appendChild(dot);
+        if (check.skill && STAT_ICONS[check.skill]) {
+            tdName.appendChild(statIcon(check.skill));
+        }
+        tdName.appendChild(document.createTextNode(check.name));
+        tr.appendChild(tdName);
+
+        var tdStatus = document.createElement('td');
+        tdStatus.className = 'check-status';
+        tdStatus.textContent = status.label;
+        tr.appendChild(tdStatus);
+
+        var tdWhat = document.createElement('td');
+        if (firedValue !== undefined) {
+            tdWhat.textContent = firedValue;
+        } else if (spoilerContents) {
+            tdWhat.textContent = spoilerContents;
+            tdWhat.className = 'check-spoiler';
+        }
+        tr.appendChild(tdWhat);
+
+        return tr;
+    }
+
+    function checksTable(rows, fired, spoilerVisible) {
+        var table = document.createElement('table');
+        table.className = 'discovery-table checks-table';
+        var thead = document.createElement('thead');
+        thead.innerHTML = '<tr><th>Check</th><th>Status</th><th>' + (spoilerVisible ? 'Contains' : 'Gave you') + '</th></tr>';
+        table.appendChild(thead);
+        var tbody = document.createElement('tbody');
+        rows.forEach(function (check) {
+            tbody.appendChild(checkRow(check, fired[check.id], spoilerMode ? check.contents : null));
+        });
+        table.appendChild(tbody);
+        return table;
+    }
+
+    // rebuilt only when something visible actually changed - the 5s poll would
+    // otherwise re-create up to 517 rows under the player's scroll position.
+    var lastChecksKey = null;
+
+    function renderChecksTab() {
+        var container = document.getElementById('checks-groups');
+        var emptyEl = document.getElementById('checks-empty');
+        var counterEl = document.getElementById('checks-counter');
+        var catalog = state.checks;
+
+        if (!catalog) {
+            return;
+        }
+        if (!catalog.present) {
+            container.innerHTML = '';
+            counterEl.textContent = '';
+            emptyEl.hidden = false;
+            return;
+        }
+        emptyEl.hidden = true;
+
+        var fired = (state.data && state.data.discoveries && state.data.discoveries.checks) || {};
+        var searchInput = document.getElementById('checks-search');
+        var filterTerm = ((searchInput && searchInput.value) || '').trim().toLowerCase();
+        var hideDoneBox = document.getElementById('checks-hide-done');
+        var hideDone = !!(hideDoneBox && hideDoneBox.checked);
+
+        var renderKey = [catalog.checks.length, Object.keys(fired).length, filterTerm, hideDone].join('|');
+        if (renderKey === lastChecksKey) {
+            return;
+        }
+        lastChecksKey = renderKey;
+
+        var byGroup = {};
+        var totalObtainable = 0;
+        var totalFired = 0;
+        catalog.checks.forEach(function (check) {
+            if (!byGroup[check.group]) {
+                byGroup[check.group] = [];
+            }
+            byGroup[check.group].push(check);
+            // a check this seed never generated isn't part of the denominator - counting
+            // it would make 100% completion unreachable on paper.
+            if (!check.excluded) {
+                totalObtainable++;
+                if (fired[check.id] !== undefined) {
+                    totalFired++;
+                }
+            }
+        });
+
+        counterEl.textContent = '(' + totalFired + ' / ' + totalObtainable + ' fired' + (spoilerMode ? ' · showing contents' : '') + ')';
+
+        container.innerHTML = '';
+
+        catalog.groups.forEach(function (group) {
+            var all = byGroup[group.key] || [];
+            if (all.length === 0) {
+                return;
+            }
+
+            var obtainable = all.filter(function (c) { return !c.excluded; });
+            var doneCount = obtainable.filter(function (c) { return fired[c.id] !== undefined; }).length;
+
+            var visible = all;
+            if (hideDone) {
+                visible = visible.filter(function (c) { return fired[c.id] === undefined; });
+            }
+            if (filterTerm) {
+                visible = visible.filter(function (c) { return c.name.toLowerCase().indexOf(filterTerm) !== -1; });
+            }
+            if (visible.length === 0) {
+                return;
+            }
+
+            var details = document.createElement('details');
+            details.className = 'check-group';
+            // a filter is a request to see the matches, whatever the group's usual state
+            details.open = filterTerm ? true : !!state.checksOpen[group.key];
+            details.addEventListener('toggle', function () {
+                if (!filterTerm) {
+                    state.checksOpen[group.key] = details.open;
+                }
+            });
+
+            var summary = document.createElement('summary');
+            summary.textContent = group.label;
+            var count = document.createElement('span');
+            count.className = 'counter';
+            count.textContent = doneCount + ' / ' + obtainable.length;
+            if (doneCount === obtainable.length && obtainable.length > 0) {
+                count.classList.add('all-done');
+            }
+            summary.appendChild(count);
+            details.appendChild(summary);
+
+            // Miscellaneous is a merge of three kinds - keep their own headings inside it
+            // so "which barcrawl bar am I missing" is still one glance.
+            var sections = [];
+            var bySection = {};
+            visible.forEach(function (check) {
+                if (!bySection[check.section]) {
+                    bySection[check.section] = [];
+                    sections.push(check.section);
+                }
+                bySection[check.section].push(check);
+            });
+
+            sections.forEach(function (section) {
+                if (sections.length > 1) {
+                    var heading = document.createElement('h4');
+                    heading.className = 'check-section';
+                    heading.textContent = section;
+                    details.appendChild(heading);
+                }
+                details.appendChild(checksTable(bySection[section], fired, spoilerMode));
+            });
+
+            container.appendChild(details);
+        });
+
+        if (container.children.length === 0) {
+            var noMatch = document.createElement('p');
+            noMatch.className = 'tab-desc';
+            noMatch.textContent = filterTerm ? 'No checks match "' + filterTerm + '".' : 'Every check in this seed is done. Nice.';
+            container.appendChild(noMatch);
+        }
+    }
+
+    function initChecksControls() {
+        var search = document.getElementById('checks-search');
+        if (search) {
+            search.addEventListener('input', renderChecksTab);
+        }
+        var hideDone = document.getElementById('checks-hide-done');
+        if (hideDone) {
+            hideDone.addEventListener('change', renderChecksTab);
         }
     }
 
@@ -554,19 +897,24 @@
             applyTransform();
         }, { passive: false });
 
+        // Both layers are always drawn now (see worldLayout), so these are jump-to
+        // shortcuts on one continuous canvas, not a switch that hides the other half.
         document.querySelectorAll('.layer-btn').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                document.querySelectorAll('.layer-btn').forEach(function (b) { b.classList.remove('active'); });
-                btn.classList.add('active');
-                state.layer = btn.dataset.layer;
-                // a selection on the other layer would be invisible - drop it
-                state.selectedSite = null;
-                // reset the view for the new layer's image
-                mapDrag.tx = 0;
-                mapDrag.ty = 0;
-                mapDrag.scale = 1;
-                applyTransform();
-                renderMap();
+                var meta = state.meta;
+                if (!meta) {
+                    return;
+                }
+                if (btn.dataset.layer === 'home') {
+                    centerOnSpawn();
+                    return;
+                }
+                var bounds = meta[btn.dataset.layer];
+                var offset = worldLayout(meta).offsets[btn.dataset.layer];
+                if (!bounds || !offset) {
+                    return;
+                }
+                centerOn({ x: offset.x + bounds.widthPx / 2, y: offset.y + bounds.heightPx / 2 }, 0.5);
             });
         });
     }
@@ -592,7 +940,8 @@
         var entrances = knownEntrances(data);
         var teleports = (data.discoveries && data.discoveries.teleports) || {};
         var sources = data.entranceSources || [];
-        return sources.length + '|' + Object.keys(entrances).length + '|' + Object.keys(teleports).length;
+        var spawn = (data.spawn && data.spawn.raw) || '';
+        return sources.length + '|' + Object.keys(entrances).length + '|' + Object.keys(teleports).length + '|' + spawn;
     }
 
     function buildSites(data) {
@@ -667,34 +1016,49 @@
     var lastPinKey = null;
     var lastLabelKey = null;
 
-    function renderMap() {
-        var data = state.data;
-        var meta = state.meta;
-        var img = document.getElementById('map-image');
-        var overlay = document.getElementById('map-overlay');
-        var loadingEl = document.getElementById('map-loading');
-        var emptyEl = document.getElementById('map-empty');
-
-        if (!meta || !meta[state.layer]) {
+    function layerImage(meta, layer) {
+        var img = document.getElementById('map-image-' + layer);
+        if (!img) {
             return;
         }
-
-        loadingEl.hidden = true;
-
-        var bounds = meta[state.layer];
-        var pxPerTile = meta.pxPerTile || 2;
-        var src = 'worldmap-' + state.layer + '.png';
-
+        var bounds = meta[layer];
+        var offset = worldLayout(meta).offsets[layer];
+        if (!bounds || !offset) {
+            img.hidden = true;
+            return;
+        }
+        img.hidden = false;
+        var src = 'worldmap-' + layer + '.png';
         if (img.getAttribute('data-src') !== src) {
             img.src = src;
             img.setAttribute('data-src', src);
             img.width = bounds.widthPx;
             img.height = bounds.heightPx;
         }
+        img.style.left = offset.x + 'px';
+        img.style.top = offset.y + 'px';
+    }
 
-        overlay.setAttribute('width', bounds.widthPx);
-        overlay.setAttribute('height', bounds.heightPx);
-        overlay.setAttribute('viewBox', '0 0 ' + bounds.widthPx + ' ' + bounds.heightPx);
+    function renderMap() {
+        var data = state.data;
+        var meta = state.meta;
+        var overlay = document.getElementById('map-overlay');
+        var loadingEl = document.getElementById('map-loading');
+        var emptyEl = document.getElementById('map-empty');
+
+        if (!meta || !meta.surface) {
+            return;
+        }
+
+        loadingEl.hidden = true;
+
+        var layout = worldLayout(meta);
+        layerImage(meta, 'surface');
+        layerImage(meta, 'underground');
+
+        overlay.setAttribute('width', layout.width);
+        overlay.setAttribute('height', layout.height);
+        overlay.setAttribute('viewBox', '0 0 ' + layout.width + ' ' + layout.height);
 
         var labelGroup = document.getElementById('map-labels');
         var pinGroup = document.getElementById('map-pins');
@@ -709,11 +1073,10 @@
             overlay.appendChild(selGroup);
         }
 
-        // Place-name labels come from static meta (worldmap-meta.json), so rebuild them
-        // only when the layer changes, not on every 5s poll.
-        if (lastLabelKey !== state.layer) {
-            lastLabelKey = state.layer;
-            rebuildLabels(labelGroup, bounds, pxPerTile);
+        // Place-name labels come from static meta (worldmap-meta.json) - build once.
+        if (!lastLabelKey) {
+            lastLabelKey = 'built';
+            rebuildLabels(labelGroup, meta);
         }
 
         if (!data) {
@@ -721,11 +1084,11 @@
         }
 
         var sites = buildSites(data);
-        var pinKey = state.layer + '::' + trackerSignature(data);
+        var pinKey = trackerSignature(data);
 
         if (pinKey !== lastPinKey) {
             lastPinKey = pinKey;
-            rebuildPins(pinGroup, sites, bounds, pxPerTile);
+            rebuildPins(pinGroup, sites, meta);
             var counters = document.getElementById('map-counters');
             var discoveredEntrances = (data.discoveries && data.discoveries.entrances) || {};
             var discoveredTeleports = (data.discoveries && data.discoveries.teleports) || {};
@@ -739,22 +1102,75 @@
         }
 
         selGroup.innerHTML = '';
-        renderSelectionOverlay(selGroup, sites, bounds, pxPerTile);
+        renderSelectionOverlay(selGroup, sites, meta);
         renderSitePanel(sites);
+
+        // First paint with real data: open on the run's home area rather than the
+        // top-left corner of a 3584x9792 canvas nobody starts at.
+        if (!state.centered) {
+            state.centered = true;
+            centerOnSpawn();
+        }
+
         applyMapTransform(); // set the initial --pin-r etc. for the current zoom
+    }
+
+    // ---- home / respawn point (data.spawn, from ap-spawn.json) ----
+
+    function spawnCoord() {
+        var spawn = state.data && state.data.spawn;
+        return spawn && spawn.raw ? parseCoord(spawn.raw) : null;
+    }
+
+    // Centers the viewport on this run's home point at a readable zoom. Falls back to
+    // the middle of the surface map when the server has no ap-spawn.json (vanilla home).
+    function centerOnSpawn() {
+        var meta = state.meta;
+        if (!meta) {
+            return;
+        }
+        var coord = spawnCoord();
+        var p = coord ? coordToPixel(coord, meta) : null;
+        if (!p) {
+            var surface = meta.surface;
+            if (!surface) {
+                return;
+            }
+            p = { x: surface.widthPx / 2, y: surface.heightPx / 2 };
+        }
+        centerOn(p, 2);
+    }
+
+    function centerOn(p, scale) {
+        var viewport = document.getElementById('map-viewport');
+        if (!viewport) {
+            return;
+        }
+        mapDrag.scale = scale || mapDrag.scale;
+        mapDrag.tx = viewport.clientWidth / 2 - p.x * mapDrag.scale;
+        mapDrag.ty = viewport.clientHeight / 2 - p.y * mapDrag.scale;
+        applyMapTransform();
     }
 
     // ---- base layer: one pin per site, no connecting lines (those are drawn only for
     // the selected site, keeping the default view legible at any zoom) ----
-    function rebuildPins(pinGroup, sites, bounds, pxPerTile) {
+    function rebuildPins(pinGroup, sites, meta) {
         pinGroup.innerHTML = '';
         currentPins = [];
+
+        // home flag first, so a shuffled entrance sharing the tile draws on top of it
+        var home = spawnCoord();
+        var homePixel = home ? coordToPixel(home, meta) : null;
+        if (homePixel) {
+            pinGroup.appendChild(svgEl('circle', { class: 'site-pin home', cx: homePixel.x, cy: homePixel.y, r: 4 }));
+        }
+
         Object.keys(sites).forEach(function (k) {
             var site = sites[k];
-            if (site.layer !== state.layer) {
+            var p = coordToPixel(site, meta);
+            if (!p) {
                 return;
             }
-            var p = coordToPixel(site, bounds, pxPerTile);
             var teleOnly = site.entrances.length === 0 && site.teleports.length > 0;
             var cls = 'site-pin ' + (teleOnly ? 'teleport' : (siteIsExplored(site) ? 'known' : 'unexplored'));
             pinGroup.appendChild(svgEl('circle', { class: cls, cx: p.x, cy: p.y, r: 4 }));
@@ -776,19 +1192,36 @@
     // worldmap-meta.json as absolute-tile coords + a size tier. Drawn as SVG text in
     // map space so they scale with the map like real map lettering (they are map
     // furniture, unlike the constant-screen-size pins). '/' is a line break.
-    function rebuildLabels(labelGroup, bounds, pxPerTile) {
+    function rebuildLabels(labelGroup, meta) {
         labelGroup.innerHTML = '';
-        var labels = (state.meta && state.meta.labels) || [];
+        var layout = worldLayout(meta);
+        var bounds = meta.surface;
+        var pxPerTile = layout.px;
+        var labels = (meta.labels || []);
+
+        // caption for the second image, so the stacked layout reads as two places
+        // rather than one very tall continent
+        if (meta.underground && layout.offsets.underground) {
+            var capY = layout.offsets.underground.y - LAYER_GAP_PX / 2;
+            labelGroup.appendChild(svgEl('line', {
+                class: 'layer-divider',
+                x1: 0, y1: capY + 16, x2: layout.width, y2: capY + 16
+            }));
+            var caption = svgEl('text', { class: 'layer-caption', x: layout.width / 2, y: capY, 'font-size': 34 });
+            caption.textContent = 'UNDERGROUND';
+            labelGroup.appendChild(caption);
+        }
+
         // size tier -> font-size in map px (map is ~2px/tile); region names largest.
         var SIZE_PX = [11, 16, 24];
         labels.forEach(function (lbl) {
-            // only labels that fall inside this layer's bounds (all vanilla labels are
-            // surface, so underground shows none)
-            if (lbl.x < bounds.minAbsX || lbl.x > bounds.maxAbsX || lbl.z < bounds.minAbsZ || lbl.z > bounds.maxAbsZ) {
+            // every vanilla label is a surface place name, so they all live in the
+            // surface image's band of the shared canvas
+            if (!bounds || lbl.x < bounds.minAbsX || lbl.x > bounds.maxAbsX || lbl.z < bounds.minAbsZ || lbl.z > bounds.maxAbsZ) {
                 return;
             }
-            var px = (lbl.x - bounds.minAbsX) * pxPerTile;
-            var py = (bounds.maxAbsZ - lbl.z) * pxPerTile;
+            var px = (lbl.x - bounds.minAbsX) * pxPerTile + layout.offsets.surface.x;
+            var py = (bounds.maxAbsZ - lbl.z) * pxPerTile + layout.offsets.surface.y;
             var fontPx = SIZE_PX[lbl.size] || SIZE_PX[0];
             var lines = String(lbl.text).split('/');
             var text = svgEl('text', {
@@ -808,24 +1241,35 @@
         });
     }
 
-    // Lines + destination dots for the selected site only. Cross-layer destinations
-    // can't be drawn on this image, so they're left to the info panel's jump links.
-    function renderSelectionOverlay(group, sites, bounds, pxPerTile) {
+    // Lines + destination dots for the selected site. Both layers share one canvas now,
+    // so a surface-to-underground ladder draws as an ordinary (dashed) line straight
+    // down into the lower image instead of being deferred to a jump link.
+    function renderSelectionOverlay(group, sites, meta) {
         var key = state.selectedSite;
-        if (!key || !sites[key] || sites[key].layer !== state.layer) {
+        if (!key || !sites[key]) {
             return;
         }
         var site = sites[key];
-        var origin = coordToPixel(site, bounds, pxPerTile);
+        var origin = coordToPixel(site, meta);
+        if (!origin) {
+            return;
+        }
         group.appendChild(svgEl('circle', { class: 'site-ring', cx: origin.x, cy: origin.y, r: 8 }));
 
         site.entrances.forEach(function (e, i) {
-            if (!e.dest || e.dest.layer !== state.layer) {
+            if (!e.dest) {
+                return;
+            }
+            var pd = coordToPixel(e.dest, meta);
+            if (!pd) {
                 return;
             }
             var color = SEL_PALETTE[i % SEL_PALETTE.length];
-            var pd = coordToPixel(e.dest, bounds, pxPerTile);
-            group.appendChild(svgEl('line', { class: 'sel-line', x1: origin.x, y1: origin.y, x2: pd.x, y2: pd.y, stroke: color }));
+            var crossLayer = e.dest.layer !== site.layer;
+            group.appendChild(svgEl('line', {
+                class: 'sel-line' + (crossLayer ? ' cross-layer' : ''),
+                x1: origin.x, y1: origin.y, x2: pd.x, y2: pd.y, stroke: color
+            }));
             group.appendChild(svgEl('circle', { class: 'sel-dest', cx: pd.x, cy: pd.y, r: 4, fill: color, stroke: '#000' }));
         });
     }
@@ -918,21 +1362,22 @@
                 dest.className = 'info-dest';
                 var swatch = document.createElement('span');
                 swatch.className = 'info-swatch';
-                swatch.style.background = (e.dest.layer === state.layer) ? SEL_PALETTE[i % SEL_PALETTE.length] : '#7a6a4a';
+                // every destination is drawable now, so the swatch always matches its line
+                swatch.style.background = SEL_PALETTE[i % SEL_PALETTE.length];
                 dest.appendChild(swatch);
                 dest.appendChild(document.createTextNode(labelForRaw(e.destRaw)));
-                if (e.dest.layer !== state.layer) {
-                    dest.appendChild(document.createTextNode('  '));
-                    var jump = document.createElement('a');
-                    jump.className = 'info-jump';
-                    jump.href = '#';
-                    jump.textContent = '(jump)';
-                    jump.addEventListener('click', function (ev) {
-                        ev.preventDefault();
-                        panToRaw(e.destRaw);
-                    });
-                    dest.appendChild(jump);
-                }
+                // the line to a far-away (or other-layer) destination can run right off
+                // screen at this zoom - keep the jump as the "take me there" shortcut
+                dest.appendChild(document.createTextNode('  '));
+                var jump = document.createElement('a');
+                jump.className = 'info-jump';
+                jump.href = '#';
+                jump.textContent = '(jump)';
+                jump.addEventListener('click', function (ev) {
+                    ev.preventDefault();
+                    panToRaw(e.destRaw);
+                });
+                dest.appendChild(jump);
             } else {
                 dest.className = 'info-dest unexplored';
                 dest.textContent = 'not yet explored';
@@ -1003,23 +1448,16 @@
         }, 1500);
     }
 
-    // Switches to the map tab (and the coord's layer if needed), centers the
-    // viewport on it, and drops a brief pulse there - the entrances list's "jump to
-    // it on the map" affordance. Since panning always centers the target in the
-    // viewport, the pulse itself needs no coordinate math: it's just a fixed dot at
-    // the viewport's center.
+    // Switches to the map tab, centers the viewport on the coord and drops a brief
+    // pulse there - the entrances list's "jump to it on the map" affordance. No layer
+    // switching any more: both layers share one canvas, so this is a pure pan. Since
+    // panning always centers the target in the viewport, the pulse itself needs no
+    // coordinate math: it's just a fixed dot at the viewport's center.
     function panToRaw(raw) {
         var coord = parseCoord(raw);
         var meta = state.meta;
         if (!coord || !meta || !meta[coord.layer]) {
             return;
-        }
-
-        if (state.layer !== coord.layer) {
-            state.layer = coord.layer;
-            document.querySelectorAll('.layer-btn').forEach(function (b) {
-                b.classList.toggle('active', b.dataset.layer === coord.layer);
-            });
         }
 
         // select the site at that spot so its stacked entrances (and their lines) show
@@ -1032,18 +1470,14 @@
             p.classList.toggle('active', p.id === 'tab-map');
         });
 
-        var viewport = document.getElementById('map-viewport');
-        var bounds = meta[coord.layer];
-        var pxPerTile = meta.pxPerTile || 2;
-        var p = coordToPixel(coord, bounds, pxPerTile);
-
-        mapDrag.scale = Math.max(mapDrag.scale, 2);
-        mapDrag.tx = viewport.clientWidth / 2 - p.x * mapDrag.scale;
-        mapDrag.ty = viewport.clientHeight / 2 - p.y * mapDrag.scale;
-        applyMapTransform();
+        var p = coordToPixel(coord, meta);
+        if (!p) {
+            return;
+        }
+        centerOn(p, Math.max(mapDrag.scale, 2));
 
         renderMap();
-        showPanPulse(viewport);
+        showPanPulse(document.getElementById('map-viewport'));
     }
 
     // ---- render: unlocks (current received-item state from ap-unlocks.json - never
@@ -1307,11 +1741,12 @@
     // ---- render all ----
 
     function renderAll() {
-        renderItemSwapTab('gather', 'gathering-table', 'gathering-empty', 'gathering-counter');
-        renderItemSwapTab('process', 'recipes-table', 'recipes-empty', 'recipes-counter');
+        renderItemSwapTab('gather', 'gathering-table', 'gathering-empty', 'gathering-counter', 'gathering-show-undiscovered');
+        renderItemSwapTab('process', 'recipes-table', 'recipes-empty', 'recipes-counter', 'recipes-show-undiscovered');
         renderBestiaryTab();
         renderTeleportsTab();
         renderEntrancesTab();
+        renderChecksTab();
         renderUnlocksTab();
         renderMap();
     }
@@ -1323,9 +1758,12 @@
         initSpoilerToggle();
         initMapControls();
         initEntranceSearch();
+        initChecksControls();
+        initUndiscoveredToggles();
         initShowLockedToggle();
         initArchipelagoTab();
         fetchMeta();
+        fetchChecks();
         fetchTracker();
         setInterval(fetchTracker, POLL_MS);
     });

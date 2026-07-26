@@ -247,6 +247,7 @@ main#app {
 
 .legend-dot.known { background: var(--accent); }
 .legend-dot.teleport { background: var(--gold); }
+.legend-dot.home { background: #ffffff; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .legend-dot.unexplored { background: #201a12; border-color: #9a865e; }
 .legend-dot.multi {
     background: var(--accent);
@@ -397,10 +398,17 @@ main#app {
     image-rendering: pixelated;
 }
 
+/* the two layer images are absolutely placed into one shared canvas (surface on
+   top, underground below it, aligned on world X) - see worldLayout() in app.js */
 .map-image {
     display: block;
+    position: absolute;
     user-select: none;
     -webkit-user-drag: none;
+}
+
+.map-image[hidden] {
+    display: none;
 }
 
 .map-overlay {
@@ -484,6 +492,41 @@ main#app {
     stroke-width: var(--sel-sw, 1.6);
     stroke-dasharray: 4 3;
     opacity: 0.95;
+}
+
+/* surface <-> underground: a much longer line crossing the layer gap, so it gets a
+   looser dash to read as "this leaves the layer" rather than a local connection */
+.sel-line.cross-layer {
+    stroke-dasharray: 10 7;
+    opacity: 0.85;
+}
+
+/* home / respawn point (ap-spawn.json) - the one pin that isn't a discovery */
+.site-pin.home {
+    fill: #ffffff;
+    stroke: var(--accent);
+    stroke-width: calc(var(--pin-sw, 1.1) * 2);
+}
+
+/* caption + rule separating the stacked layer images */
+.layer-caption {
+    fill: var(--accent);
+    stroke: #000;
+    stroke-width: 0.16em;
+    paint-order: stroke;
+    text-anchor: middle;
+    font-family: inherit;
+    font-weight: 700;
+    letter-spacing: 0.35em;
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+.layer-divider {
+    stroke: var(--border);
+    stroke-width: 2;
+    stroke-dasharray: 12 10;
+    opacity: 0.6;
 }
 
 .sel-dest {
@@ -620,6 +663,29 @@ main#app {
 
 .discovery-table .spoiler-row {
     opacity: 0.55;
+}
+
+/* "still out there" rows: the list equivalent of the map's hollow pins. Dimmed and
+   hollow-dotted so they never read as a result you've already seen. */
+.discovery-table .undiscovered-row {
+    opacity: 0.62;
+}
+
+.discovery-table .undiscovered-row td:first-child::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 8px;
+    border-radius: 50%;
+    background: #201a12;
+    border: 1px solid #9a865e;
+    vertical-align: middle;
+}
+
+.discovery-table .undiscovered-row td:last-child {
+    color: var(--text-dim);
+    font-style: italic;
 }
 
 .discovery-table .spoiler-row td:last-child::after {
@@ -801,4 +867,97 @@ main#app {
 .unlock-open td:last-child,
 .unlock-maxed td:last-child {
     color: var(--good);
+}
+
+/* ---- Checks tab (GitHub #19) ---- */
+
+.check-group {
+    margin-bottom: 1rem;
+    border: 2px solid var(--border);
+    outline: 1px solid var(--border-dark);
+    border-radius: 4px;
+    background: #1e1810;
+}
+
+.check-group > summary {
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    background: linear-gradient(#3d3323, #2c2418);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-shadow: 1px 1px 0 #000;
+    user-select: none;
+}
+
+.check-group > summary .counter {
+    float: right;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.check-group > summary .counter.all-done {
+    color: var(--good);
+}
+
+.check-group[open] > summary {
+    border-bottom: 1px solid var(--border);
+}
+
+.check-section {
+    margin: 0.75rem 0.75rem 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--gold);
+}
+
+.checks-table {
+    border: none;
+    outline: none;
+    border-radius: 0;
+}
+
+/* status dot, shared by the rows and the legend above them */
+.check-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 1px solid #000;
+    box-shadow: 0 0 0 1px #000;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.check-dot.done { background: var(--good); }
+.check-dot.todo { background: #201a12; border-color: #9a865e; }
+.check-dot.luck { background: var(--gold); }
+.check-dot.gone { background: #4a4038; border-color: #6b5c46; }
+
+.check-status {
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.check-done .check-status { color: var(--good); }
+.check-luck .check-status { color: var(--gold); }
+
+/* a check this seed never generated is struck through, not merely faint - it is
+   not a to-do item and must never read as one. */
+.check-gone {
+    opacity: 0.5;
+}
+
+.check-gone td:first-child {
+    text-decoration: line-through;
+}
+
+.check-spoiler {
+    color: var(--warn);
+    font-style: italic;
 }

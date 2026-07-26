@@ -3726,3 +3726,63 @@ consumers - but it was the only record of the drip seed the installed `.npc` fil
 from. The file now says `"dryRun": true`, so it is obvious it no longer describes the
 installed content. **Back up per-tool spoiler outputs too, not just the config the tool
 writes.**
+
+## Tracker "Checks" tab (GitHub #19) - what the payload split taught us
+
+Full design in `docs/tracker-map.md` ("Checks tab"); the reusable bits:
+
+- **`/ap/tracker.json` is a 5s poll - do not put static tables on it.** The check
+  catalog is 517 names and never changes within a run, so it got its own
+  `GET /ap/checks.json` route fetched once at load (and again on tab open, which is
+  what picks up the one genuinely dynamic input: an Archipelago connect). Fired
+  state, which *does* change, stays on the poll as `discoveries.checks`. Any future
+  tab with a big static catalog should split the same way.
+- **`data/config/ap-archipelago-data.json` is a general-purpose catalog, not just
+  the AP client's datapackage.** It ships with the overlay and holds all 517
+  locations with the ids/names/kinds the multiworld, the spoiler log and (now) the
+  tracker all use. Reach for it before hand-listing checks anywhere engine-side -
+  `tools/sim/PlacementEngine.ts` is tooling and must not be imported from `src/`.
+- **"Can't do it yet" and "can't ever do it" must not render alike.** A check the
+  seed never generated (apworld feasibility exclusion / `musicChecks: false`) has to
+  be visibly out of the run *and* out of the denominator, or the list becomes a
+  to-do with impossible entries and an unreachable 100%. Two sources feed it:
+  `Connected`'s `missing_locations + checked_locations` in AP mode (ApClient now
+  keeps them), and a new `infeasibleChecks` array in `ap-placements.json` in solo
+  mode. Both are allowed to be absent - then nothing is marked, which is the safe
+  failure direction.
+- **`fillerOnly` is not "unobtainable".** It means "never holds progression" (clue
+  trails: acquisition is drop RNG; music: deliberate). Tag it, don't exclude it.
+  Conflating the two would have crossed out 233 perfectly reachable checks.
+- **Spoiler contents are mode-scoped.** Unfired contents come from
+  `ap-placements.json`, which in AP mode is a *stale solo artifact* - `?spoiler=1`
+  returns `{}` there rather than presenting last run's answers as this run's.
+
+## Tracker map + "what's left" lists (same session as #19)
+
+- **Two map layers, one canvas.** The Surface/Underground switch was hiding half the
+  world and made cross-layer connections undrawable. They can't share one transform
+  (underground mapsquares are `mapZ+100`, so their absolute-Z band is 9216-10367 vs
+  the surface's 1280-4991), so each layer keeps its own bounds and gets a pixel
+  OFFSET into a shared canvas - `worldLayout()` in `app.js`, surface on top,
+  underground below, aligned on world X. Everything downstream (`coordToPixel`, pins,
+  labels, selection lines, `panToRaw`) takes the coord's own layer instead of a global
+  `state.layer`, which is now gone. If a third layer ever appears, it's one more entry
+  in `worldLayout`.
+- **Open where the player is.** The map opens centered on `ap-spawn.json`'s home at 2x
+  with a white home pin, not at the top-left of a 3584x9848 canvas. `tracker.json`
+  carries the home coord for it - the least secret thing in a seed.
+- **"Nothing here" and "nothing found yet" look identical in a discovery journal.**
+  The four swap tabs (gathering/recipes/bestiary/teleports) only listed hits, so the
+  counter was the only hint of what remained. They now also list their un-hit sources
+  from a new `sources` block on `tracker.json` (each override table's key set, plus
+  the seven teleport spell names hardcoded to match `teleport.rs2`'s `ap_track` keys).
+  This inherits the map's hollow-pin contract exactly: naming a source reveals no more
+  than the existing discovered/total counter did, and never what it now yields. Keep
+  that split - the moment a "not yet found" row shows its answer outside `?spoiler=1`,
+  the whole journal premise is gone.
+- **`names` must be widened with any new id list.** The id -> name maps in
+  `buildApTrackerResponse` were scoped to discovered (+ spoiler) ids; adding the
+  sources block without also feeding those ids into `itemIds` / `dropSlotIds` renders
+  a page full of `item_317`. `tracker.json` is ~84 KB per 5s poll after this - fine
+  for a localhost single-user tracker, but it is the reason the 517-entry check
+  catalog got its own fetch-once route instead.

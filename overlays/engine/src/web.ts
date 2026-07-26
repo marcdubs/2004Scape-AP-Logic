@@ -18,7 +18,8 @@ import { createDefaultWorldConfig, loadWorldConfig, normalizeWorldConfig, saveWo
 import OnDemand from '#/engine/OnDemand.js';
 import { tryParseInt } from '#/util/TryParse.js';
 import ObjType from '#/cache/config/ObjType.js';
-import { getApStatus, initApClient, probeServer, reconfigure } from '#/engine/ApClient.js';
+import { getApStatus, getSlotCheckIds, initApClient, isApModeActive, probeServer, reconfigure } from '#/engine/ApClient.js';
+import { getApOption } from '#/engine/ApOptions.js';
 import { getDropOverrideCount } from '#/engine/ApDropOverrides.js';
 import { AXE_TIERS, GEAR_FAMILY_LABELS, GEAR_TIER_LEVELS, GEAR_TIER_NAMES, GEAR_TIER_STARTERS, PICKAXE_TIERS, getUnlockCount, questGateLabel } from '#/engine/ApUnlockOverrides.js';
 import { getEntranceOverrideCount, getEntranceSources } from '#/engine/ApEntranceOverrides.js';
@@ -204,6 +205,21 @@ function collectEntranceCoords(map: Record<string, string> | undefined, coords: 
         coords.add(sep === -1 ? key : key.slice(0, sep));
         coords.add(value);
     }
+}
+
+// The 7 spellbook teleports wired to ap_track in teleport.rs2, keyed exactly as that
+// script passes them ("<City> Teleport" - see the @magic_teleport call sites). Static
+// vanilla knowledge, not seed data: it's the spell list on the standard spellbook.
+const TELEPORT_SPELLS = ['Varrock Teleport', 'Lumbridge Teleport', 'Falador Teleport', 'Camelot Teleport', 'Ardougne Teleport', 'Watchtower Teleport', 'Trollheim Teleport'];
+
+// Every key in a randomizer's override table, i.e. the full set of things that COULD
+// be discovered in that category. Same "hollow pin" contract the map's entranceSources
+// already established: naming the source (this rock/this recipe/this monster is in the
+// shuffle) reveals no more than the tab's own discovered/total counter already did,
+// and never says what it now yields - that still takes actually finding it.
+function tableSourceKeys(filePath: string): string[] {
+    const map = readJsonFile<{ map?: Record<string, unknown> }>(filePath)?.map;
+    return map ? Object.keys(map) : [];
 }
 
 type ApSpoilerTables = { entrances: Record<string, string>; gather: Record<string, string>; process: Record<string, string>; drops: Record<string, string> };
@@ -399,6 +415,28 @@ function buildApTrackerResponse(spoilerMode: boolean): unknown {
     collectIds(discoveries.process, itemIds);
     collectDropIds(discoveries.drops, dropSlotIds, dropUnitIds);
 
+    // "what's left to find" lists for the gathering/recipes/bestiary/teleports tabs
+    const sources = {
+        gather: tableSourceKeys('data/config/ap-gather.json'),
+        process: tableSourceKeys('data/config/ap-process.json'),
+        drops: tableSourceKeys('data/config/ap-drops.json'),
+        teleports: TELEPORT_SPELLS
+    };
+    // those sources are rendered by name, so they need naming too (the id -> name maps
+    // below are otherwise scoped to what's been discovered)
+    for (const id of [...sources.gather, ...sources.process]) {
+        const n = Number(id);
+        if (Number.isInteger(n)) {
+            itemIds.add(n);
+        }
+    }
+    for (const id of sources.drops) {
+        const n = Number(id);
+        if (Number.isInteger(n)) {
+            dropSlotIds.add(n);
+        }
+    }
+
     let spoiler: ApSpoilerTables | null = null;
     if (spoilerMode) {
         spoiler = loadSpoilerTables();
@@ -450,9 +488,19 @@ function buildApTrackerResponse(spoilerMode: boolean): unknown {
         }
     }
 
+    // Home/respawn point (data/config/ap-spawn.json, written by RandomizeSpawn.ts).
+    // Not a spoiler in any meaningful sense - it is where the player physically stands
+    // the first second they log in, and docs/tracker-map.md always planned a home flag.
+    // The map uses it to open centered on the run's starting area instead of on the
+    // arbitrary top-left corner of the world image.
+    const spawnFile = readJsonFile<{ home?: string; label?: string }>('data/config/ap-spawn.json');
+    const spawn = typeof spawnFile?.home === 'string' ? { raw: spawnFile.home, label: spawnFile.label ?? null } : null;
+
     return {
         discoveries,
         entranceSources,
+        sources,
+        spawn,
         unlocks: buildUnlocksPanel(),
         names: { items, dropSlots, dropUnits, places },
         totals: {
@@ -460,13 +508,167 @@ function buildApTrackerResponse(spoilerMode: boolean): unknown {
             gather: getGatherOverrideCount(),
             process: getProcessOverrideCount(),
             drops: getDropOverrideCount(),
-            // stable code fact, not a spoiler - exactly 7 spellbook teleport spells
-            // are wired to ap_track in teleport.rs2 (Varrock/Lumbridge/Falador/
-            // Camelot/Ardougne/Watchtower/Trollheim); there's no JSON override table
-            // to size this from the way the other three categories have.
-            teleports: 7
+            // stable code fact, not a spoiler - the spellbook teleports wired to
+            // ap_track in teleport.rs2; there's no JSON override table to size this
+            // from the way the other three categories have.
+            teleports: TELEPORT_SPELLS.length
         },
         spoiler
+    };
+}
+
+// ---------------------------------------------------------------------------
+// GET /ap/checks.json - the check catalog behind the tracker's "Checks" tab
+// (GitHub #19). Fired state is NOT here: it already rides on tracker.json as
+// discoveries.checks (ApChecks.fireCheck records every check it fires), so this
+// route serves only the per-seed-static catalog and the SPA fetches it once
+// instead of re-shipping 517 names every 5s poll.
+// ---------------------------------------------------------------------------
+
+// kind -> which tab group it lands in, and its own heading inside that group.
+// Section labels are RS2004World._KIND_GROUP's verbatim (apworld/rs2004scape/
+// __init__.py), so the tracker, the AP client's location_name_groups and the
+// spoiler log all name a check's category identically. The three odds-and-ends
+// kinds share one "Miscellaneous" group: individually they're too small to be
+// worth a tab, together they're the list a player consults to find the checks
+// they forgot exist (Barcrawl, Gnomeball, the Mage Arena god cape).
+const CHECK_GROUPS: { key: string; label: string; kinds: string[]; open: boolean }[] = [
+    { key: 'misc', label: 'Miscellaneous', kinds: ['activity', 'barcrawl', 'ds'], open: true },
+    { key: 'quests', label: 'Quests', kinds: ['quest'], open: false },
+    { key: 'levels', label: 'Level Milestones', kinds: ['level'], open: false },
+    { key: 'first_xp', label: 'First XP', kinds: ['first_xp'], open: false },
+    { key: 'first_kill', label: 'First Kills', kinds: ['first_kill'], open: false },
+    { key: 'music', label: 'Music Tracks', kinds: ['music'], open: false }
+];
+
+const CHECK_SECTION_LABELS: Record<string, string> = {
+    quest: 'Quests',
+    ds: 'Dragon Slayer Stages',
+    barcrawl: 'Barcrawl Bars',
+    level: 'Level Milestones',
+    activity: 'Activities',
+    first_xp: 'First XP',
+    first_kill: 'First Kills',
+    music: 'Music Tracks'
+};
+
+type ApCheckCatalogEntry = { name?: string; kind?: string; skill?: string; level?: number; fillerOnly?: boolean };
+
+let checkCatalogCache: Record<string, ApCheckCatalogEntry> | null = null;
+
+// The AP datapackage doubles as the check catalog: same 517 locations, same ids,
+// same display names the multiworld and the spoiler log use. Static for the process
+// lifetime (it ships with the overlay and only changes when ExportApWorldData.ts is
+// re-run, which needs a restart anyway).
+function loadCheckCatalog(): Record<string, ApCheckCatalogEntry> {
+    if (checkCatalogCache === null) {
+        checkCatalogCache = readJsonFile<{ locations?: Record<string, ApCheckCatalogEntry> }>('data/config/ap-archipelago-data.json')?.locations ?? {};
+    }
+    return checkCatalogCache;
+}
+
+// Check ids this seed can never fire, so the tab can render them as "not in this
+// seed" instead of leaving impossible entries on the player's to-do list. Two
+// sources, one per mode: connected AP mode knows exactly which locations the
+// multiworld generated for this slot (ApClient.getSlotCheckIds, from the Connected
+// packet); solo placement mode reads GenerateSeed.ts's own feasibility exclusions
+// out of ap-placements.json. Either may be unavailable (never connected, or a seed
+// rolled before infeasibleChecks was written) - then nothing is marked, which is the
+// safe direction: an obtainable check listed as to-do beats an obtainable check
+// crossed out.
+function excludedCheckIds(catalog: Record<string, ApCheckCatalogEntry>): Set<string> {
+    const excluded = new Set<string>();
+
+    if (isApModeActive()) {
+        const slotIds = getSlotCheckIds();
+        if (slotIds !== null) {
+            for (const id of Object.keys(catalog)) {
+                if (!slotIds.has(id)) {
+                    excluded.add(id);
+                }
+            }
+        }
+        return excluded;
+    }
+
+    // re-read per request: a reseed rewrites ap-placements.json under a running server
+    const parsed = readJsonFile<{ infeasibleChecks?: unknown[] }>('data/config/ap-placements.json');
+    for (const id of parsed?.infeasibleChecks ?? []) {
+        if (typeof id === 'string') {
+            excluded.add(id);
+        }
+    }
+    return excluded;
+}
+
+// What each check holds, for ?spoiler=1 only - the same UI-development escape hatch
+// the entrance/gather/process/drop tabs already have. Solo placement mode only: in AP
+// mode the multiworld owns the contents and the server genuinely doesn't know them
+// until a check fires (and a stale ap-placements.json from an earlier solo run must
+// never be presented as this run's answer).
+function loadCheckContents(): Record<string, string> {
+    if (isApModeActive()) {
+        return {};
+    }
+    const parsed = readJsonFile<{ placements?: Record<string, { item?: string; display?: string }> }>('data/config/ap-placements.json');
+    const out: Record<string, string> = {};
+    for (const [id, entry] of Object.entries(parsed?.placements ?? {})) {
+        out[id] = entry?.item === 'filler' || !entry?.item ? 'filler' : (entry.display ?? entry.item);
+    }
+    return out;
+}
+
+function buildApChecksResponse(spoilerMode: boolean): unknown {
+    const catalog = loadCheckCatalog();
+    const ids = Object.keys(catalog);
+    if (ids.length === 0) {
+        return { present: false, apMode: isApModeActive(), groups: [], checks: [] };
+    }
+
+    // musicChecks off = the music watches are never even loaded (ApChecks.loadWatches),
+    // so those 230 locations don't exist this run. Drop them entirely rather than
+    // showing a permanently-0/230 group.
+    const includeMusic = getApOption('musicChecks');
+    const excluded = excludedCheckIds(catalog);
+    const contents = spoilerMode ? loadCheckContents() : null;
+
+    const groupByKind = new Map<string, string>();
+    for (const group of CHECK_GROUPS) {
+        for (const kind of group.kinds) {
+            groupByKind.set(kind, group.key);
+        }
+    }
+
+    const checks = [];
+    for (const id of ids) {
+        const entry = catalog[id];
+        const kind = entry.kind ?? '';
+        const group = groupByKind.get(kind);
+        if (group === undefined || (kind === 'music' && !includeMusic)) {
+            continue;
+        }
+        checks.push({
+            id,
+            name: entry.name ?? id,
+            kind,
+            group,
+            section: CHECK_SECTION_LABELS[kind] ?? kind,
+            skill: entry.skill,
+            level: entry.level,
+            // clue-trail tiers and music tracks: reachable, but never hold progression
+            // (clue ACQUISITION is drop RNG) - worth flagging so a player doesn't read
+            // an unfired one as a missed progression item.
+            luck: entry.fillerOnly === true ? true : undefined,
+            excluded: excluded.has(id) ? true : undefined,
+            contents: contents ? (contents[id] ?? null) : undefined
+        });
+    }
+
+    return {
+        present: true,
+        apMode: isApModeActive(),
+        groups: CHECK_GROUPS.filter(g => !(g.key === 'music' && !includeMusic)).map(g => ({ key: g.key, label: g.label, open: g.open })),
+        checks
     };
 }
 
@@ -530,6 +732,8 @@ async function handleWebRequest(req: Request): Promise<Response> {
             }
         } else if (url.pathname === '/ap/tracker.json') {
             return jsonResponse(buildApTrackerResponse(url.searchParams.get('spoiler') === '1'));
+        } else if (url.pathname === '/ap/checks.json') {
+            return jsonResponse(buildApChecksResponse(url.searchParams.get('spoiler') === '1'));
         } else if (url.pathname === '/ap/archipelago.json') {
             return jsonResponse({ config: readApConnectionConfig(), status: getApStatus() });
         } else if (Environment.node.debug) {

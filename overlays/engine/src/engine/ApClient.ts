@@ -95,6 +95,13 @@ let sentChecks = new Set<string>();
 
 let ws: WebSocket | null = null;
 let connected = false; // Connected packet received
+// Check ids this slot actually HAS in the multiworld, from the Connected packet's
+// missing_locations + checked_locations (together, every location the generator
+// created for us). The apworld drops locations its region model can't justify this
+// seed (RS2004World.create_regions' feasibility exclusion) and all 230 music
+// locations when music_checks is off - so a catalog id missing from this set can
+// never be checked in this run. Null until the first Connected (unknown, not empty).
+let slotCheckIds: Set<string> | null = null;
 let goals: string[] = ['dragon']; // victory requires EVERY listed goal's checks
 let lastError: string | null = null; // most recent connection problem, for the tracker's setup page
 let reconnectAttempt = 0;
@@ -226,6 +233,29 @@ function locationIdsFor(checkIds: Iterable<string>): number[] {
         // goals below.
     }
     return ids;
+}
+
+// Inverse of locationIdsFor for the two location-id arrays the Connected packet
+// carries: builds the set of check ids this slot actually holds (see slotCheckIds).
+// Ids belonging to OTHER games in the room never map back through
+// checkToLocationId, so a shared-id collision can't widen our set.
+function rememberSlotLocations(missing: unknown, checked: unknown): void {
+    if (!Array.isArray(missing) && !Array.isArray(checked)) {
+        return; // pre-0.6 server or a trimmed Connected - leave "unknown" rather than claiming everything is excluded
+    }
+    const byLocationId = new Map<number, string>();
+    for (const [checkId, locId] of checkToLocationId ?? []) {
+        byLocationId.set(locId, checkId);
+    }
+    const ids = new Set<string>();
+    for (const raw of [...(Array.isArray(missing) ? missing : []), ...(Array.isArray(checked) ? checked : [])]) {
+        const checkId = typeof raw === 'number' ? byLocationId.get(raw) : undefined;
+        if (checkId !== undefined) {
+            ids.add(checkId);
+        }
+    }
+    slotCheckIds = ids;
+    printInfo(`AP client: slot holds ${ids.size} of ${byLocationId.size} known check location(s)`);
 }
 
 function sendFullResync(): void {
@@ -568,6 +598,7 @@ function handlePacket(packet: { cmd?: string } & Record<string, unknown>): void 
             reconnectAttempt = 0;
             lastError = null;
             printInfo(`AP client: connected to ${config?.host}:${config?.port} as "${config?.slot}"`);
+            rememberSlotLocations(packet.missing_locations, packet.checked_locations);
             applySlotData(packet.slot_data as Record<string, unknown> | undefined);
             sendFullResync();
             break;
@@ -687,6 +718,7 @@ export function reconfigure(): void {
         ws = null;
     }
     connected = false;
+    slotCheckIds = null; // re-learned from the next Connected packet
 
     const wasActive = config !== null;
     config = loadConfig();
@@ -714,6 +746,16 @@ export function reconfigure(): void {
     printInfo(`AP client: enabled (${checkToLocationId.size} locations, ${itemsById.size} items mapped)`);
     startDeliveryTimer();
     connect();
+}
+
+/**
+ * Check ids this slot holds in the multiworld, or null when that isn't known
+ * (not in AP mode, or connected but the Connected packet carried no location
+ * arrays). The tracker's Checks tab uses it to render locations the multiworld
+ * never generated as "not in this seed" instead of "not done yet".
+ */
+export function getSlotCheckIds(): Set<string> | null {
+    return isApModeActive() ? slotCheckIds : null;
 }
 
 /** Live client state for the tracker's Archipelago setup page. */
