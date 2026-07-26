@@ -580,6 +580,9 @@ Tools (`overlays/engine/tools/drops/`):
 - `CapDropRarity.ts` - the drop-RATE pass (no seed, no items): rewrites cascade
   thresholds so no loot slot is rarer than `--min-rate` (default 1/32). Orthogonal to
   every swap mode above and runs after them - see "Rarity cap" below.
+- `SimulateDrops.ts` - rolls one monster's real loot table N times and prints what fell
+  out, vanilla vs capped side by side. Writes nothing; the capped column is computed in
+  memory, so it's safe to run before or after the cap is applied.
 - `MimicTransform.ts` - everything specific to `--mode mimic`: parses each
   `[ai_queue3,...]` death handler out of the pristine backup, extracts its
   post-prologue loot into a `[label,ap_drops_<n>]` block in one generated file
@@ -687,6 +690,43 @@ floor is the arithmetic limit, and imp is the one table that hits it.
   scaled up (`random(6)` -> `random(24)`) rather than distorted. No vanilla cascade needs
   this at 1/32; a coarser `--min-rate` can. A cascade with more drop branches than the
   floor allows (>32 at 1/32) is impossible by arithmetic - it warns and stays vanilla.
+
+### Seeing it: the drop simulator
+
+```
+cd Server/engine && npx tsx tools/drops/SimulateDrops.ts <npc> [--kills 10000] [--seed <n>] [--min-rate 1/32] [--live] [--list]
+```
+
+Rolls that monster's actual cascade `--kills` times and prints the result twice - vanilla
+weights and capped weights, same seed, so the only thing that differs between the columns
+is the table:
+
+```
+$ npx tsx tools/drops/SimulateDrops.ts werewolf --kills 5000
+_werewolf (werewolf.rs2, vanilla backup) - 5,000 kills, seed 777, floor 1/32
+
+drop                            VANILLA                  CAPPED
+                       rate     sim   count       rate     sim   count
+~randomjewel          1/512   0.18%       9       1/32   3.24%     162
+rune_med_helm       1/170.7   0.52%      26       1/32   3.24%     162
+mithril_chainbody    1/51.2   1.68%      84       1/32   2.74%     137
+steel_scimitar         1/16   6.30%     315     1/18.3   5.62%     281
+coins                 1/3.2  32.00%    1600      1/3.7  27.74%    1387
+
+rarest drop: 1/512 -> 1/32; drops rarer than 1/32: 9 -> 0
+nothing at all: 0.59% -> 0.00% of kills
+```
+
+`--live` reads the installed content instead of the vanilla backup (including
+`ap_mimic.rs2`), which is how you check what a running server would actually give you.
+`--list` prints all 63 tables. `rate` is the table's exact odds and `sim`/`count` are the
+simulated results, so the two agreeing is the sim checking itself.
+
+Rows are one cascade BRANCH each, which is why a `~randomherb` branch shows as a single
+outcome (the proc's own table is out of scope for the cap) and why a `map_members`
+branch shows as `bloodrune | body_talisman` - one roll, two possible items. `death_drop`
+(bones/ashes) is reported separately when the npc config resolves, since it's guaranteed
+and outside the roll.
 
 ### Scope
 

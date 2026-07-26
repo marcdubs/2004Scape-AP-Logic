@@ -200,7 +200,7 @@ const ASSIGN_ITEM_RE = /\$[a-zA-Z0-9_]+\s*=\s*([a-z][a-zA-Z0-9_]*)\s*;/g;
 
 // what a branch drops, for the spoiler only - literal obj_add items plus the
 // `$drop = <item>;` form megararetable uses. Never used to decide anything.
-function branchItems(branch: CascadeBranch): string[] {
+export function branchItems(branch: CascadeBranch): string[] {
     const items = new Set<string>();
     for (const m of branch.bodyText.matchAll(OBJ_ADD_ITEM_RE)) {
         if (m[1] !== 'npc_param') {

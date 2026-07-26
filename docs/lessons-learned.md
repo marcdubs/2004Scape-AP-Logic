@@ -3987,3 +3987,28 @@ measuring the corpus instead of reasoning about one table.
   rebuilt. **Not verified in-game** - the user's Server checkout was left exactly as
   found (mimic seed, vanilla rates); `node scripts/install.js` + `RegenerateAll.ts` is
   what turns this on.
+
+### Addendum: the drop simulator (same session)
+
+`tools/drops/SimulateDrops.ts` came out of the user asking, reasonably, whether the whole
+cap was overcomplicated and whether biasing the roll toward low numbers would do the same
+job. Two things settled it, and both are worth keeping:
+
+- **Cascade branch ORDER carries no reliable rarity signal.** Exactly 1 of 61 cascades
+  (>=4 branches) has monotonic weights; the rarest branch averages position 0.21 but sits
+  in the second half in 7 tables, barbarian.rs2 ends with eight consecutive weight-1
+  branches AFTER its 42-weight coin branch, and guard.rs2's FIRST branch is "nothing
+  dropped". So a low-biased roll boosts a position range, not rare items. Simulated
+  against the real corpus: min-of-2 rolls lift only 128 of the 721 sub-1/32 branches to
+  1/32 while making 450 branches rarer than vanilla; min-of-5 gets 254 and makes 579
+  worse. A bias is monotone in position; rarity isn't. Kept as the answer if this comes
+  up again.
+- **The simulator simulates BOTH columns from one parse.** Vanilla weights and the
+  in-memory `planCascade()` weights, same seed, same roll loop - so the printed
+  difference can only be the table, never two hand-copied tables drifting. It writes
+  nothing (safe on a live tree) and `--live` reads installed content including
+  `ap_mimic.rs2`, which makes it the "did the install actually take" check too.
+- **Verified independently**: a separate re-implementation of the roll loop over all 63
+  tables x 200,000 kills with capped weights - worst |observed - table| = 0.236pp, and
+  the rarest OBSERVED drop rate anywhere in the corpus was 1/33.4 (sampling noise around
+  the 1/32 floor). That is the empirical form of the guarantee the cap makes on paper.

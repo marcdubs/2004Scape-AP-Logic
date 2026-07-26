@@ -131,6 +131,11 @@ From `Server/engine`:
 - [ ] `npx tsx tools/drops/CapDropRarity.ts --dry-run` — on the vanilla corpus expect
       "721 drop branch(es) raised across 62 cascade(s)"; the counts are higher once
       `ap_mimic.rs2` exists (mimic mode caps those tables too)
+- [ ] `npx tsx tools/drops/SimulateDrops.ts werewolf --kills 5000` — rarest drop
+      1/512 → 1/32, "drops rarer than 1/32: 9 → 0", and each `sim` column tracking
+      its own `rate` column (that agreement is the sim validating itself)
+- [ ] `npx tsx tools/drops/SimulateDrops.ts <npc> --live` after installing the cap —
+      the AS INSTALLED column should already show the capped rates
 
 ### Drop rarity cap offline checks (GitHub #11)
 
