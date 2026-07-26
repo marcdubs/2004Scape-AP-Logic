@@ -69,6 +69,10 @@ interface ExportedItem {
     count?: number;
     copies: number;
     filler?: boolean;
+    /** Filler items only: which reward category the game server should roll
+     *  (ap_rewards.rs2 ~ap_grant_named_pack). Absent = "Mystery Reward", the
+     *  roll-anything filler. */
+    pack?: string;
 }
 
 interface ApDataFile {
@@ -84,6 +88,9 @@ interface PendingDelivery {
     display: string;
     filler: boolean;
     grant?: string;
+    /** Filler deliveries only - see ExportedItem.pack. Undefined on entries
+     *  persisted by a pre-pack build, which rs2 reads as the roll-anything case. */
+    pack?: string;
 }
 
 interface SessionState {
@@ -561,7 +568,7 @@ function applyReceivedItem(networkItem: { item?: number }): void {
     }
 
     if (entry.def.filler || !entry.def.grant) {
-        queueDelivery({ display: entry.name, filler: true });
+        queueDelivery({ display: entry.name, filler: true, pack: entry.def.pack });
         return;
     }
 
@@ -660,7 +667,7 @@ async function drainDeliveries(): Promise<void> {
         const pending = session.pending;
         session.pending = [];
         for (const delivery of pending) {
-            player.enqueueScript(script, PlayerQueueType.ENGINE, 0, [delivery.display, delivery.filler ? 1 : 0]);
+            player.enqueueScript(script, PlayerQueueType.ENGINE, 0, [delivery.display, delivery.filler ? 1 : 0, delivery.pack ?? '']);
             if (delivery.grant) {
                 // the grant may have raised a cap that has banked xp waiting
                 ApUnlockOverrides.applyBankedXpForUnlock(player, delivery.grant);

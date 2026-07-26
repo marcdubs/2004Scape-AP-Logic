@@ -3,8 +3,8 @@
 from BaseClasses import CollectionState
 
 from . import RS2004TestBase
-from .. import (CAP_ITEM_BY_SKILL, GEAR_ITEM_NAMES, PROGRESSIVE_QUEST_NAME, QUEST_UNLOCK_ITEM_BY_ID,
-                TOOL_ITEM_NAMES, GATED_QUEST_IDS)
+from .. import (CAP_ITEM_BY_SKILL, FILLER_NAMES, GEAR_ITEM_NAMES, PROGRESSIVE_QUEST_NAME,
+                QUEST_UNLOCK_ITEM_BY_ID, TOOL_ITEM_NAMES, GATED_QUEST_IDS)
 
 
 class TestNoGearNoTools(RS2004TestBase):
@@ -54,6 +54,6 @@ class TestAllCategoriesOff(RS2004TestBase):
                "skill_caps": False, "quest_unlocks": False, "goal": "legends"}
 
     def test_pool_is_all_filler_and_beatable(self) -> None:
-        self.assertTrue(all(item.name == "Mystery Reward" for item in self.multiworld.itempool))
+        self.assertTrue(all(item.name in FILLER_NAMES for item in self.multiworld.itempool))
         state = self.multiworld.get_all_state()
         self.assertTrue(self.multiworld.completion_condition[self.player](state))

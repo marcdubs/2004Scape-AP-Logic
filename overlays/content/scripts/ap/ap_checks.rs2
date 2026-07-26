@@ -43,10 +43,16 @@ if ($is_unlock = 1) {
 // by the AP server). The unlock itself was already applied engine-side via
 // grantUnlock before this was enqueued; the filler branch rolls the same random
 // reward a solo filler check pays.
-[queue,ap_remote_item](string $display, int $is_filler)
+//
+// $pack names WHICH filler item arrived ("ore_pack", "bar_pack", "herb_pack",
+// "rune_pack"), so the multiworld's named packs land on their own category
+// instead of the weighted random one. Empty = "Mystery Reward" (roll anything),
+// which is also what a pre-pack ApClient sends and what a resumed session's
+// older persisted queue replays - see ~ap_grant_named_pack.
+[queue,ap_remote_item](string $display, int $is_filler, string $pack)
 if ($is_filler = 1) {
     mes("Archipelago sent you a reward!");
-    ~ap_grant_check_reward;
+    ~ap_grant_named_pack($pack);
 } else {
     ~music_jingle("quest complete 1");
     mes("Archipelago item received: <$display>!");

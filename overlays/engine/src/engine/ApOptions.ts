@@ -53,7 +53,53 @@ const NUMERIC_DEFAULTS: Record<string, { value: number; min: number; max: number
     // randomizer run wants supplies at the pace the rest of the pacing assumes,
     // and 2004 gathering rates are the standout outlier (GitHub #13). Set 100 for
     // untouched 2004 odds.
-    gatherSpeed: { value: 200, min: 25, max: 1000 }
+    gatherSpeed: { value: 200, min: 25, max: 1000 },
+
+    // ---- reward roll tuning (ap_rewards.rs2) ----
+    // How many items a "pack" category (ores/bars/herbs/runes) hands out per
+    // reward. Each roll is independently level-biased, so a pack reads like a
+    // drop table rather than one lonely stack. 1 turns packs back into the
+    // single-item categories everything else uses.
+    rewardPackRolls: { value: 3, min: 1, max: 10 },
+    // Aspiration knob: how many levels ABOVE your own a tier has to be for its
+    // roll weight to halve (see ~ap_tier_weight). Small = strict, you almost
+    // only ever get what you can already use; large = generous, high tiers show
+    // up early as "someday" prizes. 8 puts runite ore at roughly 1-2% of an ore
+    // pack roll for a level-40 smith.
+    rewardAspirationLevels: { value: 8, min: 1, max: 40 },
+    // Obsolescence knob: weight lost per level you are ABOVE a tier, in
+    // thousandths (see ~ap_tier_weight, which starts every usable tier at 1000
+    // and floors it at 120). 8 means a tier is at the floor once you are ~110
+    // levels past it - i.e. bronze never fully stops coming, but by level 60 it
+    // is roughly 1/8th as likely as the best thing you can use.
+    rewardObsolescence: { value: 8, min: 0, max: 100 },
+
+    // Category weights for the "roll anything" reward (Mystery Reward, and every
+    // solo-mode filler check). Relative, not percentages - the roll is
+    // proportional-to-weight over whatever these sum to, so 0 disables a
+    // category outright and doubling one key doubles its share. Defaults lean
+    // hard on the packs and on XP/cash: gear categories are the ones players
+    // out-tier fastest, and coal/bars/herbs/runes are the actual bottlenecks in
+    // a randomized world (drop, gathering and processing shuffles all make raw
+    // materials harder to get, never easier).
+    rewardWeightOres: { value: 110, min: 0, max: 1000 },
+    rewardWeightBars: { value: 100, min: 0, max: 1000 },
+    rewardWeightHerbs: { value: 85, min: 0, max: 1000 },
+    rewardWeightRunes: { value: 85, min: 0, max: 1000 },
+    rewardWeightXp: { value: 85, min: 0, max: 1000 },
+    rewardWeightCash: { value: 65, min: 0, max: 1000 },
+    rewardWeightFood: { value: 55, min: 0, max: 1000 },
+    rewardWeightPotions: { value: 55, min: 0, max: 1000 },
+    rewardWeightCrafting: { value: 45, min: 0, max: 1000 },
+    rewardWeightTools: { value: 45, min: 0, max: 1000 },
+    rewardWeightRunecraft: { value: 40, min: 0, max: 1000 },
+    rewardWeightAddons: { value: 40, min: 0, max: 1000 },
+    rewardWeightArmour: { value: 40, min: 0, max: 1000 },
+    rewardWeightWeapons: { value: 40, min: 0, max: 1000 },
+    rewardWeightArrows: { value: 35, min: 0, max: 1000 },
+    rewardWeightRangedGear: { value: 30, min: 0, max: 1000 },
+    rewardWeightCaskets: { value: 30, min: 0, max: 1000 },
+    rewardWeightKeepsakes: { value: 25, min: 0, max: 1000 }
 };
 
 let cache: Record<string, boolean> | null = null;

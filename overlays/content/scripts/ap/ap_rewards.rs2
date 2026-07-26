@@ -32,12 +32,42 @@ return;
 
 // info: custom - the general-purpose check+reward hook, public interface for
 // every other check surface (e.g. the checks agent's [queue,ap_check_fired]
-// calls this directly). Rolls a fully random category at the player's level
+// calls this directly). Rolls a weighted random category at the player's level
 // in that category and delivers it. Callers must only invoke this from a
 // queue-triggered (or otherwise already-protected) context, same guarantee
 // ap_quest_complete relies on above.
 [proc,ap_grant_check_reward]
-def_string $category = ~ap_random_category;
+~ap_grant_category(~ap_random_category);
+
+// info: custom - named-pack entry point, for real-Archipelago mode. The AP item
+// pool ships DISTINCT filler items ("Ore Pack", "Bar Pack", ...) rather than one
+// opaque "Mystery Reward", so the multiworld can hint them, the spoiler log
+// names them, and a YAML can ask for more of one kind. ApClient.ts resolves the
+// received item name to the pack id and passes it through [queue,ap_remote_item]
+// to here; the CONTENTS are still rolled locally at receipt time, against the
+// stats you have when it lands. An unrecognized (or empty) pack id is the
+// "Mystery Reward" case and falls back to the weighted random category, so an
+// older server paired with a newer apworld degrades to the old behavior instead
+// of dropping the reward.
+[proc,ap_grant_named_pack](string $pack)
+if (compare($pack, "ore_pack") = 0) {
+    ~ap_grant_category("ores");
+} else if (compare($pack, "bar_pack") = 0) {
+    ~ap_grant_category("bars");
+} else if (compare($pack, "herb_pack") = 0) {
+    ~ap_grant_category("herbs");
+} else if (compare($pack, "rune_pack") = 0) {
+    ~ap_grant_category("runes");
+} else {
+    ~ap_grant_check_reward;
+}
+
+// Rolls and delivers one reward from $category. "Pack" categories
+// (ores/bars/herbs/runes) roll rewardPackRolls times instead of once - each roll
+// independently level-biased - so a pack reads like a drop table rather than one
+// lonely stack. Identical rolls stack in the inventory on their own, so no
+// merging is needed here.
+[proc,ap_grant_category](string $category)
 if (compare($category, "xp") = 0) {
     ~ap_grant_xp_reward;
     return;
@@ -48,10 +78,45 @@ if (compare($category, "addons") = 0) {
     }
     // every enabled addon already owned (or all disabled) - the slot falls
     // back to a keepsake so the roll is never a dud.
-    ~ap_deliver_reward(~ap_roll_reward("keepsakes", 1));
+    ~ap_deliver_reward(~ap_roll_reward("keepsakes", 1), "Archipelago reward");
     return;
 }
-~ap_deliver_reward(~ap_roll_reward($category, ~ap_level_for_category($category)));
+def_int $level = ~ap_level_for_category($category);
+def_int $rolls = ~ap_category_rolls($category);
+def_string $label = ~ap_category_label($category);
+def_int $i = 0;
+while ($i < $rolls) {
+    ~ap_deliver_reward(~ap_roll_reward($category, $level), $label);
+    $i = calc($i + 1);
+}
+
+// How many independent rolls a category hands out. Only the four resource packs
+// are multi-roll: the rest are single items where three copies would just be
+// noise (nobody wants three rune platebodies).
+[proc,ap_category_rolls](string $category)(int)
+if (compare($category, "ores") = 0 | compare($category, "bars") = 0 | compare($category, "herbs") = 0 | compare($category, "runes") = 0) {
+    def_int $rolls = ap_option("rewardPackRolls");
+    if ($rolls < 1) {
+        $rolls = 1;
+    }
+    return($rolls);
+}
+return(1);
+
+// Chat prefix for a delivery line. The packs get their own name so a multi-roll
+// reward reads as one thing ("Ore Pack: 61 x Coal!" three times over) instead of
+// three unrelated "Archipelago reward" lines.
+[proc,ap_category_label](string $category)(string)
+if (compare($category, "ores") = 0) {
+    return("Ore Pack");
+} else if (compare($category, "bars") = 0) {
+    return("Bar Pack");
+} else if (compare($category, "herbs") = 0) {
+    return("Herb Pack");
+} else if (compare($category, "runes") = 0) {
+    return("Rune Pack");
+}
+return("Archipelago reward");
 
 // The addon drop ladder: first enabled-and-not-yet-
 // owned item in a fixed power-curve order is delivered. Ownership = inventory
@@ -63,25 +128,25 @@ if (compare($category, "addons") = 0) {
 // ap_option consults data/config/ap-options.json engine-side.
 [proc,ap_try_addon_reward]()(boolean)
 if (ap_option("addonBankBox") = 1 & ~ap_addon_owned(ap_bank_box) = false) {
-    ~ap_deliver_reward(ap_bank_box, 1);
+    ~ap_deliver_reward(ap_bank_box, 1, "Archipelago reward");
     return(true);
 }
 if (ap_option("addonTreeCompass") = 1 & ~ap_addon_owned(ap_tree_compass) = false) {
-    ~ap_deliver_reward(ap_tree_compass, 1);
+    ~ap_deliver_reward(ap_tree_compass, 1, "Archipelago reward");
     return(true);
 }
 if (ap_option("addonTeleportingFocus") = 1) {
     if (~ap_addon_owned(ap_teleporting_focus) = false & ~ap_addon_owned(ap_greater_teleporting_focus) = false) {
-        ~ap_deliver_reward(ap_teleporting_focus, 1);
+        ~ap_deliver_reward(ap_teleporting_focus, 1, "Archipelago reward");
         return(true);
     }
     if (~ap_addon_owned(ap_teleporting_focus) = true & ~ap_addon_owned(ap_greater_teleporting_focus) = false) {
-        ~ap_deliver_reward(ap_greater_teleporting_focus, 1);
+        ~ap_deliver_reward(ap_greater_teleporting_focus, 1, "Archipelago reward");
         return(true);
     }
 }
 if (ap_option("addonNpcTeleport") = 1 & ~ap_addon_owned(ap_npc_teleport) = false) {
-    ~ap_deliver_reward(ap_npc_teleport, 1);
+    ~ap_deliver_reward(ap_npc_teleport, 1, "Archipelago reward");
     return(true);
 }
 return(false);
@@ -104,40 +169,96 @@ def_int $exp = calc(random(400001) + 100000);
 ap_stat_advance_raw($stat, $exp);
 mes("You are struck by inspiration! +<tostring(calc($exp / 10))> <~stat_name($stat)> XP.");
 
+// Weighted category roll for a "roll anything" reward. Was a flat random(16),
+// which gave 3-row `caskets` exactly as much airtime as 27-row `armour` and put
+// ~19% of every reward you will ever see into melee/ranged gear you have almost
+// certainly already out-tiered. Now each category carries a weight from
+// ap-options.json (rewardWeight*, see ApOptions.ts NUMERIC_DEFAULTS for the
+// defaults and the reasoning) and the roll is proportional to weight - so a
+// weight of 0 removes a category outright and the resource packs can carry the
+// bulk of the pool without any category being unreachable.
+//
+// Same single-pass weighted reservoir (A-Chao) as ap_roll_reward: no arrays in
+// this script language, so ~ap_weigh_category folds one candidate in at a time
+// and hands back the running (choice, total) pair.
 [proc,ap_random_category]()(string)
-def_int $r = random(16);
-if ($r = 0) {
-    return("armour");
-} else if ($r = 1) {
-    return("weapons");
-} else if ($r = 2) {
-    return("ranged_gear");
-} else if ($r = 3) {
-    return("arrows");
-} else if ($r = 4) {
-    return("runes");
-} else if ($r = 5) {
-    return("potions");
-} else if ($r = 6) {
-    return("food");
-} else if ($r = 7) {
-    return("tools");
-} else if ($r = 8) {
-    return("cash");
-} else if ($r = 9) {
-    return("xp");
-} else if ($r = 10) {
-    return("herb_supplies");
-} else if ($r = 11) {
-    return("runecraft_supplies");
-} else if ($r = 12) {
-    return("crafting_supplies");
-} else if ($r = 13) {
-    return("caskets");
-} else if ($r = 14) {
-    return("addons");
+def_string $chosen = "";
+def_int $total = 0;
+$chosen, $total = ~ap_weigh_category("ores", "rewardWeightOres", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("bars", "rewardWeightBars", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("herbs", "rewardWeightHerbs", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("runes", "rewardWeightRunes", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("xp", "rewardWeightXp", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("cash", "rewardWeightCash", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("food", "rewardWeightFood", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("potions", "rewardWeightPotions", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("crafting_supplies", "rewardWeightCrafting", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("tools", "rewardWeightTools", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("runecraft_supplies", "rewardWeightRunecraft", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("addons", "rewardWeightAddons", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("armour", "rewardWeightArmour", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("weapons", "rewardWeightWeapons", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("arrows", "rewardWeightArrows", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("ranged_gear", "rewardWeightRangedGear", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("caskets", "rewardWeightCaskets", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("keepsakes", "rewardWeightKeepsakes", $chosen, $total);
+if (compare($chosen, "") = 0) {
+    // every weight zeroed out - never leave a check unpaid.
+    return("keepsakes");
 }
-return("keepsakes");
+return($chosen);
+
+// One reservoir step: fold ($name, weight of $key) into the running selection.
+// Weight <= 0 means the category is disabled and is skipped entirely (it never
+// enters the total, so it cannot be picked).
+[proc,ap_weigh_category](string $name, string $key, string $chosen, int $total)(string, int)
+def_int $weight = ap_option($key);
+if ($weight <= 0) {
+    return($chosen, $total);
+}
+$total = calc($total + $weight);
+if (random($total) < $weight) {
+    $chosen = $name;
+}
+return($chosen, $total);
+
+// The level bias, and the heart of the "drop table" feel. The old rule was a
+// HARD cutoff (min_level <= your level, weight = min_level + 1): you could never
+// be given something you could not already use, which removed every moment of
+// "I can't use this yet, but I will". This replaces it with a tent curve around
+// your level, with no cutoff at all:
+//
+//   * at or below your level - full weight (1000), shedding `rewardObsolescence`
+//     per level you are past it, floored at 120 so low tiers keep coming in bulk
+//     (you always want coal, at every level).
+//   * above your level - halve per `rewardAspirationLevels` levels of overshoot,
+//     never below 1. At the default 8, a level-40 smith sees mithril ore at
+//     roughly 1 roll in 24, adamantite around 1 in 96, runite around 1 in 400.
+//
+// Bias, not a rule: everything in the category stays possible at every level.
+[proc,ap_tier_weight](int $min_level, int $level)(int)
+def_int $gap = calc($level - $min_level);
+def_int $weight = 1000;
+if ($gap >= 0) {
+    def_int $decay = ap_option("rewardObsolescence");
+    $weight = calc(1000 - $gap * $decay);
+    if ($weight < 120) {
+        $weight = 120;
+    }
+    return($weight);
+}
+def_int $over = calc(0 - $gap);
+def_int $halflife = ap_option("rewardAspirationLevels");
+if ($halflife < 1) {
+    // defensive: a 0 here would spin forever. ApOptions clamps to >= 1, so this
+    // only fires if the option table is ever loaded from somewhere that doesn't.
+    $halflife = 1;
+}
+while ($over > 0 & $weight > 1) {
+    $weight = calc($weight / 2);
+    $over = calc($over - $halflife);
+}
+return($weight);
 
 // Maps a reward category to the stat (or %qp, for cash) that gates its tiers.
 // "xp" never reaches this (special-cased before the dbtable roll in both
@@ -159,7 +280,14 @@ if (compare($category, "armour") = 0) {
     return(min(stat_base(woodcutting), stat_base(mining)));
 } else if (compare($category, "cash") = 0) {
     return(%qp);
-} else if (compare($category, "herb_supplies") = 0) {
+} else if (compare($category, "ores") = 0 | compare($category, "bars") = 0) {
+    // Smithing, not Mining: the ore pack exists to feed a smith, and gating on
+    // the gathering stat would hand a high-Mining/low-Smithing character ore
+    // they can already mine for themselves. Bars are Smithing by definition.
+    // min_level on the ore rows is therefore the SMITHING level at which that
+    // ore becomes relevant (coal at 30 = steel bars), not its mining level.
+    return(stat_base(smithing));
+} else if (compare($category, "herbs") = 0) {
     return(stat_base(herblore));
 } else if (compare($category, "runecraft_supplies") = 0) {
     return(stat_base(runecraft));
@@ -172,21 +300,25 @@ if (compare($category, "armour") = 0) {
     // rolls easy caskets, a developed one can also roll medium/hard.
     return(stat_base(hitpoints));
 } else if (compare($category, "keepsakes") = 0) {
-    // flat pool - every keepsakes row is min_level 1, so the weighted
-    // reservoir roll (weight = min_level + 1) is naturally uniform across
-    // the whole category regardless of what we return here, as long as it's
-    // >= 1. No level gating is appropriate for one-per-account quest
-    // keepsakes, so this is a deliberate neutral mapping, not an oversight.
+    // flat pool - every keepsakes row is min_level 1, so ~ap_tier_weight hands
+    // every row the same weight and the roll is uniform across the whole
+    // category regardless of what we return here. No level gating is
+    // appropriate for one-per-account quest keepsakes, so this is a deliberate
+    // neutral mapping, not an oversight.
     return(1);
 }
 return(1);
 
-// Weighted roll among ap_rewards rows in $category with min_level <= $level,
-// biased toward the top of the qualifying range (weight = min_level + 1).
+// Weighted roll among EVERY ap_rewards row in $category - there is no
+// eligibility filter any more, only the ~ap_tier_weight bias, so a tier above
+// your level is rare rather than impossible.
 // Single-pass weighted reservoir sampling (A-Chao): after folding in each
-// eligible row, keep it with probability weight/running_total - this is
-// exactly proportional-to-weight selection without needing an array to
-// collect candidates first (this script language has none).
+// row, keep it with probability weight/running_total - this is exactly
+// proportional-to-weight selection without needing an array to collect
+// candidates first (this script language has none).
+// Quantity is a uniform roll in [qty, qty_max] so repeat rewards of the same
+// item still feel different; qty_max < qty (a bad hand edit) degrades to the
+// fixed qty rather than a negative random() argument.
 [proc,ap_roll_reward](string $category, int $level)(namedobj, int)
 def_namedobj $chosen_item = null;
 def_int $chosen_qty = 0;
@@ -195,14 +327,16 @@ def_int $total_weight = 0;
 db_find(ap_rewards:category, $category);
 def_dbrow $row = db_findnext;
 while ($row ! null) {
-    def_int $row_min_level = db_getfield($row, ap_rewards:min_level, 0);
-    if ($row_min_level <= $level) {
-        def_int $weight = calc($row_min_level + 1);
-        $total_weight = calc($total_weight + $weight);
-        if (random($total_weight) < $weight) {
-            $chosen_item = db_getfield($row, ap_rewards:reward, 0);
-            $chosen_qty = db_getfield($row, ap_rewards:qty, 0);
+    def_int $weight = ~ap_tier_weight(db_getfield($row, ap_rewards:min_level, 0), $level);
+    $total_weight = calc($total_weight + $weight);
+    if (random($total_weight) < $weight) {
+        $chosen_item = db_getfield($row, ap_rewards:reward, 0);
+        def_int $qty_min = db_getfield($row, ap_rewards:qty, 0);
+        def_int $qty_max = db_getfield($row, ap_rewards:qty_max, 0);
+        if ($qty_max < $qty_min) {
+            $qty_max = $qty_min;
         }
+        $chosen_qty = calc($qty_min + random(calc($qty_max - $qty_min + 1)));
     }
     $row = db_findnext;
 }
@@ -236,10 +370,18 @@ return($chosen_item, $chosen_qty);
 // entire reward instead of splitting. Bank overflow is not handled by design:
 // bank.inv is stackall (240 distinct slots), so a full bank means 240 distinct
 // item types - not a state worth code here.
-[proc,ap_deliver_reward](namedobj $item, int $qty)
+//
+// $label is the chat prefix (~ap_category_label): "Archipelago reward" for the
+// single-item categories, "Ore Pack" / "Bar Pack" / ... for the multi-roll
+// resource packs, so a three-roll pack reads as one reward rather than three
+// unrelated ones.
+[proc,ap_deliver_reward](namedobj $item, int $qty, string $label)
 if ($item = null) {
     mes("AP: no reward available for that roll.");
     return;
+}
+if ($qty < 1) {
+    $qty = 1;
 }
 def_boolean $fits = false;
 if (oc_stackable($item) = true) {
@@ -251,21 +393,24 @@ if (oc_stackable($item) = true) {
 }
 if ($fits = true) {
     inv_add(inv, $item, $qty);
-    mes("Archipelago reward: <tostring($qty)> x <oc_name($item)>!");
+    mes("<$label>: <tostring($qty)> x <oc_name($item)>!");
 } else {
     inv_add(bank, $item, $qty);
-    mes("Archipelago reward: <tostring($qty)> x <oc_name($item)> (no inventory space, sent to your bank)!");
+    mes("<$label>: <tostring($qty)> x <oc_name($item)> (no inventory space, sent to your bank)!");
 }
 
-// ::apreward [category] [level] - bare = fully random category + the
-// player's own level in that category (same roll send_quest_complete would
-// make); with args, forces category/tier so every level bracket can be
-// eyeballed without playing to it. Valid category names: armour, weapons,
-// ranged_gear, arrows, runes, potions, food, tools, cash, xp, herb_supplies,
-// runecraft_supplies, crafting_supplies, caskets, addons, keepsakes - an unrecognized name
-// rolls no eligible rows and prints ap_deliver_reward's "no reward available"
-// message. xp ignores $level entirely (it's not tiered - see
-// ap_grant_xp_reward); keepsakes ignores $level too (flat pool).
+// ::apreward [category] [level] - bare = weighted random category + the
+// player's own level in that category (same roll a filler check would make);
+// with args, forces category/tier so every level bracket can be eyeballed
+// without playing to it. Valid category names: ores, bars, herbs, runes,
+// armour, weapons, ranged_gear, arrows, potions, food, tools, cash, xp,
+// runecraft_supplies, crafting_supplies, caskets, addons, keepsakes - an
+// unrecognized name matches no rows and prints ap_deliver_reward's "no reward
+// available" message. xp ignores $level entirely (it's not tiered - see
+// ap_grant_xp_reward); keepsakes ignores $level too (flat pool). A $level of 0
+// or less means 99, so `::apreward ores 0` shows the top of the curve; pass a
+// real level (`::apreward ores 40`) to see the bias a level-40 smith gets,
+// including the rare over-level rolls the old hard cutoff made impossible.
 [debugproc,ap_reward](string $category, int $level)
 if_close;
 if (p_finduid(uid) = false) {
@@ -295,7 +440,15 @@ if (compare($category, "addons") = 0) {
 if ($level <= 0) {
     $level = 99;
 }
-~ap_deliver_reward(~ap_roll_reward($category, $level));
+// same multi-roll treatment the live path gives packs, so ::apreward ores
+// shows what a real Ore Pack looks like rather than one lonely stack.
+def_int $rolls = ~ap_category_rolls($category);
+def_string $label = ~ap_category_label($category);
+def_int $i = 0;
+while ($i < $rolls) {
+    ~ap_deliver_reward(~ap_roll_reward($category, $level), $label);
+    $i = calc($i + 1);
+}
 
 // ::apquestcheck - fires the quest-completion check+reward path
 // (~ap_quest_complete, the same proc send_quest_complete calls) directly, so

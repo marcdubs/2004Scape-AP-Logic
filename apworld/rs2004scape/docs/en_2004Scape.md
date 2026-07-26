@@ -54,10 +54,13 @@ is done.
 first-time XP and first-kill milestones, skill level milestones, activity/minigame checks, and (optionally, via the
 `music_checks` option) 230 "first visit to each music region" checks.
 
-**Items** (86 distinct): the progressive gear/tool tiers, per-skill cap raises, quest unlock gates, and "Mystery
-Reward" filler (a random in-game reward - supplies, gear, or XP). Mystery Rewards can also roll **relics** - custom
-convenience items (Bank Box, Tree Compass, Teleporting Focus, NPC Teleport) - selectable per slot via the `relics`
-option.
+**Items** (90 distinct): the progressive gear/tool tiers, per-skill cap raises, quest unlock gates, and five kinds of
+filler. "Mystery Reward" rolls a random in-game reward (supplies, gear, cash, or XP) and can also roll **relics** -
+custom convenience items (Bank Box, Tree Compass, Teleporting Focus, NPC Teleport), selectable per slot via the
+`relics` option. The four **resource packs** - Ore Pack, Bar Pack, Herb Pack, Rune Pack - each hand out several items
+from one resource table, weighted toward your level in the governing skill (Smithing, Herblore, Magic) but never
+limited to it: a tier above you is rare, not impossible. The mix of filler is set per slot by the `filler_weights`
+option, so a multiworld can meaningfully ask this slot for more ore.
 
 ## Which items can be in another player's world?
 

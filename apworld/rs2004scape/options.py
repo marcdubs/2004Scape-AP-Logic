@@ -1,7 +1,7 @@
 # Options for the 2004Scape Archipelago world (docs/archipelago-integration.md).
 from dataclasses import dataclass
 
-from Options import Choice, DefaultOnToggle, OptionSet, PerGameCommonOptions, Range, Toggle
+from Options import Choice, DefaultOnToggle, OptionDict, OptionSet, PerGameCommonOptions, Range, Toggle
 
 GOAL_NAMES = ("dragon_slayer", "barcrawl", "kbd", "heroes", "legends")
 
@@ -225,6 +225,50 @@ class Relics(OptionSet):
     default = frozenset({"bank_box", "tree_compass", "teleporting_focus", "npc_teleport"})
 
 
+#: The filler items the pool can be padded with, and the weight keys that pick
+#: between them. Every location the progression items don't fill gets one of
+#: these, so the WEIGHTS decide the mix and the count stays derived (it depends
+#: on how many locations and progression items the rest of your options produce).
+FILLER_ITEM_BY_WEIGHT_KEY = {
+    "mystery_reward": "Mystery Reward",
+    "ore_pack": "Ore Pack",
+    "bar_pack": "Bar Pack",
+    "herb_pack": "Herb Pack",
+    "rune_pack": "Rune Pack",
+}
+
+DEFAULT_FILLER_WEIGHTS = {
+    "mystery_reward": 40,
+    "ore_pack": 15,
+    "bar_pack": 15,
+    "herb_pack": 10,
+    "rune_pack": 10,
+}
+
+
+class FillerWeights(OptionDict):
+    """Relative weights for the filler items that pad out the item pool.
+
+    Every location your other options leave unfilled by progression gets one of
+    these, so these weights set the MIX, not the count (the count is derived -
+    roughly 115 filler slots at default options, ~345 with music_checks on).
+
+    mystery_reward: rolls a weighted random category in game (gear, XP, cash,
+    food, potions, supplies, ... - anything).
+    ore_pack / bar_pack / herb_pack / rune_pack: roll several items from that
+    one resource table, biased toward - but not limited to - your level in the
+    governing skill (Smithing for ores and bars, Herblore for herbs, Magic for
+    runes). These exist because raw materials, coal above all, are the real
+    bottleneck once the gathering, processing and drop shuffles are on.
+
+    Weights are relative and need not sum to anything; 0 removes that filler.
+    Setting all five to 0 falls back to the defaults."""
+
+    display_name = "Filler Weights"
+    valid_keys = frozenset(FILLER_ITEM_BY_WEIGHT_KEY)
+    default = dict(DEFAULT_FILLER_WEIGHTS)
+
+
 class MusicChecks(Toggle):
     """Include the 230 music-track discovery checks (first visit to each music
     region) as filler locations. The game server adopts this automatically on
@@ -244,6 +288,7 @@ class RS2004Options(PerGameCommonOptions):
     quest_unlocks: QuestUnlocks
     progressive_quests: ProgressiveQuests
     relics: Relics
+    filler_weights: FillerWeights
     music_checks: MusicChecks
     region_logic: RegionLogic
     entrance_randomization: EntranceRandomization

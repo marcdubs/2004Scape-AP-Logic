@@ -1,5 +1,5 @@
 {
-  "_generated": "tools/ap/ExportApWorldData.ts (2026-07-19) - ids are append-only, do not hand-edit",
+  "_generated": "tools/ap/ExportApWorldData.ts (2026-07-26) - ids are append-only, do not hand-edit",
   "game": "2004Scape",
   "locationBaseId": 20040000,
   "itemBaseId": 20045000,
@@ -3767,6 +3767,30 @@
       "id": 20045085,
       "copies": 0,
       "filler": true
+    },
+    "Ore Pack": {
+      "id": 20045087,
+      "copies": 0,
+      "filler": true,
+      "pack": "ore_pack"
+    },
+    "Bar Pack": {
+      "id": 20045088,
+      "copies": 0,
+      "filler": true,
+      "pack": "bar_pack"
+    },
+    "Herb Pack": {
+      "id": 20045089,
+      "copies": 0,
+      "filler": true,
+      "pack": "herb_pack"
+    },
+    "Rune Pack": {
+      "id": 20045090,
+      "copies": 0,
+      "filler": true,
+      "pack": "rune_pack"
     }
   },
   "goalChecks": {

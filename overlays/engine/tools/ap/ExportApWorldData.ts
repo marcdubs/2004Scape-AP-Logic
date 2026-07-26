@@ -60,6 +60,10 @@ interface ExportedItem {
     /** How many copies of this item exist in the pool. */
     copies: number;
     filler?: boolean;
+    /** Filler items only: the ap_rewards category the game server rolls on
+     *  receipt (~ap_grant_named_pack). Absent on "Mystery Reward", which rolls
+     *  a weighted random category instead. */
+    pack?: string;
 }
 
 function loadQuests(): QuestReq[] {
@@ -258,7 +262,17 @@ function main(): void {
     // copies); the Nth copy unlocks questUnlockOrder[N-1]. ApClient resolves the
     // indirection at grant time; the apworld's rules count copies.
     addItem('Progressive Quest Unlock', { grant: 'progressive_quest', count: 1, copies: QUEST_GATE_IDS.length });
-    addItem('Mystery Reward', { copies: 0, filler: true }); // copies computed at generation (locations - progression)
+    // Filler. Copies are computed at generation time (locations - progression) and
+    // split across these names by the apworld's `filler_weights` option, so the
+    // multiworld sees a NAMED item ("Ore Pack") in hints and the spoiler log
+    // rather than one opaque "Mystery Reward" for every filler slot. The contents
+    // are still rolled game-side at receipt, against the stats the player has when
+    // it lands - `pack` is just which ap_rewards category to roll.
+    addItem('Mystery Reward', { copies: 0, filler: true }); // no pack => weighted random category
+    addItem('Ore Pack', { copies: 0, filler: true, pack: 'ore_pack' });
+    addItem('Bar Pack', { copies: 0, filler: true, pack: 'bar_pack' });
+    addItem('Herb Pack', { copies: 0, filler: true, pack: 'herb_pack' });
+    addItem('Rune Pack', { copies: 0, filler: true, pack: 'rune_pack' });
 
     const questUnlockOrder = buildQuestUnlockOrder(quests);
 

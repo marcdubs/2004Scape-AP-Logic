@@ -3,3 +3,7 @@ column=category,string,INDEXED,REQUIRED
 column=min_level,int
 column=reward,namedobj
 column=qty,int
+// Upper bound of the quantity roll: ap_roll_reward hands out a random amount in
+// [qty, qty_max]. Every row sets it (equal to qty for the fixed-amount rows) so
+// db_getfield never reads an absent field.
+column=qty_max,int

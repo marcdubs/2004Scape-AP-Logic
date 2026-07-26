@@ -4358,3 +4358,90 @@ Details in docs/entrance-logic.md. Three things worth remembering:
   `ValidateSeed` - which matches by name, not engine id - still models all 107 as
   gated. The divergence is in the safe direction (the validator assumes more
   gating than is enforced, so it cannot strand anyone), but it is a divergence.
+
+## Resource packs + the soft level bias (2026-07-27)
+
+User feedback: "the random rewards that are filled in can be a bit
+underwhelming." Two questions worth answering before touching anything, because
+"the reward pool" turned out to mean two different pools:
+
+- **The AP item pool.** `create_items` builds progression items and then pads to
+  the location count with filler, so the filler *count* is derived, never
+  declared: ~115 slots at default options (287 locations - 172 progression),
+  ~345 with `music_checks`, and up to *every* location with the four
+  item-category toggles off. Nothing configures it directly, and nothing should:
+  the count is a consequence of the other options. Only the **mix** is worth a
+  knob.
+- **The in-game reward table.** `ap_rewards.dbrow`, 175 rows / 14 tiered
+  categories at the time (201 / 16 now).
+
+### The three things that actually made it feel bad
+
+1. **Flat category choice.** `~ap_random_category` was `random(16)` - a uniform
+   pick over 16 categories with wildly different sizes and value, so the 3-row
+   `caskets` category got as much airtime as the 27-row `armour` one, and ~19% of
+   every reward was melee/ranged gear a player had already out-tiered.
+2. **A hard level cutoff.** `~ap_roll_reward` filtered `min_level <= $level` and
+   weighted `min_level + 1`. Top-biased within the eligible set, but you could
+   *never* be handed something you could not already use - so the drop-table
+   thrill ("I can't use this yet, but I will") was structurally impossible. This
+   is the one that mattered most.
+3. **Flat, tiny quantities.** `qty` was a single fixed int. `5x bread` forever.
+
+### The fix worth remembering: replace the filter with a weight
+
+`~ap_tier_weight(min_level, level)` is a tent curve with **no cutoff**, all
+integer math (this dialect has no floats):
+
+- `gap >= 0` (usable): `1000 - gap * rewardObsolescence`, floored at 120, so
+  low tiers decay toward but never to zero - you always want coal.
+- `gap < 0` (above you): halve per `rewardAspirationLevels` levels of overshoot,
+  bottoming out at 1 rather than 0.
+
+The existing A-Chao weighted reservoir sampler needed **no change at all** - only
+the weight function did. That is the whole trick: a hard eligibility filter and a
+soft bias are the same loop with a different weight, so "make it a drop table"
+was a ~15-line proc, not a rewrite. Measured at 40 Smithing: coal 15.5%, mithril
+4.2%, adamantite 1.0%, runite 0.3%.
+
+The same reservoir shape solved the category roll too, via a
+`(string, int) -> (string, int)` fold proc (`~ap_weigh_category`) called once per
+category - multi-return assignment (`$a, $b = ~proc`) is supported in this
+dialect (vanilla's `$x, $z = ~door_open(...)` is the precedent), which is what
+makes single-pass weighted selection expressible without arrays.
+
+### Named filler is what makes it a *multiworld* feature
+
+Every filler used to be one item, `Mystery Reward`, so the multiworld could not
+tell an ore pack from 5 bread: hints, the spoiler log and the fill all saw one
+opaque name. Splitting it into five named filler items (`Mystery Reward` + `Ore
+Pack` / `Bar Pack` / `Herb Pack` / `Rune Pack`) with a `filler_weights`
+`OptionDict` is what turns "the rewards are underwhelming" into something another
+player can act on.
+
+The contents still roll **game-side at receipt**, against live stats - so a pack
+sent in hour 1 and one sent in hour 20 pay differently, which a generation-time
+roll could never do. `ExportedItem.pack` carries the category from the exporter
+through `ApClient` into a new third argument on `[queue,ap_remote_item]`; an
+empty or unknown pack id falls back to the random roll, so a newer apworld
+against an older server degrades instead of dropping the reward.
+
+### Smaller things
+
+- **Gate ores on Smithing, not Mining.** Smithing is what *consumes* ore; gating
+  on the gathering stat hands a high-Mining/low-Smithing character ore they can
+  already mine for themselves. So `min_level` on an ore row is the **smithing**
+  level the ore matters at (coal at 30 = steel bars), not its mining level.
+- **`ItemClassification.filler` is the zero flag**, so `item.classification.filler`
+  is falsy for *every* item. Assert with `==`, not truthiness - cost one test
+  failure to learn.
+- **Proc names do not survive into `script.dat`** (they resolve to ids), so
+  grepping the pack for `ap_tier_weight` proves nothing. String *literals* do
+  survive - grep for `"Ore Pack"` or `"rewardWeightOres"` to prove a rebuild
+  actually picked up new content.
+- **The table is generated now** (`scripts/gen-rewards.py` -> `ap_rewards.dbrow`).
+  201 rows across 16 categories is past the point where hand-editing stays
+  consistent, and the generator is where the level/quantity reasoning lives.
+- **Adding a dbtable column is safe if every row sets it.** `qty_max` was
+  appended to `ap_rewards.dbtable`; the generator writes it on all 201 rows so
+  `db_getfield` never reads an absent field.

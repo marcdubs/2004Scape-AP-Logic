@@ -35,7 +35,7 @@ from worlds.generic.Rules import set_rule
 
 from .entrances import EntranceShuffler, coverage, vanilla_entrances
 from .logic import LogicEngine, load_bundle
-from .options import Goal, RS2004Options
+from .options import DEFAULT_FILLER_WEIGHTS, FILLER_ITEM_BY_WEIGHT_KEY, Goal, RS2004Options
 from .randomizers import apply_rolls, roll_all
 
 DATA = json.loads(pkgutil.get_data(__name__, "data/rs2004_data.json").decode("utf-8"))
@@ -62,6 +62,14 @@ for _name, _def in ITEMS.items():
         QUEST_UNLOCK_ITEM_BY_ID[_def["grant"][len("quest_"):]] = _name
 
 FILLER_NAME = "Mystery Reward"
+
+#: Every filler item the pool can be padded with. "Mystery Reward" rolls a
+#: weighted random reward category in game; the packs roll several items from one
+#: resource table, level-biased. All are ItemClassification.filler - the packs are
+#: named purely so the multiworld can hint them, the spoiler log can name them,
+#: and `filler_weights` can ask for more of one kind. See
+#: overlays/content/scripts/ap/ap_rewards.rs2 for what each one actually pays.
+FILLER_NAMES = frozenset(FILLER_ITEM_BY_WEIGHT_KEY.values())
 
 # skills a quest locks outright - see types.ts SKILL_QUEST_GATES for the two kinds of
 # entry (Runecrafting is a hard script gate, Herblore a deliberate balance choice).
@@ -159,6 +167,10 @@ class RS2004World(World):
             and name != PROGRESSIVE_QUEST_NAME
             and not d.get("filler")
         },
+        # every filler item, so a plando/hint can say "Filler" without listing
+        # the packs one by one.
+        "Filler": {name for name, d in ITEMS.items() if d.get("filler")},
+        "Resource Packs": {name for name, d in ITEMS.items() if d.get("pack")},
     }
 
     _KIND_GROUP = {
@@ -538,14 +550,43 @@ class RS2004World(World):
 
         real_locations = len([loc for loc in self.multiworld.get_locations(self.player) if loc.address is not None])
         while len(pool) < real_locations:
-            pool.append(self.create_item(FILLER_NAME))
+            pool.append(self.create_item(self.get_filler_item_name()))
         if len(pool) > real_locations:
             raise OptionError(f"2004Scape: item pool ({len(pool)}) exceeds locations ({real_locations}) - enable more checks (music_checks)")
 
         self.multiworld.itempool += pool
 
+    def _filler_weights(self) -> tuple:
+        """(names, weights) for the filler roll, from the `filler_weights` option.
+
+        The filler COUNT is derived (locations - progression items), so the only
+        thing a YAML can steer is the mix - which is exactly what a multiworld
+        wants: "send me more ore packs" is meaningful, "send me 40 fillers" is not,
+        because the other options already decided how many slots there are.
+
+        Unknown keys are impossible (OptionDict validates against valid_keys) but
+        non-integer or negative values are not, so they are coerced here rather
+        than blowing up generation. An all-zero (or empty) dict falls back to the
+        defaults instead of leaving the pool unpaddable.
+        """
+        configured = dict(self.options.filler_weights.value or {})
+        names, weights = [], []
+        for key, item_name in FILLER_ITEM_BY_WEIGHT_KEY.items():
+            try:
+                weight = int(configured.get(key, 0))
+            except (TypeError, ValueError):
+                weight = 0
+            if weight > 0:
+                names.append(item_name)
+                weights.append(weight)
+        if not names:
+            names = [FILLER_ITEM_BY_WEIGHT_KEY[k] for k in DEFAULT_FILLER_WEIGHTS]
+            weights = list(DEFAULT_FILLER_WEIGHTS.values())
+        return names, weights
+
     def get_filler_item_name(self) -> str:
-        return FILLER_NAME
+        names, weights = self._filler_weights()
+        return self.random.choices(names, weights=weights, k=1)[0]
 
     # ------------------------------------------------------------------
     # spoiler

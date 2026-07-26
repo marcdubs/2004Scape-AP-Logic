@@ -140,6 +140,49 @@ a quest).
 levels 1/20/40/60/99 via `::apreward` and confirm no invalid-obj errors and
 sensible tiers; fill inventory and confirm bank fallback fires.
 
+### Revision 2026-07-27 — resource packs and the soft level bias
+
+Playtest feedback: the rolls were underwhelming. Three causes, all fixed:
+
+1. **Category choice was flat.** `~ap_random_category` was `random(16)`, so the
+   3-row `caskets` category got exactly as much airtime as the 27-row `armour`
+   one, and ~19% of every reward was melee/ranged gear the player had already
+   out-tiered. It is now a weighted reservoir roll over `rewardWeight*` keys in
+   `ap-options.json` (defaults in `ApOptions.ts` `NUMERIC_DEFAULTS`), which also
+   makes "no caskets this run" a one-key edit.
+2. **The level gate was hard.** `~ap_roll_reward` filtered `min_level <= level`,
+   so you could *never* be handed something you could not already use - there was
+   no "I can't use this yet, but I will" moment at all. Replaced by
+   `~ap_tier_weight`, a tent curve with **no cutoff**: full weight at or below
+   your level (shedding `rewardObsolescence` per level past it, floored at 120 so
+   coal never stops coming), halving per `rewardAspirationLevels` levels of
+   overshoot above it, never reaching zero. Measured at 40 Smithing: coal 15.5%,
+   mithril ore 4.2%, adamantite 1.0%, runite 0.3%.
+3. **Quantities were flat and tiny.** `qty_max` is now a dbtable column and the
+   amount is a uniform roll in `[qty, qty_max]`.
+
+Plus the four resource packs the feedback actually asked for - `ores` and `bars`
+(new, both **Smithing**-gated: Smithing is what *consumes* ore, so a
+high-Mining/low-Smithing character does not get handed ore they could already
+mine), `herbs` (absorbs the old `herb_supplies`) and `runes` (requantified).
+Pack categories roll `rewardPackRolls` (3) times instead of once, so a pack reads
+like a drop table rather than one lonely stack. Coal carries the fattest
+quantities in the table on purpose: the gathering, processing and drop shuffles
+all make raw materials harder to get, never easier, and coal is the sharpest
+bottleneck of the lot.
+
+On the Archipelago side the single opaque `Mystery Reward` filler became **five
+named items** (`Mystery Reward` + the four packs) split by the `filler_weights`
+YAML option - so the multiworld hints and spoiler log name the real thing and a
+slot can meaningfully be asked for more ore. The contents are still rolled
+game-side at receipt against live stats; `ExportedItem.pack` carries the category
+through `ApClient` into `[queue,ap_remote_item]`'s new third argument, and an
+empty/unknown pack id falls back to the random roll (newer apworld, older server
+still pays out).
+
+The table is now generated: edit `scripts/gen-rewards.py`, re-run it against
+`overlays/content/scripts/ap/configs/ap_rewards.dbrow`, rebuild the pack.
+
 ## Feature 3 — Random respawn/home point
 
 One seed-chosen **home coordinate**, drawn from the 7 standard-spellbook teleport

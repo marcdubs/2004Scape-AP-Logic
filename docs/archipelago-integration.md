@@ -82,9 +82,16 @@ Item name conventions (AP-visible display names):
   (`progressive_<skill>`, **+2** - the engine cap formula is 20 + 10*count, one
   copy = +20 levels).
 - `Quest Unlock: <Name>` (61, single copy) -> grantUnlock(`quest_<id>`, 1).
-- `Mystery Reward` - the filler; on receipt the client rolls the existing
-  `~ap_grant_check_reward` random reward for the online player (queued while
-  nobody is online).
+- Filler (`Mystery Reward`, `Ore Pack`, `Bar Pack`, `Herb Pack`, `Rune Pack`) -
+  no grant; on receipt ApClient passes the item's `pack` id through
+  `[queue,ap_remote_item]` to `~ap_grant_named_pack`, which rolls that resource
+  category (or, for `Mystery Reward`, a weighted random one via
+  `~ap_grant_check_reward`) for the online player - queued while nobody is
+  online. The apworld splits filler across these names by the `filler_weights`
+  option, so the multiworld hints and spoiler log name the real thing; the
+  CONTENTS are still rolled game-side at receipt, against the stats the player
+  has when it lands. An empty/unknown pack id degrades to the random roll, so a
+  newer apworld against an older server still pays out.
 
 ## Logic model in the apworld (v2: region-aware, GitHub #3)
 

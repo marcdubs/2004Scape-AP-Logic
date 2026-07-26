@@ -90,6 +90,49 @@ list only stops it *rolling*. The game server adopts this on connect (the
 | `teleporting_focus` | rune-free teleports; a Greater upgrade can roll later |
 | `npc_teleport` | teleport to a previously-met NPC |
 
+### `filler_weights`
+
+Relative weights for the filler items the pool is padded with. Every location
+your other options leave unfilled by progression gets one of these, so this sets
+the **mix**, not the count - the count is derived (`locations - progression
+items`, roughly **115** filler slots at default options, **~345** with
+`music_checks: true`, and up to *every* location if you turn the four
+item-category toggles off).
+
+```yaml
+  filler_weights:
+    mystery_reward: 40
+    ore_pack: 15
+    bar_pack: 15
+    herb_pack: 10
+    rune_pack: 10
+```
+
+| filler | what you get |
+|---|---|
+| `mystery_reward` | one roll from a weighted random category - gear, XP, cash, food, potions, supplies, caskets, a relic, anything |
+| `ore_pack` | 3 rolls from the ore table, biased on **Smithing** (clay/copper/tin -> coal -> mithril -> adamantite -> runite) |
+| `bar_pack` | 3 rolls from the bar table, biased on **Smithing** |
+| `herb_pack` | 3 rolls from the herb table (unidentified herbs, secondaries, vials), biased on **Herblore** |
+| `rune_pack` | 3 rolls from the rune table, biased on **Magic** |
+
+Weights are relative and need not sum to anything; `0` removes that filler
+entirely. Setting all five to `0` falls back to the defaults (the pool still has
+to be paddable).
+
+The packs exist because raw materials - coal above all - are the real bottleneck
+in a randomized world: `gathering_randomization` can take coal rocks away from
+you, `processing_randomization` can make smelting produce something other than
+the bar the recipe names, and `drop_randomization` moves the rest. A bar pack is
+worth more than an ore pack in a default seed for exactly that reason.
+
+**The level bias is a bias, not a rule.** Each roll weights tiers around your
+current level in the governing skill, but nothing is ever excluded: at 40
+Smithing an ore pack is mostly coal/gold/iron, ~4% mithril, ~1% adamantite and
+~0.3% runite. You can always be handed something you cannot use yet - just
+rarely. Tune the curve with `rewardAspirationLevels` / `rewardObsolescence`
+below.
+
 ### `region_logic`
 
 `true` (default) / `false`. Reason about where things physically **are**.
@@ -269,8 +312,12 @@ Notes for this world specifically:
   `progressive_quests: true` - replaces every `Quest Unlock: <name>` above;
   copy N unlocks the Nth quest in the difficulty order).
   (Dragon Slayer and Horror from the Deep are never gated.)
-- **Filler**: `Mystery Reward` - rolls the in-game random reward
-  (runes/gear/supplies/cash/caskets/addons) when received.
+- **Filler** (see `filler_weights`): `Mystery Reward` (weighted random
+  category), `Ore Pack`, `Bar Pack`, `Herb Pack`, `Rune Pack` (3 level-biased
+  rolls from that one resource table). All are `filler` classification; the
+  contents are rolled game-side when the item lands, against the stats you have
+  at that moment. Item groups: `Filler` (all five), `Resource Packs` (the four
+  packs).
 
 ## Location name reference (for `exclude_locations`, `priority_locations`, hints...)
 
@@ -344,6 +391,32 @@ Boolean toggles for the custom QoL items that `Mystery Reward` can roll:
 (teleport-to-last-talked-NPC writ). All default `true`; turn one off if you'd
 rather not see it this run. (`musicChecks` also lives in this file but is
 overridden by the YAML's `music_checks` on connect - the YAML wins.)
+
+### Reward roll tuning (`Server/engine/data/config/ap-options.json`)
+
+The YAML picks *which* filler item lands (`filler_weights`); these decide what a
+roll actually pays. Server-side only - edit the file and restart. They apply in
+both AP and solo mode.
+
+| key | default | what it does |
+|---|---|---|
+| `rewardPackRolls` | `3` | items per resource pack. `1` makes packs single-item like every other category |
+| `rewardAspirationLevels` | `8` | levels **above** yours a tier needs for its odds to halve. Lower = you almost only get what you can use; higher = high tiers show up early as "someday" prizes |
+| `rewardObsolescence` | `8` | weight lost (per 1000) for each level you are **above** a tier, floored at 120. Low tiers never stop coming - you always want coal |
+| `rewardWeight<Category>` | see below | relative odds of each category for a `Mystery Reward` roll. `0` disables that category |
+
+`rewardWeight*` keys and defaults: `Ores` 110, `Bars` 100, `Herbs` 85, `Runes`
+85, `Xp` 85, `Cash` 65, `Food` 55, `Potions` 55, `Crafting` 45, `Tools` 45,
+`Runecraft` 40, `Addons` 40, `Armour` 40, `Weapons` 40, `Arrows` 35,
+`RangedGear` 30, `Caskets` 30, `Keepsakes` 25. (This replaced a flat
+`random(16)` that gave the 3-row casket category exactly as much airtime as the
+27-row armour category, and put ~19% of every reward into melee/ranged gear you
+had almost certainly already out-tiered.)
+
+The reward table itself is `overlays/content/scripts/ap/configs/ap_rewards.dbrow`
+(201 rows / 16 categories), generated by `scripts/gen-rewards.py` - edit the
+generator, re-run it, then rebuild the pack. Test any bracket in game with
+`::apreward <category> <level>` (e.g. `::apreward ores 40`).
 
 ### Seed-roll knobs (`scripts/new-run.sh`)
 
