@@ -4317,3 +4317,44 @@ Design points worth keeping:
   are reset in place for the same reason. Clearing happens inside
   `applySlotData`, i.e. after `Connected` and before `sendFullResync`, so the
   wiped session is what the resync and the room's item replay see.
+
+## Gated-area denial messages now say what they want (2026-07-26)
+
+Reported from play: climbing a shuffled ladder produced
+`A strange force bars your way. (Wall)` and nothing else. The gate was working
+exactly as designed - the arrival landed inside a gated area and `ApAreaGates`
+refused it - but the message named the *scenery*, not the requirement.
+
+Counted it: of the 107 areas in `ap-gated-areas.json`, only **7** (the curated
+guilds) spell out what they want. The other 100 were generated from the loc label
+- 46 say `(Door)`, 10 `(Gate)`, 3 `(Wall)`. In vanilla that would be survivable
+because you would be standing at a door you recognise; under entrance
+randomization the lock has moved away from the door, so the player has no way to
+infer it.
+
+**Fix**: render the resolved `require` into the message at load time and splice
+it into the trailing parenthetical - `(Wall: requires Heroes' Quest (stage 4+))`.
+Details in docs/entrance-logic.md. Three things worth remembering:
+
+- **Render at load, not on denial.** `applyAreaGate` is on the shuffled-entrance
+  hot path *and* fires from stair/ladder menu-label previews. The requirement
+  never changes after load, so the string is built once per area.
+- **Detect self-explanatory messages instead of tracking which are curated.** A
+  `:` inside the trailing `(...)` means the author already said it. That keeps
+  the transform idempotent and makes hand-written text always win, with no list
+  to maintain.
+- **Name things from data already on disk.** `ap-checks.json`'s completion-watch
+  table gives varp -> `quest_<id>` -> `questGateLabel`, and comparing the gate's
+  `gte` against the watch's completion value is what decides between "requires
+  Heroes' Quest" and "requires Heroes' Quest (stage 4+)". No new table.
+
+**Two things this surfaced, deliberately left alone** (report, don't scope-creep):
+
+- `Wall (dragonsecretdoor)` requires `%dragon_wall >= 0`, which is trivially true
+  - it can never bar anyone. `ExplainGates.ts` flags this shape.
+- The engine loads **103** of the 107 areas: `horrorfire`, `horrorquest`,
+  `troll_freed_eadgar` and `troll_entered_stronghold` do not resolve against rev
+  274's varp table, so those four fail open (ungated at runtime) while
+  `ValidateSeed` - which matches by name, not engine id - still models all 107 as
+  gated. The divergence is in the safe direction (the validator assumes more
+  gating than is enforced, so it cannot strand anyone), but it is a divergence.

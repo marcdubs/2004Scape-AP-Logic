@@ -61,6 +61,37 @@ Guild, plus quest-locked zones found by grepping door/gate/entry scripts for
 `%qp` / `stat_base` / quest-varp checks. Test command `::apgates` (what gate, if
 any, covers my current tile + do I pass).
 
+### Denial messages explain themselves (2026-07-26)
+
+Only the 7 curated guild entries were authored with a message that names their
+requirement; the other 100 were generated from the loc label alone and read
+`A strange force bars your way. (Door)` / `(Wall)` / `(Gate)`. That is a dead end
+for a player: under entrance randomization the door you would have opened is not
+where the lock is any more, so there is no vanilla knowledge to fall back on.
+
+`ApAreaGates` now renders the resolved `require` into the message at **load
+time** (never on the hot path) and splices it into the trailing parenthetical:
+
+```
+A strange force bars your way. (Wall: requires Heroes' Quest (stage 4+))
+A strange force bars your way. (Door: requires Dramen staff (carried or worn))
+A strange force bars your way. (Door: requires Heroes' Quest (stage 10+), and Shield of Arrav)
+A strange force bars your way. (Mining Guild: requires level 60 Mining)   <- curated, untouched
+```
+
+Rules: quest varps are named via `ap-checks.json`'s completion-watch table plus
+`questGateLabel` (at/above the completion value it reads as the plain quest name,
+below it as `(stage N+)`); stats become `level 60 Mining`; items become
+`Dramen staff (carried or worn)`; `allOf` joins under one leading "requires".
+A message whose trailing `(...)` already contains a `:` is treated as
+self-explanatory and left alone, so re-running is idempotent and hand-written
+entries always win.
+
+Check the wording without booting a server:
+`npx tsx tools/logic/ExplainGates.ts [--grep door]` prints every area's real
+message (engine code path, via the `allGateMessages()` export) and flags entries
+whose requirement is trivially true.
+
 ## Workstream B — gated-entrance inclusion
 
 The previously auto-excluded gated entrance scripts join the shuffle pool with

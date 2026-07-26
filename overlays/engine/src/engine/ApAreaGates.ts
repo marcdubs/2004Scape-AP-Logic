@@ -36,12 +36,15 @@ import path from 'path';
 import ObjType from '#/cache/config/ObjType.js';
 import InvType from '#/cache/config/InvType.js';
 import VarPlayerType from '#/cache/config/VarPlayerType.js';
+import { questGateLabel } from '#/engine/ApUnlockOverrides.js';
 import { CoordGrid } from '#/engine/CoordGrid.js';
 import type Player from '#/engine/entity/Player.js';
-import { PlayerStatMap } from '#/engine/entity/PlayerStat.js';
+import { PlayerStatMap, PlayerStatNameMap } from '#/engine/entity/PlayerStat.js';
 import { printInfo, printWarning } from '#/util/Logger.js';
 
 const CONFIG_PATH = 'data/config/ap-gated-areas.json';
+// completion-watch table, read only to name the quest behind a varp in denial messages
+const WATCHES_PATH = 'data/config/ap-checks.json';
 
 // per-player denial-message throttle: the same applyAreaGate lookup fires from
 // stair/ladder MENU-LABEL previews (building the "climb up"/"climb down" options),
@@ -153,8 +156,121 @@ function resolveRequire(raw: unknown, areaName: string): ResolvedRequire | null 
     return null;
 }
 
+// ---------------------------------------------------------------------------
+// Denial-message wording: say what the gate WANTS, not just where you are
+// ---------------------------------------------------------------------------
+//
+// Only 7 of the 107 curated areas ship a message that names their requirement (the
+// guilds: "requires level 60 Mining"). The other 100 were generated from the loc
+// label alone - 46 read "(Door)", 3 "(Wall)" - which tells a player they are blocked
+// and nothing whatsoever about by what. Under entrance randomization that is a dead
+// end: the door you would have opened is not where the lock is any more, so there is
+// no vanilla knowledge to fall back on.
+//
+// So we render the resolved requirement into the message at LOAD time (once, never on
+// the hot path) and splice it into the trailing parenthetical. Messages that already
+// explain themselves - detected by a ':' in that parenthetical - are left untouched.
+
+/** varp id -> the quest it watches: { label, completion } from ap-checks.json's watch table. */
+function loadQuestVarps(): Map<number, { label: string; completion: number }> {
+    const map = new Map<number, { label: string; completion: number }>();
+    try {
+        if (!fs.existsSync(WATCHES_PATH)) {
+            return map;
+        }
+        const watches = (JSON.parse(fs.readFileSync(WATCHES_PATH, 'utf8')) as { watches?: { varp?: string; mode?: string; value?: number; check?: string }[] }).watches ?? [];
+        for (const w of watches) {
+            if (typeof w.varp !== 'string' || typeof w.check !== 'string' || !w.check.startsWith('quest_') || w.mode !== 'gte' || typeof w.value !== 'number') {
+                continue;
+            }
+            const varpId = VarPlayerType.getId(w.varp);
+            if (varpId !== -1 && !map.has(varpId)) {
+                map.set(varpId, { label: questGateLabel(w.check), completion: w.value });
+            }
+        }
+    } catch (err) {
+        printWarning(`AP area gates: could not read ${WATCHES_PATH} for quest names, denial messages fall back to varp names (${err instanceof Error ? err.message : err})`);
+    }
+    return map;
+}
+
+function statLabel(statId: number): string {
+    const name = PlayerStatNameMap.get(statId);
+    return name ? name.charAt(0) + name.slice(1).toLowerCase() : `stat ${statId}`;
+}
+
+function objLabel(objId: number): string {
+    try {
+        return ObjType.get(objId)?.name ?? `item ${objId}`;
+    } catch {
+        return `item ${objId}`;
+    }
+}
+
+function varpLabel(varpId: number): string {
+    try {
+        return VarPlayerType.get(varpId)?.debugname ?? `varp ${varpId}`;
+    } catch {
+        return `varp ${varpId}`;
+    }
+}
+
+// One requirement, as a noun phrase ("Heroes' Quest (stage 4+)", "level 60 Mining") so
+// allOf can join them under a single leading "requires" instead of repeating it.
+function requireClause(req: ResolvedRequire, questVarps: Map<number, { label: string; completion: number }>): string {
+    switch (req.kind) {
+        case 'varp': {
+            const quest = questVarps.get(req.varpId);
+            if (quest) {
+                // at or above the completion threshold the gate really means "finish it";
+                // below it, the gate opens partway through, so say which stage.
+                return req.gte >= quest.completion ? quest.label : `${quest.label} (stage ${req.gte}+)`;
+            }
+            return `${varpLabel(req.varpId)} >= ${req.gte}`;
+        }
+        case 'varpBit': {
+            const quest = questVarps.get(req.varpId);
+            const what = quest ? `progress in ${quest.label}` : `${varpLabel(req.varpId)} bit ${req.bit}`;
+            return req.set ? what : `${what} NOT done`;
+        }
+        case 'stat':
+            return `level ${req.gte} ${statLabel(req.statId)}`;
+        case 'item':
+            return `${objLabel(req.objId)} (carried or worn)`;
+        case 'allOf':
+            return req.all.map(sub => requireClause(sub, questVarps)).join(', and ');
+    }
+}
+
+function describeRequire(req: ResolvedRequire, questVarps: Map<number, { label: string; completion: number }>): string {
+    const clause = requireClause(req, questVarps);
+    return clause.length > 0 ? `requires ${clause}` : '';
+}
+
+/**
+ * Splices the rendered requirement into the message's trailing "(...)" label, so
+ * "(Wall)" becomes "(Wall: requires Heroes' Quest (to stage 4))" while the curated
+ * "(Mining Guild: requires level 60 Mining)" is recognised as self-explanatory and
+ * passed through untouched. No trailing parenthetical at all: append one.
+ */
+function explainMessage(message: string, req: ResolvedRequire, questVarps: Map<number, { label: string; completion: number }>): string {
+    const detail = describeRequire(req, questVarps);
+    if (detail.length === 0) {
+        return message;
+    }
+    const match = message.match(/\(([^()]*)\)\s*$/);
+    if (!match) {
+        return `${message} (${detail})`;
+    }
+    if (match[1].includes(':')) {
+        return message; // already spells out its own requirement
+    }
+    return `${message.slice(0, match.index)}(${match[1]}: ${detail})`;
+}
+
 function loadAreas(): Area[] {
     const loaded: Area[] = [];
+    const questVarps = loadQuestVarps();
 
     if (!fs.existsSync(CONFIG_PATH)) {
         printInfo(`AP area gates: no ${path.basename(CONFIG_PATH)}, gated areas are all open (vanilla)`);
@@ -203,7 +319,7 @@ function loadAreas(): Area[] {
                 continue;
             }
 
-            loaded.push({ name: a.name, boxes, require, message: a.message });
+            loaded.push({ name: a.name, boxes, require, message: explainMessage(a.message, require, questVarps) });
         }
 
         printInfo(`AP area gates: loaded ${loaded.length} gated area(s)`);
@@ -335,4 +451,32 @@ export function describeGateAt(coord: number): string | null {
         printWarning(`AP area gates: describeGateAt failed (${err instanceof Error ? err.message : err})`);
         return null;
     }
+}
+
+/**
+ * The exact denial message a player would get for arriving at `coord` - i.e. the
+ * curated text with the rendered requirement spliced in. Null when no gate covers
+ * the coord. Companion to describeGateAt for tooling and for verifying the wording
+ * without a live server (tools/logic/ExplainGates.ts).
+ */
+export function gateMessageAt(coord: number): string | null {
+    try {
+        if (areas === null) {
+            areas = loadAreas();
+        }
+        const pos = CoordGrid.unpackCoord(coord);
+        const area = findArea(areas, pos.level, pos.x, pos.z);
+        return area ? area.message : null;
+    } catch (err) {
+        printWarning(`AP area gates: gateMessageAt failed (${err instanceof Error ? err.message : err})`);
+        return null;
+    }
+}
+
+/** Every gated area's name + the message it would show, in load order. Tooling only. */
+export function allGateMessages(): { name: string; message: string }[] {
+    if (areas === null) {
+        areas = loadAreas();
+    }
+    return areas.map(a => ({ name: a.name, message: a.message }));
 }
