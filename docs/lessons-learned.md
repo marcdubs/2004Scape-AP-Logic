@@ -4151,3 +4151,49 @@ and unlocks silently decode as different variables.
   all name-keyed - verified with `scripts/bundle-drift.js` reporting no drift
   after the renumber. The cost is a one-time save break for characters created
   before it.
+
+## `ap-session.json` is run state, and it was outliving the run (2026-07-26)
+
+Auditing README step 5 ("does rolling a seed after connecting clobber the
+Archipelago setup?") turned up one file that was on the wrong side of the line.
+
+**What the audit confirmed is safe.** `scripts/new-run.{sh,bat}` never writes
+`ap-archipelago.json` (host/port/slot/password) or `ap-options.json` - no tool
+in `tools/` writes either, and `GenerateSeed.ts` only *copies* `ap-options.json`
+into its validation scratch dir. `ap-entrances.json` is preserved when it came
+from `slot_data` (`seed-options-to-env.cjs` forces the entrance stage off *and*
+skips the delete when `source === 'archipelago slot_data'`). The tables that do
+get re-rolled are deterministic off the seed AP pinned, so they come back
+identical to what the multiworld's fill assumed.
+
+**The one that wasn't.** `GenerateSeed.clearRunState` cleared
+`ap-checks-fired.json` + `ap-tracker.json` and zeroed `ap-unlocks.json`, but
+never touched `ap-session.json` - the AP client's `receivedCount` and its list
+of already-reported checks. The failure mode is silent and total:
+
+- on connect the room replays `ReceivedItems` from index 0;
+- `handleReceivedItems` computes `skip = receivedCount - index` and discards
+  exactly that many as "already applied" (`ApClient.ts`);
+- but the unlock state that held them was just zeroed, and grants are applied at
+  *receive* time (`ApUnlockOverrides.grantUnlock` -> `ap-unlocks.json`), not at
+  delivery time - `session.pending` only carries the announcement + banked-xp
+  reapply, so nothing re-grants them later.
+
+Net: every item received before the roll is gone, and the previous run's
+`sentChecks` get re-reported into the new room by `sendFullResync`, releasing
+locations the player never earned. Found live on the dev server: a Jul-19
+`ap-session.json` with `receivedCount: 21` sitting next to a Jul-26
+`ap-unlocks.json` with every unlock at `0`.
+
+**Fix**: `ap-session.json` joined the `clearRunState` list. A placement seed IS
+a new run, and the room is the source of truth - it resends everything on
+connect, so there is nothing to preserve. Verified by running GenerateSeed
+against a throwaway `--config-dir` (that flag is the way to exercise this tool
+without wrecking the live run state): `Cleared: ap-checks-fired.json,
+ap-tracker.json, ap-session.json`.
+
+**Generalize**: any new file the AP client persists needs a decision about which
+side of `clearRunState` it lives on. State that mirrors something the room can
+resend belongs in the cleared list; only credentials and the room's own
+downstream config (`ap-archipelago.json`, `ap-options.json`) should survive a
+roll.

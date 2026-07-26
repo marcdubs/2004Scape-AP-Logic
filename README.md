@@ -248,7 +248,8 @@ first thing to attach to a bug report.
    **Save & Connect**. The status panel flips to *connected*. (Headless
    equivalent: write `Server/engine/data/config/ap-archipelago.json` by hand.)
    On connect the server adopts the room's live options (goal + extra goals,
-   music checks, item-family toggles, relics, infinite run), rebuilds
+   music checks, item-family toggles, relics, infinite run, gather speed,
+   progressive XP rate - all applied without a seed roll), rebuilds
    `ap-placements.json` with just the seed's quest gates (the multiworld owns
    item placements), and writes your YAML's randomization options to
    `data/config/ap-seed-options.json` for the seed roll to pick up.
@@ -274,11 +275,42 @@ first thing to attach to a bug report.
    quest unlocks) and are announced in-game, and reaching your goal (plus any
    extra goals) reports victory to the multiworld automatically.
 
-Note: `npx tsx tools/sim/SimulateProgression.ts` only means something for SOLO
-runs - in AP mode `ap-placements.json` has no local placements, so the sim
-reports everything unreachable. The AP-mode sanity check is
-`npx tsx tools/logic/ValidateSeed.ts` (the spatial layer); item-layer
-soundness is Archipelago's own generation.
+#### What the seed roll touches (and what it leaves alone)
+
+Rolling after connecting is safe: `new-run.sh`/`.bat` never touch your
+Archipelago connection or the settings the room handed down.
+
+- **Never written.** `ap-archipelago.json` (host/port/slot/password) and
+  `ap-options.json` (the room's live toggles - music checks, item families,
+  relics, infinite run, gather speed, progressive XP). No tool in the pipeline
+  writes either; the seed roll only reads `ap-options.json`. Reconnecting after
+  the restart re-applies the room's toggles anyway.
+- **Preserved, not re-rolled.** `ap-entrances.json`, when the layout came from
+  `slot_data`: the adoption step forces the entrance stage off *and* keeps the
+  file, precisely so the map the multiworld's fill reasoned over survives. (A
+  genuinely vanilla-entrance run is the only case where the file is removed.)
+- **Rewritten, but to the same tables.** `ap-gather/-process/-thieving/-spawn/`
+  `-drops.json` plus the content pack. These are re-rolled from the seed
+  Archipelago pinned in `ap-seed-options.json`, and every tool is deterministic,
+  so they come back identical to what the fill assumed.
+- **Deleted on purpose.** `ap-placements.json` - the multiworld owns item
+  placement, and the server rewrites the file with the room's quest gates when
+  it reconnects.
+- **Reset, because a roll IS a new run.** `ap-unlocks.json` (zeroed),
+  `ap-checks-fired.json`, `ap-tracker.json`, and `ap-session.json` - the AP
+  client's `receivedCount` plus the checks it already reported. That last one
+  has to go with the others: the roll zeroes `ap-unlocks.json`, so a surviving
+  session would make the room's replay-on-reconnect get skipped as "already
+  applied" (leaving those unlocks at zero) and would re-report the old run's
+  checks into the new room. The room is the source of truth and resends
+  everything on connect, so nothing is lost.
+
+Note: `npx tsx tools/sim/SimulateProgression.ts` reports on the seed's own item
+placement, which in AP mode the room owns - so it detects the item-less
+`ap-placements.json`, says so, and falls back to the vanilla quest-graph report
+instead of pretending everything is unreachable. The AP-mode sanity check is
+`npx tsx tools/logic/ValidateSeed.ts` (the spatial layer); item-layer soundness
+is Archipelago's own generation.
 
 Full details: [docs/archipelago-integration.md](docs/archipelago-integration.md)
 and [apworld/README.md](apworld/README.md).

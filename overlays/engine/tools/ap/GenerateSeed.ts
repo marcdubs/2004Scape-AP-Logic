@@ -344,7 +344,14 @@ function writePlacements(dir: string, seed: number, pool: PoolMode, placements: 
 
 function clearRunState(dir: string): string[] {
     const cleared: string[] = [];
-    for (const name of ['ap-checks-fired.json', 'ap-tracker.json']) {
+    // ap-session.json is the AP client's bookkeeping (receivedCount + the checks it
+    // already reported) and MUST go with the rest of the run state: we zero
+    // ap-unlocks.json just below, so a surviving receivedCount makes the room's
+    // replay-from-index-0 on reconnect get skipped as "already applied" and those
+    // unlocks stay at zero forever, while the old run's sentChecks get re-reported
+    // into the new room. Deleting it is safe - the room is the source of truth and
+    // resends everything on connect.
+    for (const name of ['ap-checks-fired.json', 'ap-tracker.json', 'ap-session.json']) {
         const p = path.join(dir, name);
         if (fs.existsSync(p)) {
             fs.rmSync(p);
