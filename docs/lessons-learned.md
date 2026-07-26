@@ -3913,3 +3913,102 @@ strings - never re-derive those, see #15), and `seed-options-to-env.cjs` already
 an `o.thieving` slot option, so the server side is forward-compatible the day the option
 ships. What's left is the Python side: a `thieving` option, a `roll_skill_swaps` call,
 the `ExportLogicBundle` pool wiring, and a parity fixture.
+
+## Drop-rarity cap: every slot at least 1/32 (GitHub #11, 2026-07-26)
+
+A rate-only pass (`tools/drops/CapDropRarity.ts`), orthogonal to every existing drop
+randomizer: it rewrites cascade thresholds and never touches which item sits in a slot.
+The design work was all in one question the issue could not answer from the code -
+**where the extra probability comes from** - and the answer only became obvious after
+measuring the corpus instead of reasoning about one table.
+
+- **Survey first, and the survey killed the issue's own suggested fix.** The issue
+  proposed "floor each slot's weight at ceil(total/32), and if the summed weights exceed
+  total, raise total (widen the denominator) to preserve non-boosted rates." Widening
+  doesn't preserve anything - it divides every non-boosted slot's rate by the same factor
+  it divides the boosted ones, and `ceil(total/32)` grows with `total`, so the floor
+  chases its own tail. The real numbers: 721 of 1212 branches are below 1/32, and
+  `sum(max(p, 1/32))` exceeds 1 in **46 of 63 cascades** - 9 of them (black demon,
+  blue/green/red dragon, imp, fire giant, guard, chaos dwarf, kalphite queen) have zero
+  no-drop tail to spend because their cascades already cover the full denominator. So
+  there is no arrangement that floors everything AND leaves common rates untouched. The
+  user picked the only faithful option after seeing those numbers: spend the no-drop tail
+  first, then take the rest proportionally out of the above-floor branches (never pushing
+  one below the floor). Common slots shrink ~15-25% in a typical table; rarity ORDER is
+  preserved because donors give in proportion to their surplus.
+- **The floor is feasible iff `dropBranches * ceil(total/32) <= total`, i.e. at most 32
+  branches.** The corpus maxes out at exactly 32 (imp.rs2), which is why no vanilla
+  cascade needs its denominator widened at 1/32 - every edit lands inside the original
+  `random(128)`/`random(512)`. imp's table therefore comes out perfectly uniform at
+  4/128 per branch: that's the arithmetic limit, not a bug. `planCascade()` still
+  implements widening (scale the whole cascade by the floor's denominator) for a coarser
+  `--min-rate`, and refuses (warns, leaves vanilla) when even that can't fit.
+- **The unit of PROBABILITY is the branch; the unit of ITEM identity is the DropSlot.**
+  They are not the same object: a `map_members`-gated branch holds two mutually-exclusive
+  `obj_add` calls at one shared weight, so `parseDropSlots()` yields two slots for one
+  roll. Capping per slot would double-count those. `parseDropCascades()` was added for
+  this and `parseDropSlots()` is now derived from it (verified byte-identical on both the
+  backup and live trees - 1127 slots, same items/qtys/lines).
+- **A branch whose body is empty once comments are stripped is not a drop.** guard.rs2's
+  `if ($random < 8) { // nothing dropped }` is vanilla's explicit "roll this range and
+  get nothing" - flooring it would raise the odds of receiving nothing. It's exempt from
+  the floor and donates like any above-floor branch. Detecting it by "has no obj_add"
+  would have been wrong: `megararetable`'s branches assign `$drop = rune_spear;` and
+  obj_add nothing, yet are absolutely drops.
+- **Only `def_int $var = random(N)` counts as a cascade, which quietly decides scope.**
+  `randomherb`/`randomjewel`/`ultrarare_getitem` declare `def_int $random = 0;` and
+  assign `$random = random(128);` later (randomjewel even picks between `random(65)` and
+  `random(128)` for one shared branch chain, so it has no single denominator), so they're
+  invisible to the parser and stay vanilla. `megararetable` uses the `def_int` form and
+  does get capped. That asymmetry is a consequence of the existing parser's shape, not a
+  scoping decision - worth knowing before someone "fixes" the parser and silently widens
+  the cap's blast radius.
+- **Edits are applied by absolute character offset, right-to-left, not by line replace.**
+  Thresholds share their line with everything else (`} else if ($random < 128) {`, and in
+  werewolf.rs2 the entire brace-less branch body). `parseDropCascades()` records each
+  threshold's exact offset/length in the LF-normalized text; applying the rewrites in
+  descending offset order keeps every earlier offset valid as digit counts change. Cap
+  runs AFTER RandomizeDrops in `RegenerateAll.ts` because in mimic mode the loot tables
+  that actually run live in the generated `ap_mimic.rs2`, which doesn't exist until the
+  drops pass has run (the cascades left in the handlers are the no-override fallback and
+  get capped too).
+- **Idempotent by construction**: a cascade with no deficit plans no edits, so a second
+  run over its own output changes nothing and a reseed can't compound the boost. This is
+  what makes it safe to run unconditionally in the pipeline.
+- **Verified offline** (all against throwaway COPIES of the corpus, never the live tree -
+  see docs/testing-checklist.md §9): parser regression byte-identical (1127 slots, backup
+  AND live), 0 of 1211 drop branches left below 1/32, thresholds monotonic and within the
+  denominator, no zero-weight branches, only threshold digits differ (line count and CRLF
+  intact, every `obj_add(...)` byte-identical), slot list unchanged, second pass 0
+  changes, plus synthetic fixtures for the widening (`random(6)` -> `random(24)` at
+  `--min-rate 1/4`) and impossible (5 branches at 1/4 - warns, stays vanilla) paths.
+  Engine typecheck clean, and a full `tools/pack/Build.ts` on the capped live corpus
+  completed clean (`pack: 1:31.888`) before the live tree was restored byte-identical and
+  rebuilt. **Not verified in-game** - the user's Server checkout was left exactly as
+  found (mimic seed, vanilla rates); `node scripts/install.js` + `RegenerateAll.ts` is
+  what turns this on.
+
+### Addendum: the drop simulator (same session)
+
+`tools/drops/SimulateDrops.ts` came out of the user asking, reasonably, whether the whole
+cap was overcomplicated and whether biasing the roll toward low numbers would do the same
+job. Two things settled it, and both are worth keeping:
+
+- **Cascade branch ORDER carries no reliable rarity signal.** Exactly 1 of 61 cascades
+  (>=4 branches) has monotonic weights; the rarest branch averages position 0.21 but sits
+  in the second half in 7 tables, barbarian.rs2 ends with eight consecutive weight-1
+  branches AFTER its 42-weight coin branch, and guard.rs2's FIRST branch is "nothing
+  dropped". So a low-biased roll boosts a position range, not rare items. Simulated
+  against the real corpus: min-of-2 rolls lift only 128 of the 721 sub-1/32 branches to
+  1/32 while making 450 branches rarer than vanilla; min-of-5 gets 254 and makes 579
+  worse. A bias is monotone in position; rarity isn't. Kept as the answer if this comes
+  up again.
+- **The simulator simulates BOTH columns from one parse.** Vanilla weights and the
+  in-memory `planCascade()` weights, same seed, same roll loop - so the printed
+  difference can only be the table, never two hand-copied tables drifting. It writes
+  nothing (safe on a live tree) and `--live` reads installed content including
+  `ap_mimic.rs2`, which makes it the "did the install actually take" check too.
+- **Verified independently**: a separate re-implementation of the roll loop over all 63
+  tables x 200,000 kills with capped weights - worst |observed - table| = 0.236pp, and
+  the rarest OBSERVED drop rate anywhere in the corpus was 1/33.4 (sampling noise around
+  the 1/32 floor). That is the empirical form of the guarantee the cap makes on paper.

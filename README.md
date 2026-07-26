@@ -577,6 +577,12 @@ Tools (`overlays/engine/tools/drops/`):
   and `parseDeathDropSlots()` for the separate `death_drop` axis.
 - `RandomizeDrops.ts` - reassigns eligible slots' items (mode-dependent, see Scope
   below) and separately deranges `death_drop` values across every eligible NPC.
+- `CapDropRarity.ts` - the drop-RATE pass (no seed, no items): rewrites cascade
+  thresholds so no loot slot is rarer than `--min-rate` (default 1/32). Orthogonal to
+  every swap mode above and runs after them - see "Rarity cap" below.
+- `SimulateDrops.ts` - rolls one monster's real loot table N times and prints what fell
+  out, vanilla vs capped side by side. Writes nothing; the capped column is computed in
+  memory, so it's safe to run before or after the cap is applied.
 - `MimicTransform.ts` - everything specific to `--mode mimic`: parses each
   `[ai_queue3,...]` death handler out of the pristine backup, extracts its
   post-prologue loot into a `[label,ap_drops_<n>]` block in one generated file
@@ -591,6 +597,7 @@ Tools (`overlays/engine/tools/drops/`):
 
 ```
 cd Server/engine && npx tsx tools/drops/RandomizeDrops.ts [--seed <number>] [--dry-run] [--mode tiered|chaos|mimic] [--no-death-drop] [--exclude <substr,substr,...>]
+cd Server/engine && npx tsx tools/drops/CapDropRarity.ts [--min-rate 1/32] [--dry-run] [--exclude <substr,substr,...>]
 cd Server/engine && npx tsx tools/pack/Build.ts
 ```
 
@@ -635,13 +642,101 @@ unit's label, or falls through to its untouched vanilla loot on a miss.
   source table's npc display name, also recorded as `nowName` in the spoiler). Only
   redirected kills print - the vanilla fallthrough path is silent.
 
+### Rarity cap (GitHub #11)
+
+`CapDropRarity.ts` guarantees no monster loot slot is rarer than `--min-rate` (default
+1/32 ≈ 3.1%). Vanilla rates go down to 1/512, and in a randomizer a required item can
+end up behind exactly one of those rolls - which is a wall, not a check. It is a
+rate-only pass: it rewrites `if ($random < N)` thresholds and never touches which item
+sits in a slot, so it composes with `tiered`/`chaos`/`mimic` in either order and needs
+no seed (it is fully deterministic). Run it after `RandomizeDrops.ts`, then rebuild the
+pack; `RegenerateAll.ts` does this for you (`--skip-rarity-cap` opts out, `--min-rate`
+passes through). Spoiler is `engine/tools/drops/drop-rarity-cap.json`.
+
+Where the extra probability comes from - the actual design decision, since a floor is
+not free:
+
+1. the cascade's no-drop tail (rolls above the last threshold) is spent first, down to
+   zero if needed;
+2. the remainder comes proportionally out of the branches already at or above the
+   floor, never pushing any of them below it.
+
+Step 2 is not optional: 46 of the 63 vanilla cascades need more than their entire
+no-drop tail to floor everything, and 9 of those (black demon, blue/green/red dragon,
+imp, fire giant, guard, chaos dwarf, kalphite queen) have no tail at all - their
+cascades already cover the full denominator. The visible cost is that common slots (coins, low-tier junk) shrink by
+roughly 15-25% in a typical table. Vanilla rarity ORDER is preserved: donors shrink in
+proportion to their surplus, so a 20% slot stays rarer than a 30% one.
+
+Applied to the vanilla corpus at 1/32 this raises 721 of 1212 branches across 62 of the
+63 cascades (chicken's two-branch table is already above the floor). Notable results:
+bandit's 1/128 steel axe becomes 4/128; werewolf's 1/512 `~randomjewel` becomes 16/512;
+imp's 32-branch table becomes exactly uniform at 4/128 each - 32 branches at a 1/32
+floor is the arithmetic limit, and imp is the one table that hits it.
+
+- The unit is the cascade BRANCH, not the item slot: a branch fires as a whole, and a
+  few branches hold two mutually-exclusive `obj_add` calls behind a `map_members` check.
+- Branches that call a shared proc (`~randomherb`, `~randomjewel`, `~ultrarare_getitem`)
+  are floored like any other branch - the pass has no opinion on what the proc returns.
+  The procs' own internal tables are NOT capped (they use an assignment form,
+  `$random = random(128)`, that isn't a cascade for parsing purposes) except
+  `megararetable`, which is a real `def_int` cascade and does get capped.
+- Vanilla's one explicit "nothing dropped" branch (guard.rs2) is not a drop, so it is
+  never floored - it donates like any above-floor branch.
+- In mimic mode the generated `ap_mimic.rs2` is capped too (that's where the loot tables
+  that actually run live); the cascades left behind in the handlers are the no-override
+  fallback and get capped as well.
+- If a cascade can't fit the floor inside its own denominator, the whole cascade is
+  scaled up (`random(6)` -> `random(24)`) rather than distorted. No vanilla cascade needs
+  this at 1/32; a coarser `--min-rate` can. A cascade with more drop branches than the
+  floor allows (>32 at 1/32) is impossible by arithmetic - it warns and stays vanilla.
+
+### Seeing it: the drop simulator
+
+```
+cd Server/engine && npx tsx tools/drops/SimulateDrops.ts <npc> [--kills 10000] [--seed <n>] [--min-rate 1/32] [--live] [--list]
+```
+
+Rolls that monster's actual cascade `--kills` times and prints the result twice - vanilla
+weights and capped weights, same seed, so the only thing that differs between the columns
+is the table:
+
+```
+$ npx tsx tools/drops/SimulateDrops.ts werewolf --kills 5000
+_werewolf (werewolf.rs2, vanilla backup) - 5,000 kills, seed 777, floor 1/32
+
+drop                            VANILLA                  CAPPED
+                       rate     sim   count       rate     sim   count
+~randomjewel          1/512   0.18%       9       1/32   3.24%     162
+rune_med_helm       1/170.7   0.52%      26       1/32   3.24%     162
+mithril_chainbody    1/51.2   1.68%      84       1/32   2.74%     137
+steel_scimitar         1/16   6.30%     315     1/18.3   5.62%     281
+coins                 1/3.2  32.00%    1600      1/3.7  27.74%    1387
+
+rarest drop: 1/512 -> 1/32; drops rarer than 1/32: 9 -> 0
+nothing at all: 0.59% -> 0.00% of kills
+```
+
+`--live` reads the installed content instead of the vanilla backup (including
+`ap_mimic.rs2`), which is how you check what a running server would actually give you.
+`--list` prints all 63 tables. `rate` is the table's exact odds and `sim`/`count` are the
+simulated results, so the two agreeing is the sim checking itself.
+
+Rows are one cascade BRANCH each, which is why a `~randomherb` branch shows as a single
+outcome (the proc's own table is out of scope for the cap) and why a `map_members`
+branch shows as `bloodrune | body_talisman` - one roll, two possible items. `death_drop`
+(bones/ashes) is reported separately when the npc config resolves, since it's guaranteed
+and outside the roll.
+
 ### Scope
 
 Only the 73-file monster drop-table corpus and the `death_drop` npc param are in
 scope - the shared reward sub-tables called via `~procname` (`~randomherb`,
 `~randomjewel`, `~ultrarare_getitem`, `~megararetable`, `~randomjunk` in
 `shared_droptables.rs2`) and any `obj_add(...)` drops outside that folder (quest/area
-scripts) are deliberately left untouched.
+scripts) are deliberately left untouched. (Scope here means WHICH ITEM sits in a slot -
+the rarity cap above is a rate-only pass with its own, slightly wider scope: it also
+floors `megararetable`'s branches.)
 
 `--mode` picks how a slot's replacement item is sampled (kept as a flag rather than one
 fixed design, since it's intended to become an Archipelago per-slot option):

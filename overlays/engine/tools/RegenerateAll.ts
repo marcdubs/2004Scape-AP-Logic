@@ -35,7 +35,7 @@ import { execNpxTsx } from './shared/Npx.js';
 // (`man_torso_backpack`) from BEFORE the armor-set fix existed, and skip-not-restore
 // meant it stayed wrong indefinitely.
 //
-// Usage: npx tsx tools/RegenerateAll.ts [--seed <number>] [--drip-seed <n>] [--shops-seed <n>] [--drops-seed <n>] [--teleports-seed <n>] [--mode tiered|chaos|mimic] [--skip-drip] [--skip-shops] [--skip-drops] [--skip-teleports] [--no-rebuild]
+// Usage: npx tsx tools/RegenerateAll.ts [--seed <number>] [--drip-seed <n>] [--shops-seed <n>] [--drops-seed <n>] [--teleports-seed <n>] [--mode tiered|chaos|mimic] [--min-rate 1/32] [--skip-drip] [--skip-shops] [--skip-drops] [--skip-teleports] [--skip-rarity-cap] [--no-rebuild]
 
 function parseArgs() {
     const args = process.argv.slice(2);
@@ -49,6 +49,7 @@ function parseArgs() {
 
     const modeIdx = args.indexOf('--mode');
     const mode = modeIdx !== -1 ? args[modeIdx + 1] : null;
+    const minRateIdx = args.indexOf('--min-rate');
 
     return {
         dripSeed: namedSeed('--drip-seed'),
@@ -56,10 +57,12 @@ function parseArgs() {
         dropsSeed: namedSeed('--drops-seed'),
         teleportsSeed: namedSeed('--teleports-seed'),
         mode,
+        minRate: minRateIdx !== -1 ? args[minRateIdx + 1] : null,
         skipDrip: args.includes('--skip-drip'),
         skipShops: args.includes('--skip-shops'),
         skipDrops: args.includes('--skip-drops'),
         skipTeleports: args.includes('--skip-teleports'),
+        skipRarityCap: args.includes('--skip-rarity-cap'),
         rebuild: !args.includes('--no-rebuild')
     };
 }
@@ -70,7 +73,7 @@ function run(scriptPath: string, args: string[]): void {
 }
 
 function main() {
-    const { dripSeed, shopsSeed, dropsSeed, teleportsSeed, mode, skipDrip, skipShops, skipDrops, skipTeleports, rebuild } = parseArgs();
+    const { dripSeed, shopsSeed, dropsSeed, teleportsSeed, mode, minRate, skipDrip, skipShops, skipDrops, skipTeleports, skipRarityCap, rebuild } = parseArgs();
 
     // ensure backups exist (no-op if this isn't the first-ever run), then restore
     // every backed-up file onto its live path - this is the "start completely fresh"
@@ -130,6 +133,16 @@ function main() {
         run('tools/drops/RandomizeDrops.ts', dropsArgs);
     } else {
         printInfo('drops: skipped (--skip-drops)');
+    }
+
+    // rate cap runs AFTER drops, not before: in mimic mode the loot tables that actually
+    // run live in the generated ap_mimic.rs2, which only exists once RandomizeDrops has
+    // run. It's a threshold-only rewrite that never changes a line count, so it can't
+    // disturb the item pass's line-indexed edits either way (GitHub #11).
+    if (!skipRarityCap) {
+        run('tools/drops/CapDropRarity.ts', minRate ? ['--min-rate', minRate] : []);
+    } else {
+        printInfo('drop rarity cap: skipped (--skip-rarity-cap) - drop rates stay vanilla');
     }
 
     if (!skipTeleports) {

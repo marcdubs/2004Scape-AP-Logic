@@ -47,6 +47,39 @@ export const DROP_SCRIPTS_DIR = path.join(SCRIPTS_ROOT, 'drop tables', 'scripts'
 export const DROP_BACKUP_DIR = path.join(BACKUP_ROOT, 'drop tables', 'scripts');
 const QUESTS_DIR = path.join(SCRIPTS_ROOT, 'quests');
 
+// One `if ($var < N)` branch of a cascade. The unit of PROBABILITY (a branch fires as a
+// whole), which is not the same as the unit of ITEM identity - a branch can hold two
+// mutually-exclusive obj_add calls behind a `map_members` check, so it can back two
+// DropSlots at one shared weight. Rate-capping (CapDropRarity.ts) works on branches;
+// item reassignment (RandomizeDrops.ts) works on slots.
+export type CascadeBranch = {
+    threshold: number; // the literal N in `if ($var < N)` as it currently stands in the file
+    weight: number; // threshold - the previous branch's threshold
+    line: number; // 0-based line index of the branch header
+    // absolute offsets into the LF-normalized file text (readNpcSource output), so an
+    // edit pass can rewrite just the threshold digits and leave every other character -
+    // conditions, comments, brace-less bodies sharing the line - untouched.
+    thresholdOffset: number;
+    thresholdLength: number;
+    bodyOffset: number;
+    bodyText: string;
+    // false only for a body that is empty once comments are stripped - vanilla's explicit
+    // "roll this range and drop nothing" branch (guard.rs2's `{ // nothing dropped }`).
+    // Such a branch is not a drop, so a minimum-rate floor must not apply to it.
+    isDrop: boolean;
+};
+
+export type DropCascade = {
+    file: string;
+    block: string;
+    varName: string;
+    total: number; // the random(total) denominator
+    line: number; // 0-based line index of the `def_int $var = random(total);` line
+    totalOffset: number; // absolute offset of the digits inside random(...), for widening
+    totalLength: number;
+    branches: CascadeBranch[];
+};
+
 export type DropSlot = {
     file: string; // relative to the root passed to parseDropSlots (backup root or DROP_SCRIPTS_DIR)
     block: string; // npc debugname, e.g. "bandit"
@@ -157,9 +190,8 @@ export function restoreDropScriptBackup(): number {
     return restored;
 }
 
-export function parseDropSlots(filePath: string, relFile: string): DropSlot[] {
-    const lines = readNpcSource(filePath).split('\n');
-
+// `[header,name]` blocks with their line spans, in file order.
+function splitBlocks(lines: string[]): { name: string; startLine: number; endLine: number }[] {
     const blocks: { name: string; startLine: number; endLine: number }[] = [];
     let curName: string | null = null;
     let curStart = 0;
@@ -176,11 +208,56 @@ export function parseDropSlots(filePath: string, relFile: string): DropSlot[] {
     if (curName !== null) {
         blocks.push({ name: curName, startLine: curStart, endLine: lines.length });
     }
+    return blocks;
+}
 
-    const slots: DropSlot[] = [];
+// a branch is a drop unless its body is EMPTY once comments, braces and separators are
+// stripped - i.e. vanilla explicitly wrote "this range drops nothing" (guard.rs2's
+// `if ($random < 8) { // nothing dropped }`, the only such branch in the corpus). Bodies
+// that assign rather than obj_add (shared_droptables.rs2's megararetable writes `$drop =
+// rune_spear;` and obj_adds after the cascade) still count as drops, which is why this
+// isn't "contains an obj_add call".
+function bodyProducesDrop(bodyText: string): boolean {
+    return (
+        bodyText
+            .replace(/\/\/[^\n]*/g, '')
+            .replace(/[{}\s;]/g, '').length > 0
+    );
+}
 
-    for (const block of blocks) {
+// every weighted cascade in a file: `def_int $var = random(total);` followed by its
+// chain of `if ($var < N)` / `else if ($var < N)` branches. Branch spans are found by
+// header text position (see the file header comment for why, not brace tracking), and
+// the last branch's body runs to the end of the cascade - anything after the final
+// `else if` is attributed to it.
+export function parseDropCascades(filePath: string, relFile: string): DropCascade[] {
+    const text = readNpcSource(filePath);
+    const lines = text.split('\n');
+
+    // line index of an absolute offset, via the cumulative start offset of each line
+    const lineStarts: number[] = [0];
+    for (let i = 0; i < lines.length; i++) {
+        lineStarts.push(lineStarts[i] + lines[i].length + 1);
+    }
+    const lineOf = (offset: number): number => {
+        let lo = 0;
+        let hi = lines.length - 1;
+        while (lo < hi) {
+            const mid = (lo + hi + 1) >> 1;
+            if (lineStarts[mid] <= offset) {
+                lo = mid;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        return lo;
+    };
+
+    const cascades: DropCascade[] = [];
+
+    for (const block of splitBlocks(lines)) {
         const blockText = lines.slice(block.startLine, block.endLine).join('\n');
+        const blockOffset = lineStarts[block.startLine];
         const defMatches = [...blockText.matchAll(DEF_RANDOM_RE)];
 
         for (let ci = 0; ci < defMatches.length; ci++) {
@@ -192,45 +269,83 @@ export function parseDropSlots(filePath: string, relFile: string): DropSlot[] {
             const cascadeText = blockText.slice(cascadeStart, cascadeEnd);
 
             const branchRe = new RegExp(`(?:if|else if)\\s*\\(\\s*\\$${varName}\\s*<\\s*(\\d+)\\s*\\)`, 'g');
-            const branches = [...cascadeText.matchAll(branchRe)];
+            const branchMatches = [...cascadeText.matchAll(branchRe)];
 
+            const branches: CascadeBranch[] = [];
             let prevThreshold = 0;
-            for (let bi = 0; bi < branches.length; bi++) {
-                const bm = branches[bi];
+            for (let bi = 0; bi < branchMatches.length; bi++) {
+                const bm = branchMatches[bi];
                 const threshold = parseInt(bm[1], 10);
-                const weight = threshold - prevThreshold;
-                prevThreshold = threshold;
-
                 const bodyStart = bm.index! + bm[0].length;
-                const bodyEnd = bi + 1 < branches.length ? branches[bi + 1].index! : cascadeText.length;
+                const bodyEnd = bi + 1 < branchMatches.length ? branchMatches[bi + 1].index! : cascadeText.length;
                 const bodyText = cascadeText.slice(bodyStart, bodyEnd);
 
-                OBJ_ADD_RE.lastIndex = 0;
-                let om: RegExpExecArray | null;
-                while ((om = OBJ_ADD_RE.exec(bodyText))) {
-                    const item = om[1];
-                    if (item.startsWith('~')) {
-                        continue;
-                    }
-                    const qty = parseInt(om[2], 10);
-                    const absoluteOffset = cascadeStart + bodyStart + om.index;
-                    const upToMatch = blockText.slice(0, absoluteOffset);
-                    const lineNumber = block.startLine + (upToMatch.match(/\n/g)?.length ?? 0);
-                    const probability = weight / total;
+                // the threshold digits are the last number in the header text, e.g. the
+                // `128` of `} else if ($random < 128) {` (the var name can itself contain
+                // digits, so this is anchored on the closing paren rather than searched).
+                const tm = /(\d+)\s*\)\s*$/.exec(bm[0])!;
+                const headerOffset = blockOffset + cascadeStart + bm.index!;
 
-                    slots.push({
-                        file: relFile,
-                        block: block.name,
-                        line: lineNumber,
-                        raw: om[0],
-                        item,
-                        qty,
-                        weight,
-                        total,
-                        probability,
-                        bucket: bucketFor(probability)
-                    });
+                branches.push({
+                    threshold,
+                    weight: threshold - prevThreshold,
+                    line: lineOf(headerOffset),
+                    thresholdOffset: headerOffset + tm.index,
+                    thresholdLength: tm[1].length,
+                    bodyOffset: blockOffset + cascadeStart + bodyStart,
+                    bodyText,
+                    isDrop: bodyProducesDrop(bodyText)
+                });
+                prevThreshold = threshold;
+            }
+
+            const totalDigitsOffset = blockOffset + dm.index! + dm[0].lastIndexOf(dm[2]);
+            cascades.push({
+                file: relFile,
+                block: block.name,
+                varName,
+                total,
+                line: lineOf(blockOffset + dm.index!),
+                totalOffset: totalDigitsOffset,
+                totalLength: dm[2].length,
+                branches
+            });
+        }
+    }
+
+    return cascades;
+}
+
+export function parseDropSlots(filePath: string, relFile: string): DropSlot[] {
+    const text = readNpcSource(filePath);
+    const slots: DropSlot[] = [];
+
+    for (const cascade of parseDropCascades(filePath, relFile)) {
+        for (const branch of cascade.branches) {
+            OBJ_ADD_RE.lastIndex = 0;
+            let om: RegExpExecArray | null;
+            while ((om = OBJ_ADD_RE.exec(branch.bodyText))) {
+                const item = om[1];
+                if (item.startsWith('~')) {
+                    continue;
                 }
+                const qty = parseInt(om[2], 10);
+                const absoluteOffset = branch.bodyOffset + om.index;
+                const lineNumber = text.slice(0, absoluteOffset).match(/\n/g)?.length ?? 0;
+                const probability = branch.weight / cascade.total;
+
+                slots.push({
+                    file: relFile,
+                    block: cascade.block,
+                    line: lineNumber,
+                    raw: om[0],
+                    item,
+                    qty,
+                    weight: branch.weight,
+                    total: cascade.total,
+                    probability,
+                    bucket: bucketFor(probability)
+                });
             }
         }
     }

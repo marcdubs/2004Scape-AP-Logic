@@ -44,6 +44,10 @@ The progression path is generated on demand, not stored:
 - [ ] Cross a multiple-of-10 level — `level_<skill>_<N>` (a big `::apreward xp`
       roll can cross several at once — all of them should fire)
 - [ ] Sign a Barcrawl bar — `barcrawl_bar_N`
+- [ ] Kill ~30 of one monster with the rarity cap on (GitHub #11) — every entry in
+      that monster's table should show up at least once or twice; nothing in the
+      corpus is rarer than 1/32 any more. Coins/junk drops should feel slightly
+      less frequent (they pay for the boost)
 - [ ] Complete a quick quest (Sheep Shearer) — vanilla completion + the
       quest-check reward (regression: Feature 2 path still works)
 - [ ] Start Dragon Slayer (needs 32 QP) — `ds_started` stage check
@@ -124,6 +128,32 @@ From `Server/engine`:
 - [ ] `npx tsx tools/logic/ValidateSeed.ts` — exit 0, all goals reachable
 - [ ] `npx tsx tools/map/RandomizeEntrances.ts --seed <n>` — watch it validate
       (or reroll) automatically at the end
+- [ ] `npx tsx tools/drops/CapDropRarity.ts --dry-run` — on the vanilla corpus expect
+      "721 drop branch(es) raised across 62 cascade(s)"; the counts are higher once
+      `ap_mimic.rs2` exists (mimic mode caps those tables too)
+- [ ] `npx tsx tools/drops/SimulateDrops.ts werewolf --kills 5000` — rarest drop
+      1/512 → 1/32, "drops rarer than 1/32: 9 → 0", and each `sim` column tracking
+      its own `rate` column (that agreement is the sim validating itself)
+- [ ] `npx tsx tools/drops/SimulateDrops.ts <npc> --live` after installing the cap —
+      the AS INSTALLED column should already show the capped rates
+
+### Drop rarity cap offline checks (GitHub #11)
+
+These run against a throwaway COPY of the corpus — never the live tree. Copy
+`content/.ap-backup/scripts/drop tables/scripts` somewhere temporary, then drive
+`capFile()` (exported from `tools/drops/CapDropRarity.ts`) over the copy with
+`npx tsx --input-type=module -e "..."` and assert:
+
+- [ ] every `isDrop` branch ends at `weight/total >= 1/32`, thresholds stay monotonic
+      and never exceed the denominator
+- [ ] the only characters that differ from the original are threshold digits — line
+      count unchanged, CRLF intact, every `obj_add(...)` call byte-identical
+- [ ] `parseDropSlots()` returns the same 1127 slots (item, qty, line) before and after
+      — the cap must never move loot
+- [ ] a second pass over its own output reports 0 changed files (idempotent, so a
+      reseed can't compound the boost)
+- [ ] `parseDropSlots()` output is byte-identical to the pre-#11 parser on both the
+      backup and live trees (the cascade refactor's regression gate)
 
 ## Known risks to watch (from agent reports)
 
