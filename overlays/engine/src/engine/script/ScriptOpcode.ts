@@ -129,6 +129,11 @@ export const enum ScriptOpcode {
     AP_NPCTP_NAME = 1911,
     AP_NPCTP_COORD = 1912,
 
+    // custom: Archipelago thieving randomizer (pickpocketing / stalls / trapped
+    // chests) loot swap lookup - same explicit-numbering reasoning as
+    // AP_ENTRANCE_OVERRIDE above.
+    AP_THIEVING_SWAP = 1913,
+
     // Player ops (2000-2499)
     AFK_EVENT = 2000,
     ALLOWDESIGN,
@@ -590,6 +595,7 @@ export const ScriptOpcodeMap: Map<string, number> = new Map([
     ['AP_OPTION', ScriptOpcode.AP_OPTION],
     ['AP_NPCTP_NAME', ScriptOpcode.AP_NPCTP_NAME],
     ['AP_NPCTP_COORD', ScriptOpcode.AP_NPCTP_COORD],
+    ['AP_THIEVING_SWAP', ScriptOpcode.AP_THIEVING_SWAP],
 
     ['AFK_EVENT', ScriptOpcode.AFK_EVENT],
     ['ALLOWDESIGN', ScriptOpcode.ALLOWDESIGN],

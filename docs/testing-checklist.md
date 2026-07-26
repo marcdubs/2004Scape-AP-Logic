@@ -51,10 +51,13 @@ The progression path is generated on demand, not stored:
 ## 3. Browser tracker
 
 - [ ] Open `http://localhost:8080/ap/` (or `:80` if that's your Windows port) —
-      world map renders, five tabs, per-category "0 / M discovered" counters
+      world map renders, all tabs present, per-category "0 / M discovered" counters
 - [ ] Use a shuffled ladder/stair — within ~5s a marker + connection line appears
 - [ ] Mine/chop a shuffled resource — Gathering tab row ("Tree → Raw mackerel")
 - [ ] Cook/smith a shuffled product — Recipes tab row
+- [ ] Pick a pocket / rob a stall / loot a trapped chest — Thieving tab row
+      ("Coins → steals like → Adamantite ore"). The stall still narrates the
+      vanilla line; the item that lands in your pack is the reveal.
 - [ ] Kill a mimicked monster (cows mimic paladins this seed; also listen for the
       "Smells like..." chat line) — Bestiary row
 - [ ] Cast any teleport spell — Teleports tab row

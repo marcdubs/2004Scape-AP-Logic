@@ -47,6 +47,7 @@ done
 RUN_CONTENT=1             # drip + shops + drops + teleports via RegenerateAll (INCLUDES the ~1:30 pack rebuild)
 RUN_GATHER=1              # gathering swap table (runtime JSON, restart only)
 RUN_PROCESS=1             # processing/recipe swap table (runtime JSON, restart only)
+RUN_THIEVING=1            # thieving loot swap table (runtime JSON, restart only)
 RUN_SPAWN=1               # random home/respawn point (MUST run before entrances - see note above)
 RUN_ENTRANCES=1           # entrance shuffle + automatic logic validation/reroll
 RUN_PLACEMENT=1           # AP placement: checks contain the unlocks (RESETS run progress!)
@@ -82,6 +83,15 @@ GATHER_EXTRA=""
 #               [--pin-quest-items] [--no-quest-pins] [--dry-run]
 PROCESS_MODE=shuffle
 PROCESS_EXTRA=""
+
+# RandomizeThieving.ts - what pickpockets/market stalls/trapped chests hand you.
+#   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
+#               [--surfaces pickpocket,stalls,chests] [--exclude <item,item>]
+#               [--pin-quest-items] [--no-quest-pins] [--dry-run] [--export-pool <path>]
+#   (`--exclude coins` leaves the big-money rows - 1000-coin Ardougne chest, hero/
+#    paladin pockets - handing out vanilla coins; quantity is never rescaled.)
+THIEVING_MODE=shuffle
+THIEVING_EXTRA=""
 
 # RandomizeSpawn.ts - the home/respawn point. Runs BEFORE entrances (see note up top).
 #   all params: [--seed <n>] [--mode city|chunk] [--dry-run] [--include-far-west]
@@ -125,6 +135,7 @@ run() { echo; echo "==> npx tsx $*"; npx tsx "$@"; }
 [ "$RUN_CONTENT" = 1 ]   && run tools/RegenerateAll.ts --seed "$SEED" --mode "$DROPS_MODE" $REGENERATE_EXTRA
 [ "$RUN_GATHER" = 1 ]    && run tools/gather/RandomizeGathering.ts --seed "$SEED" --mode "$GATHER_MODE" $GATHER_EXTRA
 [ "$RUN_PROCESS" = 1 ]   && run tools/process/RandomizeProcessing.ts --seed "$SEED" --mode "$PROCESS_MODE" $PROCESS_EXTRA
+[ "$RUN_THIEVING" = 1 ]  && run tools/thieving/RandomizeThieving.ts --seed "$SEED" --mode "$THIEVING_MODE" $THIEVING_EXTRA
 [ "$RUN_SPAWN" = 1 ]     && run tools/spawn/RandomizeSpawn.ts --seed "$SEED" --mode "$SPAWN_MODE" $SPAWN_EXTRA
 [ "$RUN_ENTRANCES" = 1 ] && run tools/map/RandomizeEntrances.ts --seed "$SEED" $ENTRANCE_EXTRA
 [ "$REFRESH_REGION_GRAPH" = 1 ] && run tools/logic/BuildRegionGraph.ts

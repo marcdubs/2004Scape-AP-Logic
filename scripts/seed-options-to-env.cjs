@@ -88,6 +88,15 @@ if (o.processing === 'off') {
 } else if (typeof o.processing === 'string') {
     set('PROCESS_MODE', o.processing);
 }
+// Forward-compatible: the apworld does not emit `thieving` yet (its fill does not model
+// thieving swaps - see docs/lessons-learned.md, GitHub #6 follow-up), so this is a no-op
+// on today's slot data and becomes live the moment the option ships.
+if (o.thieving === 'off') {
+    set('RUN_THIEVING', 0);
+    del('ap-thieving.json');
+} else if (typeof o.thieving === 'string') {
+    set('THIEVING_MODE', o.thieving);
+}
 if (o.spawn === 'off') {
     set('RUN_SPAWN', 0);
     del('ap-spawn.json');

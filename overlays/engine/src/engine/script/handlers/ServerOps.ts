@@ -17,6 +17,7 @@ import Midi from '#/cache/midi/Midi.js';
 import { getDropGroupOverride } from '#/engine/ApDropOverrides.js';
 import { getGatherSwap } from '#/engine/ApGatherOverrides.js';
 import { getProcessSwap } from '#/engine/ApProcessOverrides.js';
+import { getThievingSwap } from '#/engine/ApThievingOverrides.js';
 import { getEntranceOverride } from '#/engine/ApEntranceOverrides.js';
 import { applyAllBankedXp, getUnlockCount } from '#/engine/ApUnlockOverrides.js';
 import { recordDiscovery } from '#/engine/ApTracker.js';
@@ -550,6 +551,12 @@ const ServerOps: CommandHandlers = {
         const product = state.popInt();
 
         state.pushInt(getProcessSwap(product));
+    },
+
+    [ScriptOpcode.AP_THIEVING_SWAP]: state => {
+        const product = state.popInt();
+
+        state.pushInt(getThievingSwap(product));
     },
 
     // custom: Archipelago reward XP drops - identical to STAT_ADVANCE except the

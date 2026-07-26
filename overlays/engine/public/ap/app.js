@@ -325,9 +325,12 @@
         return tr;
     }
 
-    // ---- render: gathering / recipes (obj id -> obj id, via names.items) ----
+    // ---- render: gathering / recipes / thieving (obj id -> obj id, via names.items) ----
 
-    function renderItemSwapTab(category, tableId, emptyId, counterId, toggleId) {
+    // `arrow` is optional - thieving passes "steals like" for the mimic-style
+    // presentation the bestiary already uses ("smells like"); everything else gets the
+    // bare arrow.
+    function renderItemSwapTab(category, tableId, emptyId, counterId, toggleId, arrow) {
         var data = state.data;
         if (!data) {
             return;
@@ -341,7 +344,7 @@
         document.getElementById(counterId).textContent = '(' + Object.keys(discovered).length + ' / ' + total + ' discovered)';
 
         renderTable(tableId, emptyId, discovered, spoilerFull, function (key, value) {
-            return makeRow(itemName(key), '→', itemName(value));
+            return makeRow(itemName(key), arrow || '→', itemName(value));
         }, pendingSources(category, discovered, toggleId, itemName), function (key) {
             return makeRow(itemName(key), '→', 'not yet discovered');
         });
@@ -565,11 +568,12 @@
         input.addEventListener('input', renderEntrancesTab);
     }
 
-    // "Show not-yet-discovered" on the four swap tabs - each just re-renders its own tab
+    // "Show not-yet-discovered" on the five swap tabs - each just re-renders its own tab
     function initUndiscoveredToggles() {
         [
             ['gathering-show-undiscovered', function () { renderItemSwapTab('gather', 'gathering-table', 'gathering-empty', 'gathering-counter', 'gathering-show-undiscovered'); }],
             ['recipes-show-undiscovered', function () { renderItemSwapTab('process', 'recipes-table', 'recipes-empty', 'recipes-counter', 'recipes-show-undiscovered'); }],
+            ['thieving-show-undiscovered', function () { renderItemSwapTab('thieving', 'thieving-table', 'thieving-empty', 'thieving-counter', 'thieving-show-undiscovered', '→ steals like'); }],
             ['bestiary-show-undiscovered', renderBestiaryTab],
             ['teleports-show-undiscovered', renderTeleportsTab]
         ].forEach(function (pair) {
@@ -1743,6 +1747,7 @@
     function renderAll() {
         renderItemSwapTab('gather', 'gathering-table', 'gathering-empty', 'gathering-counter', 'gathering-show-undiscovered');
         renderItemSwapTab('process', 'recipes-table', 'recipes-empty', 'recipes-counter', 'recipes-show-undiscovered');
+        renderItemSwapTab('thieving', 'thieving-table', 'thieving-empty', 'thieving-counter', 'thieving-show-undiscovered', '→ steals like');
         renderBestiaryTab();
         renderTeleportsTab();
         renderEntrancesTab();

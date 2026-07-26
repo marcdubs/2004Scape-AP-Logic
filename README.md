@@ -851,12 +851,100 @@ quantities are untouched, so a recipe slot that hands out 5 of its product (the
 metal-tier knives, `nails`) still hands out 5 of whatever it got swapped to; same
 "structure stays put, content moves" philosophy as tiered drop randomization.
 
+## Thieving randomization (pickpocketing / stalls / trapped chests)
+
+Shuffles what every thieving source actually hands the player - pick a man's pocket and
+get an adamantite ore, rob the gem stall and get a shark. Same runtime-override design
+as gathering/processing: reseeding rewrites a JSON table and needs a server restart
+only, no pack rebuild. Deleting `engine/data/config/ap-thieving.json` restores vanilla
+thieving.
+
+The survey step the issue asked for came back clean: **all three surfaces are
+dbtable-driven and the reward is a plain scalar item lookup**, not an inline
+`if ($random < N) obj_add(...)` cascade - so this is a runtime-override table, not a
+config mutation. All three reward cascades even live in one file.
+
+### Pieces
+
+- `overlays/engine/src/engine/ApThievingOverrides.ts` - runtime loader for
+  `engine/data/config/ap-thieving.json` (obj id -> obj id). Same vanilla-passthrough-
+  on-miss semantics as `ApGatherOverrides.ts`.
+- `ScriptOpcode.ts` / `ServerOps.ts` - `AP_THIEVING_SWAP = 1913`, declared in
+  `ap/ap.rs2` as `[command,ap_thieving_swap](obj $product)(namedobj)`.
+- A whole-file overlay of `skill_thieving/scripts/thieving.rs2`, with all three
+  reward chokepoints wrapped as `inv_add(inv, ap_thieving_swap($reward), n)`:
+  `pick_pocket_check_for_reward`, `stealing_check_for_reward` and
+  `trapped_chest_check_for_reward` (1 each). Each wrap sits **inside** the vanilla
+  `if ($roll >= $denominator)` rarity branch, so the drop rate still decides *if* you
+  get something and only *what* you get moves - nothing is revealed for loot the
+  player never actually received.
+- `overlays/engine/tools/thieving/RandomizeThieving.ts` - builds the loot pool from
+  the game's own dbtable data (`pickpocket.dbrow`, `stealing.dbrow`,
+  `trapped_chest.dbrow`), writes the JSON table and a spoiler at
+  `engine/tools/thieving/thieving-seed.json`.
+- Tracker "Thieving" tab - rows read `Coins -> steals like -> Adamantite ore`,
+  revealed the first time you actually steal the item (the mimic-style presentation
+  the Bestiary's "smells like" already established).
+- `::apthieving <item_debugname>` test command (e.g. `::apthieving coins`) - prints
+  what a thieving reward is randomized into.
+
+### Usage
+
+```
+cd ../Server/engine
+npx tsx tools/thieving/RandomizeThieving.ts [--seed <n>] [--mode shuffle|tiered|chaos]
+    [--surfaces pickpocket,stalls,chests] [--exclude <item,...>]
+    [--pin-quest-items] [--no-quest-pins] [--dry-run] [--export-pool <path>]
+```
+
+- `shuffle` (default): one derangement across the combined 33-item pool - a bijection,
+  so every item is still stealable from exactly one source and nothing maps to itself.
+  Seed 777: 33 swapped, 18 land cross-surface.
+- `tiered`: the same derangement run separately inside each **progression band** (see
+  [Progression bands](#progression-bands-mode-tiered)), so a level-1 pocket yields
+  another level-1 item and the gem stall stays in the 75+ band. Seed 777 bands:
+  5/2/8/3/5/10 items.
+- `chaos`: every item independently resamples from the pool - duplicates allowed, so
+  some items can become unstealable entirely.
+- `--surfaces` restricts which surfaces join the pool; items only reachable through an
+  unselected surface stay vanilla.
+
+**Quest-critical pinning is mode-aware**, same reasoning as gathering/processing:
+shuffle and tiered don't pin by default (both are bijections), chaos pins by default.
+Override with `--pin-quest-items` / `--no-quest-pins`. Seed 777 with pins forced on:
+8 of 33 pinned (coins, lockpick, bread, earthrune, deathrune, cup_of_tea, silk,
+naturerune).
+
+### Scope
+
+The three loot-bearing surfaces: pickpocketing (13 `pickpocket.dbrow` rows covering
+~50 NPCs), market stalls (9 `stealing.dbrow` rows incl. the two Rellekka viking
+stalls) and trapped/locked chests (6 `trapped_chest.dbrow` rows). Everything else in
+`skill_thieving` stays vanilla by design: `locked_door.dbrow` (thieving doors have no
+loot, they only open), the `chest_steel_arrowtips` lockpick gate (a requirement, not a
+reward - its loot row is in the pool like every other chest), and every failure path
+(stun rolls, guard aggro, "Too late, they're dead.").
+
+Only the item identity moves. The rarity rolls, XP, respawn timers and chest teleport
+traps are untouched, and the stall's `"You steal <message>."` line plus its bread-only
+sound check both still read the **pre-swap** reward on purpose - "You steal some
+silk." while a raw shark lands in your pack is the reveal, exactly like gathering's
+"You manage to mine some coal." Quantities are untouched too, so the 1000-coin
+Ardougne chest hands out 1000 of whatever it got swapped to (`inv_add` fills what
+space there is for a non-stackable); `--exclude coins` is the escape hatch if a run
+wants the big-money rows left alone.
+
+**Not yet modelled in the apworld.** Local/solo mode is complete; the Archipelago fill
+does not yet reason about thieving-sourced items the way it does about
+gathering/processing (`randomizers.py`). `--export-pool` already emits the input that
+port needs - see the open follow-up in `docs/lessons-learned.md`.
+
 ## Progression bands (`--mode tiered`)
 
-Gathering and processing both accept `--mode tiered`, which is shuffle mode confined
-to a level band: still a cross-skill derangement, still a bijection, but a product can
+Gathering, processing and thieving all accept `--mode tiered`, which is shuffle mode
+confined to a level band: still a cross-skill derangement, still a bijection, but a product can
 only turn into a product of a comparable skill level. `overlays/engine/tools/shared/
-SkillTiers.ts` owns the bands and the shuffle both tools call.
+SkillTiers.ts` owns the bands and the shuffle all three tools call.
 
 | band | levels | why |
 | --- | --- | --- |
@@ -875,7 +963,8 @@ gets its own PRNG stream (`mulberry32(seed ^ hashKey(band))`), so widening one b
 later doesn't disturb the others.
 
 Every level is read out of the game's own data - `rock_level` / `levelrequired` /
-`level` columns for mining, woodcutting, cooking, smithing, crafting and fletching,
+`level` columns for mining, woodcutting, cooking, smithing, crafting, fletching and
+all three thieving dbrows,
 the level embedded in `fletch_bow_table`'s `shortbow`/`longbow` tuple, and (fishing
 having no product table) the `stat(fishing)` guards in the spot scripts, parsed by
 `FishingLevels.ts`. A product made by several sources takes the LOWEST level that

@@ -104,6 +104,8 @@ few-thousand-pixel image, one file is fine.
   extractable from the cache later; text first).
 - **Recipes tab**: same for processing swaps (cooking/smithing/crafting/
   fletching outputs).
+- **Thieving tab** (built 2026-07, GitHub #6): "Coins — steals like —
+  Adamantite ore" per discovered pickpocket/stall/chest loot swap.
 - **Bestiary tab**: "Goblin — smells like Cow" per discovered mimic.
 - **Teleports/Shops tab**: revealed cast-by-cast / visit-by-visit.
 - **Checks tab** (built 2026-07, GitHub #19 — see "Checks tab" below): the
