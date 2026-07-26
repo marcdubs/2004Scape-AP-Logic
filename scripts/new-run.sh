@@ -70,14 +70,14 @@ DROPS_MODE=mimic          # tiered | chaos | mimic ("chicken runs the green drag
 REGENERATE_EXTRA=""       # e.g. "--skip-drip" or "--drip-seed 555"
 
 # RandomizeGathering.ts - what mining/fishing/woodcutting actually yield.
-#   all params: [--seed <n>] [--mode shuffle|chaos]
+#   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
 #               [--skills mining,fishing,woodcutting] [--exclude <item,item>]
 #               [--pin-quest-items] [--no-quest-pins] [--dry-run]
-GATHER_MODE=shuffle       # shuffle (bijective, everything obtainable) | chaos
+GATHER_MODE=shuffle       # shuffle (bijective) | tiered (bijective within level bands) | chaos
 GATHER_EXTRA=""
 
 # RandomizeProcessing.ts - what cooking/smithing/crafting/fletching produce.
-#   all params: [--seed <n>] [--mode shuffle|chaos]
+#   all params: [--seed <n>] [--mode shuffle|tiered|chaos]
 #               [--skills cooking,smithing,crafting,fletching] [--exclude <item,item>]
 #               [--pin-quest-items] [--no-quest-pins] [--dry-run]
 PROCESS_MODE=shuffle

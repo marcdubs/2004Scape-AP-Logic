@@ -720,6 +720,12 @@ rewrites a JSON table and needs a server restart only, no pack rebuild. Deleting
   the game's own data (`mine.dbrow` rock_output, `trees.dbrow` product,
   `~fish_roll`/`~fish_roll_loc` call-site literals + the big-net wraps), writes the
   JSON table and a spoiler at `engine/tools/gather/gather-seed.json`.
+- `overlays/engine/tools/gather/FishingLevels.ts` - the level side of that pool.
+  Mining and woodcutting state their requirement in a dbrow column; fishing has no
+  product table at all, so this walks the spot scripts' `stat(fishing) < N` /
+  `>= N` guards (including the one that hides behind
+  `~oil_rod_fishing_check_requirements`) and reports the level each fish first
+  becomes catchable at. Only `--mode tiered` uses it.
 - `::apgather <item_debugname>` test command (e.g. `::apgather logs`) - prints what a
   product is randomized into, via the same engine lookup the skill scripts use.
 
@@ -727,7 +733,7 @@ rewrites a JSON table and needs a server restart only, no pack rebuild. Deleting
 
 ```
 cd ../Server/engine
-npx tsx tools/gather/RandomizeGathering.ts [--seed <n>] [--mode shuffle|chaos]
+npx tsx tools/gather/RandomizeGathering.ts [--seed <n>] [--mode shuffle|tiered|chaos]
     [--skills mining,fishing,woodcutting] [--exclude <item,...>]
     [--pin-quest-items] [--no-quest-pins] [--dry-run]
 ```
@@ -735,6 +741,11 @@ npx tsx tools/gather/RandomizeGathering.ts [--seed <n>] [--mode shuffle|chaos]
 - `shuffle` (default): one derangement across the combined ~39-product pool - a
   bijection, so every product is still obtainable from exactly one gathering action
   and nothing maps to itself. Seed 777: 38 swapped, 30 land cross-skill.
+- `tiered`: the same derangement run separately inside each **progression band**
+  (`lvl1-14`, `lvl15-29`, `lvl30-44`, `lvl45-59`, `lvl60-74`, `lvl75+` - see
+  [Progression bands](#progression-bands-mode-tiered)). Still cross-skill and still a
+  bijection, but a level-1 fish can only become a level-1 ore or log and Runite stays
+  behind something you actually need 75+ for. Seed 424242: 38 swapped, 26 cross-skill.
 - `chaos`: every product independently resamples from the pool - duplicates allowed,
   so some products can become unobtainable from gathering entirely.
 - `--skills` restricts which skills join the pool; unselected skills stay vanilla.
@@ -742,9 +753,9 @@ npx tsx tools/gather/RandomizeGathering.ts [--seed <n>] [--mode shuffle|chaos]
 **Quest-critical pinning is mode-aware**, unlike drop randomization's always-on pin:
 the `inv_total`/`inv_del` gating scan flags 16 of the 39 products (every log type,
 most basic ores) because common gathering products gate quests constantly. Shuffle
-mode doesn't pin by default - it's a bijection, everything stays obtainable, a quest
-just needs its item gathered from a different action (the spoiler says which). Chaos
-genuinely can orphan a product, so it pins by default. Override with
+and tiered don't pin by default - they're bijections, everything stays obtainable, a
+quest just needs its item gathered from a different action (the spoiler says which).
+Chaos genuinely can orphan a product, so it pins by default. Override with
 `--pin-quest-items` / `--no-quest-pins`.
 
 ### Scope
@@ -801,7 +812,7 @@ processing.
 
 ```
 cd ../Server/engine
-npx tsx tools/process/RandomizeProcessing.ts [--seed <n>] [--mode shuffle|chaos]
+npx tsx tools/process/RandomizeProcessing.ts [--seed <n>] [--mode shuffle|tiered|chaos]
     [--skills cooking,smithing,crafting,fletching] [--exclude <item,...>]
     [--pin-quest-items] [--no-quest-pins] [--dry-run]
 ```
@@ -809,15 +820,19 @@ npx tsx tools/process/RandomizeProcessing.ts [--seed <n>] [--mode shuffle|chaos]
 - `shuffle` (default): one derangement across the combined ~253-product pool - a
   bijection, so every product is still obtainable from exactly one processing action
   and nothing maps to itself. Seed 777: 253 swapped, 160 land cross-skill.
+- `tiered`: the same derangement run separately inside each **progression band** (see
+  [Progression bands](#progression-bands-mode-tiered)), so a level-1 recipe yields
+  another level-1 product and rune gear stays behind a 75+ recipe. Seed 424242: 252
+  swapped, 148 cross-skill, across bands of 63/41/42/29/27/50 products.
 - `chaos`: every product independently resamples from the pool - duplicates allowed,
   so some products can become unobtainable from processing entirely.
 - `--skills` restricts which skills join the pool; unselected skills stay vanilla.
 
-**Quest-critical pinning is mode-aware**, same reasoning as gathering: shuffle
-doesn't pin by default (it's a bijection - everything stays obtainable, a quest just
-needs its item made by a different recipe), chaos pins by default (independent
-resampling can genuinely orphan a product). Override with `--pin-quest-items` /
-`--no-quest-pins`.
+**Quest-critical pinning is mode-aware**, same reasoning as gathering: shuffle and
+tiered don't pin by default (both are bijections - everything stays obtainable, a
+quest just needs its item made by a different recipe), chaos pins by default
+(independent resampling can genuinely orphan a product). Override with
+`--pin-quest-items` / `--no-quest-pins`.
 
 ### Scope
 
@@ -835,6 +850,47 @@ true final `inv_add` in each of those files. Only the item identity is wrapped -
 quantities are untouched, so a recipe slot that hands out 5 of its product (the
 metal-tier knives, `nails`) still hands out 5 of whatever it got swapped to; same
 "structure stays put, content moves" philosophy as tiered drop randomization.
+
+## Progression bands (`--mode tiered`)
+
+Gathering and processing both accept `--mode tiered`, which is shuffle mode confined
+to a level band: still a cross-skill derangement, still a bijection, but a product can
+only turn into a product of a comparable skill level. `overlays/engine/tools/shared/
+SkillTiers.ts` owns the bands and the shuffle both tools call.
+
+| band | levels | why |
+| --- | --- | --- |
+| `lvl1-14` | 0-14 | bronze/iron era - shrimp, clay, plain logs |
+| `lvl15-29` | 15-29 | steel era - iron ore, oak, trout |
+| `lvl30-44` | 30-44 | mithril era - coal, willow, lobster |
+| `lvl45-59` | 45-59 | adamant era - mithril ore, maple, swordfish |
+| `lvl60-74` | 60-74 | yew/adamantite |
+| `lvl75+` | 75+ | rune era - runite ore, magic logs, shark |
+
+Fixed bands, not the percentile buckets tiered drop randomization uses: "rare" only
+means something relative to the rest of a loot table, but a skill level is an
+absolute number a player already thinks in, and fixed boundaries mean adding a product
+to the corpus can't silently reshuffle which band everything else lands in. Each band
+gets its own PRNG stream (`mulberry32(seed ^ hashKey(band))`), so widening one band
+later doesn't disturb the others.
+
+Every level is read out of the game's own data - `rock_level` / `levelrequired` /
+`level` columns for mining, woodcutting, cooking, smithing, crafting and fletching,
+the level embedded in `fletch_bow_table`'s `shortbow`/`longbow` tuple, and (fishing
+having no product table) the `stat(fishing)` guards in the spot scripts, parsed by
+`FishingLevels.ts`. A product made by several sources takes the LOWEST level that
+yields it - the level it first becomes reachable at. A missing level is a hard error,
+not a default: silently banding a level-85 product as level 1 is exactly the failure
+this mode exists to prevent.
+
+As a side effect this is the strongest mitigation available for the cross-skill quest
+risk: a low-level quest ingredient can only be re-keyed onto another low-level action,
+so no quest ends up gated behind a skill level the player has no business having yet.
+
+In Archipelago mode it's the `tiered` value of `gathering_randomization` /
+`processing_randomization`; the apworld replays the same per-band derangement from the
+`band` each product carries in the exported pool (`randomizers.py`), so its fill knows
+exactly what the server will hand out.
 
 ## Infinite run energy
 

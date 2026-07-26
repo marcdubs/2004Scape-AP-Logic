@@ -153,8 +153,8 @@ quests", just re-run for a fresh seed.
 | `shop_randomization` | `true` / `false` | which NPC has which shop |
 | `teleport_randomization` | `true` / `false` | the 7 spellbook teleports land at each other's destinations (always a vanilla landmark, never wilderness; casting quest-gates stay put) |
 | `drop_randomization` | `mimic` / `off` / `tiered` / `chaos` | monster loot: rarity-banded, full chaos, or whole-table mimicry |
-| `gathering_randomization` | `shuffle` / `off` / `chaos` | what mining/fishing/woodcutting yield |
-| `processing_randomization` | `shuffle` / `off` / `chaos` | what cooking/smithing/crafting/fletching produce |
+| `gathering_randomization` | `shuffle` / `off` / `tiered` / `chaos` | what mining/fishing/woodcutting yield; `tiered` shuffles only within a level band, so a level-1 fish becomes a level-1 ore or log |
+| `processing_randomization` | `shuffle` / `off` / `tiered` / `chaos` | what cooking/smithing/crafting/fletching produce; `tiered` as above |
 | `spawn_randomization` | `city` / `off` / `chunk` | home/respawn point: spellbook landmark or random map square |
 
 ### `infinite_run`

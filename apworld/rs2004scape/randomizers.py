@@ -43,15 +43,25 @@ def roll_skill_swaps(pool: Mapping, seed: int, mode: str,
                      quest_pins: Optional[bool] = None) -> SkillSwapRoll:
     """Port of RandomizeGathering/RandomizeProcessing's main().
 
-    `mode` is off | shuffle | chaos. Quest-critical pinning is mode-aware exactly as in
-    the tools: off in shuffle (a bijection keeps everything obtainable, the item just
-    moves), on in chaos (which genuinely can orphan a product).
+    `mode` is off | shuffle | tiered | chaos. Quest-critical pinning is mode-aware exactly
+    as in the tools: off in shuffle and tiered (both are bijections, so everything stays
+    obtainable and the item just moves), on in chaos (which genuinely can orphan a
+    product).
+
+    tiered runs shuffle's derangement once per PROGRESSION BAND instead of once over the
+    whole pool, so a product only ever becomes another product of a similar skill level.
+    The band boundaries are NOT re-derived here: the TS tool stamps each product with the
+    band it landed in and exports the band order alongside, and this groups by those
+    strings. That is deliberate - a band table duplicated on both sides is a table that
+    can drift, and a drifted band means the apworld's logic describes swaps the server
+    never made.
     """
-    if mode not in ("shuffle", "chaos"):
+    if mode not in ("shuffle", "tiered", "chaos"):
         return SkillSwapRoll(mode="off")
 
     products = [entry["item"] for entry in pool["products"]]
     obj_ids = {entry["item"]: entry["objId"] for entry in pool["products"]}
+    band_of = {entry["item"]: entry.get("band") for entry in pool["products"]}
 
     pin_quest_items = (mode == "chaos") if quest_pins is None else quest_pins
     pinned: Dict[str, str] = {}
@@ -67,15 +77,28 @@ def roll_skill_swaps(pool: Mapping, seed: int, mode: str,
     if len(candidates) < 2:
         return SkillSwapRoll(pinned=pinned, mode=mode)
 
-    rand = mulberry32(seed)
     swaps: Dict[str, str] = {}
-    if mode == "shuffle":
+    if mode == "tiered":
+        # one derangement per band, each on its own stream (salted by band NAME, so
+        # widening one band later does not reshuffle the others). A band holding fewer
+        # than 2 eligible products can't be deranged - its member stays vanilla.
+        for band in pool.get("bands", ()):
+            members = [item for item in candidates if band_of.get(item) == band]
+            if len(members) < 2:
+                continue
+            rand = mulberry32(seed ^ hash_key(band))
+            perm = derangement(len(members), rand)
+            for index, item in enumerate(members):
+                swaps[item] = members[perm[index]]
+    elif mode == "shuffle":
+        rand = mulberry32(seed)
         perm = derangement(len(candidates), rand)
         for index, item in enumerate(candidates):
             swaps[item] = candidates[perm[index]]
     else:
         # chaos: independent uniform resample per product, retried up to 50x so nothing
         # keeps its own value by accident (same loop shape as the TS original).
+        rand = mulberry32(seed)
         for item in candidates:
             picked = item
             for _ in range(50):

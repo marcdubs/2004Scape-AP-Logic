@@ -4,6 +4,8 @@ import path from 'path';
 import { CONTENT_ROOT, SCRIPTS_ROOT } from '../npc/NpcDripParser.js';
 import { loadQuestCriticalItems } from '../drops/DropTableParser.js';
 import { derangement, mulberry32 } from '../shared/Prng.js';
+import { LEVEL_BANDS, type ProductLevel, bandFor, minLevels, readDbrowProducts, tieredSwaps } from '../shared/SkillTiers.js';
+import { loadFishingProductLevels } from './FishingLevels.js';
 
 // Gathering-skill randomization: shuffles which item each Mining / Fishing /
 // Woodcutting action actually hands the player - cut a tree and get a fish, fish and
@@ -33,21 +35,31 @@ import { derangement, mulberry32 } from '../shared/Prng.js';
 // obj.pack alone.
 //
 // Usage (run from ../Server/engine):
-//   npx tsx tools/gather/RandomizeGathering.ts [--seed <n>] [--mode shuffle|chaos]
+//   npx tsx tools/gather/RandomizeGathering.ts [--seed <n>] [--mode shuffle|tiered|chaos]
 //       [--skills mining,fishing,woodcutting] [--exclude <item,item,...>]
 //       [--pin-quest-items] [--no-quest-pins] [--dry-run]
 //
 // - shuffle (default): one derangement across the combined product pool - a bijection,
 //   so every product is still obtainable from exactly one gathering action, and no
 //   product maps to itself.
+// - tiered: the same derangement, but run separately inside each PROGRESSION BAND (see
+//   tools/shared/SkillTiers.ts) - a level-1 fish becomes a level-1 ore or log, a
+//   level-75 one becomes another level-75 product. Still cross-skill, still a bijection
+//   (per band), just no longer able to put rune ore behind a level-1 rock or shrimp
+//   behind Runite. Levels come from the content itself: mine.dbrow's rock_level,
+//   trees.dbrow's levelrequired, and - fishing having no product dbtable - the
+//   stat(fishing) guards in the spot scripts (FishingLevels.ts).
 // - chaos: every product independently resamples from the whole pool - duplicates
 //   allowed, so some products can become unobtainable from gathering entirely.
 // - --skills: restrict which skills join the pool; products of unselected skills stay
 //   vanilla (they're simply never written into the table).
-// Both modes are kept behind --mode (rather than picking one) for the same reason as
-// drop randomization: the user wants these as Archipelago slot options eventually.
+// All three modes are kept behind --mode (rather than picking one) for the same reason
+// as drop randomization: they're Archipelago slot options.
 //
 // Quest-critical pinning is MODE-AWARE, unlike drop randomization's always-on pin.
+// (tiered behaves like shuffle here: it's a bijection inside every band, so nothing
+// becomes unobtainable and it actually REDUCES the quest-item risk by keeping a
+// low-level quest ingredient low-level.)
 // The scan (same inv_total/inv_del gating idiom) flags 16 of the 39 products here -
 // including every log type and most basic ores - because common gathering products
 // gate quests constantly. Pinning all of them in shuffle mode would gut the feature
@@ -76,62 +88,31 @@ function readLines(file: string): string[] {
     return fs.readFileSync(file, 'utf8').split(/\r?\n/);
 }
 
-function loadMiningProducts(): string[] {
-    const out: string[] = [];
-    for (const line of readLines(path.join(SCRIPTS_ROOT, 'skill_mining', 'configs', 'mine.dbrow'))) {
-        const m = line.trim().match(/^data=rock_output,([a-zA-Z0-9_]+)$/);
-        if (m) {
-            out.push(m[1]);
-        }
-    }
-    return out;
+// Each loader returns the product AND the skill level it first becomes gatherable at -
+// the level is what `--mode tiered` buckets on, and it costs nothing to parse it in
+// every mode (a missing one is parser drift either way, and readDbrowProducts throws).
+function loadMiningProducts(): ProductLevel[] {
+    return readDbrowProducts(path.join(SCRIPTS_ROOT, 'skill_mining', 'configs', 'mine.dbrow'), {
+        product: 'rock_output',
+        level: 'rock_level'
+    });
 }
 
-function loadWoodcuttingProducts(): string[] {
-    const out: string[] = [];
-    for (const line of readLines(path.join(SCRIPTS_ROOT, 'skill_woodcutting', 'configs', 'trees.dbrow'))) {
-        const m = line.trim().match(/^data=product,([a-zA-Z0-9_]+)$/);
-        if (m) {
-            out.push(m[1]);
-        }
-    }
-    return out;
+function loadWoodcuttingProducts(): ProductLevel[] {
+    return readDbrowProducts(path.join(SCRIPTS_ROOT, 'skill_woodcutting', 'configs', 'trees.dbrow'), {
+        product: 'product',
+        level: 'levelrequired'
+    });
 }
 
 // fishing has no product dbtable - fish are literal args at ~fish_roll/~fish_roll_loc
 // call sites (args 1+2; arg 3+ is equipment/bait), plus the big-net fish that
 // memberfish.rs2's overlay wraps directly in ap_gather_swap(<literal>). Parsed from
 // the LIVE (overlaid) fishing scripts, which is also a nice property: the pool is by
-// construction "whatever delivery points are actually wrapped".
-const FISH_ROLL_RE = /~fish_roll(?:_loc)?\(\s*([a-zA-Z0-9_$]+)\s*,\s*([a-zA-Z0-9_$]+)/g;
-const GATHER_WRAP_RE = /ap_gather_swap\(([a-zA-Z_][a-zA-Z0-9_]*)\)/g;
-
-function loadFishingProducts(): string[] {
-    const out: string[] = [];
-    const root = path.join(SCRIPTS_ROOT, 'skill_fishing', 'scripts');
-    const stack = [root];
-    while (stack.length > 0) {
-        const dir = stack.pop()!;
-        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-            const full = path.join(dir, entry.name);
-            if (entry.isDirectory()) {
-                stack.push(full);
-            } else if (entry.name.endsWith('.rs2')) {
-                const text = fs.readFileSync(full, 'utf8');
-                for (const m of text.matchAll(FISH_ROLL_RE)) {
-                    for (const arg of [m[1], m[2]]) {
-                        if (arg !== 'null' && !arg.startsWith('$')) {
-                            out.push(arg);
-                        }
-                    }
-                }
-                for (const m of text.matchAll(GATHER_WRAP_RE)) {
-                    out.push(m[1]);
-                }
-            }
-        }
-    }
-    return out;
+// construction "whatever delivery points are actually wrapped". FishingLevels.ts does
+// that scan and carries the stat(fishing) guards out with it.
+function loadFishingProducts(): ProductLevel[] {
+    return loadFishingProductLevels();
 }
 
 function loadObjIds(): Map<string, number> {
@@ -148,7 +129,7 @@ function loadObjIds(): Map<string, number> {
 function parseArgs(argv: string[]) {
     const args = {
         seed: (Date.now() / 1000) | 0,
-        mode: 'shuffle' as 'shuffle' | 'chaos',
+        mode: 'shuffle' as 'shuffle' | 'tiered' | 'chaos',
         skills: [...SKILLS] as Skill[],
         exclude: new Set<string>(),
         questPins: null as boolean | null, // null = decide by mode (shuffle off, chaos on)
@@ -167,8 +148,8 @@ function parseArgs(argv: string[]) {
             }
         } else if (arg === '--mode') {
             const mode = argv[++i];
-            if (mode !== 'shuffle' && mode !== 'chaos') {
-                throw new Error(`unknown --mode ${mode} (expected shuffle|chaos)`);
+            if (mode !== 'shuffle' && mode !== 'tiered' && mode !== 'chaos') {
+                throw new Error(`unknown --mode ${mode} (expected shuffle|tiered|chaos)`);
             }
             args.mode = mode;
         } else if (arg === '--skills') {
@@ -212,7 +193,7 @@ function parseArgs(argv: string[]) {
 function main() {
     const args = parseArgs(process.argv);
 
-    const bySkill: Record<Skill, string[]> = {
+    const bySkill: Record<Skill, ProductLevel[]> = {
         mining: loadMiningProducts(),
         fishing: loadFishingProducts(),
         woodcutting: loadWoodcuttingProducts()
@@ -220,14 +201,18 @@ function main() {
 
     // dedupe into one ordered pool (deterministic: skill order, then first occurrence -
     // limestone appears on 3 rocks, logs on 2 trees, mackerel at 2 big-net slots).
+    // The LEVEL of a duplicated product is the lowest one that yields it (minLevels),
+    // i.e. the level it first becomes reachable at - limestone is a level-1 product even
+    // though one of its three rocks sits higher.
     const skillOf = new Map<string, Skill>();
     for (const skill of args.skills) {
-        for (const item of bySkill[skill]) {
+        for (const { item } of bySkill[skill]) {
             if (!skillOf.has(item)) {
                 skillOf.set(item, skill);
             }
         }
     }
+    const levelOf = minLevels(args.skills.flatMap(skill => bySkill[skill]));
     if (skillOf.size === 0) {
         throw new Error('empty product pool - are the overlays installed? (run from ../Server/engine)');
     }
@@ -253,7 +238,18 @@ function main() {
             _generated: 'tools/gather/RandomizeGathering.ts --export-pool - the UNSHUFFLED candidate pool',
             generatedAt: new Date().toISOString(),
             skills: args.skills,
-            products: [...skillOf.entries()].map(([item, skill]) => ({ item, skill, objId: objIds.get(item)! })),
+            // `bands` is exported alongside the per-product `band` so the apworld never
+            // has to re-derive the boundaries: it groups by the string it was handed, in
+            // the order it was handed, which is the only way tiered mode can be
+            // guaranteed not to drift between the two implementations.
+            bands: LEVEL_BANDS.map(b => b.name),
+            products: [...skillOf.entries()].map(([item, skill]) => ({
+                item,
+                skill,
+                objId: objIds.get(item)!,
+                level: levelOf.get(item)!,
+                band: bandFor(levelOf.get(item)!)
+            })),
             hardExcluded: Object.fromEntries(Object.entries(HARD_EXCLUDED).filter(([item]) => skillOf.has(item))),
             questCritical: [...questCriticalAll].sort()
         };
@@ -293,9 +289,21 @@ function main() {
         throw new Error(`only ${pool.length} unpinned product(s) - nothing to shuffle`);
     }
 
-    const rand = mulberry32(args.seed);
     const mapping = new Map<string, string>();
-    if (args.mode === 'shuffle') {
+    let bandNotes: string[] = [];
+    if (args.mode === 'tiered') {
+        // one derangement per progression band, each on its own PRNG stream (salted by
+        // band name) - so widening a band later doesn't reshuffle the others.
+        const tiered = tieredSwaps(pool, levelOf, args.seed);
+        for (const [was, now] of tiered.mapping) {
+            mapping.set(was, now);
+        }
+        bandNotes = [
+            ...tiered.bands.map(b => `band ${b.band}: ${b.members.length} product(s) deranged among themselves`),
+            ...tiered.warnings
+        ];
+    } else if (args.mode === 'shuffle') {
+        const rand = mulberry32(args.seed);
         const perm = derangement(pool.length, rand);
         for (let i = 0; i < pool.length; i++) {
             mapping.set(pool[i], pool[perm[i]]);
@@ -303,6 +311,7 @@ function main() {
     } else {
         // chaos: independent uniform resample per product; resample (up to 50x, same
         // convention as drip) so no product keeps its own value by accident.
+        const rand = mulberry32(args.seed);
         for (const item of pool) {
             let picked = item;
             for (let i = 0; i < 50 && picked === item; i++) {
@@ -312,20 +321,29 @@ function main() {
         }
     }
 
+    if (mapping.size === 0) {
+        throw new Error(`mode ${args.mode} produced no swaps - every progression band holds fewer than 2 eligible products (widen --skills or drop some --exclude)`);
+    }
+
     const swaps = [...mapping.entries()].map(([was, now]) => ({
         was,
         wasSkill: skillOf.get(was)!,
+        wasLevel: levelOf.get(was)!,
         wasId: objIds.get(was)!,
         now,
         nowSkill: skillOf.get(now)!,
+        nowLevel: levelOf.get(now)!,
         nowId: objIds.get(now)!
     }));
     const crossSkill = swaps.filter(s => s.wasSkill !== s.nowSkill).length;
 
     console.log(`gathering randomizer: seed ${args.seed}, mode ${args.mode}, skills ${args.skills.join(',')}, quest pins ${pinQuestItems ? 'on' : 'off'}`);
-    console.log(`pool: ${skillOf.size} distinct products (${args.skills.map(s => `${s} ${new Set(bySkill[s]).size}`).join(', ')}), ${pins.size} pinned vanilla, ${pool.length} shuffled`);
+    console.log(`pool: ${skillOf.size} distinct products (${args.skills.map(s => `${s} ${new Set(bySkill[s].map(p => p.item)).size}`).join(', ')}), ${pins.size} pinned vanilla, ${pool.length} shuffled`);
+    for (const note of bandNotes) {
+        console.log(`  ${note}`);
+    }
     for (const s of swaps) {
-        console.log(`  ${s.wasSkill.padEnd(11)} ${s.was} -> ${s.now}${s.wasSkill !== s.nowSkill ? ` (${s.nowSkill})` : ''}`);
+        console.log(`  ${s.wasSkill.padEnd(11)} ${s.was} (lvl ${s.wasLevel}) -> ${s.now} (lvl ${s.nowLevel})${s.wasSkill !== s.nowSkill ? ` [${s.nowSkill}]` : ''}`);
     }
     for (const [item, reason] of pins) {
         console.log(`  pinned      ${item} (${reason})`);
@@ -352,6 +370,7 @@ function main() {
                 seed: args.seed,
                 mode: args.mode,
                 skills: args.skills,
+                bandNotes,
                 pinned: [...pins.entries()].map(([item, reason]) => ({ item, reason })),
                 swaps
             },

@@ -31,8 +31,9 @@ family's items stay out of the pool and that system is unrestricted from the sta
   quests in difficulty order - short errands first, the long master quests last.
 
 On top of that, the game server can randomize the world itself per seed - entrances, monster drop tables (including a
-"mimic" mode where monsters run each other's entire loot tables), shop locations, gathering and processing outputs,
-and NPC appearances. Those are configured server-side when rolling the seed.
+"mimic" mode where monsters run each other's entire loot tables), shop locations, gathering and processing outputs
+(optionally "tiered", so a swapped product always sits at a comparable skill level), and NPC appearances. Those are
+configured server-side when rolling the seed.
 
 ## What is the goal?
 
