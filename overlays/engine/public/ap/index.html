@@ -30,7 +30,8 @@
     <section id="tab-map" class="tab-panel active">
         <div class="map-toolbar">
             <div class="layer-switch">
-                <button class="layer-btn active" data-layer="surface">Surface</button>
+                <button class="layer-btn" data-layer="home">Home</button>
+                <button class="layer-btn" data-layer="surface">Surface</button>
                 <button class="layer-btn" data-layer="underground">Underground</button>
             </div>
             <div class="map-counters" id="map-counters"></div>
@@ -40,11 +41,13 @@
             <span class="legend-item"><span class="legend-dot known"></span>explored</span>
             <span class="legend-item"><span class="legend-dot unexplored"></span>not yet explored</span>
             <span class="legend-item"><span class="legend-dot teleport"></span>teleport landing</span>
+            <span class="legend-item"><span class="legend-dot home"></span>home / respawn</span>
             <span class="legend-item"><span class="legend-dot multi"></span>multiple here</span>
         </div>
         <div class="map-viewport" id="map-viewport">
             <div class="map-world" id="map-world">
-                <img id="map-image" class="map-image" alt="world map" draggable="false">
+                <img id="map-image-surface" class="map-image" alt="surface map" draggable="false">
+                <img id="map-image-underground" class="map-image" alt="underground map" draggable="false">
                 <svg id="map-overlay" class="map-overlay" xmlns="http://www.w3.org/2000/svg"></svg>
             </div>
             <div id="map-info" class="map-info" hidden>
@@ -52,7 +55,7 @@
                 <h3 id="map-info-title"></h3>
                 <div id="map-info-body"></div>
             </div>
-            <div id="map-empty" class="empty-state" hidden>No shuffled entrances on this layer.</div>
+            <div id="map-empty" class="empty-state" hidden>No shuffled entrances in this seed.</div>
             <div id="map-loading" class="empty-state">Loading map&hellip;</div>
         </div>
     </section>

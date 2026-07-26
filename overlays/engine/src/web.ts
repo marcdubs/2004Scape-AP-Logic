@@ -451,9 +451,18 @@ function buildApTrackerResponse(spoilerMode: boolean): unknown {
         }
     }
 
+    // Home/respawn point (data/config/ap-spawn.json, written by RandomizeSpawn.ts).
+    // Not a spoiler in any meaningful sense - it is where the player physically stands
+    // the first second they log in, and docs/tracker-map.md always planned a home flag.
+    // The map uses it to open centered on the run's starting area instead of on the
+    // arbitrary top-left corner of the world image.
+    const spawnFile = readJsonFile<{ home?: string; label?: string }>('data/config/ap-spawn.json');
+    const spawn = typeof spawnFile?.home === 'string' ? { raw: spawnFile.home, label: spawnFile.label ?? null } : null;
+
     return {
         discoveries,
         entranceSources,
+        spawn,
         unlocks: buildUnlocksPanel(),
         names: { items, dropSlots, dropUnits, places },
         totals: {

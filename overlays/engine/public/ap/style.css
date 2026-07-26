@@ -247,6 +247,7 @@ main#app {
 
 .legend-dot.known { background: var(--accent); }
 .legend-dot.teleport { background: var(--gold); }
+.legend-dot.home { background: #ffffff; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .legend-dot.unexplored { background: #201a12; border-color: #9a865e; }
 .legend-dot.multi {
     background: var(--accent);
@@ -397,10 +398,17 @@ main#app {
     image-rendering: pixelated;
 }
 
+/* the two layer images are absolutely placed into one shared canvas (surface on
+   top, underground below it, aligned on world X) - see worldLayout() in app.js */
 .map-image {
     display: block;
+    position: absolute;
     user-select: none;
     -webkit-user-drag: none;
+}
+
+.map-image[hidden] {
+    display: none;
 }
 
 .map-overlay {
@@ -484,6 +492,41 @@ main#app {
     stroke-width: var(--sel-sw, 1.6);
     stroke-dasharray: 4 3;
     opacity: 0.95;
+}
+
+/* surface <-> underground: a much longer line crossing the layer gap, so it gets a
+   looser dash to read as "this leaves the layer" rather than a local connection */
+.sel-line.cross-layer {
+    stroke-dasharray: 10 7;
+    opacity: 0.85;
+}
+
+/* home / respawn point (ap-spawn.json) - the one pin that isn't a discovery */
+.site-pin.home {
+    fill: #ffffff;
+    stroke: var(--accent);
+    stroke-width: calc(var(--pin-sw, 1.1) * 2);
+}
+
+/* caption + rule separating the stacked layer images */
+.layer-caption {
+    fill: var(--accent);
+    stroke: #000;
+    stroke-width: 0.16em;
+    paint-order: stroke;
+    text-anchor: middle;
+    font-family: inherit;
+    font-weight: 700;
+    letter-spacing: 0.35em;
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+.layer-divider {
+    stroke: var(--border);
+    stroke-width: 2;
+    stroke-dasharray: 12 10;
+    opacity: 0.6;
 }
 
 .sel-dest {
