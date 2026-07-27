@@ -4312,11 +4312,14 @@ Design points worth keeping:
   module-level caches that are authoritative over their files - deleting
   `ap-checks-fired.json`/`ap-tracker.json` alone would have been undone by the
   next debounced flush. Both modules got explicit `resetFiredLedger()` /
-  `resetTrackerState()` exports (dynamic-imported by ApClient, since both import
-  ApClient and a static back-edge would be a cycle), and `session`/`sentChecks`
-  are reset in place for the same reason. Clearing happens inside
-  `applySlotData`, i.e. after `Connected` and before `sendFullResync`, so the
-  wiped session is what the resync and the room's item replay see.
+  `resetTrackerState()` exports, and `session`/`sentChecks` are reset in place
+  for the same reason. Clearing happens inside `applySlotData`, i.e. after
+  `Connected` and before `sendFullResync`, so the wiped session is what the
+  resync and the room's item replay see.
+
+  (Both reset exports were originally reached by *dynamic* import on the theory
+  that both modules import ApClient. Only `ApChecks` does; that mistake is what
+  the 2026-07-27 entry below is about.)
 
 ## Gated-area denial messages now say what they want (2026-07-26)
 
@@ -4445,3 +4448,54 @@ against an older server degrades instead of dropping the reward.
 - **Adding a dbtable column is safe if every row sets it.** `qty_max` was
   appended to `ap_rewards.dbtable`; the generator writes it on all 201 rows so
   `db_getfield` never reads an absent field.
+
+## A wipe that ran a microtask too late (2026-07-27)
+
+Reported symptom: "I reset a run and connected it to a new Archipelago save, but
+it automatically gave 32 checks as soon as I connected." The checkbox from the
+entry above was ticked; the wipe ran; the room still lit up with the finished
+run's locations the instant the socket connected.
+
+`clearLocalRunState()` deleted `ap-placements.json`/`ap-session.json`
+synchronously but reached the fired ledger through
+`void import('#/engine/ApChecks.js').then(m => m.resetFiredLedger())`. The
+`Connected` handler is synchronous end to end:
+
+```
+applySlotData()          -> clearLocalRunState() schedules the .then, returns
+sendFullResync()         -> loadFiredLedger() re-reads ap-checks-fired.json
+<message handler ends>   -> only NOW does the .then run and delete the file
+```
+
+So the resync read a file that was still on disk and reported every id in it.
+The ledger was then deleted a microtask later - too late to matter, and late
+enough to look like it had worked. `sentChecks` kept the ids and persisted them
+straight into the fresh `ap-session.json`, so the damage outlived the connect.
+
+**The generalization worth keeping: a cleanup step that another step in the same
+synchronous frame depends on cannot be deferred, not even by one microtask.**
+`void import(...).then(cleanup)` is a *scheduling* construct, not an ordering
+one. Three instances of the same class turned up in that one function:
+
+| State | Read again by | Why deferring lost |
+| --- | --- | --- |
+| `ap-checks-fired.json` | `sendFullResync` (same frame) | resync re-sent the old run's checks |
+| `ApUnlockOverrides.table` | the room's `ReceivedItems` replay | `ensureFresh()` is throttled 2s, so `grantUnlock` bumped and re-persisted the *old* counts over the zeroed file - and pins `lastMtimeMs` to its own write, hiding it for good |
+| `ApQuestGates.gatesByVarp` | any logged-in player's varp write | "loaded once per process" assumes a reseed implies a restart; this wipe is a live reseed, so the old run's gates stayed enforced |
+
+Fixes: delete `FIRED_PATH` synchronously in `clearLocalRunState` (ApClient
+already owns that constant), add `invalidateUnlockCache()` /
+`resetQuestGateCache()` exports and call them synchronously, and import
+`ApTracker`/`ApQuestGates` statically - **neither imports ApClient**, so the
+cycle that justified the dynamic import never applied to them. Only `ApChecks`
+genuinely needs it, and there the deferral is now harmless *and documented as
+such*: it only clears an in-memory Set, and ApChecks is already resident (Player
+imports it), so the `.then` lands on the microtask drain at the end of the
+WebSocket message - ahead of the next game tick, hence ahead of anything that
+could fire a check.
+
+**Throttled/lazy caches deserve a named invalidator the day they get one.**
+`ApUnlockOverrides.ensureFresh()`'s `RELOAD_THROTTLE_MS` window is correct for
+the hot read path it was written for, and silently wrong for any writer that
+isn't `grantUnlock`. If a module caches a file it does not exclusively own,
+export the invalidator up front rather than waiting for the first cross-writer.

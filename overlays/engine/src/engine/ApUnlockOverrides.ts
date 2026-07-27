@@ -89,6 +89,24 @@ function ensureFresh(): void {
     }
 }
 
+// Drops the cached table AND the mtime/throttle bookkeeping, so the very next read
+// reparses from disk no matter where we are in the RELOAD_THROTTLE_MS window.
+//
+// Needed because ensureFresh() is deliberately lazy: for up to RELOAD_THROTTLE_MS
+// after someone ELSE rewrites ap-unlocks.json, `table` still holds the previous
+// contents - and grantUnlock persists that whole in-memory table back out, so a
+// grant landing inside that window resurrects what the rewrite removed. ApClient's
+// clearLocalRun wipe zeroes the file and is followed within milliseconds by the new
+// room's ReceivedItems replay, which is exactly that window; without this call the
+// finished run's unlock counts come straight back and the new run starts on top of
+// them. grantUnlock's own lastMtimeMs pinning would then hide the discrepancy for
+// good.
+export function invalidateUnlockCache(): void {
+    table = null;
+    lastStatCheckMs = 0;
+    lastMtimeMs = -1;
+}
+
 // How many of a named progressive unlock the player has received
 // (e.g. "progressive_melee", "progressive_pickaxe"). 99 = effectively unlimited (no
 // table = not an AP run). A table that exists but lacks the key = 0 received so far.

@@ -18,6 +18,11 @@
 //   so a static ApClient -> World edge would close a cycle through Player's own
 //   module init. World is dynamically imported inside the delivery timer, which
 //   first runs long after every module graph is settled.
+// - Ap* modules that do NOT import ApClient back (ApOptions, ApTracker,
+//   ApQuestGates, ApUnlockOverrides) are safe to import statically, and should be:
+//   the clearLocalRun wipe needs their cache resets to complete synchronously,
+//   before sendFullResync runs. ApChecks is the one exception - it imports
+//   ApClient, so it stays a dynamic import.
 
 import fs from 'fs';
 import path from 'path';
@@ -26,6 +31,8 @@ import { randomUUID } from 'crypto';
 import WebSocket from 'ws';
 
 import { setApOption, setApOptionInt } from '#/engine/ApOptions.js';
+import * as ApQuestGates from '#/engine/ApQuestGates.js';
+import * as ApTracker from '#/engine/ApTracker.js';
 import * as ApUnlockOverrides from '#/engine/ApUnlockOverrides.js';
 import type Player from '#/engine/entity/Player.js';
 import { PlayerQueueType } from '#/engine/entity/PlayerQueueRequest.js';
@@ -348,17 +355,39 @@ function clearLocalRunState(): string[] {
         }
     }
 
-    // Fired ledger and tracker discoveries live in module-level caches that are
-    // authoritative over their files, so they need their own resets (dynamic import:
-    // both modules import ApClient, a static back-edge would be a cycle). Fire and
-    // forget - the files are already gone from the player's point of view either way.
+    // Zeroing the FILE is not enough: ApUnlockOverrides serves reads from a cached
+    // table it only revalidates every RELOAD_THROTTLE_MS, and grantUnlock writes that
+    // whole cached table back out. The room's ReceivedItems replay lands well inside
+    // that window, so without this the first item of the new run re-persists the
+    // finished run's counts and the wipe silently undoes itself.
+    ApUnlockOverrides.invalidateUnlockCache();
+
+    // The fired ledger has to be gone from DISK before this function returns, not
+    // "soon after": our caller (applySlotData) is followed synchronously by
+    // sendFullResync, whose loadFiredLedger() re-reads this exact file. Deferring the
+    // delete to a promise - as this did until 2026-07-27 - meant the resync still saw
+    // the finished run's ledger and reported every one of its checks into the brand
+    // new room the moment we connected, which is the opposite of a wipe.
+    if (fs.existsSync(FIRED_PATH)) {
+        fs.rmSync(FIRED_PATH);
+        cleared.push('ap-checks-fired.json');
+    }
+
+    // ApTracker is a leaf module (fs/path/Logger only), so importing it statically
+    // closes no cycle and its reset is plain synchronous.
+    ApTracker.resetTrackerState();
+    cleared.push('ap-tracker.json');
+
+    // ApChecks' in-memory `fired` Set is authoritative over the file we just deleted,
+    // so it needs its own reset or the next debounced persist writes the old ids back.
+    // This one must stay a dynamic import (ApChecks imports ApClient - a static
+    // back-edge would be a cycle), but the deferral is harmless here: ApChecks is
+    // already resident in the module graph (Player.ts imports it), so the .then runs
+    // on the microtask drain at the end of this WebSocket message - ahead of the next
+    // game tick, and therefore ahead of anything that could fire a check.
     void import('#/engine/ApChecks.js')
         .then(m => m.resetFiredLedger())
         .catch(err => printWarning(`AP client: failed to reset the fired ledger (${err instanceof Error ? err.message : err})`));
-    void import('#/engine/ApTracker.js')
-        .then(m => m.resetTrackerState())
-        .catch(err => printWarning(`AP client: failed to reset tracker discoveries (${err instanceof Error ? err.message : err})`));
-    cleared.push('ap-checks-fired.json', 'ap-tracker.json');
 
     // in-memory state has to go with the files, or the next persist writes it back
     session = { receivedCount: 0, sentChecks: [], goalSent: false, pending: [] };
@@ -544,6 +573,10 @@ function applySlotData(slotData: Record<string, unknown> | undefined): void {
         const current = JSON.stringify(existing.questGates ?? []);
         if (current !== JSON.stringify(gates)) {
             fs.writeFileSync(PLACEMENTS_PATH, JSON.stringify({ placements: {}, questGates: gates }, null, 2), 'utf8');
+            // ApQuestGates caches this file once per process, which normally assumes a
+            // restart follows a reseed - but the wipe above is a live reseed, so drop
+            // the cache or a player who is already logged in keeps the OLD run's gates.
+            ApQuestGates.resetQuestGateCache();
             printInfo(`AP client: wrote ${gates.length} quest gate(s) from slot_data`);
         }
     } catch (err) {

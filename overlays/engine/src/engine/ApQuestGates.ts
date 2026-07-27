@@ -63,6 +63,15 @@ const EXTRA_GATE_VARPS: Record<string, string[]> = {
 
 let gatesByVarp: Map<number, Gate> | null = null;
 
+// Drops the once-per-process cache so the next interceptVarpWrite reloads from the
+// CURRENT ap-placements.json. The "reseed implies a restart" lifetime above holds for
+// the offline tools, but not for ApClient's clearLocalRun wipe: that rewrites
+// ap-placements.json with the new room's questGates while the process (and possibly a
+// logged-in player, whose varp writes have already populated this map) keeps running.
+export function resetQuestGateCache(): void {
+    gatesByVarp = null;
+}
+
 function loadGates(): Map<number, Gate> {
     const map = new Map<number, Gate>();
 
