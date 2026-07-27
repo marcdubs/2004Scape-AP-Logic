@@ -89,26 +89,7 @@ pace; see the "Game-server tweaks" section of
 ### 2. One-time: Archipelago server setup
 
 The archipelago.gg website can't generate for custom worlds, so self-host.
-
-**The short way - a prebuilt image.**
-[marchipelago](https://github.com/marcdubs/marchipelago) is an Archipelago
-WebHost image with this world already baked in and Archipelago pinned to the
-exact commit its test suite is validated against, so there is no venv, no
-`requirements.txt`, and no apworld to copy:
-
-```
-docker run -d --name marchipelago -p 8080:8080 -p 38281-38380:38281-38380 \
-    -e GAME_PORTS=38281-38380 -v marchipelago-data:/home/container \
-    ghcr.io/marcdubs/marchipelago:latest
-```
-
-Open `http://localhost:8080`, upload the YAML below on the player-options page,
-and generate from the host page - then skip to step 3. (The image is rebuilt
-from this repo's `main`, and also ships a Pterodactyl/Pelican egg.) Note it
-serves the WebHost on 8080, the same default the game server's tracker uses -
-put them on different machines, or move one of the two ports.
-
-**The manual way.** Clone anywhere you like, then follow the guide for your OS.
+Clone anywhere you like, then follow the guide for your OS.
 
 **macOS / Linux (or WSL):**
 
