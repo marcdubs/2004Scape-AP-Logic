@@ -4571,13 +4571,12 @@ models coupled by hand.
 
 **`scripts/audit-gate-coverage.py`** is the general check: any region holding a
 boxed tile is "protected", so any *other* walkable tile of that region is a
-bypass. Run it against the deployed Server checkout. It found 8 more live leaks
-of the same shape in the auto-derived areas, all with entrance-pool sides
-already sitting in the gap - `Door (loc_2559)` (Yanille dungeon, Thieving 82 +
-lockpick; box is 4x4, the pocket is 132 tiles), `Door (blackarmdoor)`,
-`Wall (loc_2854)`, `Large door (death_castledoor)`, `Door (death_harold_door)`,
-`Door (garvdoor)`, `Door (merlinworkshop)`. Not fixed here - each needs a call
-on what the true protected area is.
+bypass. Run it against the deployed Server checkout. Its first version reported
+8 more "leaks" in the auto-derived areas (`Door (loc_2559)`,
+`Door (blackarmdoor)`, `Wall (loc_2854)`, `Large door (death_castledoor)`,
+`Door (death_harold_door)`, `Door (garvdoor)`, `Door (merlinworkshop)`).
+**Those were false positives - see the 2026-07-29 follow-up section below**, which
+has the corrected criterion and the five real bugs the corrected audit did find.
 
 **Regeneration is the matched triple plus the bundle.** `ap-gated-areas.json` ->
 `BuildRegionGraph` -> `ExtractQuestRegions` -> `ExportLogicBundle --copy`. The
@@ -4596,3 +4595,72 @@ temp path, then `parity-check.py --bundle <temp>`.
 **Only a restart is needed to pick this up** - `ap-gated-areas.json` is engine
 data read lazily by `ApAreaGates`, so no pack rebuild, and it applies to the
 seed already in play rather than needing a reseed.
+
+## Gate boxes, part 2: the leak audit was crying wolf, the real bug was the mirror image (2026-07-29)
+
+Working through the "8 more leaks" the first audit reported turned all eight into
+false positives - and found five real bugs of the *opposite* polarity in the
+process. Worth reading before trusting any coverage number.
+
+**Why the first criterion was wrong.** It called a region "protected" if ANY of
+its tiles fell inside a box, then flagged every other tile of that region. But a
+derived box is the bbox of the pocket behind a door, and a bbox routinely spills
+a few tiles across the doorway onto the PUBLIC side. Those spill tiles put the
+public room into "protected", so the whole room read as a leak.
+`Door (merlinworkshop)` is the clean example: the pocket (Merlin's workshop, 24
+tiles) is 100% boxed, the box also clips 7 tiles of Camelot's 258-tile first
+floor, and the "leak" was the castle floor itself. Same story for the other
+seven. Test each door's OWN pocket for full coverage before believing a report.
+
+**The real invariant**: a walkable region should be entirely inside an area's
+boxes or entirely outside them - a gate boundary belongs on a wall or a door,
+never across open floor. A straddling region is a bug in one of two directions,
+and which one depends on which side the area is actually guarding (the audit
+splits on how much of the region is boxed, `STRADDLE_FRACTION` = 25%: the real
+Legends leak sat at 46%, every observed spill under 20%).
+
+**The five real bugs were all FALSE DENIALS** - a box jutting into a public room
+that an entrance-pool arrival lands on, so the runtime refuses a move vanilla
+allows while the logic model (which gates by region membership behind the door
+tiles) thinks it is free and can place progression behind it:
+
+| area | was | now |
+| --- | --- | --- |
+| Mining Guild | one 64x64 square (a whole mapsquare) swallowing ~500 tiles of the Dwarven Mine, incl. the "Falador - down to mine" ladder arrival | 21 rects fitted to the guild's 459-tile cave |
+| `Door (closet_door)` | 4 boxes incl. all of Draynor Manor's first AND second floor (the manor staircases were gated on a closet key) | the 10-tile closet the door actually shuts |
+| `Door (loc_2555)` | Ardougne castle's L1 corridor (incl. the public staircase arrival) + the whole L2 | 11 rects over the two Thieving-61 wings; L2 dropped (its ladders are in the public corridor) |
+| `Mouse hole (witchmousehole)` | 7x4 over the witch's house floor | the 9-tile hole |
+| Crafting Guild | east wall 2 tiles short (a real, if unreachable, LEAK) | +2 strip boxes; L1 refitted to the guild's own upper floor |
+
+**Deriving the true pocket, mechanically**: `BuildRegionGraph --config-dir
+<empty dir> --extra-closed-doors <file listing just that area's door tiles>`
+(~3s per run), then read the region on each side of the door. The smaller side
+is the pocket; fit rectangles to its exact tile set, allowing non-walkable tiles
+inside a rect but never another region's walkable tile. `scripts/` has no tool
+for the fitting - it was a throwaway greedy cover; if this comes up again, that
+is the thing worth committing.
+
+**Tiling a room with several rectangles broke the LOGIC model, silently.**
+`LogicModel.resolveBoxGatedArea` decided "is this region the area's interior?"
+by checking a 1-tile ring around each box *individually*: with one box per room
+that works, but with 21 rects tiling one cave, each rect's ring lands on its
+neighbour's tiles - the same region - so the interior landed in `outsideIds` and
+`gatedRegionIds` came out EMPTY. The gate then existed at runtime and not in the
+logic. ValidateSeed's lint caught it ("no interior region distinct from its
+surroundings") - that warning is load-bearing, do not ignore it. Fix: the ring
+test now skips tiles inside ANY box of the same area.
+
+**The Mining Guild's giant box was adopting 172 regions (814 tiles) of the
+Dwarven Mine** as "behind Mining 60". They are rock-enclosed crumbs - 77 are a
+single tile, none touches a gated door tile - so the model was making a false
+claim, and losing it (reachable regions 5285 -> 5114) is the model getting more
+honest, not access disappearing. ValidateSeed still passes 63/63 quests, 5/5
+goals, all progression collectable. If any of those pockets turn out to be real
+mine floor, the fix belongs in whatever isolates them, never in a guild's gate.
+
+**Regenerating changed nothing this time**: the box edits moved no doors, so
+`region-graph.json` and `quest-regions.generated.json` came back byte-identical
+apart from their timestamps and were deliberately NOT re-committed (the graph is
+4.3 MB on one line - re-committing it for a timestamp is pure churn). Only
+`ap-gated-areas.json` and the exported bundle actually changed. parity-check
+still fails on its pre-existing region-count delta of 52 (5062 vs 5114).

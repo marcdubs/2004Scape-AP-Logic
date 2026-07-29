@@ -173,6 +173,15 @@ export function resolveGatedAreas(areas: GatedArea[], graph: RegionGraph): Resol
         }
         const insideIds = new Set<number>();
         const outsideIds = new Set<number>();
+        // The ring test is per AREA, not per box: an irregular room (the Mining Guild
+        // cave, Ardougne's locked wings) is covered by SEVERAL rectangles tiling it, and
+        // each rectangle's ring lands on its neighbour's tiles - the same region. Testing
+        // the ring against the current box alone would then push every such interior into
+        // outsideIds and leave gatedRegionIds empty, i.e. silently drop the gate from the
+        // logic model while the runtime still enforces it (ValidateSeed's "no interior
+        // region distinct from its surroundings" lint is exactly this).
+        const inAnyBox = (level: number, x: number, z: number): boolean =>
+            area.boxes.some(b => b.level === level && x >= b.x1 && x <= b.x2 && z >= b.z1 && z <= b.z2);
         for (const box of area.boxes) {
             for (let x = box.x1; x <= box.x2; x++) {
                 for (let z = box.z1; z <= box.z2; z++) {
@@ -185,8 +194,8 @@ export function resolveGatedAreas(areas: GatedArea[], graph: RegionGraph): Resol
             // 1-tile ring immediately outside the (padded) box.
             for (let x = box.x1 - 1; x <= box.x2 + 1; x++) {
                 for (let z = box.z1 - 1; z <= box.z2 + 1; z++) {
-                    if (x >= box.x1 && x <= box.x2 && z >= box.z1 && z <= box.z2) {
-                        continue; // inside the box, not the ring.
+                    if (inAnyBox(box.level, x, z)) {
+                        continue; // inside the area, not the ring.
                     }
                     const id = graph.regionAt(x, z, box.level);
                     if (id !== 0) {

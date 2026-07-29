@@ -55,8 +55,10 @@ progression" is the intended experience.
   for exactly this reason (its boxes ended 3 tiles short of the building; see
   lessons-learned 2026-07-29). Use several tight boxes rather than one loose
   one when the shape is awkward, and verify with
-  `python3 scripts/audit-gate-coverage.py`, which flags every entrance-pool
-  tile that shares a region with a boxed tile but is not itself boxed.
+  `python3 scripts/audit-gate-coverage.py`, which reports both directions: a
+  guarded room with an ungated entrance tile (leak) and a box jutting into a
+  public room an entrance lands in (false denial — the Mining Guild's box was a
+  whole 64×64 mapsquare and refused the Dwarven Mine ladder).
 - Missing file = everything allowed (vanilla fail-open, same as every AP table).
 
 ## Workstream A — area-gate enforcement

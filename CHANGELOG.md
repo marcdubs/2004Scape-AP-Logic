@@ -5,6 +5,26 @@ anything earlier, `git log` is the record.
 
 ## Unreleased
 
+### Gates
+
+- **Gated-area boxes now match the rooms they guard.** `ApAreaGates` tests the
+  arrival tile against an area's rectangles, and several of them did not line up
+  with the walls. The **Legends' Guild** boxes ended three tiles short of the
+  building, so a shuffled entrance onto its first floor was never gate-checked
+  (user report). Five more were the mirror image — boxes jutting into public
+  rooms, refusing arrivals vanilla allows: the **Mining Guild** box was a whole
+  64x64 mapsquare and denied the Dwarven Mine ladder, `closet_door` gated both
+  of Draynor Manor's upper floors behind a closet key, `loc_2555` gated
+  Ardougne castle's public staircase and second floor, `witchmousehole` gated
+  the witch's house floor, and the **Crafting Guild** was two tiles short at its
+  east wall.
+- **`scripts/audit-gate-coverage.py`** reports both directions (leak / false
+  denial) from the rule that a walkable region must be entirely inside an area's
+  boxes or entirely outside them.
+- **Logic-model fix**: an area whose room is covered by several rectangles used
+  to resolve to an empty interior set, so the gate existed at runtime but not in
+  the logic. The interior test now treats the area's boxes as one shape.
+
 ### Rewards
 
 - **Five resource packs** — `Ore Pack`, `Bar Pack`, `Herb Pack`, `Rune Pack`,
