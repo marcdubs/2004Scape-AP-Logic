@@ -4662,5 +4662,16 @@ mine floor, the fix belongs in whatever isolates them, never in a guild's gate.
 `region-graph.json` and `quest-regions.generated.json` came back byte-identical
 apart from their timestamps and were deliberately NOT re-committed (the graph is
 4.3 MB on one line - re-committing it for a timestamp is pure churn). Only
-`ap-gated-areas.json` and the exported bundle actually changed. parity-check
-still fails on its pre-existing region-count delta of 52 (5062 vs 5114).
+`ap-gated-areas.json` and the exported bundle actually changed.
+
+**parity-check passes again (5114 = 5114), and the fix was the stale pool.**
+The region-count delta of 52 that had been failing every run on this branch was
+never a logic disagreement: `ExportLogicBundle.loadPool` only regenerates an
+`--export-pool` dump when the file is ABSENT, and the local
+`data/config/ap-entrance-pool.json` remembered 366 gates while the game data
+describes 402. The apworld was reasoning about a smaller world than
+ValidateSeed. `rm data/config/ap-entrance-pool.json` before exporting (that is
+what `.github/workflows/logic-bundle.yml` gets for free from its clean checkout)
+and the two agree exactly. Re-run the coverage audit afterwards too - a bigger
+pool means more entrance tiles for a gate box to be wrong about; it stayed clean
+in both directions at 1100 tiles, up from 954.
