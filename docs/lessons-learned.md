@@ -4538,3 +4538,61 @@ is flaky, ~1 run in 3.** `WorldTestBase` seeds randomly, so a full-suite run tha
 shows this one failure proves nothing about your diff. Confirmed by running the
 single test six times on the unmodified HEAD apworld: two failures. Do not go
 looking for a logic regression in a filler-only change.
+
+## A curated gate box must cover the whole ROOM, not the doorway (2026-07-29)
+
+User report: a shuffled entrance (`archi4` op 1 at `0_45_55_26_51`) led straight
+into the Legends' Guild with the quest unstarted. The entrance shuffle was
+working as designed; the gate was not.
+
+**The leak.** `1_42_52_44_52` is (2732, 3380) on level 1 - the arrival tile of
+the guild's own internal staircase, i.e. the guild's first floor. The curated
+`Legends' Guild` boxes stopped at `z2: 3377` on every level, but the building
+runs north to z3386 (level 0) / z3382 (levels 1-2). `ApAreaGates` tests the
+destination tile against the boxes, so an arrival three tiles north of the box
+edge is simply "not in a gated area" and the `legendsquest >= 75` check never
+runs. Both sides of that staircase (`1_42_52_44_50` trigger, `1_42_52_44_52`
+arrival) were outside every box.
+
+**The asymmetry that makes this a class of bug, not a typo.** Since GitHub #16
+the LOGIC side gates by *region membership* behind an area's `doors[]` tiles,
+but the RUNTIME side (`ApAreaGates.applyAreaGate`) still gates by rectangle. A
+box smaller than the region it protects is therefore invisible to
+ValidateSeed - the logic model correctly treats the guild as gated - while the
+live server lets you walk in. Any fix that only widens boxes leaves the two
+models coupled by hand.
+
+**The fix**: boxes that cover the flood-filled pockets exactly -
+`L0 x2715-2742 z3346-3377` (courtyard, unchanged) + `L0 x2719-2738 z3378-3385`
++ `L0 x2720-2737 z3386` (the north strip, split so the two public path tiles at
+(2719,3386) and (2738,3386) stay outside), `L1 z2 3377 -> 3383`,
+`L2 z2 3378 -> 3383`. Verified: 0 pocket tiles uncovered, 0 large-region
+(public) tiles captured.
+
+**`scripts/audit-gate-coverage.py`** is the general check: any region holding a
+boxed tile is "protected", so any *other* walkable tile of that region is a
+bypass. Run it against the deployed Server checkout. It found 8 more live leaks
+of the same shape in the auto-derived areas, all with entrance-pool sides
+already sitting in the gap - `Door (loc_2559)` (Yanille dungeon, Thieving 82 +
+lockpick; box is 4x4, the pocket is 132 tiles), `Door (blackarmdoor)`,
+`Wall (loc_2854)`, `Large door (death_castledoor)`, `Door (death_harold_door)`,
+`Door (garvdoor)`, `Door (merlinworkshop)`. Not fixed here - each needs a call
+on what the true protected area is.
+
+**Regeneration is the matched triple plus the bundle.** `ap-gated-areas.json` ->
+`BuildRegionGraph` -> `ExtractQuestRegions` -> `ExportLogicBundle --copy`. The
+graph moved by exactly 3 doors (`doorsOpened` 11608 -> 11605, `doorsKeptGated`
+164 -> 167, 3 fewer walkable tiles) and region ids did not shift, so
+`quest-regions.generated.json` changed only in its timestamp. ValidateSeed after
+the change: 63/63 quests, 5/5 goals, all progression collectable.
+
+**Parity baseline, measured not remembered.** `parity-check.py` fails on this
+branch before and after (HEAD: python 5232 vs ts 5284; with the fix: 5233 vs
+5285 - the same delta of 52, both sides moving together). To get a real
+baseline without touching the working tree: `git show HEAD:<file> > ../Server/...`
+for the gated-areas/graph/quest-regions triple, `ExportLogicBundle --copy` to a
+temp path, then `parity-check.py --bundle <temp>`.
+
+**Only a restart is needed to pick this up** - `ap-gated-areas.json` is engine
+data read lazily by `ApAreaGates`, so no pack rebuild, and it applies to the
+seed already in play rather than needing a reseed.

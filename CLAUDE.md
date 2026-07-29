@@ -38,6 +38,7 @@ cd ../Server/engine && npx tsc --noEmit -p .              # typecheck engine
 cd ../Server/engine && npx tsx tools/ap/ExportLogicBundle.ts \
     --copy ../../2004Scape-AP-Logic/apworld/rs2004scape/data/rs2004_logic.json
 python3 scripts/parity-check.py [--write-fixture]        # ValidateSeed.ts vs logic.py
+python3 scripts/audit-gate-coverage.py                   # gated-area boxes vs the regions they guard
 ```
 
 ## Hard-won rules (details in lessons-learned)

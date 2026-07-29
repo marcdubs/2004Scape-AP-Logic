@@ -49,6 +49,14 @@ progression" is the intended experience.
   future tools) must handle all four forms.
 - Boxes are absolute tile coords, inclusive. Multiple boxes per area (floors,
   annexes). Slightly-generous boxes are safer than leaky ones.
+- **A box must cover the whole walkable region it protects, not the doorway.**
+  `ApAreaGates` tests the arrival TILE, so any tile of the room left outside the
+  rectangles is a way in — the Legends' Guild let players onto its first floor
+  for exactly this reason (its boxes ended 3 tiles short of the building; see
+  lessons-learned 2026-07-29). Use several tight boxes rather than one loose
+  one when the shape is awkward, and verify with
+  `python3 scripts/audit-gate-coverage.py`, which flags every entrance-pool
+  tile that shares a region with a boxed tile but is not itself boxed.
 - Missing file = everything allowed (vanilla fail-open, same as every AP table).
 
 ## Workstream A — area-gate enforcement
