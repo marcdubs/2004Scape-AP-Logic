@@ -5,6 +5,7 @@
     "addonTeleportingFocus": true,
     "addonNpcTeleport": true,
     "gatherSpeed": 200,
+    "rockRespawnSpeed": 300,
     "rewardPackRolls": 3,
     "rewardAspirationLevels": 8,
     "rewardObsolescence": 8,

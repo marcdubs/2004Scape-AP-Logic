@@ -5,6 +5,16 @@ anything earlier, `git log` is the record.
 
 ## Unreleased
 
+### Gathering
+
+- **`rockRespawnSpeed`** — a depleted mining rock's respawn timer divided by a
+  percentage, default **300** (a third of the wait), tunable live in
+  `ap-options.json` or per slot with the `rock_respawn_speed` YAML option. The
+  vanilla timers are written for a busy world and are *shortened* as one fills up,
+  so a solo world always paid the full price: gem rocks 2 minutes, runite 24.
+  Mining rocks only — trees and fishing spots are untouched. `gather_speed`
+  decides how often a swing pays out; this decides the wait afterwards.
+
 ### Gates
 
 - **Gated-area boxes now match the rooms they guard.** `ApAreaGates` tests the

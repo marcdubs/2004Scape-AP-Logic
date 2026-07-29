@@ -129,6 +129,7 @@ game: 2004Scape
   progressive_quests: false # one difficulty-ordered "Progressive Quest Unlock" item instead of 61 named ones
   music_checks: false      # 230 extra "first visit to each music region" checks
   gather_speed: 200        # mining/woodcutting/fishing success rate, % of vanilla (100 = untouched)
+  rock_respawn_speed: 300  # how fast a mined-out rock comes back, % of vanilla (gem rocks: 2min -> 40s)
   region_logic: true       # default. Archipelago reasons about where things physically are,
                            # and rolls the world (entrances, gathering, processing, shops,
                            # drops, spawn) itself so the fill matches what you will play.

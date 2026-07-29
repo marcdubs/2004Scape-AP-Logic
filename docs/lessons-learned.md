@@ -4675,3 +4675,36 @@ what `.github/workflows/logic-bundle.yml` gets for free from its clean checkout)
 and the two agree exactly. Re-run the coverage audit afterwards too - a bigger
 pool means more entrance tiles for a gate box to be wrong about; it stayed clean
 in both directions at 1100 tiles, up from 954.
+
+## Rock respawn is the other half of gathering pacing (2026-07-29)
+
+User report: "rocks should replenish quicker after being mined - gem rocks take
+an age". `gatherSpeed` (2026-07-26) only removes FAILED swings; once a rock is
+depleted you still wait out `mining_table:rock_respawnrate` from
+`skill_mining/configs/mine.dbrow`, and on this project that wait is always the
+worst case:
+
+- **`~scale_by_playercount` makes respawns SHORTER as a world fills up**
+  (`base * (4000 - playercount) / 4000`), so a busy 2004 world was the design
+  target and a one-player randomizer pays 100% of the timer, every time. Gem
+  rocks are 200 ticks (2 min), runite 2400 (24 min), adamantite 800, mithril 400,
+  coal 100.
+
+New knob `rockRespawnSpeed` (default 300, clamp 10-1000): `~ap_rock_respawn` in
+`scripts/ap/ap.rs2` divides the already-playercount-scaled value, so the two
+compose and `100` is exactly vanilla. Applied at the three `loc_change` sites in
+`skill_mining/scripts/mining.rs2` (normal / fast / gem rock labels - all three
+read the same dbrow column, so missing one would silently leave a rock family on
+vanilla timers). Mining only; trees and fishing spots were not asked for and are
+untouched. AP side mirrors `gather_speed` exactly: a `rock_respawn_speed` Range
+option -> `fill_slot_data` -> `ApClient.applySlotData` -> `setApOptionInt`, live
+on connect.
+
+**The parity FIXTURE is part of the bundle, and nothing regenerates it for you.**
+`apworld/rs2004scape/test/data/parity_fixture.json` freezes ValidateSeed's answer
+for one layout; the gate-box commits earlier today changed the bundle's region
+sets and left it stale, so `test_parity.py::test_reachable_regions_match` failed
+even though `scripts/parity-check.py` passed. Rule: any change that moves the
+bundle's `gatedAreas`/region numbers needs
+`python3 scripts/parity-check.py --write-fixture` in the same commit. The
+apworld suite catches it; `parity-check.py` alone does not.

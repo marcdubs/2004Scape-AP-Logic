@@ -171,6 +171,29 @@ if (%ap_kbd_killed = 1) {
 // untouched, so this removes failed cycles rather than speeding up the loop.
 [command,ap_gather_random](stat $stat, int $low, int $high)(boolean)
 
+// Divides a depleted-resource respawn by the ap-options.json
+// "rockRespawnSpeed" percentage: 100 = vanilla, 300 = back in a third of the
+// time. The companion to gatherSpeed - that one removes failed swings, this one
+// removes the wait for the rock to come back, which is what actually hurts on a
+// one-player world: ~scale_by_playercount shortens respawns as a world fills up
+// (base * (4000 - playercount) / 4000), so a solo server always pays the FULL
+// vanilla timer. Gem rocks are the worst of it at 200 ticks (2 minutes).
+// Callers pass the already-playercount-scaled value, so the two compose.
+[proc,ap_rock_respawn](int $ticks)(int)
+def_int $speed = ap_option("rockRespawnSpeed");
+if ($speed < 1) {
+    // defensive: ApOptions clamps to >= 10, so this only fires if the table is
+    // ever loaded from somewhere that doesn't. A 0 here would divide by zero.
+    $speed = 100;
+}
+def_int $out = calc($ticks * 100 / $speed);
+if ($out < 1) {
+    // a rock that reappears the same tick it is depleted reads as never
+    // depleting at all, and the loc_change would fight the mining loop.
+    $out = 1;
+}
+return($out);
+
 // info: custom - NPC Teleport addon lookup (engine ApNpcTeleport registry of
 // NPCs the player has spoken to while carrying the writ). Recency-ordered:
 // $index 0 is the most recently talked-to NPC. _name returns "" past the last

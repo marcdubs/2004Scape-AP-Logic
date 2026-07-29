@@ -680,6 +680,7 @@ class RS2004World(World):
             "infiniteRun": bool(self.options.infinite_run.value),
             "progressiveXpRate": bool(self.options.progressive_xp_rate.value),
             "gatherSpeed": int(self.options.gather_speed.value),
+            "rockRespawnSpeed": int(self.options.rock_respawn_speed.value),
             # The finished entrance layout, when this world built it (region_logic on).
             # The client writes it straight to data/config/ap-entrances.json, so the map
             # the server serves is the map the fill reasoned over - no reroll, no

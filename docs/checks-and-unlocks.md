@@ -221,7 +221,13 @@ boolean keys default true; missing file = all enabled). rs2 reads it through the
 `addonNpcTeleport`.
 
 **Numeric tuning knobs** live in the same file and come back from the same
-`ap_option` command as their value (booleans come back as 1/0). Today that's
+`ap_option` command as their value (booleans come back as 1/0). Two of them are
+gathering pacing: `rockRespawnSpeed` (added 2026-07-29) divides a depleted mining
+rock's respawn timer by a percentage, default **300**, clamped 10-1000, applied
+in rs2 by `~ap_rock_respawn` after `~scale_by_playercount` - vanilla respawns are
+written for a busy world and get *shorter* as one fills up, so a solo world pays
+the full price (gem rocks 2 minutes, runite 24). Mining only. AP side: the
+`rock_respawn_speed` YAML option, adopted live from slot_data. And
 `gatherSpeed` (added 2026-07-26, GitHub #13): a percentage applied to the
 mining/woodcutting/fishing success threshold, default **200**, clamped to
 25-1000. It is applied by a separate `ap_gather_random` command

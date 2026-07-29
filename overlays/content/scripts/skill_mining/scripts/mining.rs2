@@ -1,3 +1,8 @@
+// AP: every depleted rock's respawn goes through ~ap_rock_respawn (ap.rs2), which
+// divides the vanilla, playercount-scaled timer by the ap-options.json
+// "rockRespawnSpeed" percentage - 100 is vanilla, the default 300 puts a gem rock
+// back in 40s instead of 2 minutes. Nothing else about depletion changes.
+//
 // AP: every gathering success roll below goes through ap_gather_random instead of
 // vanilla stat_random - same math, with the ap-options.json "gatherSpeed" percentage
 // folded into the level-interpolated threshold (100 = vanilla, higher = fewer failed
@@ -155,7 +160,7 @@ if (random($chance) = ^true) {
     // They added a 1t p_delay in this update: https://oldschool.runescape.wiki/w/Update:Special_Attacks
     p_delay(0);
     // deplete
-    def_int $respawn = ~scale_by_playercount(db_getfield($data, mining_table:rock_respawnrate, 0));
+    def_int $respawn = ~ap_rock_respawn(~scale_by_playercount(db_getfield($data, mining_table:rock_respawnrate, 0)));
     // Temp note: dur does not need updated
     loc_change(loc_param(next_loc_stage_mining), $respawn);
     sound_synth(mine, 1, 0); // Sudden says its mine
@@ -198,7 +203,7 @@ if (random($chance) = ^true) {
     }
 } else if (ap_gather_random(mining, db_getfield($data, mining_table:rock_successchance, 0)) = true) {
     // deplete
-    def_int $respawn = ~scale_by_playercount(db_getfield($data, mining_table:rock_respawnrate, 0));
+    def_int $respawn = ~ap_rock_respawn(~scale_by_playercount(db_getfield($data, mining_table:rock_respawnrate, 0)));
     // Temp note: dur does not need updated
     loc_change(loc_param(next_loc_stage_mining), $respawn);
     sound_synth(mine, 1, 0); // Sudden says its mine
@@ -243,7 +248,7 @@ if (ap_gather_random(mining, $low, $high) = true) {
     // They added a 1t p_delay in this update: https://oldschool.runescape.wiki/w/Update:Special_Attacks
     // p_delay(0);
     // deplete
-    def_int $respawn = ~scale_by_playercount(db_getfield($data, mining_table:rock_respawnrate, 0));
+    def_int $respawn = ~ap_rock_respawn(~scale_by_playercount(db_getfield($data, mining_table:rock_respawnrate, 0)));
     // Temp note: dur does not need updated
     loc_change(loc_param(next_loc_stage_mining), $respawn);
     // stop mining, give ore and xp.

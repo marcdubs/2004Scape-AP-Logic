@@ -15,6 +15,8 @@ class TestSeedOptionsDefaults(RS2004TestBase):
         self.assertTrue(slot_data["progressiveXpRate"])
         # percentage, live server-side knob - 100 would be vanilla 2004 rates
         self.assertEqual(slot_data["gatherSpeed"], 200)
+        # likewise: mined-rock respawn as a percentage, 300 = a third of the wait
+        self.assertEqual(slot_data["rockRespawnSpeed"], 300)
         seed_options = slot_data["seedOptions"]
         # the shared seed is rolled per generation, so only its shape is fixed here -
         # test_ships_its_own_seed below is what pins its meaning
@@ -85,6 +87,7 @@ class TestSeedOptionsCustom(RS2004TestBase):
         "infinite_run": True,
         "progressive_xp_rate": False,
         "gather_speed": 500,
+        "rock_respawn_speed": 100,
     }
 
     def test_custom_values(self) -> None:
@@ -92,6 +95,7 @@ class TestSeedOptionsCustom(RS2004TestBase):
         self.assertTrue(slot_data["infiniteRun"])
         self.assertFalse(slot_data["progressiveXpRate"])
         self.assertEqual(slot_data["gatherSpeed"], 500)
+        self.assertEqual(slot_data["rockRespawnSpeed"], 100)  # opted back to vanilla timers
         seed = slot_data["seedOptions"]
         self.assertEqual(seed["entrances"], "off")  # region_logic ships the table itself
         self.assertFalse(seed["npcDrip"])

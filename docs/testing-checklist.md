@@ -26,6 +26,9 @@ The progression path is generated on demand, not stored:
       blankrune essence), no invalid-obj errors
 - [ ] `::apreward crafting_runecraft 1` — three rolls prefixed
       "Crafting & Runecrafting Pack", only flax / leather / rune essence
+- [ ] Mine a gem rock (Shilo Village) — it should be back in ~40s, not 2 minutes;
+      set `rockRespawnSpeed` to 100 in `data/config/ap-options.json`, restart, and
+      confirm the 2-minute vanilla wait returns
 - [ ] Fill inventory, roll again — bank-fallback message fires
 - [ ] `::apunlock` — all counts read 99 (no unlock table = vanilla)
 - [ ] `::apspawn` — prints home coord + teleports there (vanilla Lumbridge until

@@ -242,6 +242,31 @@ Nothing else that rolls against a skill moves: cooking burn chance, fletching,
 thieving and friends all keep vanilla odds (they share the vanilla
 `stat_random` command; only the three gathering skills call the AP one).
 
+### `rock_respawn_speed`
+
+`300` (default), range `10`-`1000`. How fast a **depleted mining rock** comes
+back, as a percentage of the vanilla timer: `100` is untouched 2004 behavior,
+`300` is a third of the wait. `gather_speed` decides how often a swing pays out;
+this decides how long you stand there afterwards, and on a one-player world that
+is the bigger number. Applies **live** on connect, no reseed needed.
+
+Vanilla respawns are written for a populated world and are then *shortened* as a
+world fills up (`~scale_by_playercount`), so a solo slot always pays the full
+price. At the default `300`:
+
+| rock | vanilla | at `300` |
+|---|---|---|
+| copper / tin | 6s | 2s |
+| iron | 12s | 4s |
+| coal | 60s | 20s |
+| gem rock | 2min | 40s |
+| mithril | 4min | 80s |
+| adamantite | 8min | 160s |
+| runite | 24min | 8min |
+
+Mining only - trees and fishing spots keep vanilla behavior. Set `100` for
+authentic timers.
+
 ### `music_checks`
 
 `false` (default) / `true`. Adds 230 "first visit to each music-track region"

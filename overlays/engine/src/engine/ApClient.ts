@@ -487,6 +487,12 @@ function applySlotData(slotData: Record<string, unknown> | undefined): void {
         setApOptionInt('gatherSpeed', slotData.gatherSpeed);
     }
 
+    // rock respawn likewise - ~ap_rock_respawn reads ApOptions when a rock is
+    // depleted, so a changed value takes effect on the next swing.
+    if (typeof slotData.rockRespawnSpeed === 'number') {
+        setApOptionInt('rockRespawnSpeed', slotData.rockRespawnSpeed);
+    }
+
     // seed knobs (entrances/drip/shops/drops/gathering/processing/spawn):
     // persisted for scripts/new-run to adopt on the NEXT seed roll - they can't
     // apply live (several need a content pack rebuild).

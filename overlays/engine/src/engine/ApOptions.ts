@@ -54,6 +54,16 @@ const NUMERIC_DEFAULTS: Record<string, { value: number; min: number; max: number
     // and 2004 gathering rates are the standout outlier (GitHub #13). Set 100 for
     // untouched 2004 odds.
     gatherSpeed: { value: 200, min: 25, max: 1000 },
+    // How fast a depleted MINING rock comes back, as a percentage of the vanilla
+    // timer (which content/scripts/skill_mining/configs/mine.dbrow sets per rock
+    // and ~scale_by_playercount then shortens as a world fills up - so a solo
+    // world always waits the full vanilla time). 100 = vanilla, 300 = a third of
+    // the wait. Default 300 because the vanilla numbers assume a populated world
+    // with several rocks' worth of competition: gem rocks are 200 ticks (2 min),
+    // runite 2400 (24 min), and on a one-player randomizer that is dead time, not
+    // difficulty. Applied by ~ap_rock_respawn (scripts/ap/ap.rs2); woodcutting
+    // and fishing respawns are untouched.
+    rockRespawnSpeed: { value: 300, min: 10, max: 1000 },
 
     // ---- reward roll tuning (ap_rewards.rs2) ----
     // How many items a "pack" category (ores/bars/herbs/runes/crafting_runecraft) hands out per

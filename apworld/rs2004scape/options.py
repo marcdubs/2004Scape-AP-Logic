@@ -211,6 +211,21 @@ class GatherSpeed(Range):
     default = 200
 
 
+class RockRespawnSpeed(Range):
+    """How fast a depleted mining rock comes back, as a percentage of the
+    vanilla timer. 100 is untouched 2004 behaviour; 300 means a third of the
+    wait. The vanilla numbers assume a populated world - they are even shortened
+    as a world fills up - so a one-player slot always waits the full time: a gem
+    rock is 2 minutes, runite 24. Only mining rocks are affected; tree and
+    fishing-spot behaviour is unchanged. Applies live on connect (server-side
+    knob, no reseed needed)."""
+
+    display_name = "Rock Respawn Speed"
+    range_start = 10
+    range_end = 1000
+    default = 300
+
+
 class Relics(OptionSet):
     """Which relic reward items are allowed to roll from "Mystery Reward"
     filler. A relic keeps working once delivered; unticking one only stops it
@@ -306,3 +321,4 @@ class RS2004Options(PerGameCommonOptions):
     infinite_run: InfiniteRun
     progressive_xp_rate: ProgressiveXpRate
     gather_speed: GatherSpeed
+    rock_respawn_speed: RockRespawnSpeed
