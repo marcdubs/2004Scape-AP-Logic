@@ -4499,3 +4499,42 @@ could fire a check.
 the hot read path it was written for, and silently wrong for any writer that
 isn't `grantUnlock`. If a module caches a file it does not exclusively own,
 export the invalidator up front rather than waiting for the first cross-writer.
+
+## Adding a reward category is a six-file change (2026-07-29)
+
+The user asked for a "Crafting & Runecrafting" drop (flax / leather / pure
+essence). Two things worth remembering.
+
+**Pure essence does not exist in rev 274.** It is a September-2005 item; the
+era-correct object is `blankrune` ("Rune essence"). Same class of trap as
+`soft_leather` (see the 2004-item audit above): check
+`Server/content/scripts/**/configs/*.obj` before writing an obj name into a
+reward table, because a bad name is a silent no-row roll, not a build error.
+
+**The checklist for a new category**, in dependency order - miss one and the
+category exists but is unreachable, or reachable but unnamed:
+
+1. `scripts/gen-rewards.py` - the rows; re-run it against
+   `overlays/content/scripts/ap/configs/ap_rewards.dbrow`.
+2. `ap_rewards.rs2` - four separate procs: `~ap_random_category` (else it never
+   rolls), `~ap_level_for_category` (else it silently gets level 1),
+   `~ap_category_rolls` + `~ap_category_label` (only if it is a multi-roll
+   pack), and `~ap_grant_named_pack` (only if AP ships it as a named filler).
+3. `ApOptions.ts` + `data/config/ap-options.json` - the `rewardWeight*` key.
+   `~ap_weigh_category` treats a missing key as weight 0, so forgetting this is
+   exactly "the category never appears" with no error anywhere.
+4. `ExportApWorldData.ts` `addItem(..., { filler: true, pack })`, then re-run
+   the exporter and copy the JSON into BOTH `overlays/engine/data/config/` and
+   `apworld/rs2004scape/data/`. Ids are append-only, so this only ever appends.
+5. `apworld/rs2004scape/options.py` - `FILLER_ITEM_BY_WEIGHT_KEY` and
+   `DEFAULT_FILLER_WEIGHTS`. Item groups derive themselves from `pack`.
+   A YAML that lists the old keys explicitly gets weight 0 for the new pack
+   (`_filler_weights` defaults missing keys to 0) - backwards compatible, but it
+   means existing YAMLs will not see it until they add the key.
+6. Rebuild the pack, restart. Content change, so `Build.ts` is mandatory.
+
+**`test_item_categories.py::TestNoQuestUnlocks::test_gated_quest_needs_no_unlock`
+is flaky, ~1 run in 3.** `WorldTestBase` seeds randomly, so a full-suite run that
+shows this one failure proves nothing about your diff. Confirmed by running the
+single test six times on the unmodified HEAD apworld: two failures. Do not go
+looking for a logic regression in a filler-only change.

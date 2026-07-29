@@ -106,6 +106,7 @@ item-category toggles off).
     bar_pack: 15
     herb_pack: 10
     rune_pack: 10
+    crafting_runecraft_pack: 10
 ```
 
 | filler | what you get |
@@ -115,9 +116,10 @@ item-category toggles off).
 | `bar_pack` | 3 rolls from the bar table, biased on **Smithing** |
 | `herb_pack` | 3 rolls from the herb table (unidentified herbs, secondaries, vials), biased on **Herblore** |
 | `rune_pack` | 3 rolls from the rune table, biased on **Magic** |
+| `crafting_runecraft_pack` | 3 rolls from flax / leather / rune essence - the crafting and runecrafting grind inputs. No tiers, so no level bias |
 
 Weights are relative and need not sum to anything; `0` removes that filler
-entirely. Setting all five to `0` falls back to the defaults (the pool still has
+entirely. Setting all six to `0` falls back to the defaults (the pool still has
 to be paddable).
 
 The packs exist because raw materials - coal above all - are the real bottleneck
@@ -313,11 +315,11 @@ Notes for this world specifically:
   copy N unlocks the Nth quest in the difficulty order).
   (Dragon Slayer and Horror from the Deep are never gated.)
 - **Filler** (see `filler_weights`): `Mystery Reward` (weighted random
-  category), `Ore Pack`, `Bar Pack`, `Herb Pack`, `Rune Pack` (3 level-biased
-  rolls from that one resource table). All are `filler` classification; the
-  contents are rolled game-side when the item lands, against the stats you have
-  at that moment. Item groups: `Filler` (all five), `Resource Packs` (the four
-  packs).
+  category), `Ore Pack`, `Bar Pack`, `Herb Pack`, `Rune Pack`,
+  `Crafting & Runecrafting Pack` (3 level-biased rolls from that one resource
+  table). All are `filler` classification; the contents are rolled game-side
+  when the item lands, against the stats you have at that moment. Item groups:
+  `Filler` (all six), `Resource Packs` (the five packs).
 
 ## Location name reference (for `exclude_locations`, `priority_locations`, hints...)
 
@@ -406,7 +408,8 @@ both AP and solo mode.
 | `rewardWeight<Category>` | see below | relative odds of each category for a `Mystery Reward` roll. `0` disables that category |
 
 `rewardWeight*` keys and defaults: `Ores` 110, `Bars` 100, `Herbs` 85, `Runes`
-85, `Xp` 85, `Cash` 65, `Food` 55, `Potions` 55, `Crafting` 45, `Tools` 45,
+85, `Xp` 85, `CraftingRunecraft` 80, `Cash` 65, `Food` 55, `Potions` 55,
+`Crafting` 45, `Tools` 45,
 `Runecraft` 40, `Addons` 40, `Armour` 40, `Weapons` 40, `Arrows` 35,
 `RangedGear` 30, `Caskets` 30, `Keepsakes` 25. (This replaced a flat
 `random(16)` that gave the 3-row casket category exactly as much airtime as the

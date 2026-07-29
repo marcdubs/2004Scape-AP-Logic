@@ -180,6 +180,13 @@ through `ApClient` into `[queue,ap_remote_item]`'s new third argument, and an
 empty/unknown pack id falls back to the random roll (newer apworld, older server
 still pays out).
 
+A fifth pack, `crafting_runecraft` (`Crafting & Runecrafting Pack`), was added
+later on the same feedback: flax, leather and rune essence, the grind inputs for
+the two skills the other four packs never touch. It is a flat pool - none of the
+three has tiers, so `~ap_tier_weight` weights them equally at every level - and
+`~ap_level_for_category` maps it to `min(crafting, runecraft)` for honesty
+rather than effect.
+
 The table is now generated: edit `scripts/gen-rewards.py`, re-run it against
 `overlays/content/scripts/ap/configs/ap_rewards.dbrow`, rebuild the pack.
 

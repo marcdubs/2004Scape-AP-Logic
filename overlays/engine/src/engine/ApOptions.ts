@@ -56,7 +56,7 @@ const NUMERIC_DEFAULTS: Record<string, { value: number; min: number; max: number
     gatherSpeed: { value: 200, min: 25, max: 1000 },
 
     // ---- reward roll tuning (ap_rewards.rs2) ----
-    // How many items a "pack" category (ores/bars/herbs/runes) hands out per
+    // How many items a "pack" category (ores/bars/herbs/runes/crafting_runecraft) hands out per
     // reward. Each roll is independently level-biased, so a pack reads like a
     // drop table rather than one lonely stack. 1 turns packs back into the
     // single-item categories everything else uses.
@@ -86,6 +86,9 @@ const NUMERIC_DEFAULTS: Record<string, { value: number; min: number; max: number
     rewardWeightBars: { value: 100, min: 0, max: 1000 },
     rewardWeightHerbs: { value: 85, min: 0, max: 1000 },
     rewardWeightRunes: { value: 85, min: 0, max: 1000 },
+    // flax / leather / rune essence, three rolls at a time - the crafting and
+    // runecraft grind inputs, which no other pack covers.
+    rewardWeightCraftingRunecraft: { value: 80, min: 0, max: 1000 },
     rewardWeightXp: { value: 85, min: 0, max: 1000 },
     rewardWeightCash: { value: 65, min: 0, max: 1000 },
     rewardWeightFood: { value: 55, min: 0, max: 1000 },

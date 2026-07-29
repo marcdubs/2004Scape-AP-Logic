@@ -235,6 +235,7 @@ FILLER_ITEM_BY_WEIGHT_KEY = {
     "bar_pack": "Bar Pack",
     "herb_pack": "Herb Pack",
     "rune_pack": "Rune Pack",
+    "crafting_runecraft_pack": "Crafting & Runecrafting Pack",
 }
 
 DEFAULT_FILLER_WEIGHTS = {
@@ -243,6 +244,7 @@ DEFAULT_FILLER_WEIGHTS = {
     "bar_pack": 15,
     "herb_pack": 10,
     "rune_pack": 10,
+    "crafting_runecraft_pack": 10,
 }
 
 
@@ -255,14 +257,16 @@ class FillerWeights(OptionDict):
 
     mystery_reward: rolls a weighted random category in game (gear, XP, cash,
     food, potions, supplies, ... - anything).
-    ore_pack / bar_pack / herb_pack / rune_pack: roll several items from that
-    one resource table, biased toward - but not limited to - your level in the
-    governing skill (Smithing for ores and bars, Herblore for herbs, Magic for
-    runes). These exist because raw materials, coal above all, are the real
-    bottleneck once the gathering, processing and drop shuffles are on.
+    ore_pack / bar_pack / herb_pack / rune_pack / crafting_runecraft_pack: roll
+    several items from that one resource table, biased toward - but not limited
+    to - your level in the governing skill (Smithing for ores and bars, Herblore
+    for herbs, Magic for runes; the crafting/runecrafting pack is flax, leather
+    and rune essence, which have no tiers). These exist because raw materials,
+    coal above all, are the real bottleneck once the gathering, processing and
+    drop shuffles are on.
 
     Weights are relative and need not sum to anything; 0 removes that filler.
-    Setting all five to 0 falls back to the defaults."""
+    Setting all six to 0 falls back to the defaults."""
 
     display_name = "Filler Weights"
     valid_keys = frozenset(FILLER_ITEM_BY_WEIGHT_KEY)

@@ -24,6 +24,8 @@ The progression path is generated on demand, not stored:
 - [ ] `::apreward herb_supplies 40`, `::apreward runecraft_supplies 40`,
       `::apreward crafting_supplies 40` — era-correct items (unidentified herbs,
       blankrune essence), no invalid-obj errors
+- [ ] `::apreward crafting_runecraft 1` — three rolls prefixed
+      "Crafting & Runecrafting Pack", only flax / leather / rune essence
 - [ ] Fill inventory, roll again — bank-fallback message fires
 - [ ] `::apunlock` — all counts read 99 (no unlock table = vanilla)
 - [ ] `::apspawn` — prints home coord + teleports there (vanilla Lumbridge until

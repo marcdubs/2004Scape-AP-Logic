@@ -82,7 +82,8 @@ Item name conventions (AP-visible display names):
   (`progressive_<skill>`, **+2** - the engine cap formula is 20 + 10*count, one
   copy = +20 levels).
 - `Quest Unlock: <Name>` (61, single copy) -> grantUnlock(`quest_<id>`, 1).
-- Filler (`Mystery Reward`, `Ore Pack`, `Bar Pack`, `Herb Pack`, `Rune Pack`) -
+- Filler (`Mystery Reward`, `Ore Pack`, `Bar Pack`, `Herb Pack`, `Rune Pack`,
+  `Crafting & Runecrafting Pack`) -
   no grant; on receipt ApClient passes the item's `pack` id through
   `[queue,ap_remote_item]` to `~ap_grant_named_pack`, which rolls that resource
   category (or, for `Mystery Reward`, a weighted random one via

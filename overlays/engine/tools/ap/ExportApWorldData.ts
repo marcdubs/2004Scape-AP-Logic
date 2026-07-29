@@ -273,6 +273,7 @@ function main(): void {
     addItem('Bar Pack', { copies: 0, filler: true, pack: 'bar_pack' });
     addItem('Herb Pack', { copies: 0, filler: true, pack: 'herb_pack' });
     addItem('Rune Pack', { copies: 0, filler: true, pack: 'rune_pack' });
+    addItem('Crafting & Runecrafting Pack', { copies: 0, filler: true, pack: 'crafting_runecraft_pack' });
 
     const questUnlockOrder = buildQuestUnlockOrder(quests);
 

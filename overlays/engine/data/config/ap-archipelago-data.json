@@ -1,5 +1,5 @@
 {
-  "_generated": "tools/ap/ExportApWorldData.ts (2026-07-26) - ids are append-only, do not hand-edit",
+  "_generated": "tools/ap/ExportApWorldData.ts (2026-07-29) - ids are append-only, do not hand-edit",
   "game": "2004Scape",
   "locationBaseId": 20040000,
   "itemBaseId": 20045000,
@@ -3791,6 +3791,12 @@
       "copies": 0,
       "filler": true,
       "pack": "rune_pack"
+    },
+    "Crafting & Runecrafting Pack": {
+      "id": 20045091,
+      "copies": 0,
+      "filler": true,
+      "pack": "crafting_runecraft_pack"
     }
   },
   "goalChecks": {

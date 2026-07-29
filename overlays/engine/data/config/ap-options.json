@@ -12,6 +12,7 @@
     "rewardWeightBars": 100,
     "rewardWeightHerbs": 85,
     "rewardWeightRunes": 85,
+    "rewardWeightCraftingRunecraft": 80,
     "rewardWeightXp": 85,
     "rewardWeightCash": 65,
     "rewardWeightFood": 55,

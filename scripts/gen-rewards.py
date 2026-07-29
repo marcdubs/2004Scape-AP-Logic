@@ -100,6 +100,12 @@ cat("runes", "runes (magic). Quantities are per-pack rolls, so three air-rune ro
     (76, "bloodrune", 20, 45),
 ])
 
+cat("crafting_runecraft", "crafting_runecraft (min of crafting and runecraft) - the raw-material\n// pack for the two skills whose inputs are pure grind: flax for bowstrings,\n// leather for the armour ladder, rune essence for every rune. Flat pool (every\n// row is min_level 1) because none of the three has tiers - they are the same\n// bottleneck at level 1 and at 99.", [
+    (1, "flax", 15, 30),
+    (1, "leather", 12, 25),
+    (1, "blankrune", 30, 70),
+])
+
 # ---------------------------------------------------------------------------
 # single-roll categories
 # ---------------------------------------------------------------------------

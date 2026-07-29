@@ -58,12 +58,14 @@ if (compare($pack, "ore_pack") = 0) {
     ~ap_grant_category("herbs");
 } else if (compare($pack, "rune_pack") = 0) {
     ~ap_grant_category("runes");
+} else if (compare($pack, "crafting_runecraft_pack") = 0) {
+    ~ap_grant_category("crafting_runecraft");
 } else {
     ~ap_grant_check_reward;
 }
 
 // Rolls and delivers one reward from $category. "Pack" categories
-// (ores/bars/herbs/runes) roll rewardPackRolls times instead of once - each roll
+// (ores/bars/herbs/runes/crafting_runecraft) roll rewardPackRolls times instead of once - each roll
 // independently level-biased - so a pack reads like a drop table rather than one
 // lonely stack. Identical rolls stack in the inventory on their own, so no
 // merging is needed here.
@@ -90,11 +92,11 @@ while ($i < $rolls) {
     $i = calc($i + 1);
 }
 
-// How many independent rolls a category hands out. Only the four resource packs
+// How many independent rolls a category hands out. Only the five resource packs
 // are multi-roll: the rest are single items where three copies would just be
 // noise (nobody wants three rune platebodies).
 [proc,ap_category_rolls](string $category)(int)
-if (compare($category, "ores") = 0 | compare($category, "bars") = 0 | compare($category, "herbs") = 0 | compare($category, "runes") = 0) {
+if (compare($category, "ores") = 0 | compare($category, "bars") = 0 | compare($category, "herbs") = 0 | compare($category, "runes") = 0 | compare($category, "crafting_runecraft") = 0) {
     def_int $rolls = ap_option("rewardPackRolls");
     if ($rolls < 1) {
         $rolls = 1;
@@ -115,6 +117,8 @@ if (compare($category, "ores") = 0) {
     return("Herb Pack");
 } else if (compare($category, "runes") = 0) {
     return("Rune Pack");
+} else if (compare($category, "crafting_runecraft") = 0) {
+    return("Crafting & Runecrafting Pack");
 }
 return("Archipelago reward");
 
@@ -188,6 +192,7 @@ $chosen, $total = ~ap_weigh_category("ores", "rewardWeightOres", $chosen, $total
 $chosen, $total = ~ap_weigh_category("bars", "rewardWeightBars", $chosen, $total);
 $chosen, $total = ~ap_weigh_category("herbs", "rewardWeightHerbs", $chosen, $total);
 $chosen, $total = ~ap_weigh_category("runes", "rewardWeightRunes", $chosen, $total);
+$chosen, $total = ~ap_weigh_category("crafting_runecraft", "rewardWeightCraftingRunecraft", $chosen, $total);
 $chosen, $total = ~ap_weigh_category("xp", "rewardWeightXp", $chosen, $total);
 $chosen, $total = ~ap_weigh_category("cash", "rewardWeightCash", $chosen, $total);
 $chosen, $total = ~ap_weigh_category("food", "rewardWeightFood", $chosen, $total);
@@ -293,6 +298,12 @@ if (compare($category, "armour") = 0) {
     return(stat_base(runecraft));
 } else if (compare($category, "crafting_supplies") = 0) {
     return(stat_base(crafting));
+} else if (compare($category, "crafting_runecraft") = 0) {
+    // flat pool - all three rows are min_level 1, so ~ap_tier_weight weights
+    // them equally whatever this returns. min() of the two governing stats is
+    // the honest mapping (same reasoning as tools) rather than a claim that
+    // either skill alone owns the pack.
+    return(min(stat_base(crafting), stat_base(runecraft)));
 } else if (compare($category, "caskets") = 0) {
     // trail reward caskets (the user-requested "junk casket" filler - see
     // checks-and-unlocks.md "Treasure Trails"). Tiered on hitpoints as an
@@ -404,9 +415,9 @@ if ($fits = true) {
 // with args, forces category/tier so every level bracket can be eyeballed
 // without playing to it. Valid category names: ores, bars, herbs, runes,
 // armour, weapons, ranged_gear, arrows, potions, food, tools, cash, xp,
-// runecraft_supplies, crafting_supplies, caskets, addons, keepsakes - an
-// unrecognized name matches no rows and prints ap_deliver_reward's "no reward
-// available" message. xp ignores $level entirely (it's not tiered - see
+// runecraft_supplies, crafting_supplies, crafting_runecraft, caskets, addons,
+// keepsakes - an unrecognized name matches no rows and prints
+// ap_deliver_reward's "no reward available" message. xp ignores $level entirely (it's not tiered - see
 // ap_grant_xp_reward); keepsakes ignores $level too (flat pool). A $level of 0
 // or less means 99, so `::apreward ores 0` shows the top of the curve; pass a
 // real level (`::apreward ores 40`) to see the bias a level-40 smith gets,

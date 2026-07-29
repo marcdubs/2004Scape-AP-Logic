@@ -459,6 +459,36 @@ data=qty,20
 data=qty_max,45
 
 
+// ---- crafting_runecraft (min of crafting and runecraft) - the raw-material
+// pack for the two skills whose inputs are pure grind: flax for bowstrings,
+// leather for the armour ladder, rune essence for every rune. Flat pool (every
+// row is min_level 1) because none of the three has tiers - they are the same
+// bottleneck at level 1 and at 99. ----
+[ap_reward_crafting_runecraft_flax]
+table=ap_rewards
+data=category,crafting_runecraft
+data=min_level,1
+data=reward,flax
+data=qty,15
+data=qty_max,30
+
+[ap_reward_crafting_runecraft_leather]
+table=ap_rewards
+data=category,crafting_runecraft
+data=min_level,1
+data=reward,leather
+data=qty,12
+data=qty_max,25
+
+[ap_reward_crafting_runecraft_blankrune]
+table=ap_rewards
+data=category,crafting_runecraft
+data=min_level,1
+data=reward,blankrune
+data=qty,30
+data=qty_max,70
+
+
 // ---- armour (defence) ----
 [ap_reward_armour_bronze_platebody]
 table=ap_rewards
