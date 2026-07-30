@@ -28,6 +28,8 @@ import { getProcessOverrideCount } from '#/engine/ApProcessOverrides.js';
 import { getThievingOverrideCount } from '#/engine/ApThievingOverrides.js';
 import { getTrackerState } from '#/engine/ApTracker.js';
 import { findPath, listPlaces } from '#/engine/ApPathfinder.js';
+import { clearRoute, routeText, startRoute } from '#/engine/ApPathGuide.js';
+import type Player from '#/engine/entity/Player.js';
 
 type NodeRequestInit = RequestInit & {
     duplex?: 'half';
@@ -700,6 +702,19 @@ function buildApPlacesResponse(): unknown {
 }
 
 /**
+ * The player the tracker is speaking for. This is a single-player-per-world tool, so the
+ * first logged-in player IS "me" - there is no session to tie the browser to the game.
+ */
+function trackerPlayer(): Player | null {
+    for (const p of World.players) {
+        if (p) {
+            return p;
+        }
+    }
+    return null;
+}
+
+/**
  * Where a route should start. Defaults to the logged-in player's tile - the tracker sits
  * beside a running game, so "from where I am" is the question actually being asked - and
  * accepts an explicit raw coord for planning a route you are not standing at.
@@ -713,12 +728,44 @@ function resolvePathOrigin(from: string | null): { tile: { level: number; x: num
         return { error: `'from' must be a raw coord or 'player', got '${from}'` };
     }
 
-    for (const p of World.players) {
-        if (p) {
-            return { tile: { level: p.level, x: p.x, z: p.z }, label: 'your position' };
-        }
+    const player = trackerPlayer();
+    if (player) {
+        return { tile: { level: player.level, x: player.x, z: player.z }, label: 'your position' };
     }
     return { error: 'nobody is logged in, so there is no player position to route from - pass an explicit from=<coord>' };
+}
+
+/**
+ * Arms (or takes down) the in-game hint arrow for the logged-in player, so a route picked
+ * in the browser shows up on screen without anyone typing ::appath and spelling a place
+ * name. Kept separate from /ap/path.json precisely because it CHANGES the game's state -
+ * that endpoint stays a pure query, this one is the one with a side effect.
+ *
+ * Routing from an explicit 'from' place is planning, not navigation, so the tracker only
+ * calls this when the route starts at the player; guiding someone from a tile they are
+ * not standing on would point the arrow at a leg they have not reached.
+ */
+function buildApGuideResponse(params: URLSearchParams): unknown {
+    const player = trackerPlayer();
+    if (!player) {
+        return { ok: false, reason: 'nobody is logged in, so there is nobody to guide' };
+    }
+
+    if (params.get('clear') === '1') {
+        clearRoute(player);
+        return { ok: true, cleared: true };
+    }
+
+    const to = params.get('to');
+    if (!to) {
+        return { ok: false, reason: "missing 'to' - pass a place key or a raw coord" };
+    }
+
+    const legs = startRoute(player, to, params.get('spoiler') === '1');
+    if (legs <= 0) {
+        return { ok: false, reason: routeText(player, -1) };
+    }
+    return { ok: true, legs, summary: routeText(player, -1) };
 }
 
 function buildApPathResponse(params: URLSearchParams): unknown {
@@ -812,6 +859,8 @@ async function handleWebRequest(req: Request): Promise<Response> {
             return jsonResponse(buildApPlacesResponse());
         } else if (url.pathname === '/ap/path.json') {
             return jsonResponse(buildApPathResponse(url.searchParams));
+        } else if (url.pathname === '/ap/guide.json') {
+            return jsonResponse(buildApGuideResponse(url.searchParams));
         } else if (Environment.node.debug) {
             if (url.pathname === '/maped') {
                 return new Response(await ejs.renderFile('view/maped.ejs'), {

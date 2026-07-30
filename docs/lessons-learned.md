@@ -4827,11 +4827,35 @@ takes four. Also, this rs2 dialect has no string-replace and builds strings with
 `append(a, b)`, not `"<$a><$b>"` interpolation (interpolation works inside literals passed
 to `mes`, which is what misled me).
 
+### Follow-up: the browser is the input device, the game is the output device (2026-07-30)
+
+There are **135 routable destinations** — they are the world map's own typographic labels,
+so the catalog is whatever Jagex chose to name: cities and dungeons, but also `Flax`,
+`Beehives`, `Bone Yard`, and a `Castle Wars (due Dec-2004)` that will not exist for months.
+That list is fine in a dropdown and miserable at a chat prompt, which is what `::appathlist`
+paging over 90-character lines was really telling me. The user's call: configure the route in
+the tracker, show it in game. So finding a route in the browser now also arms the hint arrow.
+
+Two things worth keeping from how it was wired:
+
+- **The side effect got its own endpoint.** `/ap/guide.json`, not a `guide=1` flag on
+  `/ap/path.json`. Both are GETs on a local server so nothing enforces the distinction, but
+  keeping the query pure means a refresh, a bookmark, or a second browser tab can never
+  yank a player's arrow to somewhere they did not ask to go. The endpoint that mutates
+  should be the one you have to name.
+- **It only fires when the route starts at the player.** The tracker's From picker can plan
+  from anywhere; guiding from a tile you are not standing on would arm the arrow at a
+  waypoint several legs ahead. Planning and navigating look identical in the response and
+  are completely different intents — `routeFromParam() === 'player'` is the whole test.
+
+The call is advisory: the map route is drawn before it runs, so "nobody is logged in" reports
+itself in the status line without throwing away the route the user actually asked for.
+
 ### Files
 
 `ApWalkGrid.ts` (format + reader), `BuildRegionGraph.ts` (emits the grid),
 `BuildWalkGraph.ts` (the precompute), `ApPathfinder.ts` (router), `ApPathGuide.ts` (in-game
 guide + arrow), `ap_path.rs2`, opcodes 1915-1919, `web.ts` (`/ap/path.json`,
-`/ap/places.json`), tracker `app.js`/`index.html`/`style.css`, and
+`/ap/places.json`, `/ap/guide.json`), tracker `app.js`/`index.html`/`style.css`, and
 `tools/logic/ExplainPath.ts` for inspecting a seed offline (`--compare` ranks destinations
 by how much the shuffle beats walking: 81 of 105 on the seed this was built against).

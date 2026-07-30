@@ -277,6 +277,15 @@ is then a Dijkstra over ~1.7k nodes.
    floods the grid to attach the player's arbitrary tile, runs Dijkstra. ~10ms warm.
 4. **`ApPathGuide.ts`** + `ap_path.rs2` + opcodes 1915-1919 — the in-game side.
 5. **`/ap/path.json`** + `/ap/places.json` + the tracker's route bar — the browser side.
+6. **`/ap/guide.json`** — the browser arming the in-game arrow. Picking a route in the
+   tracker is picking it in game: 135 destinations is a dropdown's job, not a chat prompt's.
+   Deliberately a *separate* endpoint from `path.json` rather than a flag on it, because it
+   is the one that changes the game's state; keeping `path.json` a pure query means a stray
+   refresh or a bookmarked URL can never move a player's arrow. It only fires when the route
+   starts at the player — routing from an explicit From place is planning a trip, not
+   walking one, and would aim the arrow at a leg nobody has reached. The call is advisory:
+   the map route is already drawn when it runs, so a failure reports itself without
+   discarding the answer that was asked for.
 
 ### Two traps worth remembering
 

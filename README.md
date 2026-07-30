@@ -1252,6 +1252,16 @@ something to walk), numbered markers at every point you must do something, and t
 frames the whole route so a cross-layer trip shows both halves at once. The leg list below
 spells it out, flagging anything that needs an item or a quest.
 
+**Picking a route here also sets the arrow in game.** There are 135 destinations - that is a
+dropdown's job, not something to spell at a chat prompt - so the browser is the comfortable
+place to choose and the game is where the answer belongs. Finding a route from *your
+position* (the default) arms the in-game arrow on the spot; **Clear** takes it down. Routing
+from an explicit From place does not, because that is planning a trip, not walking one, and
+the arrow would point at a leg you have not reached.
+
+The 135 names are the world map's own labels, so the list is whatever Jagex chose to name -
+cities and dungeons, but also `Flax`, `Beehives`, and a `Castle Wars (due Dec-2004)`.
+
 ### Pieces
 
 - `overlays/engine/src/engine/ApWalkGrid.ts` - format + reader for `ap-walk-grid.bin`

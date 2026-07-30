@@ -1845,10 +1845,34 @@
                 renderRouteResult();
                 renderMap();
                 focusRoute();
+
+                // Picking a route here is picking it in game too: the destination list is
+                // 135 names long, which is a browser dropdown's job and not something to
+                // spell at a chat prompt. Only when routing from the player, though -
+                // a route planned from somewhere else is not a route they are walking.
+                if (routeFromParam() === 'player') {
+                    sendGuide('to=' + encodeURIComponent(to) + (spoilerMode ? '&spoiler=1' : ''));
+                }
             })
             .catch(function () {
                 setRouteStatus('The server did not answer.', true);
             });
+    }
+
+    // Arms or clears the in-game hint arrow. Advisory: the map route is already drawn by
+    // the time this runs, so a failure here (nobody logged in, usually) is worth saying
+    // but must not throw away the answer the user asked for.
+    function sendGuide(query) {
+        fetch('/ap/guide.json?' + query, { cache: 'no-store' })
+            .then(function (res) { return res.json(); })
+            .then(function (payload) {
+                if (payload && payload.ok && !payload.cleared) {
+                    setRouteStatus('Arrow set in game — it moves to the next entrance as you reach each one.', false);
+                } else if (payload && !payload.ok) {
+                    setRouteStatus('Route drawn, but not sent to the game: ' + payload.reason, true);
+                }
+            })
+            .catch(function () { /* the map route stands on its own */ });
     }
 
     function clearRoute() {
@@ -1856,6 +1880,7 @@
         setRouteStatus('', false);
         renderRouteResult();
         renderMap();
+        sendGuide('clear=1');
     }
 
     // Legs carry world coords; the map wants the parseCoord shape (absX/absZ/layer).
