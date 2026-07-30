@@ -141,6 +141,23 @@ export const enum ScriptOpcode {
     // AP_ENTRANCE_OVERRIDE above.
     AP_GATHER_RANDOM = 1914,
 
+    // custom: Archipelago path helper (ApPathGuide.ts / ApPathfinder.ts). AP_PATH_FIND
+    // computes a route from the active player to a named place and makes it their active
+    // guide, returning the leg count (-1 on failure); AP_PATH_TEXT reads back a
+    // prebuilt display line (index -1 = the summary, or the failure reason); AP_PATH_COORD
+    // reads back a leg's actionable tile. Text is formatted engine-side because that is
+    // where the route data lives - rs2 only prints it. Same explicit-numbering reasoning
+    // as AP_ENTRANCE_OVERRIDE above.
+    AP_PATH_FIND = 1915,
+    AP_PATH_TEXT = 1916,
+    AP_PATH_COORD = 1917,
+    AP_PATH_CLEAR = 1918,
+
+    // custom: Archipelago path helper - one chat-line-sized page of routable place names
+    // ('' past the last page), so ::appathlist can enumerate destinations without the
+    // engine having to know how wide a chat line is.
+    AP_PATH_PLACES = 1919,
+
     // Player ops (2000-2499)
     AFK_EVENT = 2000,
     ALLOWDESIGN,
@@ -604,6 +621,11 @@ export const ScriptOpcodeMap: Map<string, number> = new Map([
     ['AP_NPCTP_COORD', ScriptOpcode.AP_NPCTP_COORD],
     ['AP_THIEVING_SWAP', ScriptOpcode.AP_THIEVING_SWAP],
     ['AP_GATHER_RANDOM', ScriptOpcode.AP_GATHER_RANDOM],
+    ['AP_PATH_FIND', ScriptOpcode.AP_PATH_FIND],
+    ['AP_PATH_TEXT', ScriptOpcode.AP_PATH_TEXT],
+    ['AP_PATH_COORD', ScriptOpcode.AP_PATH_COORD],
+    ['AP_PATH_CLEAR', ScriptOpcode.AP_PATH_CLEAR],
+    ['AP_PATH_PLACES', ScriptOpcode.AP_PATH_PLACES],
 
     ['AFK_EVENT', ScriptOpcode.AFK_EVENT],
     ['ALLOWDESIGN', ScriptOpcode.ALLOWDESIGN],

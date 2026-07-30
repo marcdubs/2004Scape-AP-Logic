@@ -68,6 +68,7 @@ import { unzipSync } from 'fflate';
 import LocType from '#/cache/config/LocType.js';
 import Packet from '#/io/Packet.js';
 import { CollisionFlag, CollisionType, LocAngle, LocLayer, allocateIfAbsent, canTravel, changeFloor, changeLoc, changeWall, isFlagged, locShapeLayer } from '#/engine/routefinder/index.js';
+import { WALK_DIR_DX, WALK_DIR_DZ, WALK_DIR_COUNT, WALK_GRID_BLOCK_BYTES, encodeWalkGrid, walkGridLocalIndex } from '#/engine/ApWalkGrid.js';
 
 import { GatedAreaBox, loadGatedAreas, parseDoorCoord, tileNearBox } from './GatedAreas.js';
 
@@ -76,6 +77,12 @@ const ZIP_PATH = path.join(PACK_DIR, '.cache', 'maps-server.zip');
 const CONFIG_DIR = process.argv.includes('--config-dir') ? process.argv[process.argv.indexOf('--config-dir') + 1] : 'data/config';
 const OUT_PATH = process.argv.includes('--out') ? process.argv[process.argv.indexOf('--out') + 1] : path.join('tools', 'logic', 'region-graph.json');
 const GATED_DOOR_MARGIN = 2; // tiles - see the door-handling comment above.
+
+// Secondary artifact: the path helper's movement grid (see ApWalkGrid.ts). Emitted from
+// this tool because it must come from the same door-opened collision state as the
+// regions themselves - building it anywhere else would risk the two disagreeing.
+const WALK_GRID_OUT = process.argv.includes('--walk-grid-out') ? process.argv[process.argv.indexOf('--walk-grid-out') + 1] : path.join(CONFIG_DIR, 'ap-walk-grid.bin');
+const SKIP_WALK_GRID = process.argv.includes('--no-walk-grid');
 
 // `--extra-closed-doors <door-scan.json>`: build a Set of "level:absX:absZ" tile keys from
 // every gated passage's placementCoords, to force those doors closed during the flood-fill.
@@ -495,6 +502,77 @@ async function main(): Promise<void> {
     }
 
     console.log(`BuildRegionGraph: flood fill produced ${regions.length} region(s), ${regions.reduce((a, r) => a + r.tileCount, 0)} walkable tile(s), in ${Date.now() - t0}ms total`);
+
+    // ---- walk grid (ap-walk-grid.bin) ----
+    // One byte of step mask per tile plus a walkable bit-plane, for the Archipelago path
+    // helper (ApWalkGrid.ts documents the format and the reasoning). Deliberately a
+    // separate pass rather than piggybacking the flood above: the flood only asks
+    // canTravel about CARDINAL steps into not-yet-visited tiles, whereas the helper needs
+    // all 8 directions from every tile, including steps back into already-visited ones.
+    // Diagonals matter for distance: a diagonal step costs the same tick as a cardinal,
+    // so omitting them would overstate travel time by up to ~41% on open ground.
+    if (!SKIP_WALK_GRID) {
+        const tGrid = Date.now();
+        const blocks = new Map<string, Uint8Array>();
+        let edgeCount = 0;
+        let walkableInGrid = 0;
+
+        for (const key of loadedSquares) {
+            const [mxStr, mzStr] = key.split('_');
+            const baseX = Number(mxStr) << 6;
+            const baseZ = Number(mzStr) << 6;
+            const block = new Uint8Array(WALK_GRID_BLOCK_BYTES);
+            const planeBase = LEVELS * SQUARE_TILES * SQUARE_TILES;
+
+            for (let level = 0; level < LEVELS; level++) {
+                for (let lz = 0; lz < SQUARE_TILES; lz++) {
+                    for (let lx = 0; lx < SQUARE_TILES; lx++) {
+                        const worldX = baseX + lx;
+                        const worldZ = baseZ + lz;
+                        if (!walkable(worldX, worldZ, level)) {
+                            continue; // mask stays 0 and the walkable bit stays clear.
+                        }
+
+                        const idx = walkGridLocalIndex(lx, lz, level);
+                        block[planeBase + (idx >> 3)] |= 1 << (idx & 7);
+                        walkableInGrid++;
+
+                        let mask = 0;
+                        for (let d = 0; d < WALK_DIR_COUNT; d++) {
+                            const nx = worldX + WALK_DIR_DX[d];
+                            const nz = worldZ + WALK_DIR_DZ[d];
+                            // Steps out of the loaded world stay blocked: an unallocated
+                            // collision zone reads as NULL (all bits set) anyway, but
+                            // checking loadedSquares makes the intent explicit rather than
+                            // relying on that sentinel.
+                            if (!loadedSquares.has(`${nx >> 6}_${nz >> 6}`)) {
+                                continue;
+                            }
+                            if (!walkable(nx, nz, level)) {
+                                continue;
+                            }
+                            if (!canTravel(level, worldX, worldZ, WALK_DIR_DX[d], WALK_DIR_DZ[d], 1, 0, CollisionType.NORMAL)) {
+                                continue;
+                            }
+                            mask |= 1 << d;
+                            edgeCount++;
+                        }
+                        block[idx] = mask;
+                    }
+                }
+            }
+
+            blocks.set(key, block);
+        }
+
+        const encoded = encodeWalkGrid(blocks);
+        fs.mkdirSync(path.dirname(WALK_GRID_OUT), { recursive: true });
+        fs.writeFileSync(WALK_GRID_OUT, encoded);
+        console.log(
+            `BuildRegionGraph: wrote ${WALK_GRID_OUT} (${(encoded.length / 1024 / 1024).toFixed(2)} MiB, ${blocks.size} mapsquare(s), ` +
+                `${walkableInGrid} walkable tile(s), ${edgeCount} directed step(s)) in ${Date.now() - tGrid}ms`
+        );
+    }
 
     // ---- mainland detection: largest surface (level 0, mapZ<100) region containing Lumbridge (3222,3218). ----
     const lumbridgeCell = getRegionCell(3222, 3218, 0);

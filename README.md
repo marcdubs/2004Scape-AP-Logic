@@ -1211,6 +1211,98 @@ gets migrated from a legacy `.env` - see `WorldConfig.ts`). Takes effect on serv
 restart; no content pack rebuild needed, since this only touches engine TS. Player run
 energy will read and display 100% at all times and running is never blocked.
 
+## Path helper ("which entrances get me there fastest?")
+
+Once entrances are shuffled, "how do I get to Falador" stops having a memorized answer.
+The path helper answers it, in game and in the tracker, off one router. It minimizes
+**movement ticks** (one per step walking, two per tick running - a diagonal step costs the
+same tick as a cardinal one, so this is real travel time, not raw tile distance).
+
+On the seed this was built against, 81 of 105 destinations were faster via a shuffled
+entrance than on foot - Lumbridge to Sinclair Mansion drops from 789 steps to 76.
+
+### Spoiler-free by default
+
+Routing through an entrance you have never opened would tell you where it leads, which is
+the one thing the randomizer exists to withhold. So the default route uses **only entrances
+you have already been through**; early on that means you get told to walk. Revealing the
+rest is a separate, differently-named command (and the tracker's existing `?spoiler=1`).
+Unrestricted routes still mark which hops you have not explored.
+
+### In game
+
+| command | does |
+|---|---|
+| `::appath <place>` | route using only entrances you have explored |
+| `::appathall <place>` | route using every entrance - spoilers |
+| `::appathstop` | forget the route, take the arrow down |
+| `::appathlist` | every routable name |
+
+The legs print to chat, and the **Tutorial Island hint arrow** points at the next entrance
+you need, re-pointing itself each time you reach one. Multi-word names take no punctuation
+either way (`::appath black knights fortress`). The arrow appears when the waypoint is close
+enough for the client to draw it - the 2004 client can only mark one tile, and only inside
+the loaded scene, which is why the route is delivered one arrow at a time.
+
+### In the tracker
+
+A **From / To** bar above the map. Routes draw straight onto the existing world map: solid
+gold for walking, dashed orange for an entrance hop (a hop is a discontinuity, not
+something to walk), numbered markers at every point you must do something, and the view
+frames the whole route so a cross-layer trip shows both halves at once. The leg list below
+spells it out, flagging anything that needs an item or a quest.
+
+### Pieces
+
+- `overlays/engine/src/engine/ApWalkGrid.ts` - format + reader for `ap-walk-grid.bin`
+  (~8.5 MiB): one byte of step mask per tile (bit d = the engine's own `canTravel` allows
+  direction d) plus a walkable bit-plane.
+- `overlays/engine/tools/logic/BuildRegionGraph.ts` - **also** emits that grid. Deliberately
+  the same tool: the grid needs the same door-opened collision the regions are flooded from,
+  so emitting it here means the two can never disagree.
+- `overlays/engine/tools/logic/BuildWalkGraph.ts` - `ap-walk-graph.json` (~0.93 MiB):
+  1,751 nodes (a trigger + arrival node per entrance side, plus one per world-map label) and
+  all-pairs walking distances within each region. **Seed-independent** - walking distance
+  depends only on map geometry, so this survives every reseed and only needs rebuilding when
+  the map itself changes.
+- `overlays/engine/src/engine/ApPathfinder.ts` - overlays this seed's `ap-entrances.json` as
+  entrance edges and runs Dijkstra (~10ms). This is the only seed-dependent half.
+- `overlays/engine/src/engine/ApPathGuide.ts` - per-player active route and the arrow
+  chaining, advanced from `Player.updateMovement`.
+- `overlays/content/scripts/ap/ap_path.rs2` + opcodes 1915-1919 - the in-game commands.
+- `overlays/engine/src/web.ts` - `/ap/path.json`, `/ap/places.json`.
+- `overlays/engine/public/ap/` - the tracker's route bar and map overlay.
+
+### Usage
+
+```
+cd ../Server/engine
+npx tsx tools/logic/BuildRegionGraph.ts    # emits ap-walk-grid.bin (~12s)
+npx tsx tools/logic/BuildWalkGraph.ts      # emits ap-walk-graph.json (~70s)
+```
+
+Both are one-time (per map change, not per seed). Engine changes need a restart; the
+`ap_path.rs2` commands need a content pack rebuild. To inspect a seed without booting:
+
+```
+npx tsx tools/logic/ExplainPath.ts falador              # route from Lumbridge
+npx tsx tools/logic/ExplainPath.ts falador --from varrock --explored
+npx tsx tools/logic/ExplainPath.ts --compare            # where the shuffle helps most
+npx tsx tools/logic/ExplainPath.ts --list               # routable names
+```
+
+### Scope
+
+- Teleport spells are not yet route edges, so a route never suggests casting one. The
+  destination-shuffle table exists (`RandomizeTeleports.ts`), so this is a natural next step
+  - it needs rune/level gating to be honest.
+- Conditional entrances (dramen staff, quest varps) stay in the graph and carry their
+  requirement into the leg rather than being excluded: "take the Zanaris shed, you need a
+  dramen staff" is more useful than pretending no route exists. The helper does not check
+  whether you actually hold the item.
+- Routes are computed from where you stand when you ask. Wander off and the arrow keeps
+  pointing at the next waypoint rather than recomputing - ask again to re-plan.
+
 ## Regenerating everything at once
 
 `overlays/engine/tools/RegenerateAll.ts` restores the `.npc`/drop-table-script tree to

@@ -238,6 +238,83 @@ this was a UI change plus one new read-only route.
   built and eyeballed from WSL despite the "can't boot the server here" rule.
   In normal mode the endpoint must NOT expose spoiler data, only discoveries.
 
+## Pathfinding helper (built 2026-07-30)
+
+"Which entrances do I take, in what order, to get from here to there in the fewest
+movement ticks." Shipped to **both** front ends off one router.
+
+### Why it was cheap: the cost splits cleanly
+
+A route alternates two kinds of movement, and only one of them is seeded:
+
+| half | depends on | so it is |
+|---|---|---|
+| walking between tiles | map geometry only | precomputed **once, forever** |
+| using an entrance | the seed | rebuilt per seed, from a tiny table |
+
+That split is the whole design. The expensive part (all-pairs walking distances) never
+needs recomputing on reseed, and the seed-dependent part is a few hundred edges. A query
+is then a Dijkstra over ~1.7k nodes.
+
+### The pieces
+
+1. **`ap-walk-grid.bin`** (~8.5 MiB) — emitted by **`BuildRegionGraph.ts`**, not a new
+   tool, because it must come from the *same door-opened collision state* as the regions;
+   building it separately would risk the two disagreeing. One byte of step mask per tile
+   (bit d = `canTravel` allows direction d) plus a walkable bit-plane. Format and reader:
+   `ApWalkGrid.ts`.
+   - **8 directions, not the flood's 4.** The region flood only needs cardinals; distance
+     needs diagonals, since a diagonal step costs the same tick. Omitting them would
+     overstate travel by up to ~41% on open ground.
+   - **The unit is therefore a movement tick**, not a tile: 1 per step walking, 2 per tick
+     running. That is the thing worth minimizing.
+2. **`ap-walk-graph.json`** (~0.93 MiB) — `BuildWalkGraph.ts`. 1,751 nodes: a trigger and
+   an arrival node per entrance side (1,616) plus one per world-map label (135). Walking
+   edges as per-region distance matrices — **all pairs, not k-nearest**: within a region the
+   walk metric obeys the triangle inequality, so the direct edge *is* the shortest walk and
+   sparsifying could only return worse-than-optimal routes. ~70s to build, seed-independent.
+3. **`ApPathfinder.ts`** — overlays this seed's `ap-entrances.json` as entrance edges,
+   floods the grid to attach the player's arbitrary tile, runs Dijkstra. ~10ms warm.
+4. **`ApPathGuide.ts`** + `ap_path.rs2` + opcodes 1915-1919 — the in-game side.
+5. **`/ap/path.json`** + `/ap/places.json` + the tracker's route bar — the browser side.
+
+### Two traps worth remembering
+
+- **Map labels are typographic, not positional.** Resolving a label to its *nearest*
+  walkable tile put Falador in a sealed 207-tile shop interior, Edgeville in a 20-tile
+  room, Port Sarim in a 41-tile one — all unreachable, silently making those towns
+  un-routable. A label names the open area around it, so `resolvePlaceTile` picks the
+  candidate in the **largest** region within 24 tiles, tie-broken by proximity. Entrances
+  keep nearest-walkable: a ladder inside a building really does belong to that building.
+- **Entrance trigger tiles are mostly not walkable** (loc footprints). Only 345 of 1,616
+  endpoint tiles were directly standable; the rest need the same ring-probe
+  `RegionGraph.resolveRegion` uses. Skip it and 4 in 5 entrances have no route.
+
+### Spoiler discipline
+
+`::appath` defaults to **discovered-only** — routing through entrances the player has
+never opened would hand them the entrance layout on request, which is the one thing a
+randomizer exists to withhold. `::appathall` is the explicit, differently-named opt-in;
+the tracker follows the page's existing `?spoiler=1`. Unrestricted routes still *flag*
+unexplored hops rather than hiding that they were used.
+
+### The arrow
+
+`hint_coord` (`^hint_center = 2`) is the Tutorial Island arrow and already a stock content
+command — no engine work for the arrow itself. The client has no waypoint-path rendering,
+so a multi-leg route is delivered the only way it can be: one arrow, re-pointed at the next
+entrance as you reach the current one (`tickRoute`, called from `Player.updateMovement`).
+It is armed lazily — the client only draws a coord arrow inside its loaded scene, so
+pointing across the world does nothing; the guide arms it once the waypoint is within ~90
+tiles and disarms if you leave.
+
+### Inspecting a seed
+
+`npx tsx tools/logic/ExplainPath.ts <place> [--from x] [--explored] [--list] [--compare]`.
+`--compare` ranks destinations by how much the shuffle beats walking — on the seed this was
+built against, **81 of 105 destinations were faster via a shuffled entrance** (Sinclair
+Mansion: 789 steps on foot vs 76 with 3 hops).
+
 ## Effort estimate
 
 | Piece | Size |

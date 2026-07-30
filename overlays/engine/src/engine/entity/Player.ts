@@ -1,6 +1,7 @@
 import { PlayerInfoProt, Visibility } from '#/network/rsbuf/index.js';
 import { CollisionFlag, CollisionType } from '#/engine/routefinder/index.js';
 import { apXpMultiplier, getApOption } from '#/engine/ApOptions.js';
+import { tickRoute } from '#/engine/ApPathGuide.js';
 
 import Component from '#/cache/config/Component.js';
 import FontType from '#/cache/config/FontType.js';
@@ -698,6 +699,12 @@ export default class Player extends PathingEntity {
         if (this.stepsTaken > 0) {
             this.lastMovement = World.currentTick + 1;
         }
+
+        // custom - AP path helper: advance the hint arrow along an active ::appath route.
+        // Called unconditionally rather than only on movement, because an entrance drops
+        // the player at their next waypoint without any steps being taken. It is a WeakMap
+        // miss and immediate return for anyone without a route (i.e. almost always).
+        tickRoute(this);
 
         return this.stepsTaken > 0;
     }

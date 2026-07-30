@@ -45,6 +45,25 @@
             <span class="legend-item"><span class="legend-dot home"></span>home / respawn</span>
             <span class="legend-item"><span class="legend-dot multi"></span>multiple here</span>
         </div>
+        <div class="route-bar">
+            <label class="route-field">
+                <span>From</span>
+                <select id="route-from">
+                    <option value="player">where I am standing</option>
+                </select>
+            </label>
+            <label class="route-field">
+                <span>To</span>
+                <select id="route-to"><option value="">pick a destination&hellip;</option></select>
+            </label>
+            <button type="button" id="route-go" class="route-go">Find route</button>
+            <button type="button" id="route-clear" class="route-clear" hidden>Clear</button>
+            <div class="route-status" id="route-status"></div>
+        </div>
+        <div class="route-result" id="route-result" hidden>
+            <div class="route-summary" id="route-summary"></div>
+            <ol class="route-legs" id="route-legs"></ol>
+        </div>
         <div class="map-viewport" id="map-viewport">
             <div class="map-world" id="map-world">
                 <img id="map-image-surface" class="map-image" alt="surface map" draggable="false">

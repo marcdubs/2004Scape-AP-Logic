@@ -4708,3 +4708,130 @@ even though `scripts/parity-check.py` passed. Rule: any change that moves the
 bundle's `gatedAreas`/region numbers needs
 `python3 scripts/parity-check.py --write-fixture` in the same commit. The
 apworld suite catches it; `parity-check.py` alone does not.
+
+## Pathfinding helper: the cost model was the whole design (2026-07-30)
+
+Asked whether a helper could highlight "which entrances to take to travel the fewest
+tiles", in game and/or in the tracker. Built both. The useful lessons are about what
+made it cheap and the three things that were quietly wrong at first.
+
+### The insight that made it a day instead of a week
+
+A route across a randomized world alternates two kinds of movement, and **only one of
+them is seeded**: walking depends on map geometry (invariant across reseeds), using an
+entrance depends on the shuffle. So the expensive half — all-pairs walking distances
+between every tile a route could enter or leave a walking phase at — is computed **once,
+forever**, and reseeding only swaps a few hundred entrance edges. Query cost drops to a
+Dijkstra over ~1.7k nodes (~10ms warm, dominated by the flood that attaches the player's
+own tile, not the search).
+
+Corollary worth internalizing: before optimizing a graph search in this project, ask which
+parts of the graph the seed can actually move. Here it was ~0.3% of the edges.
+
+### Emit derived data from the tool that owns the source state
+
+`ap-walk-grid.bin` needed *door-opened* collision, which only `BuildRegionGraph.ts` has
+(its two-tier door heuristic is a substantial piece of judgment — see its header). Three
+options: re-derive it (duplicating the judgment), extract a shared module (refactoring a
+working, delicate tool), or **have BuildRegionGraph emit the second artifact from the pass
+it already runs**. The third is right: the grid and the region ids provably cannot disagree
+because they come from one flood. Verified by hashing `region-graph.json` before/after with
+`meta.generatedAt`/`buildMs` stripped — byte-identical, so the change is purely additive.
+
+Generalize: when artifact B needs the same hard-won intermediate state as artifact A,
+emitting B from A's tool beats both duplicating and refactoring.
+
+### Trap 1: the region flood is 4-connected, distances are not
+
+`BuildRegionGraph`'s flood only asks `canTravel` about **cardinal** steps — correct for
+"is this reachable", wrong for "how far". Real movement allows diagonals at the same
+one-tick cost, so a cardinals-only metric overstates travel by up to ~41% on open ground.
+The grid records all 8 directions straight from `canTravel` rather than deriving diagonals
+from cardinals, because RS corner rules live inside that function and re-deriving them
+would be a guess.
+
+Consequence worth stating in the UI: with 8 uniform-cost directions, BFS distance is
+**movement ticks**, not tiles — 1 per step walking, 2 per tick running. That is the honest
+thing to minimize, and it makes "202 steps ≈ 60s running" expressible.
+
+### Trap 2: map labels are typographic, not positional
+
+Resolving a world-map label to its *nearest* walkable tile is wrong, and wrong in a way
+that hides: labels are drawn over the settlement they name, so the nearest walkable tile is
+routinely a shop or house **interior** — a sealed region of its own. That silently put
+Falador in a 207-tile pocket, Edgeville in a 20-tile room, Port Sarim in a 41-tile one, and
+made those towns un-routable while everything still "worked" (Lumbridge→Varrock was fine, so
+the bug looked like missing data rather than a bad heuristic). At radius 3 four labels
+dropped out entirely; widening the radius alone would have made it *worse*, finding more
+interiors.
+
+Fix: a label names the open area around it, so among all walkable candidates within 24
+tiles pick the one in the **largest region**, tie-broken by proximity. Entrances keep
+nearest-walkable — a ladder inside a building genuinely belongs to that building's region,
+and snapping it outdoors would be a lie. Two different resolvers because they answer two
+different questions.
+
+The general shape: when a heuristic feeds a graph, sanity-check it against *known
+geography*, not just against "did it produce output". `lumbridge→falador = None` is what
+exposed this; the tool's own stats all looked healthy.
+
+### Trap 3: entrance trigger tiles are mostly not standable
+
+Only **345 of 1,616** endpoint tiles were directly walkable — the rest are loc footprints
+(ladders, doors, staircases occupy their own trigger tile). This is the same fact
+`RegionGraph.resolveRegion` already existed to paper over; the pathfinder needed the same
+ring-probe. Skip it and 4 in 5 entrances silently have no route. Any new consumer of
+entrance coords will hit this — treat "trigger tile is walkable" as false by default.
+
+### Spoiler discipline is a design decision, not a default
+
+A helper that freely routes through entrances the player has never opened *is an entrance-
+layout spoiler on request* — it hands over exactly what the randomizer exists to withhold.
+So `::appath` defaults to discovered-only (using `ApTracker`'s existing `entrances`
+discoveries as the filter) and `::appathall` is the explicit, differently-named opt-in.
+Unrestricted routes still flag unexplored hops rather than concealing that they were used.
+Early-game this makes `::appath falador` answer "walk 313 steps" instead of "202 via 3
+hops" — which is correct behaviour, not a limitation.
+
+### Client constraints shaped the in-game UX, not the logic
+
+The 2004 client has no waypoint-path rendering — no polyline, no multi-marker minimap. It
+has `hint_coord` (`^hint_center = 2`, `content/scripts/general/configs/hint.constant`),
+already a stock content command, which is the Tutorial Island arrow and marks exactly one
+tile. So a multi-leg route is delivered the only way expressible: one arrow, re-pointed at
+the next entrance as you reach the current one. Two details that matter:
+- The chaining hook is `Player.updateMovement`, called **unconditionally** rather than only
+  when `stepsTaken > 0`, because an entrance drops the player at their next waypoint without
+  any steps being taken. It is a WeakMap miss and immediate return for anyone without a
+  route.
+- The arrow is armed **lazily**. The client only draws a coord arrow for a tile inside its
+  loaded scene, so pointing across the world does nothing at all; the guide arms it once the
+  waypoint is within ~90 tiles and disarms on leaving. Without this, long legs would show
+  no arrow and never acquire one.
+
+Route state lives in a `WeakMap<Player, …>` rather than as Player fields on purpose: it is
+transient convenience state that must never be saved, synced, or survive a logout, and GC
+drop is exactly that lifecycle.
+
+### `::ap<name>` dispatch meant zero handler changes
+
+`ClientCheatHandler`'s `::ap<name>` → `[debugproc,ap_<name>]` dispatcher (added for the test
+commands) absorbed four new commands — `::appath`, `::appathall`, `::appathstop`,
+`::appathlist` — without touching that file. Worth remembering: new AP commands are a
+content-file addition, full stop.
+
+One dialect gotcha: the debugproc dispatcher gives each `string` parameter exactly **one**
+whitespace-separated token (`buildDebugProcParams` uses `args.shift()`), so multi-word place
+names need several string params glued back together — `::appath black knights fortress`
+takes four. Also, this rs2 dialect has no string-replace and builds strings with
+`append(a, b)`, not `"<$a><$b>"` interpolation (interpolation works inside literals passed
+to `mes`, which is what misled me).
+
+### Files
+
+`ApWalkGrid.ts` (format + reader), `BuildRegionGraph.ts` (emits the grid),
+`BuildWalkGraph.ts` (the precompute), `ApPathfinder.ts` (router), `ApPathGuide.ts` (in-game
+guide + arrow), `ap_path.rs2`, opcodes 1915-1919, `web.ts` (`/ap/path.json`,
+`/ap/places.json`), tracker `app.js`/`index.html`/`style.css`, and
+`tools/logic/ExplainPath.ts` for inspecting a seed offline (`--compare` ranks destinations
+by how much the shuffle beats walking: 81 of 105 on the seed this was built against).

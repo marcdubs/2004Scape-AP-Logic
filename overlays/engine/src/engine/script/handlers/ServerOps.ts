@@ -10,6 +10,7 @@ import { CommandHandlers } from '#/engine/script/ScriptRunner.js';
 import ScriptState from '#/engine/script/ScriptState.js';
 import { check, CoordValid, LocTypeValid, NumberNotNull, NumberPositive, SeqTypeValid, SpotAnimTypeValid, FindSquareValid } from '#/engine/script/ScriptValidators.js';
 import { ActivePlayer, checkedHandler } from '#/engine/script/ScriptPointer.js';
+import { clearRoute, placesPage, routeCoord, routeText, startRoute } from '#/engine/ApPathGuide.js';
 import World from '#/engine/World.js';
 import Environment from '#/util/Environment.js';
 import { printDebug } from '#/util/Logger.js';
@@ -651,6 +652,39 @@ const ServerOps: CommandHandlers = {
     [ScriptOpcode.AP_APPLY_BANKED_XP]: checkedHandler(ActivePlayer, state => {
         applyAllBankedXp(state.activePlayer);
     }),
+
+    // custom: Archipelago path helper (ApPathGuide.ts). AP_PATH_FIND both computes the
+    // route and installs it as the player's active guide, so the hint arrow starts
+    // chaining the moment the command runs; the remaining three are pure read-back /
+    // teardown, keeping the rs2 side to printing and nothing else.
+    [ScriptOpcode.AP_PATH_FIND]: checkedHandler(ActivePlayer, state => {
+        const revealAll = state.popInt();
+        const destination = state.popString();
+
+        state.pushInt(startRoute(state.activePlayer, destination, revealAll !== 0));
+    }),
+
+    [ScriptOpcode.AP_PATH_TEXT]: checkedHandler(ActivePlayer, state => {
+        const index = state.popInt();
+
+        state.pushString(routeText(state.activePlayer, index));
+    }),
+
+    [ScriptOpcode.AP_PATH_COORD]: checkedHandler(ActivePlayer, state => {
+        const index = state.popInt();
+
+        state.pushInt(routeCoord(state.activePlayer, index));
+    }),
+
+    [ScriptOpcode.AP_PATH_CLEAR]: checkedHandler(ActivePlayer, state => {
+        clearRoute(state.activePlayer);
+    }),
+
+    [ScriptOpcode.AP_PATH_PLACES]: state => {
+        const page = state.popInt();
+
+        state.pushString(placesPage(page));
+    },
 
     [ScriptOpcode.MIDI_LENGTH]: state => {
         const track = state.popInt();

@@ -982,3 +982,146 @@ main#app {
     color: var(--warn);
     font-style: italic;
 }
+
+/* ---- route panel + drawn route (docs/tracker-map.md "Pathfinding helper") ----
+   The router answers "which entrances get me there in the fewest movement ticks".
+   A route is drawn ON the existing map overlay rather than in its own view, so a
+   walk leg and an entrance hop read as one continuous line even when the hop
+   jumps between the surface and underground images. */
+.route-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin: 0.1rem 0 0.5rem;
+    padding: 0.45rem 0.55rem;
+    background: var(--panel);
+    border: 1px solid var(--border-dark);
+    outline: 1px solid var(--border);
+}
+
+.route-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.route-field select {
+    background: var(--panel-alt);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 0.2rem 0.3rem;
+    font: inherit;
+    font-size: 0.82rem;
+    text-transform: none;
+    letter-spacing: normal;
+    max-width: 15rem;
+}
+
+.route-go,
+.route-clear {
+    background: var(--panel-alt);
+    color: var(--gold);
+    border: 1px solid var(--border-dark);
+    outline: 1px solid var(--border);
+    padding: 0.3rem 0.7rem;
+    font: inherit;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+
+.route-go:hover,
+.route-clear:hover {
+    color: var(--accent);
+    background: var(--border);
+}
+
+.route-status {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    flex: 1 1 12rem;
+}
+
+.route-status.error {
+    color: var(--bad);
+}
+
+.route-result {
+    margin: 0 0 0.5rem;
+    padding: 0.45rem 0.6rem;
+    background: var(--panel);
+    border: 1px solid var(--border-dark);
+    outline: 1px solid var(--border);
+}
+
+.route-summary {
+    color: var(--gold);
+    font-size: 0.85rem;
+    margin-bottom: 0.3rem;
+}
+
+.route-legs {
+    margin: 0;
+    padding-left: 1.4rem;
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.route-legs .leg-use {
+    color: var(--accent);
+}
+
+.route-legs .leg-near {
+    color: var(--text-dim);
+}
+
+.route-legs .leg-note {
+    color: var(--warn);
+    font-style: italic;
+}
+
+/* The route line itself. Solid for walking, and the same per-zoom stroke variables
+   the selection lines use so it stays legible at any zoom. */
+.route-line {
+    fill: none;
+    stroke: var(--gold);
+    stroke-width: var(--sel-sw, 1.8);
+    stroke-linejoin: round;
+    opacity: 0.95;
+}
+
+/* An entrance hop is not travel through space - it is a discontinuity. Dashed, and
+   dimmer, so nobody reads the line across the layer gap as somewhere to walk. */
+.route-line.hop {
+    stroke: var(--accent);
+    stroke-dasharray: 3 3;
+    opacity: 0.8;
+}
+
+.route-node {
+    fill: var(--gold);
+    stroke: #000;
+    stroke-width: var(--pin-sw, 1.1);
+    r: var(--pin-r, 4);
+}
+
+.route-node.start {
+    fill: var(--good);
+}
+
+.route-node.end {
+    fill: var(--bad);
+}
+
+.route-step {
+    fill: #000;
+    font-size: 9px;
+    font-weight: bold;
+    text-anchor: middle;
+    dominant-baseline: central;
+    pointer-events: none;
+}

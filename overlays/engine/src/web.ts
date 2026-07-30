@@ -27,6 +27,7 @@ import { getGatherOverrideCount } from '#/engine/ApGatherOverrides.js';
 import { getProcessOverrideCount } from '#/engine/ApProcessOverrides.js';
 import { getThievingOverrideCount } from '#/engine/ApThievingOverrides.js';
 import { getTrackerState } from '#/engine/ApTracker.js';
+import { findPath, listPlaces } from '#/engine/ApPathfinder.js';
 
 type NodeRequestInit = RequestInit & {
     duplex?: 'half';
@@ -686,6 +687,63 @@ function buildApChecksResponse(spoilerMode: boolean): unknown {
     };
 }
 
+// ---- path helper (docs/tracker-map.md "Pathfinding helper") -------------------------
+// The tracker's route panel. Routing itself lives in ApPathfinder.ts; these two routes
+// only translate query strings into a call and the result into JSON.
+
+const RAW_COORD_RE = /^\d+_\d+_\d+_\d+_\d+$/;
+
+/** Every routable destination, for the route panel's pickers. */
+function buildApPlacesResponse(): unknown {
+    const places = listPlaces();
+    return { present: places.length > 0, places };
+}
+
+/**
+ * Where a route should start. Defaults to the logged-in player's tile - the tracker sits
+ * beside a running game, so "from where I am" is the question actually being asked - and
+ * accepts an explicit raw coord for planning a route you are not standing at.
+ */
+function resolvePathOrigin(from: string | null): { tile: { level: number; x: number; z: number }; label: string } | { error: string } {
+    if (from && RAW_COORD_RE.test(from)) {
+        const [level, mapX, mapZ, localX, localZ] = from.split('_').map(Number);
+        return { tile: { level, x: mapX * 64 + localX, z: mapZ * 64 + localZ }, label: from };
+    }
+    if (from && from !== 'player') {
+        return { error: `'from' must be a raw coord or 'player', got '${from}'` };
+    }
+
+    for (const p of World.players) {
+        if (p) {
+            return { tile: { level: p.level, x: p.x, z: p.z }, label: 'your position' };
+        }
+    }
+    return { error: 'nobody is logged in, so there is no player position to route from - pass an explicit from=<coord>' };
+}
+
+function buildApPathResponse(params: URLSearchParams): unknown {
+    const to = params.get('to');
+    if (!to) {
+        return { ok: false, reason: "missing 'to' - pass a place key or a raw coord" };
+    }
+
+    const origin = resolvePathOrigin(params.get('from'));
+    if ('error' in origin) {
+        return { ok: false, reason: origin.error };
+    }
+
+    // Same spoiler discipline as the rest of the tracker: routes use only entrances the
+    // player has already been through unless the page explicitly asks otherwise.
+    const spoiler = params.get('spoiler') === '1';
+    const result = findPath(origin.tile, to, { discoveredOnly: !spoiler });
+
+    return {
+        ...result,
+        origin: { ...origin.tile, label: origin.label },
+        spoiler
+    };
+}
+
 async function handleWebRequest(req: Request): Promise<Response> {
     const url = new URL(req.url);
 
@@ -750,6 +808,10 @@ async function handleWebRequest(req: Request): Promise<Response> {
             return jsonResponse(buildApChecksResponse(url.searchParams.get('spoiler') === '1'));
         } else if (url.pathname === '/ap/archipelago.json') {
             return jsonResponse({ config: readApConnectionConfig(), status: getApStatus() });
+        } else if (url.pathname === '/ap/places.json') {
+            return jsonResponse(buildApPlacesResponse());
+        } else if (url.pathname === '/ap/path.json') {
+            return jsonResponse(buildApPathResponse(url.searchParams));
         } else if (Environment.node.debug) {
             if (url.pathname === '/maped') {
                 return new Response(await ejs.renderFile('view/maped.ejs'), {

@@ -17,7 +17,9 @@
         checks: null,       // /ap/checks.json catalog (fetched separately, see fetchChecks)
         checksOpen: {},     // group key -> expanded, sticky across re-renders
         centered: false,    // has the map been auto-centered on home yet (once per load)
-        selectedSite: null
+        selectedSite: null,
+        places: null,       // /ap/places.json - routable destinations for the route pickers
+        route: null         // the currently drawn route (/ap/path.json response), or null
     };
 
     // ---- coord string parsing ----
@@ -1067,14 +1069,19 @@
         var labelGroup = document.getElementById('map-labels');
         var pinGroup = document.getElementById('map-pins');
         var selGroup = document.getElementById('map-sel');
+        var routeGroup = document.getElementById('map-route');
         if (!pinGroup) {
-            // draw order (bottom -> top): place-name labels, then pins, then selection
+            // draw order (bottom -> top): place-name labels, then pins, then selection,
+            // then the route on top - a route is what you asked for, so nothing should
+            // obscure it.
             labelGroup = svgEl('g', { id: 'map-labels' });
             pinGroup = svgEl('g', { id: 'map-pins' });
             selGroup = svgEl('g', { id: 'map-sel' });
+            routeGroup = svgEl('g', { id: 'map-route' });
             overlay.appendChild(labelGroup);
             overlay.appendChild(pinGroup);
             overlay.appendChild(selGroup);
+            overlay.appendChild(routeGroup);
         }
 
         // Place-name labels come from static meta (worldmap-meta.json) - build once.
@@ -1082,6 +1089,12 @@
             lastLabelKey = 'built';
             rebuildLabels(labelGroup, meta);
         }
+
+        // Before the no-data bail-out: a route comes from its own endpoint and does not
+        // need the tracker payload, so it must still draw on a server with no discoveries
+        // recorded yet.
+        routeGroup.innerHTML = '';
+        renderRouteOverlay(routeGroup, meta);
 
         if (!data) {
             return;
@@ -1750,6 +1763,255 @@
         setInterval(fetchApStatus, POLL_MS);
     }
 
+    // ---- route panel (docs/tracker-map.md "Pathfinding helper") ----
+    // The server does the routing (/ap/path.json -> ApPathfinder.ts); this only asks and
+    // draws. Two things worth knowing about what comes back:
+    //   - legs alternate walk/entrance, and an entrance leg's from/to are two ends of a
+    //     discontinuity, not a path through space - so it is drawn dashed.
+    //   - unless the page is in spoiler mode the route only uses entrances already
+    //     discovered, which is why a fresh save gets "walk the long way round" answers.
+
+    function fetchPlaces() {
+        fetch('/ap/places.json', { cache: 'no-store' })
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (payload) {
+                if (!payload || !payload.present) {
+                    setRouteStatus('No walk graph on the server - run BuildWalkGraph.ts to enable routing.', true);
+                    document.getElementById('route-go').disabled = true;
+                    return;
+                }
+                state.places = payload.places;
+                populatePlaceSelects(payload.places);
+            })
+            .catch(function () {
+                setRouteStatus('Could not load the place list.', true);
+            });
+    }
+
+    function populatePlaceSelects(places) {
+        var toSel = document.getElementById('route-to');
+        var fromSel = document.getElementById('route-from');
+        places.forEach(function (place) {
+            var a = document.createElement('option');
+            a.value = place.key;
+            a.textContent = place.name;
+            toSel.appendChild(a);
+
+            var b = document.createElement('option');
+            b.value = place.key;
+            b.textContent = place.name;
+            fromSel.appendChild(b);
+        });
+    }
+
+    function setRouteStatus(text, isError) {
+        var el = document.getElementById('route-status');
+        el.textContent = text || '';
+        el.classList.toggle('error', !!isError);
+    }
+
+    // "From" is a place key, but the router takes a coord for its origin - so a chosen
+    // place is sent as that place's own tile, looked up from the list we already have.
+    function routeFromParam() {
+        var value = document.getElementById('route-from').value;
+        if (value === 'player') {
+            return 'player';
+        }
+        var match = (state.places || []).filter(function (p) { return p.key === value; })[0];
+        return match ? match.raw : 'player';
+    }
+
+    function requestRoute() {
+        var to = document.getElementById('route-to').value;
+        if (!to) {
+            setRouteStatus('Pick a destination first.', true);
+            return;
+        }
+
+        setRouteStatus('Finding a route…', false);
+        var query = 'to=' + encodeURIComponent(to) + '&from=' + encodeURIComponent(routeFromParam()) + (spoilerMode ? '&spoiler=1' : '');
+        fetch('/ap/path.json?' + query, { cache: 'no-store' })
+            .then(function (res) { return res.json(); })
+            .then(function (payload) {
+                if (!payload || !payload.ok) {
+                    state.route = null;
+                    renderRouteResult();
+                    renderMap();
+                    setRouteStatus((payload && payload.reason) || 'No route found.', true);
+                    return;
+                }
+                state.route = payload;
+                setRouteStatus('', false);
+                renderRouteResult();
+                renderMap();
+                focusRoute();
+            })
+            .catch(function () {
+                setRouteStatus('The server did not answer.', true);
+            });
+    }
+
+    function clearRoute() {
+        state.route = null;
+        setRouteStatus('', false);
+        renderRouteResult();
+        renderMap();
+    }
+
+    // Legs carry world coords; the map wants the parseCoord shape (absX/absZ/layer).
+    function legTileToCoord(tile) {
+        return {
+            level: tile.level,
+            mapX: tile.x >> 6,
+            mapZ: tile.z >> 6,
+            absX: tile.x,
+            absZ: tile.z,
+            layer: (tile.z >> 6) >= 100 ? 'underground' : 'surface'
+        };
+    }
+
+    function renderRouteResult() {
+        var wrap = document.getElementById('route-result');
+        var summary = document.getElementById('route-summary');
+        var list = document.getElementById('route-legs');
+        var clearBtn = document.getElementById('route-clear');
+        var route = state.route;
+
+        if (!route) {
+            wrap.hidden = true;
+            clearBtn.hidden = true;
+            list.innerHTML = '';
+            return;
+        }
+
+        wrap.hidden = false;
+        clearBtn.hidden = false;
+
+        // Steps are movement ticks: one per step walking, two per tick running.
+        var runSeconds = Math.max(1, Math.round((route.totalSteps / 2) * 0.6));
+        summary.textContent =
+            'To ' + route.destination + ': ' + route.totalSteps + ' steps, ' +
+            route.hops + ' entrance' + (route.hops === 1 ? '' : 's') +
+            ', about ' + runSeconds + 's running.' +
+            (route.spoiler ? ' (all entrances)' : ' (only entrances you have explored)');
+
+        list.innerHTML = '';
+        route.legs.forEach(function (leg) {
+            var li = document.createElement('li');
+            if (leg.kind === 'entrance') {
+                var use = document.createElement('span');
+                use.className = 'leg-use';
+                use.textContent = 'Use ' + leg.name;
+                li.appendChild(use);
+            } else {
+                li.appendChild(document.createTextNode('Walk ' + leg.steps + ' steps to ' + leg.name));
+            }
+            if (leg.near) {
+                var near = document.createElement('span');
+                near.className = 'leg-near';
+                near.textContent = leg.nearVia ? ' (via ' + leg.near + ')' : ' (near ' + leg.near + ')';
+                li.appendChild(near);
+            }
+            var notes = [];
+            if (leg.requirement) { notes.push('needs ' + leg.requirement); }
+            if (leg.undiscovered) { notes.push('not yet explored'); }
+            if (notes.length > 0) {
+                var note = document.createElement('span');
+                note.className = 'leg-note';
+                note.textContent = ' — ' + notes.join(', ');
+                li.appendChild(note);
+            }
+            list.appendChild(li);
+        });
+    }
+
+    function renderRouteOverlay(group, meta) {
+        var route = state.route;
+        if (!route || !route.legs || route.legs.length === 0) {
+            return;
+        }
+
+        route.legs.forEach(function (leg) {
+            var a = coordToPixel(legTileToCoord(leg.from), meta);
+            var b = coordToPixel(legTileToCoord(leg.to), meta);
+            if (!a || !b) {
+                return;
+            }
+            group.appendChild(svgEl('line', {
+                class: 'route-line' + (leg.kind === 'entrance' ? ' hop' : ''),
+                x1: a.x, y1: a.y, x2: b.x, y2: b.y
+            }));
+        });
+
+        // Numbered markers at each point the player has to do something: the start, every
+        // entrance, and the destination.
+        var stops = [{ tile: route.legs[0].from, cls: 'start' }];
+        route.legs.forEach(function (leg) {
+            if (leg.kind === 'entrance') {
+                stops.push({ tile: leg.from, cls: '' });
+            }
+        });
+        stops.push({ tile: route.legs[route.legs.length - 1].to, cls: 'end' });
+
+        stops.forEach(function (stop, i) {
+            var p = coordToPixel(legTileToCoord(stop.tile), meta);
+            if (!p) {
+                return;
+            }
+            group.appendChild(svgEl('circle', {
+                class: 'route-node' + (stop.cls ? ' ' + stop.cls : ''),
+                cx: p.x, cy: p.y
+            }));
+            if (i > 0 && i < stops.length - 1) {
+                var label = svgEl('text', { class: 'route-step', x: p.x, y: p.y });
+                label.textContent = String(i);
+                group.appendChild(label);
+            }
+        });
+    }
+
+    // Frames the whole route rather than centering one end of it, so a cross-layer route
+    // shows both halves at once.
+    function focusRoute() {
+        var route = state.route;
+        var meta = state.meta;
+        if (!route || !meta || !route.legs || route.legs.length === 0) {
+            return;
+        }
+        var xs = [];
+        var ys = [];
+        route.legs.forEach(function (leg) {
+            [leg.from, leg.to].forEach(function (tile) {
+                var p = coordToPixel(legTileToCoord(tile), meta);
+                if (p) { xs.push(p.x); ys.push(p.y); }
+            });
+        });
+        if (xs.length === 0) {
+            return;
+        }
+        var minX = Math.min.apply(null, xs);
+        var maxX = Math.max.apply(null, xs);
+        var minY = Math.min.apply(null, ys);
+        var maxY = Math.max.apply(null, ys);
+
+        var viewport = document.getElementById('map-viewport');
+        var padding = 80;
+        var scaleX = viewport.clientWidth / Math.max(1, maxX - minX + padding);
+        var scaleY = viewport.clientHeight / Math.max(1, maxY - minY + padding);
+        var scale = Math.max(0.25, Math.min(3, Math.min(scaleX, scaleY)));
+        centerOn({ x: (minX + maxX) / 2, y: (minY + maxY) / 2 }, scale);
+    }
+
+    function initRouteControls() {
+        document.getElementById('route-go').addEventListener('click', requestRoute);
+        document.getElementById('route-clear').addEventListener('click', clearRoute);
+        document.getElementById('route-to').addEventListener('change', function () {
+            if (state.route) {
+                requestRoute(); // keep the drawn route in step with the picker
+            }
+        });
+    }
+
     // ---- render all ----
 
     function renderAll() {
@@ -1775,7 +2037,9 @@
         initUndiscoveredToggles();
         initShowLockedToggle();
         initArchipelagoTab();
+        initRouteControls();
         fetchMeta();
+        fetchPlaces();
         fetchChecks();
         fetchTracker();
         setInterval(fetchTracker, POLL_MS);

@@ -34,6 +34,13 @@ cd ../Server/engine && npx tsx tools/pack/Build.ts       # rebuild pack (after o
 cd ../Server/engine && npx tsx tools/map/RandomizeEntrances.ts [--seed N] [--mixed] [--dry-run]
 cd ../Server/engine && npx tsc --noEmit -p .              # typecheck engine
 
+# Path helper (docs/tracker-map.md "Pathfinding helper"). The grid comes out of
+# BuildRegionGraph; the graph is seed-independent, so it only needs rebuilding when the
+# MAP changes - never on reseed.
+cd ../Server/engine && npx tsx tools/logic/BuildRegionGraph.ts   # also emits ap-walk-grid.bin
+cd ../Server/engine && npx tsx tools/logic/BuildWalkGraph.ts     # -> ap-walk-graph.json (~70s)
+cd ../Server/engine && npx tsx tools/logic/ExplainPath.ts falador [--from varrock] [--compare]
+
 # Archipelago side (GitHub #3 - AP gets the SAME logic; local mode is unchanged)
 cd ../Server/engine && npx tsx tools/ap/ExportLogicBundle.ts \
     --copy ../../2004Scape-AP-Logic/apworld/rs2004scape/data/rs2004_logic.json

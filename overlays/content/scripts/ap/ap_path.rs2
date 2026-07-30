@@ -1,0 +1,103 @@
+// Archipelago path helper - the in-game front end (docs/tracker-map.md "Pathfinding
+// helper"). All the routing lives in the engine (ApPathfinder.ts computes, ApPathGuide.ts
+// holds the active route and chases the hint arrow along it), so everything here is
+// printing: ask for a route, print the legs, and let the engine's per-tick guide take over
+// pointing the arrow.
+//
+// ::appath <place>       - route using ONLY entrances you have already been through
+// ::appathall <place>    - route using every entrance, spoilers included
+// ::appathstop           - forget the route and take the arrow down
+// ::appathlist           - what names are routable
+//
+// The default is deliberately the discovery-limited one. A randomizer's whole content is
+// not knowing where the shuffled ladders go; a helper that freely routes you through
+// entrances you have never opened would hand you the entrance layout on request. So the
+// spoiler-free route is what `::appath` gives you, and revealing the rest is an explicit,
+// differently-named choice.
+
+// info: custom - Archipelago path helper (engine ApPathGuide.ts). _find computes a route
+// from the player's current tile to a named place and installs it as their active guide
+// (returning the leg count, or -1 on failure); _text reads back a prebuilt display line,
+// with index -1 giving the summary or the failure reason; _coord reads back a leg's
+// actionable tile; _clear forgets the route. The engine formats the text because that is
+// where the route data lives.
+[command,ap_path_find](string $dest, int $revealall)(int)
+[command,ap_path_text](int $index)(string)
+[command,ap_path_coord](int $index)(coord)
+[command,ap_path_clear]
+[command,ap_path_places](int $page)(string)
+
+// Shared implementation. $revealall = 1 routes through undiscovered entrances too.
+// Destination arrives as up to four tokens because the debugproc dispatcher hands each
+// string parameter exactly one whitespace-separated word (ClientCheatHandler's
+// buildDebugProcParams uses args.shift()), and plenty of places are "Black Knights
+// Fortress". The engine strips non-alphanumerics when matching, so gluing the tokens back
+// together is all that is needed.
+[proc,ap_path_run](string $a, string $b, string $c, string $d, int $revealall)
+if (p_finduid(uid) = false) {
+    return;
+}
+def_string $dest = append(append(append($a, $b), $c), $d);
+if (compare($dest, "") = 0) {
+    mes("usage: ::appath <place> (or ::appathall to include entrances you have not opened)");
+    mes("::appathlist shows every routable name.");
+    return;
+}
+
+def_int $legs = ap_path_find($dest, $revealall);
+def_string $summary = ap_path_text(-1);
+if ($legs < 0) {
+    mes(append("No route: ", $summary));
+    return;
+}
+if ($legs = 0) {
+    mes($summary);
+    return;
+}
+
+mes($summary);
+def_int $i = 0;
+while ($i < $legs) {
+    def_string $line = ap_path_text($i);
+    mes($line);
+    $i = calc($i + 1);
+}
+if ($revealall = 0) {
+    mes("(Spoiler-free: only entrances you have already used. ::appathall ignores that.)");
+}
+
+// ::appath <place> - the spoiler-free default.
+[debugproc,ap_path](string $a, string $b, string $c, string $d)
+~ap_path_run($a, $b, $c, $d, 0);
+
+// ::appathall <place> - route through everything, including entrances whose destination
+// you have never seen. Named separately so it can never be the thing you get by accident.
+[debugproc,ap_pathall](string $a, string $b, string $c, string $d)
+~ap_path_run($a, $b, $c, $d, 1);
+
+// ::appathstop - drop the route and take the arrow down.
+[debugproc,ap_pathstop]
+if (p_finduid(uid) = false) {
+    return;
+}
+ap_path_clear;
+mes("Path cleared.");
+
+// ::appathlist - every routable name, a chat line at a time. The engine decides where the
+// page breaks fall (it knows the names); this just prints until a page comes back empty.
+[debugproc,ap_pathlist]
+if (p_finduid(uid) = false) {
+    return;
+}
+def_int $page = 0;
+def_string $line = ap_path_places(0);
+if (compare($line, "") = 0) {
+    mes("No routable places - the path helper has no walk graph built.");
+    return;
+}
+mes("Routable places:");
+while (compare($line, "") ! 0) {
+    mes($line);
+    $page = calc($page + 1);
+    $line = ap_path_places($page);
+}
