@@ -1262,6 +1262,24 @@ the arrow would point at a leg you have not reached.
 The 135 names are the world map's own labels, so the list is whatever Jagex chose to name -
 cities and dungeons, but also `Flax`, `Beehives`, and a `Castle Wars (due Dec-2004)`.
 
+### 14 places have no route, and it is always the same reason
+
+**121 of the 135 are mutually reachable**; the other 14 sit in walk-regions nothing connects
+to. The router only has two kinds of edge, walking and shuffled entrances, and **boats are
+neither** - transport by NPC dialogue is not a door, so it is not in `ap-entrances.json` at
+all. Neither are agility shortcuts or quest-gated climbs. So:
+
+| stranded | why |
+|---|---|
+| Crandor, Ship Yard, Fishing Platform, Tutorial Island | one-node islands - boat only |
+| Arandar, Elf Camp, Isafdar, Prifddinas | Tirannwn: connected to each other, nothing else |
+| Trollheim, Troll Stronghold | behind the Death Plateau climb |
+| Lighthouse, Poison Waste, Tyras Camp | isolated singletons |
+
+Ask for one and you get `no route to X found`, which is honest rather than a wrong answer.
+Fixing it means teaching the router a third edge type (boats, charter routes, shortcuts) with
+their own requirements - worth doing, not done.
+
 ### Pieces
 
 - `overlays/engine/src/engine/ApWalkGrid.ts` - format + reader for `ap-walk-grid.bin`
