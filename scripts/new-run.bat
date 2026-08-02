@@ -73,6 +73,8 @@ set RUN_PLACEMENT=1
 REM AP placement: checks contain the unlocks (RESETS run progress!)
 set REFRESH_REGION_GRAPH=0
 REM only after map/content changes (validator input; slow-ish)
+set REFRESH_WALK_GRAPH=auto
+REM path-helper graph: auto = build only if missing or the region graph just changed (1 = force, 0 = never)
 set REFRESH_WORLDMAP_PNG=0
 REM tracker map images; only after map changes
 set RUN_VALIDATE=1
@@ -226,6 +228,41 @@ if "%REFRESH_REGION_GRAPH%"=="1" (
     echo.
     echo ==^> npx tsx tools/logic/BuildRegionGraph.ts
     call npx tsx tools/logic/BuildRegionGraph.ts || goto :error
+)
+
+REM ---- path-helper walk graph (SEED-INDEPENDENT - not a per-run stage) ---------
+REM ap-walk-graph.json is all-pairs WALKING distances, and walking cost depends only
+REM on map geometry, so a reseed cannot change a single number in it (docs\tracker-map.md
+REM "Pathfinding helper"). Rebuilding it every run would spend ~70s writing the same
+REM file back. Hence `auto`: build it only when it's missing - a fresh checkout, where
+REM ::appath and the tracker's route bar are dead until it exists - or when
+REM REFRESH_REGION_GRAPH just rebuilt the walk grid it's derived from, which is exactly
+REM when it goes stale. Set 1 to force, 0 to never.
+set BUILD_WALK_GRAPH=0
+if "%REFRESH_WALK_GRAPH%"=="1" set BUILD_WALK_GRAPH=1
+if "%REFRESH_WALK_GRAPH%"=="auto" (
+    if "%REFRESH_REGION_GRAPH%"=="1" set BUILD_WALK_GRAPH=1
+    if not exist "data\config\ap-walk-graph.json" set BUILD_WALK_GRAPH=1
+)
+
+if "%BUILD_WALK_GRAPH%"=="1" (
+    if not exist "data\config\ap-walk-grid.bin" (
+        REM Don't abort the run over the path helper - it's an optional convenience.
+        echo.
+        echo ==^> skipping BuildWalkGraph: data\config\ap-walk-grid.bin missing - set REFRESH_REGION_GRAPH=1 once ^(it emits the grid^), then re-run.
+    ) else (
+        REM The graph is keyed off the UNSHUFFLED entrance catalog, which is seed-independent
+        REM too. --export-pool is a dry run that writes only that pool ^(no entrance table^), so
+        REM filling in a missing one here can't disturb the shuffle rolled above.
+        if not exist "data\config\ap-entrance-pool.json" (
+            echo.
+            echo ==^> npx tsx tools/map/RandomizeEntrances.ts --export-pool data/config/ap-entrance-pool.json
+            call npx tsx tools/map/RandomizeEntrances.ts --export-pool data/config/ap-entrance-pool.json || goto :error
+        )
+        echo.
+        echo ==^> npx tsx tools/logic/BuildWalkGraph.ts
+        call npx tsx tools/logic/BuildWalkGraph.ts || goto :error
+    )
 )
 
 if "%REFRESH_WORLDMAP_PNG%"=="1" (

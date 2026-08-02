@@ -1309,8 +1309,17 @@ npx tsx tools/logic/BuildRegionGraph.ts    # emits ap-walk-grid.bin (~12s)
 npx tsx tools/logic/BuildWalkGraph.ts      # emits ap-walk-graph.json (~70s)
 ```
 
-Both are one-time (per map change, not per seed). Engine changes need a restart; the
-`ap_path.rs2` commands need a content pack rebuild. To inspect a seed without booting:
+Both are one-time (per map change, not per seed), and `scripts/new-run.{sh,bat}` handle
+the second one for you: its `REFRESH_WALK_GRAPH=auto` knob builds the graph when it's
+missing (fresh checkout) or when `REFRESH_REGION_GRAPH=1` just rebuilt the grid under it,
+and skips it on every other run rather than spending ~70s rewriting the same file. It
+also exports `ap-entrance-pool.json` first if that's missing, since the graph is keyed off
+that catalog. Set the knob to `1` to force a rebuild or `0` to leave it alone.
+`BuildRegionGraph.ts` stays manual (`REFRESH_REGION_GRAPH`) - it's the validator's input
+too, so its cadence is a separate decision.
+
+Engine changes need a restart; the `ap_path.rs2` commands need a content pack rebuild.
+To inspect a seed without booting:
 
 ```
 npx tsx tools/logic/ExplainPath.ts falador              # route from Lumbridge

@@ -36,7 +36,8 @@ cd ../Server/engine && npx tsc --noEmit -p .              # typecheck engine
 
 # Path helper (docs/tracker-map.md "Pathfinding helper"). The grid comes out of
 # BuildRegionGraph; the graph is seed-independent, so it only needs rebuilding when the
-# MAP changes - never on reseed.
+# MAP changes - never on reseed. new-run.{sh,bat} builds the graph automatically when
+# it's missing or the region graph was just refreshed (REFRESH_WALK_GRAPH=auto|1|0).
 cd ../Server/engine && npx tsx tools/logic/BuildRegionGraph.ts   # also emits ap-walk-grid.bin
 cd ../Server/engine && npx tsx tools/logic/BuildWalkGraph.ts     # -> ap-walk-graph.json (~70s)
 cd ../Server/engine && npx tsx tools/logic/ExplainPath.ts falador [--from varrock] [--compare]

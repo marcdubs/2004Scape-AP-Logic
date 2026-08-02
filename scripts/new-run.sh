@@ -61,6 +61,7 @@ RUN_SPAWN=1               # random home/respawn point (MUST run before entrances
 RUN_ENTRANCES=1           # entrance shuffle + automatic logic validation/reroll
 RUN_PLACEMENT=1           # AP placement: checks contain the unlocks (RESETS run progress!)
 REFRESH_REGION_GRAPH=0    # only after map/content changes (validator input; slow-ish)
+REFRESH_WALK_GRAPH=auto   # path-helper graph: auto = build only if missing or the region graph just changed (1 = force, 0 = never)
 REFRESH_WORLDMAP_PNG=0    # tracker map images; only after map changes
 RUN_VALIDATE=1            # print the beatability report (spheres + goals + item obtainability) at the end
 
@@ -171,6 +172,44 @@ run() { echo; echo "==> npx tsx $*"; npx tsx "$@"; }
 [ "$RUN_SPAWN" = 1 ]     && run tools/spawn/RandomizeSpawn.ts --seed "$SEED" --mode "$SPAWN_MODE" $QUIET_FLAG $SPAWN_EXTRA
 [ "$RUN_ENTRANCES" = 1 ] && run tools/map/RandomizeEntrances.ts --seed "$SEED" $ENTRANCE_EXTRA
 [ "$REFRESH_REGION_GRAPH" = 1 ] && run tools/logic/BuildRegionGraph.ts
+
+# ---- path-helper walk graph (SEED-INDEPENDENT - not a per-run stage) ---------
+# ap-walk-graph.json is all-pairs WALKING distances, and walking cost depends only
+# on map geometry, so a reseed cannot change a single number in it (docs/tracker-map.md
+# "Pathfinding helper"). Rebuilding it every run would spend ~70s writing the same
+# file back. Hence `auto`: build it only when it's missing - a fresh checkout, where
+# ::appath and the tracker's route bar are dead until it exists - or when
+# REFRESH_REGION_GRAPH just rebuilt the walk grid it's derived from, which is exactly
+# when it goes stale. Set 1 to force, 0 to never.
+WALK_GRAPH_FILE=data/config/ap-walk-graph.json
+WALK_GRID_FILE=data/config/ap-walk-grid.bin
+ENTRANCE_POOL_FILE=data/config/ap-entrance-pool.json
+BUILD_WALK_GRAPH=0
+case "$REFRESH_WALK_GRAPH" in
+  1) BUILD_WALK_GRAPH=1 ;;
+  0) : ;;
+  auto)
+    if [ "$REFRESH_REGION_GRAPH" = 1 ] || [ ! -f "$WALK_GRAPH_FILE" ]; then
+      BUILD_WALK_GRAPH=1
+    fi
+    ;;
+  *) echo "new-run: REFRESH_WALK_GRAPH must be auto, 1 or 0 (got '$REFRESH_WALK_GRAPH')" >&2; exit 1 ;;
+esac
+
+if [ "$BUILD_WALK_GRAPH" = 1 ]; then
+  if [ ! -f "$WALK_GRID_FILE" ]; then
+    # Don't abort the run over the path helper - it's an optional convenience.
+    echo
+    echo "==> skipping BuildWalkGraph: $WALK_GRID_FILE missing - set REFRESH_REGION_GRAPH=1 once (it emits the grid), then re-run."
+  else
+    # The graph is keyed off the UNSHUFFLED entrance catalog, which is seed-independent
+    # too. --export-pool is a dry run that writes only that pool (no entrance table), so
+    # filling in a missing one here can't disturb the shuffle rolled above.
+    [ -f "$ENTRANCE_POOL_FILE" ] || run tools/map/RandomizeEntrances.ts --export-pool "$ENTRANCE_POOL_FILE"
+    run tools/logic/BuildWalkGraph.ts
+  fi
+fi
+
 [ "$REFRESH_WORLDMAP_PNG" = 1 ] && run tools/map/RenderWorldmapPng.ts
 [ "$VERBOSE" = 1 ]       && PLACEMENT_EXTRA="--spoiler $PLACEMENT_EXTRA"
 [ "$RUN_PLACEMENT" = 1 ] && run tools/ap/GenerateSeed.ts --seed "$SEED" --pool "$POOL" $PLACEMENT_EXTRA
