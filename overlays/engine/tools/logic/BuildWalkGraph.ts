@@ -133,7 +133,18 @@ async function main(): Promise<void> {
     console.log(`BuildWalkGraph: walk grid loaded - ${grid.stats.squareCount} mapsquare(s), ${grid.stats.walkableTiles} walkable tile(s)`);
 
     const regionGraph: RegionGraph = loadRegionGraph(REGION_GRAPH_PATH);
-    const pool = readJson<EntrancePool>(ENTRANCE_POOL_PATH, 'run ExportEntrances.ts / RandomizeEntrances.ts first');
+    // Name the --export-pool command exactly. This message used to read "run
+    // ExportEntrances.ts / RandomizeEntrances.ts first", which was wrong in both halves:
+    // ExportEntrances.ts writes tools/map/entrances.json (a different catalog entirely),
+    // and a bare RandomizeEntrances.ts RE-ROLLS the live entrance table - on an
+    // Archipelago run that silently destroys the layout the multiworld's fill reasoned
+    // over. --export-pool is the only safe form: a dry run that writes the pool and no
+    // table (found 2026-08-03, after the message sent a mid-playthrough user hunting).
+    const pool = readJson<EntrancePool>(
+        ENTRANCE_POOL_PATH,
+        `run: npx tsx tools/map/RandomizeEntrances.ts --export-pool ${ENTRANCE_POOL_PATH}\n` +
+            '  (--export-pool is a dry run: it writes the pool only, never the entrance table)'
+    );
 
     // ---- collect nodes ----
     const nodes: WalkNode[] = [];

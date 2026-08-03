@@ -4859,3 +4859,57 @@ guide + arrow), `ap_path.rs2`, opcodes 1915-1919, `web.ts` (`/ap/path.json`,
 `/ap/places.json`, `/ap/guide.json`), tracker `app.js`/`index.html`/`style.css`, and
 `tools/logic/ExplainPath.ts` for inspecting a seed offline (`--compare` ranks destinations
 by how much the shuffle beats walking: 81 of 105 on the seed this was built against).
+
+## Session-end addendum: the walk graph's *second* prerequisite (2026-08-03)
+
+The user's live AP playthrough had the tracker stuck on "No walk graph on the server -
+run BuildWalkGraph.ts to enable routing." They had tried building it by hand and it
+"didn't work". Three separate things were in the way, and the order they surfaced is the
+lesson.
+
+**What actually happened, from file timestamps.** `new-run` ran at 17:25 on 2026-08-02, at
+which point `ap-walk-grid.bin` did not exist yet — so the new `auto` stage did exactly what
+it was written to do and printed `skipping BuildWalkGraph: ... grid missing - set
+REFRESH_REGION_GRAPH=1 once, then re-run`. The user then ran `BuildRegionGraph.ts` directly
+(19:15, which is where the grid and region graph both date from) rather than re-running
+`new-run`, and followed it with a hand `BuildWalkGraph.ts`. That is a completely reasonable
+reading of the skip message — and it walks straight into the prerequisite the skip message
+does not mention.
+
+**`BuildWalkGraph.ts` has TWO prerequisites, and only one of them is announced.** The grid
+check is explicit and names its fix. The entrance pool is read through the generic
+`readJson` helper, whose `what` string was `'run ExportEntrances.ts / RandomizeEntrances.ts
+first'`. Both halves of that are wrong:
+
+- `ExportEntrances.ts` writes `tools/map/entrances.json`, a different catalog entirely. It
+  will never produce `ap-entrance-pool.json` no matter how many times you run it.
+- A bare `RandomizeEntrances.ts` **re-rolls the live entrance table**. On an Archipelago run
+  that silently destroys the layout the multiworld's fill reasoned over — `ap-entrances.json`
+  there came from slot_data, and `seed-options-to-env.cjs` pins `entrances: off` precisely so
+  nothing reshuffles it. The error message was pointing a mid-playthrough user at the one
+  command that would have wrecked their run.
+
+Only `--export-pool` is safe: `main()` routes it to `runAttempt(startSeed, true, ...)` and
+returns, and the export block returns before the table write and before the spoiler write.
+The message now names that exact command, path included, with the dry-run property spelled
+out. Verified by pointing `--config-dir` at an empty directory.
+
+**Generalizable:** a tool that exits 1 on a missing input should print the command that
+creates that input, not the subsystem it belongs to. "Run the entrance tooling" is an
+invitation to guess, and in a randomizer the wrong guess is destructive rather than merely
+unhelpful. `new-run` already knew the right answer — it exports the pool itself when it is
+missing — so the knowledge existed and just wasn't where a hand-run user would find it.
+
+**The failure latches until restart.** `ApPathfinder.getGraph()` sets `loadFailed = true` on
+the first failed build and returns null forever after. `reloadPathfinder()` exists to clear
+it and **is never called from anywhere in the engine** — dead export. So dropping a correct
+`ap-walk-graph.json` next to a running server changes nothing: the tracker keeps reporting
+the old answer until the server is restarted. Worth knowing before debugging a file that is
+sitting right there and being ignored. Wiring `reloadPathfinder` to a `::ap` command is an
+obvious future cleanup, deliberately not done mid-playthrough.
+
+**Environment note.** The esbuild win32/linux ping-pong recurred (only `@esbuild/win32-x64`
+present — the user is running the server from Windows). `npm install --no-save --force
+@esbuild/linux-x64` alone fixed it and, unlike the documented full `npm install` pair, adds
+the linux binary *without* pruning the win32 one — strictly less disruptive when the user's
+server may be live. Prefer that form mid-playthrough.
