@@ -197,10 +197,24 @@ case "$REFRESH_WALK_GRAPH" in
 esac
 
 if [ "$BUILD_WALK_GRAPH" = 1 ]; then
+  # The grid is the one input in this chain that is NOT checked in, while its sibling
+  # tools/logic/region-graph.json IS - both come out of the same BuildRegionGraph pass.
+  # So a fresh checkout has the region graph and no grid, REFRESH_REGION_GRAPH defaults
+  # to 0, and this stage used to hit a "skip, go set a knob" branch on EVERY run: with
+  # stock knobs it could never fire at all, which is exactly how a finished run still
+  # left the tracker saying "No walk graph on the server" (found 2026-08-03, mid-run).
+  # Building it is ~15s and deterministic, and rewrites only region-graph.json (identical
+  # payload - just meta.generatedAt/buildMs) plus the grid. Same "handle the prerequisite,
+  # don't crash on it" call as the entrance pool below.
+  if [ ! -f "$WALK_GRID_FILE" ] && [ "$REFRESH_REGION_GRAPH" != 1 ]; then
+    echo
+    echo "==> $WALK_GRID_FILE missing (not a checked-in artifact) - building it first"
+    run tools/logic/BuildRegionGraph.ts
+  fi
   if [ ! -f "$WALK_GRID_FILE" ]; then
     # Don't abort the run over the path helper - it's an optional convenience.
     echo
-    echo "==> skipping BuildWalkGraph: $WALK_GRID_FILE missing - set REFRESH_REGION_GRAPH=1 once (it emits the grid), then re-run."
+    echo "==> skipping BuildWalkGraph: $WALK_GRID_FILE still missing after BuildRegionGraph.ts."
   else
     # The graph is keyed off the UNSHUFFLED entrance catalog, which is seed-independent
     # too. --export-pool is a dry run that writes only that pool (no entrance table), so

@@ -4867,14 +4867,29 @@ run BuildWalkGraph.ts to enable routing." They had tried building it by hand and
 "didn't work". Three separate things were in the way, and the order they surfaced is the
 lesson.
 
-**What actually happened, from file timestamps.** `new-run` ran at 17:25 on 2026-08-02, at
-which point `ap-walk-grid.bin` did not exist yet — so the new `auto` stage did exactly what
-it was written to do and printed `skipping BuildWalkGraph: ... grid missing - set
-REFRESH_REGION_GRAPH=1 once, then re-run`. The user then ran `BuildRegionGraph.ts` directly
-(19:15, which is where the grid and region graph both date from) rather than re-running
-`new-run`, and followed it with a hand `BuildWalkGraph.ts`. That is a completely reasonable
-reading of the skip message — and it walks straight into the prerequisite the skip message
-does not mention.
+**The root cause: the grid is the one artifact in the chain that is not checked in.**
+`BuildRegionGraph.ts` emits TWO files in one pass — `tools/logic/region-graph.json` and
+`data/config/ap-walk-grid.bin`. The first is committed to the repo and shipped by
+`install.js`; the second is not committed at all. So every checkout starts with the region
+graph present and the grid absent, and `REFRESH_REGION_GRAPH` defaults to **0**.
+
+That combination meant the `auto` walk-graph stage added in 81b9a89 hit its "grid missing,
+go set a knob" skip branch on *every* run. Not a timing accident — **with stock knobs it
+could never fire at all.** A fresh checkout would roll a complete seed, print no error, and
+still leave the tracker dead, exactly as reported. The stage could only ever succeed on a
+machine where someone had already run `BuildRegionGraph.ts` by hand, which is precisely the
+machine that least needed the automation.
+
+(The first pass at diagnosing this read the 19:15 mtimes on the grid and region graph as
+proof the grid "didn't exist yet at 17:25". That does not follow — a rebuild stamps the same
+mtime whether or not the file existed before, and this mount exposes no birth time. The
+structural argument above is what actually settles it, and it predicts the observed state
+without needing to date anything.)
+
+The fix mirrors what the stage already did for the entrance pool: when the grid is missing,
+*build it* rather than skipping. It is ~15s (the old comment's "slow-ish" was wrong) and
+deterministic — rebuilding it produced a `region-graph.json` whose payload is byte-identical
+to the committed one, differing only in `meta.generatedAt` and `meta.buildMs`.
 
 **`BuildWalkGraph.ts` has TWO prerequisites, and only one of them is announced.** The grid
 check is explicit and names its fix. The entrance pool is read through the generic
@@ -4894,7 +4909,10 @@ returns, and the export block returns before the table write and before the spoi
 The message now names that exact command, path included, with the dry-run property spelled
 out. Verified by pointing `--config-dir` at an empty directory.
 
-**Generalizable:** a tool that exits 1 on a missing input should print the command that
+**Generalizable — two of them.** (1) If a build step's output is a *prerequisite* of another
+step, either check it in or have the consumer build it; shipping half of a matched pair
+(region graph committed, its grid not) guarantees the consumer's "is it there?" branch is
+always false. (2) A tool that exits 1 on a missing input should print the command that
 creates that input, not the subsystem it belongs to. "Run the entrance tooling" is an
 invitation to guess, and in a randomizer the wrong guess is destructive rather than merely
 unhelpful. `new-run` already knew the right answer — it exports the pool itself when it is
@@ -4907,6 +4925,17 @@ it and **is never called from anywhere in the engine** — dead export. So dropp
 the old answer until the server is restarted. Worth knowing before debugging a file that is
 sitting right there and being ignored. Wiring `reloadPathfinder` to a `::ap` command is an
 obvious future cleanup, deliberately not done mid-playthrough.
+
+**Two traps for a `/mnt/c` session, both hit here.** `install.js` copies
+`overlays/engine/tools/logic/region-graph.json` over the Server checkout — so running it
+replaced the user's locally-built region graph while leaving `ap-walk-grid.bin` (not an
+overlay file) untouched, briefly breaking the "grid and region-graph.json can never diverge"
+invariant `ApWalkGrid.ts` documents. Harmless here only because the payloads matched;
+regenerating both in one `BuildRegionGraph.ts` pass is the repair. And `ap-entrances.json`
+changed MD5 mid-session with no tool of ours running: `ApClient` rewrites it together with
+`ap-seed-options.json` on every AP connect. On a live playthrough the config dir has a second
+writer, so "the file changed" is not evidence you changed it — check whether the timestamp
+lands in a window where you ran nothing.
 
 **Environment note.** The esbuild win32/linux ping-pong recurred (only `@esbuild/win32-x64`
 present — the user is running the server from Windows). `npm install --no-save --force

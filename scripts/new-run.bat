@@ -246,10 +246,27 @@ if "%REFRESH_WALK_GRAPH%"=="auto" (
 )
 
 if "%BUILD_WALK_GRAPH%"=="1" (
+    REM The grid is the one input in this chain that is NOT checked in, while its sibling
+    REM tools\logic\region-graph.json IS - both come out of the same BuildRegionGraph pass.
+    REM So a fresh checkout has the region graph and no grid, REFRESH_REGION_GRAPH defaults
+    REM to 0, and this stage used to hit a "skip, go set a knob" branch on EVERY run: with
+    REM stock knobs it could never fire at all, which is exactly how a finished run still
+    REM left the tracker saying "No walk graph on the server" ^(found 2026-08-03, mid-run^).
+    REM Building it is ~15s and deterministic, and rewrites only region-graph.json ^(identical
+    REM payload - just meta.generatedAt/buildMs^) plus the grid. Same "handle the prerequisite,
+    REM don't crash on it" call as the entrance pool below.
+    if not exist "data\config\ap-walk-grid.bin" (
+        if not "%REFRESH_REGION_GRAPH%"=="1" (
+            echo.
+            echo ==^> data\config\ap-walk-grid.bin missing ^(not a checked-in artifact^) - building it first
+            echo ==^> npx tsx tools/logic/BuildRegionGraph.ts
+            call npx tsx tools/logic/BuildRegionGraph.ts || goto :error
+        )
+    )
     if not exist "data\config\ap-walk-grid.bin" (
         REM Don't abort the run over the path helper - it's an optional convenience.
         echo.
-        echo ==^> skipping BuildWalkGraph: data\config\ap-walk-grid.bin missing - set REFRESH_REGION_GRAPH=1 once ^(it emits the grid^), then re-run.
+        echo ==^> skipping BuildWalkGraph: data\config\ap-walk-grid.bin still missing after BuildRegionGraph.ts.
     ) else (
         REM The graph is keyed off the UNSHUFFLED entrance catalog, which is seed-independent
         REM too. --export-pool is a dry run that writes only that pool ^(no entrance table^), so
