@@ -58,7 +58,14 @@ interface GuideState {
     lines: string[];
     waypoints: Waypoint[];
     index: number;
-    armed: boolean;
+    /**
+     * Which waypoint the arrow currently on the player's client points at, or -1 for none.
+     * NOT a boolean: the client keeps drawing the last HintArrow packet until something
+     * writes another, so "is an arrow showing" and "is it showing the RIGHT waypoint" are
+     * different questions and only the second one can drive a re-point. A bool conflated
+     * them and stranded the arrow on the first ladder of every route (see tickRoute).
+     */
+    armedIndex: number;
     totalSteps: number;
 }
 
@@ -162,7 +169,7 @@ export function startRoute(player: Player, destination: string, revealAll: boole
         lines: result.legs.map((leg, i) => describeLeg(leg, i)),
         waypoints: buildWaypoints(result),
         index: 0,
-        armed: false,
+        armedIndex: -1,
         totalSteps: result.totalSteps
     };
     routes.set(player, state);
@@ -211,7 +218,7 @@ export function clearRoute(player: Player): void {
     const state = routes.get(player);
     routes.delete(player);
     failures.delete(player);
-    if (state?.armed) {
+    if (state !== undefined && state.armedIndex !== -1) {
         player.stopHint();
     }
 }
@@ -281,7 +288,7 @@ export function tickRoute(player: Player): void {
 
     if (state.index >= state.waypoints.length) {
         // Route complete.
-        if (state.armed) {
+        if (state.armedIndex !== -1) {
             player.stopHint();
         }
         routes.delete(player);
@@ -290,7 +297,6 @@ export function tickRoute(player: Player): void {
     }
 
     if (advanced) {
-        state.armed = false;
         announce(player, state);
     }
 
@@ -299,13 +305,19 @@ export function tickRoute(player: Player): void {
         return;
     }
 
-    // Arm or disarm the arrow depending on whether the client could actually draw it.
+    // Arm, re-point, or disarm the arrow depending on whether the client could actually
+    // draw the CURRENT waypoint. Comparing armedIndex against index (rather than a bool)
+    // is what makes the middle case exist: advancing onto a waypoint the client cannot
+    // draw - which is every ladder and staircase, since the next waypoint is by definition
+    // on another level - has to take the old arrow DOWN. The bool version cleared its
+    // "armed" flag on advance and so could never reach its own stopHint branch, leaving
+    // the first ladder's arrow burned onto the screen for the rest of the route.
     const drawable = waypoint.tile.level === here.level && chebyshev(waypoint.tile, here) <= ARM_RANGE;
-    if (drawable && !state.armed) {
+    if (drawable && state.armedIndex !== state.index) {
         armArrow(player, waypoint);
-        state.armed = true;
-    } else if (!drawable && state.armed) {
+        state.armedIndex = state.index;
+    } else if (!drawable && state.armedIndex !== -1) {
         player.stopHint();
-        state.armed = false;
+        state.armedIndex = -1;
     }
 }

@@ -4942,3 +4942,56 @@ present — the user is running the server from Windows). `npm install --no-save
 @esbuild/linux-x64` alone fixed it and, unlike the documented full `npm install` pair, adds
 the linux binary *without* pruning the win32 one — strictly less disruptive when the user's
 server may be live. Prefer that form mid-playthrough.
+
+## Session-end addendum 2: the guide arrow froze on the first ladder (2026-08-03)
+
+Reported in-game: "the arrows only show for the first part, but when you climb the first
+ladder it doesn't move on to the next one." It was a one-line bookkeeping bug in
+`ApPathGuide.tickRoute`, and the shape of it is worth remembering.
+
+`GuideState.armed` was a **boolean**. On advancing to a new waypoint the code did:
+
+```ts
+if (advanced) { state.armed = false; announce(player, state); }   // <-- forgets the arrow
+...
+if (drawable && !state.armed)      { armArrow(...); state.armed = true; }
+else if (!drawable && state.armed) { player.stopHint(); state.armed = false; }
+```
+
+Clearing `armed` on advance was meant to force a re-point. What it actually did was destroy
+the only record that an arrow was on screen — so when the new waypoint was **not** drawable,
+the `else if` could not fire and `stopHint()` was never written. The client keeps drawing
+the last `HintArrow` packet forever, so the arrow stayed burned onto the first ladder.
+
+And the not-drawable case is not an edge case: `drawable` requires
+`waypoint.tile.level === here.level`, and the waypoint after any ladder or staircase is by
+definition on a different level. So the bug fired on the **first entrance of every route**,
+which is exactly what was reported.
+
+Fix: `armed: boolean` -> `armedIndex: number` (-1 = nothing showing). Arm when
+`drawable && armedIndex !== index`, disarm when `!drawable && armedIndex !== -1`, and do not
+touch it on advance. "Is an arrow showing" and "is it showing the RIGHT waypoint" are two
+questions; a bool can only answer one, and the re-point path needs the second.
+
+**Generalizable:** when local state mirrors remote state you cannot read back (a client's
+render state, a cache, a device), the mirror must record *what* was sent, not merely *that*
+something was. A bool mirror has no way to express "showing, but wrong", which is precisely
+the state a re-point has to detect.
+
+### How it was verified without booting the server
+
+`tickRoute` only touches `player.level/x/z`, `hintTile`, `stopHint` and `messageGame`, so a
+~40-line stub class cast to `never` drives the **real** function under `tsx`: `startRoute`
+against the live walk graph, then teleport the stub to each leg's `to` tile in turn and
+record every packet, replaying them into a persistent `clientArrow` variable so the harness
+models what the client is still drawing rather than what was sent this tick. Varrock ->
+Falador on the live seed: **8 ticks left a stale arrow** before the fix, **0** after, with
+the pre-fix code recovered via `git show HEAD:<path>` straight into the Server checkout and
+restored with `install.js`. Worth rebuilding that harness for any future guide/arrow change —
+it caught the difference in one run and needs no Windows server.
+
+A remaining papercut, deliberately not changed: waypoints advance on **proximity to the
+trigger** (`ARRIVE_RADIUS = 3`), not on the player actually using the entrance. So the arrow
+comes down about three tiles before you reach the ladder and the chat already names the NEXT
+entrance while you still have to click this one. Advancing on the position/level jump instead
+would be the honest fix if it annoys anyone.
