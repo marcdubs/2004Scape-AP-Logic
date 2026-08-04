@@ -47,16 +47,35 @@ if (npc_param(is_whirlpool) = ^true) {
     ~macro_whirlpool_attempt_take_equipment($equipment);
     return;
 }
+~fish_roll_pair($fish1, $fish2, $bait);
+
+[proc,fish_roll_loc](namedobj $fish1, namedobj $fish2, namedobj $bait)
+~fish_roll_pair($fish1, $fish2, $bait);
+
+// AP: the shared body of both rolls above (vanilla had the two bodies duplicated
+// verbatim). $fish2 is the rarer fish, which vanilla rolls FIRST and falls
+// through from - so on a two-fish spot the whole cast is decided by a single
+// ap_gather_random2 rather than two independently gatherSpeed-scaled rolls,
+// which is what used to squeeze the common fish out entirely (see the command's
+// note in scripts/ap/ap.rs2 - shrimp hit 0% at 99 Fishing). One-fish spots are
+// unchanged: there is no mix to preserve, so they keep the plain scaled roll.
+[proc,fish_roll_pair](namedobj $fish1, namedobj $fish2, namedobj $bait)
+if ($fish1 ! null & $fish2 ! null) {
+    def_struct $struct1 = oc_param($fish1, fishing_struct);
+    def_struct $struct2 = oc_param($fish2, fishing_struct);
+    def_int $caught = ap_gather_random2(fishing, struct_param($struct1, success_low), struct_param($struct1, success_high), struct_param($struct2, success_low), struct_param($struct2, success_high));
+    if ($caught = 2) {
+        ~fish_roll_award($fish2, $struct2, $bait);
+    } else if ($caught = 1) {
+        ~fish_roll_award($fish1, $struct1, $bait);
+    }
+    return;
+}
 
 if ($fish2 ! null) {
     def_struct $struct2 = oc_param($fish2, fishing_struct);
     if (ap_gather_random(fishing, struct_param($struct2, success_low), struct_param($struct2, success_high)) = true) {
-        if ($bait ! null) {
-            inv_del(inv, $bait, 1);
-        }
-        inv_add(inv, ap_gather_swap($fish2), 1);
-        stat_advance(fishing, struct_param($struct2, productexp));
-        mes(struct_param($struct2, productmessage));
+        ~fish_roll_award($fish2, $struct2, $bait);
         return;
     }
 }
@@ -64,41 +83,18 @@ if ($fish2 ! null) {
 if ($fish1 ! null) {
     def_struct $struct1 = oc_param($fish1, fishing_struct);
     if (ap_gather_random(fishing, struct_param($struct1, success_low), struct_param($struct1, success_high)) = true) {
-        if ($bait ! null) {
-            inv_del(inv, $bait, 1);
-        }
-        inv_add(inv, ap_gather_swap($fish1), 1);
-        stat_advance(fishing, struct_param($struct1, productexp));
-        mes(struct_param($struct1, productmessage));
+        ~fish_roll_award($fish1, $struct1, $bait);
         return;
     }
 }
 
-[proc,fish_roll_loc](namedobj $fish1, namedobj $fish2, namedobj $bait)
-if ($fish2 ! null) { // if fish2 isnt null and roll for 2nd fish passes
-    def_struct $struct2 = oc_param($fish2, fishing_struct);
-    if (ap_gather_random(fishing, struct_param($struct2, success_low), struct_param($struct2, success_high)) = true) {
-        if ($bait ! null) {
-            // delete bait
-            inv_del(inv, $bait, 1);
-        }
-        // give fish and display message
-        inv_add(inv, ap_gather_swap($fish2), 1);
-        stat_advance(fishing, struct_param($struct2, productexp));
-        mes(struct_param($struct2, productmessage));
-        return;
-    }
+// Pay out one caught fish: consume the bait, hand over whatever the gathering
+// shuffle mapped this fish to, and give the fish's OWN xp/message (the shuffle
+// swaps the item, never the effort it took).
+[proc,fish_roll_award](namedobj $fish, struct $struct, namedobj $bait)
+if ($bait ! null) {
+    inv_del(inv, $bait, 1);
 }
-if ($fish1 ! null) { // else if fish1 isnt null and roll for 1st fish passes
-    def_struct $struct1 = oc_param($fish1, fishing_struct);
-    if (ap_gather_random(fishing, struct_param($struct1, success_low), struct_param($struct1, success_high)) = true) {
-        if ($bait ! null) {
-            // delete bait
-            inv_del(inv, $bait, 1);
-        }
-        // give fish and display message
-        inv_add(inv, ap_gather_swap($fish1), 1);
-        stat_advance(fishing, struct_param($struct1, productexp));
-        mes(struct_param($struct1, productmessage));
-    }
-}
+inv_add(inv, ap_gather_swap($fish), 1);
+stat_advance(fishing, struct_param($struct, productexp));
+mes(struct_param($struct, productmessage));

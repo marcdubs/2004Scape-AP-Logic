@@ -5069,3 +5069,85 @@ passable to the fill, or whether the entrance pool needs a guaranteed exit from 
 The cheap audit that catches this whole class: for every routable place pair, flag any
 `walk` leg with `from.level > 0` whose `from` and `to` are in different mapsquares. A
 building does not span mapsquares, so any hit is an impossible walk. It went from many to 0.
+
+## Session (2026-08-04): two bugs where a "curated list" quietly under-delivered
+
+Both of this session's fixes are the same shape: a hand-maintained list, or a
+per-item scaling, that looked right in the file and was wrong against the actual
+content set. Worth generalising - anywhere this repo enumerates game entities by
+hand, assume it is incomplete until something derives it from the configs.
+
+### First-kill checks matched only the obvious npc_type names
+
+`~ap_track_kill`'s OR-chains were written from the npc names that looked right,
+so every group was under-covered and the checks silently did not fire in most of
+the places you meet the monster. `first_kill_skeleton` listed 3 of 6 skeletons -
+killing the Stronghold (`giantskeleton`), Draynor manor (`skull_skeleton`) or
+Melzar's (`dragonslayer_skeleton`) one did nothing, though all of them are just
+"Skeleton" in game. Zombie was 3 of 11, guard 2 of 6, ghost 1 of 4.
+
+- **The group is the DISPLAY NAME, not the type name.** An npc type name is an
+  implementation detail (`house_ghost`, `macro_zombie4`, `mcannonguard` - that
+  last one is named "Dwarf"); what the player thinks they killed is the config's
+  `name=`. Group by `name=` plus "is attackable" (some `op<n>=Attack`) and every
+  palette swap and quest duplicate comes along for free.
+- **So it is generated now**: `scripts/gen-kill-groups.py` rewrites the block
+  between `>>> GENERATED` / `<<< END GENERATED` markers in `ap_checks.rs2`, with
+  `--check` for a staleness gate. Re-run it after a content update. `EXTRAS`
+  carries the one case the name rule misses (Chaos dwarf, whose `name=` is
+  "Chaos dwarf" - it was already counted, dropping it would have been a
+  regression).
+- **The base rev's npcs are NOT in the area/quest config dirs.** They live in
+  `content/scripts/_unpack/{225,244,254,274}/all.npc`. Walking `content/scripts`
+  while skipping `_unpack` finds 1166 of 1359 npcs and silently misses
+  `skeleton_armed`. No npc is defined twice across the whole set (the generator
+  asserts this), so walk order does not matter.
+- **A kill check is only wireable if the npc dies through `[proc,npc_death]`**,
+  which is where `~ap_track_kill` hooks. Most npcs have no death script at all
+  and fall through `[ai_queue3,_]` -> `~npc_default_death` -> `~npc_death`, which
+  is fine; but ~20 scripted/multi-stage deaths (Delrith, the Black Knight Titan,
+  Count Draynor, the Legends bosses, the shapeshifter) run their own path and
+  would never fire one. The generator scans for those and refuses to emit them -
+  which is why Black Knight Titan is not in the black-knight group. Follow
+  `@label` tail-jumps across files when doing that scan or you get false
+  positives (the troll thrower jumps to a drop table in another file).
+
+### gatherSpeed made shrimp uncatchable (the multi-roll mix bug)
+
+`AP_GATHER_RANDOM` scales one roll's threshold. A two-fish spot is TWO rolls:
+vanilla rolls the rare fish first and only falls through to the common one when
+that misses. Scaling each roll independently therefore does not just remove
+failed casts - it hands the rare fish the casts the common fish used to win. At
+the default `gatherSpeed: 200` the anchovy threshold saturates at 256 by 99
+Fishing, so the shrimp roll is never reached: **0% shrimp**, from a knob whose
+entire job was "more fish". Sardine behind herring had the same cliff; trout and
+tuna were skewed but never saturated.
+
+- **The general lesson**: a per-item multiplier is only safe when the items are
+  independent. Under a first-match-wins fallback chain, scaling each link
+  redistributes between links. Check for a fallback chain before reusing
+  `ap_gather_random` anywhere new. Mining, woodcutting and one-fish spots are
+  single-outcome, which is why they were fine and are left alone.
+- **Fix**: `ap_gather_random2` / `AP_GATHER_RANDOM2` (opcode 1920) decides the
+  whole cast in ONE roll - compute both vanilla thresholds, form
+  `P(rare) = t2/256` and `P(common) = (1 - t2/256) * t1/256` in 1/65536 fixed
+  point, scale their SUM by gatherSpeed (clamped to 65536), then split the
+  scaled total in the untouched vanilla ratio. Catch rate scales as the knob
+  promises; the fish mix never moves.
+- **Verified numerically before touching the game**: at `gatherSpeed 100` the new
+  arithmetic reproduces vanilla's pair of rolls exactly for all four fish pairs
+  at every level 1-99 (0 mismatches); at 200 the rare-fish share of catches now
+  equals vanilla's at every level (was drifting to 100%), and catches/cast is a
+  clean 2x until it caps at 1.0. That check is worth re-running as a script if
+  this maths is ever touched again - it is much cheaper than in-game sampling.
+- **`~fish_roll` and `~fish_roll_loc` had byte-identical bodies**; they now share
+  `~fish_roll_pair` + `~fish_roll_award`. Watch out for
+  `tools/gather/FishingLevels.ts`, which learns each spot's fish by regexing
+  `~fish_roll(?:_loc)?\(` call sites - `~fish_roll_pair(` deliberately does not
+  match it (the `_loc` alternation is followed by a required `(`), so the
+  scraper still resolves every fish. Confirmed with a `RandomizeGathering.ts
+  --dry-run`.
+- Both fixes are content+engine changes: `install.js`, `tools/pack/Build.ts`
+  (clean) and a server restart. Engine typecheck clean. **Not in-game tested** -
+  see the new checklist sections (a previously-missed skeleton; section 6b for
+  the shrimp/sardine split at 99 Fishing).

@@ -30,6 +30,7 @@ restart. Content/engine overlay changes DO need `npx tsx tools/pack/Build.ts` (r
 node scripts/install.js                                  # deploy overlays -> ../Server
 python3 scripts/gen-rewards.py \
     overlays/content/scripts/ap/configs/ap_rewards.dbrow  # regen the reward table (then rebuild the pack)
+python3 scripts/gen-kill-groups.py [--check]             # regen the first-kill npc_type chains in ap_checks.rs2
 cd ../Server/engine && npx tsx tools/pack/Build.ts       # rebuild pack (after overlay changes only)
 cd ../Server/engine && npx tsx tools/map/RandomizeEntrances.ts [--seed N] [--mixed] [--dry-run]
 cd ../Server/engine && npx tsc --noEmit -p .              # typecheck engine

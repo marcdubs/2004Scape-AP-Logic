@@ -141,6 +141,14 @@ export const enum ScriptOpcode {
     // AP_ENTRANCE_OVERRIDE above.
     AP_GATHER_RANDOM = 1914,
 
+    // custom: Archipelago gathering-speed knob, two-outcome form - one roll for a
+    // fishing spot that offers a rare fish and a common fallback, returning which
+    // was caught. Exists because applying gatherSpeed to each of the two vanilla
+    // rolls separately shifts the fish MIX instead of only removing failed casts
+    // (see the handler) - same explicit-numbering reasoning as
+    // AP_ENTRANCE_OVERRIDE above.
+    AP_GATHER_RANDOM2 = 1920,
+
     // custom: Archipelago path helper (ApPathGuide.ts / ApPathfinder.ts). AP_PATH_FIND
     // computes a route from the active player to a named place and makes it their active
     // guide, returning the leg count (-1 on failure); AP_PATH_TEXT reads back a
@@ -621,6 +629,7 @@ export const ScriptOpcodeMap: Map<string, number> = new Map([
     ['AP_NPCTP_COORD', ScriptOpcode.AP_NPCTP_COORD],
     ['AP_THIEVING_SWAP', ScriptOpcode.AP_THIEVING_SWAP],
     ['AP_GATHER_RANDOM', ScriptOpcode.AP_GATHER_RANDOM],
+    ['AP_GATHER_RANDOM2', ScriptOpcode.AP_GATHER_RANDOM2],
     ['AP_PATH_FIND', ScriptOpcode.AP_PATH_FIND],
     ['AP_PATH_TEXT', ScriptOpcode.AP_PATH_TEXT],
     ['AP_PATH_COORD', ScriptOpcode.AP_PATH_COORD],

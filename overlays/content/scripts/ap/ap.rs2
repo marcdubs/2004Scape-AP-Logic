@@ -171,6 +171,21 @@ if (%ap_kbd_killed = 1) {
 // untouched, so this removes failed cycles rather than speeding up the loop.
 [command,ap_gather_random](stat $stat, int $low, int $high)(boolean)
 
+// info: custom - the two-outcome form of ap_gather_random, for a fishing spot
+// that offers a rare fish with a common fallback. One roll decides the whole
+// cast: returns 2 = the rare fish, 1 = the common one, 0 = nothing. Arguments
+// are the COMMON fish's (low, high) then the rare one's, matching ~fish_roll's
+// ($fish1, $fish2) order.
+//
+// Two ap_gather_random calls cannot do this job: vanilla rolls the rare fish
+// first and falls through, so scaling each roll on its own gives the rare fish
+// the casts the common fish used to win instead of just removing failed casts.
+// At the default gatherSpeed 200 that made shrimp uncatchable at 99 Fishing
+// (and sardines behind herring). This applies gatherSpeed to the cast's
+// combined success chance and splits the result in the vanilla ratio, so the
+// catch rate scales and the fish mix does not move.
+[command,ap_gather_random2](stat $stat, int $low1, int $high1, int $low2, int $high2)(int)
+
 // Divides a depleted-resource respawn by the ap-options.json
 // "rockRespawnSpeed" percentage: 100 = vanilla, 300 = back in a third of the
 // time. The companion to gatherSpeed - that one removes failed swings, this one

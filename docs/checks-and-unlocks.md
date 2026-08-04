@@ -239,6 +239,20 @@ tool tier and level meaningful; the per-swing action delay is untouched, so one
 resource per swing remains the throughput ceiling. AP side: the `gather_speed`
 YAML option, adopted live from slot_data.
 
+A two-fish fishing spot needed a second command (`ap_gather_random2`, opcode
+1920, added 2026-08-04). Vanilla rolls the RARE fish first and only falls
+through to the common one when that misses, so scaling each of the two
+thresholds on its own does not just remove failed casts - it hands the rare fish
+the casts the common fish used to win. At the default 200 the anchovy threshold
+saturated at 256 by 99 Fishing and **shrimp became uncatchable** (sardines
+likewise behind herring; trout and tuna were skewed but never reached zero). The
+command decides the whole cast in one roll: gatherSpeed applies to the cast's
+combined success chance, and the successes are split in the vanilla ratio, so
+the catch rate scales as advertised and the fish mix does not move. At
+gatherSpeed 100 it reproduces the vanilla pair of rolls exactly (verified for
+all four pairs at every level). One-fish spots, mining and woodcutting are
+single-outcome and keep the plain `ap_gather_random` scaling.
+
 **Addon items** (`ap_addons.obj`/`ap_addons.rs2`): a new
 `addons` reward-roll slot (1-in-16) delivers the first enabled-and-unowned item
 on a fixed ladder — Bank Box → Tree Compass → Teleporting Focus → Greater

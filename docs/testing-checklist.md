@@ -45,6 +45,9 @@ The progression path is generated on demand, not stored:
 - [ ] Kill a second chicken — nothing fires (once-ever dedupe)
 - [ ] Restart the server, kill a goblin — `first_kill_goblin` fires but
       `first_kill` does NOT (fired-set survives restarts)
+- [ ] Kill a skeleton the OLD chains missed — the Stronghold of Security
+      `giantskeleton`, Draynor manor's `skull_skeleton` or a Melzar's Maze one —
+      `first_kill_skeleton` must fire (variant coverage, scripts/gen-kill-groups.py)
 - [ ] Gain first XP in an untouched skill (light a fire) — `first_xp_firemaking`
 - [ ] Cross a multiple-of-10 level — `level_<skill>_<N>` (a big `::apreward xp`
       roll can cross several at once — all of them should fire)
@@ -105,6 +108,19 @@ From `Server/engine`:
       30: train up to it and confirm XP stops at the boundary (message shown)
 - [ ] Hitpoints is never capped regardless of table state
 - [ ] `npx tsx tools/ap/SetUnlock.ts --clear` → everything back to vanilla ~2s later
+
+## 6b. Two-fish spots vs gatherSpeed (the shrimp fix)
+
+Needs a high Fishing level, so easiest with `::setlevel fishing 99` on a test
+account. The old bug was 0% shrimp at 99 with the default `gatherSpeed: 200`.
+
+- [ ] At 99 Fishing, net a Lumbridge/Draynor shrimp spot for ~30 casts — expect a
+      roughly even shrimp/anchovies split (vanilla ratio is 50/50 at 99), NOT
+      anchovies every single cast
+- [ ] Same at a sardine/herring rod spot — sardines must still appear
+- [ ] Set `gatherSpeed` to 100 in `data/config/ap-options.json`, restart, and
+      confirm the split is unchanged but failed casts come back
+- [ ] Single-fish spots (lobster, shark) are untouched by this change
 
 ## 7. Random spawn (reseed test)
 

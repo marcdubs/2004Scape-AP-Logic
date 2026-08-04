@@ -41,6 +41,14 @@ function findGroundLoc(x: number, z: number, level: number) {
     return null;
 }
 
+// Vanilla STAT_RANDOM's level-interpolated success threshold: the 1..256 "value"
+// a 0..255 roll is compared against, walking from `low` at level 1 to `high` at
+// 99. Shared by both AP gathering rolls so they cannot drift apart.
+function gatherValue(level: number, low: number, high: number): number {
+    const clampedLevel = Math.min(level, 99);
+    return Math.floor((low * (99 - clampedLevel)) / 98) + Math.floor((high * (clampedLevel - 1)) / 98) + 1;
+}
+
 const ServerOps: CommandHandlers = {
     [ScriptOpcode.MAP_CLOCK]: state => {
         state.pushInt(World.currentTick);
@@ -615,12 +623,54 @@ const ServerOps: CommandHandlers = {
     [ScriptOpcode.AP_GATHER_RANDOM]: checkedHandler(ActivePlayer, state => {
         const [stat, low, high] = state.popInts(3);
 
-        const level = state.activePlayer.levels[stat];
-        const clampedLevel = Math.min(level, 99);
-        const value = Math.floor((low * (99 - clampedLevel)) / 98) + Math.floor((high * (clampedLevel - 1)) / 98) + 1;
+        const value = gatherValue(state.activePlayer.levels[stat], low, high);
         const chance = Math.floor(JavaRandom.nextDouble() * 256);
 
         state.pushInt(apGatherThreshold(value) > chance ? 1 : 0);
+    }),
+
+    // custom: Archipelago gathering success roll for a fishing spot that offers a
+    // rare fish with a common fallback (shrimp/anchovies, sardine/herring,
+    // trout/salmon, tuna/swordfish). Returns 2 = caught the rare fish, 1 = caught
+    // the common one, 0 = nothing. Takes the common fish's (low, high) first, to
+    // match ~fish_roll's ($fish1, $fish2) argument order.
+    //
+    // Why this is not just two AP_GATHER_RANDOM calls, which is what it replaces:
+    // vanilla rolls the RARE fish first and only falls through to the common one
+    // when that misses, so scaling each roll's threshold separately does not
+    // merely remove failed casts - it hands the rare fish the casts the common
+    // fish used to win. At the default gatherSpeed 200 the anchovy threshold
+    // saturates at 256 by 99 Fishing and shrimp become literally uncatchable
+    // (sardines likewise behind herring). So gatherSpeed is applied here to the
+    // CYCLE's combined success probability, and the successes are split in the
+    // vanilla ratio: the catch rate scales exactly as the knob promises, while
+    // the fish mix stays wherever 2004 put it. At gatherSpeed 100 this is
+    // bit-for-bit the vanilla pair of rolls, just decided with one RNG draw.
+    [ScriptOpcode.AP_GATHER_RANDOM2]: checkedHandler(ActivePlayer, state => {
+        const [stat, lowCommon, highCommon, lowRare, highRare] = state.popInts(5);
+
+        const level = state.activePlayer.levels[stat];
+        // Vanilla 0..256 thresholds, the space STAT_RANDOM compares a 0..255 roll against.
+        const common = Math.min(gatherValue(level, lowCommon, highCommon), 256);
+        const rare = Math.min(gatherValue(level, lowRare, highRare), 256);
+        // Scaled by 256 once more so the ratio split below stays integer maths:
+        // these are P(outcome) * 65536, and they sum to at most 65536.
+        const rareWeight = rare * 256;
+        const commonWeight = (256 - rare) * common;
+        const total = rareWeight + commonWeight;
+        if (total === 0) {
+            state.pushInt(0);
+            return;
+        }
+
+        const percent = getApOptionInt('gatherSpeed');
+        // Same clamp reasoning as apGatherThreshold: 65536 always succeeds, and 1
+        // keeps vanilla's "never actually impossible" floor for gatherSpeed < 100.
+        const scaled = percent === 100 ? total : Math.min(Math.max(Math.floor((total * percent) / 100), 1), 65536);
+        const rareScaled = Math.floor((scaled * rareWeight) / total);
+        const chance = Math.floor(JavaRandom.nextDouble() * 65536);
+
+        state.pushInt(chance < rareScaled ? 2 : chance < scaled ? 1 : 0);
     }),
 
     // custom: Archipelago NPC Teleport addon lookups (ApNpcTeleport registry,
