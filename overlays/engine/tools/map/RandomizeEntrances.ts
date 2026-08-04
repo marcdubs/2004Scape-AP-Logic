@@ -456,17 +456,18 @@ function runAttempt(seed: number, dryRun: boolean, rewrite: boolean, mixed: bool
     printInfo(`protected mapsquares (Tutorial Island): ${tutorialMapsquares().map(([mx, mz]) => `${mx},${mz}`).join(' ')}`);
 
     // Workstream B (docs/entrance-logic.md): gated entrances join the shuffle pool with
-    // their requirement kept - the patched handlers (see ladders.rs2, mcannon_ladders.rs2,
-    // quest_zanaris.rs2) run the requirement check BEFORE consulting the override table,
-    // so the gate guards wherever the entrance now leads. Two candidates:
-    //   - the dwarf guard tower ladder (%mcannon quest progress) - already parsed above
-    //     (gosub-resolved, `gated`+`requires` set by EntranceParser) but its destination
-    //     is still a same-tile relative movecoord; resolve it to a literal here (safe -
-    //     the player stands on the ladder's own tile when climbing, same assumption the
-    //     generic scanned ladder gates make).
+    // their requirement kept - the patched handlers (see quest_zanaris.rs2) run the
+    // requirement check BEFORE consulting the override table, so the gate guards wherever
+    // the entrance now leads. One candidate left:
     //   - the Zanaris shed door (dramen staff) - a `check_axis` door handler shape the
     //     generic switch/if parser doesn't cover at all, so it's not in allEntrances yet;
     //     inject it directly (single placement in the game, confirmed via LocPlacementScanner).
+    // The dwarf guard tower ladder used to be the second one (%mcannon quest progress);
+    // its gate is gone (mcannon_ladders.rs2 now climbs unconditionally), so it parses as
+    // an ordinary ungated ladder. The loop below stays generic for the next such gate:
+    // a gosub-resolved gated entrance arrives with a same-tile relative destination, and
+    // resolving it to a literal is safe because the player stands on the trigger's own
+    // tile when climbing (same assumption the generic scanned ladder gates make).
     let gatedResolved = 0;
     for (const e of allEntrances) {
         if (e.gated && e.requires && e.source.type === 'literal' && e.destination?.type === 'relative') {

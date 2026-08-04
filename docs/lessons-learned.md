@@ -5151,3 +5151,46 @@ tuna were skewed but never saturated.
   (clean) and a server restart. Engine typecheck clean. **Not in-game tested** -
   see the new checklist sections (a previously-missed skeleton; section 6b for
   the shrimp/sardine split at 99 Fishing).
+
+## Session (2026-08-05): the dwarf guard tower ladder is no longer quest-gated
+
+Player report: "You climb up the ladder... but the trap door will not open." and
+"I don't think this is in logic". Both halves were true in a confusing way, and the
+resolution was to delete the gate rather than teach the logic about it.
+
+- **The gate**: `[label,ladder_to_dwarf_remains]`
+  (`quest_mcannon/scripts/locs/mcannon_ladders.rs2`, reached from `[oploc1,ladder]`'s
+  `case 0_40_53_10_49`) required `%mcannon >= ^mcannon_tasked_with_checking_guard_tower`
+  (varp `mcannon` >= 2, i.e. mid-Dwarf-Cannon). It was one of the two workstream-B
+  "gated entrances that shuffle with their requirement kept"; the other is the
+  Zanaris shed door.
+- **Why it read as out-of-logic**: the requirement WAS modelled - it reached
+  `ap-entrance-pool.json`/`ap-entrances.json` as a `requires`/`gates` entry and
+  `ValidateSeed.ts` + `logic.py` both honour it. What it never reached is the
+  **path helper**: the walk grid/graph route through the ladder without consulting
+  that map, so the guide happily pointed at a trapdoor the player could not open.
+  Worth remembering: `gates` in `ap-entrances.json` is consumed by ValidateSeed,
+  RegionFeasibility and (for names only) `web.ts` - *not* by the pathfinder.
+- **The change** (`overlays/`, so it survives the next `install.js`):
+  `mcannon_ladders.rs2` now climbs unconditionally, and because there is no longer a
+  requirement that must run before the override table, `ladders.rs2` went back to the
+  standard 5-line top-of-handler preamble (the `if (loc_coord ! 0_40_53_10_49)`
+  special case is gone). Nothing above the trap door depends on quest state.
+- **Reseeding was NOT needed, and would have been harmful**: dropping the `gated`
+  flag also drops the entrance out of `literalCandidates` (its destination goes back
+  to an unresolved same-tile `movecoord`), which perturbs the candidate list and
+  therefore the shuffle RNG - re-running `RandomizeEntrances` even with the same seed
+  would have relaid the player's live world. Instead:
+  `RandomizeEntrances --dry-run --export-pool <tmp>` was diffed against the live
+  `ap-entrance-pool.json`: **`gates` and `oneWays` byte-identical, only `requires`
+  changed**. So the new pool file was copied in, the one stale `gates` entry was
+  deleted from `ap-entrances.json` by hand, and `ExportLogicBundle --copy`
+  regenerated the apworld bundle. `--dry-run --export-pool` is the safe way to ask
+  "would this script change move the shuffle?" without touching a live seed.
+- **Verification**: parser regression 353/353 records, zero differing records
+  (`gated: false`, no `requires` on that one); `parity-check.py` PARITY OK;
+  `tools/pack/Build.ts` clean. `ExportEntrances.ts` takes its output path as
+  `argv[2]` and has no `--help` - passing one writes a file literally named `--help`.
+- **The entrance ladder was never in the shuffle pool anyway** (it appears in
+  `requires` but in neither `gates` nor `oneWays` - its floor-shift partner never
+  paired), so removing the gate cost the randomizer nothing.
