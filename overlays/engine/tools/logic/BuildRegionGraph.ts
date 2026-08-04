@@ -159,23 +159,50 @@ function unpackCoord(packed: number): { x: number; z: number; level: number } {
 
 const GameMapFlags = { OPEN: 0x0, BLOCK_MAP_SQUARE: 0x1, LINK_BELOW: 0x2, REMOVE_ROOFS: 0x4 };
 
-function loadGround(lands: Int8Array, packet: Packet, mapsquareX: number, mapsquareZ: number): void {
+function loadGround(lands: Int8Array, packet: Packet, mapsquareX: number, mapsquareZ: number, floors: Uint8Array): void {
     for (let level = 0; level < LEVELS; level++) {
         for (let x = 0; x < SQUARE_TILES; x++) {
             for (let z = 0; z < SQUARE_TILES; z++) {
+                // `described` = this tile got ANY entry in the land stream (height, overlay,
+                // flags or underlay). Above ground level that is the only evidence a floor
+                // physically exists there: an upper storey is authored tile by tile, and a
+                // tile the author never mentioned is open sky. See the floors[] note below.
+                let described = false;
                 for (;;) {
                     const opcode = packet.g1();
                     if (opcode === 0) {
                         break;
                     } else if (opcode === 1) {
                         packet.pos++;
+                        described = true;
                         break;
                     }
+                    described = true;
                     if (opcode <= 49) {
                         packet.pos++;
                     } else if (opcode <= 81) {
                         lands[packCoord(x, z, level)] = opcode - 49;
                     }
+                }
+                if (described) {
+                    floors[packCoord(x, z, level)] = 1;
+                }
+            }
+        }
+    }
+
+    // Re-home bridge decks. A level-1 tile flagged LINK_BELOW describes a deck that is
+    // really at level 0 (loadLocations applies the same shift to its locs), so the floor
+    // belongs one level down and level 1 is empty air above it.
+    for (let x = 0; x < SQUARE_TILES; x++) {
+        for (let z = 0; z < SQUARE_TILES; z++) {
+            if ((lands[packCoord(x, z, 1)] & GameMapFlags.LINK_BELOW) !== GameMapFlags.LINK_BELOW) {
+                continue;
+            }
+            for (let level = 1; level < LEVELS; level++) {
+                if (floors[packCoord(x, z, level)] === 1) {
+                    floors[packCoord(x, z, level)] = 0;
+                    floors[packCoord(x, z, level - 1)] = 1;
                 }
             }
         }
@@ -325,6 +352,10 @@ async function main(): Promise<void> {
     // never part of the game world at all).
     const loadedSquares = new Set<string>();
 
+    // squareKey -> per-tile "a floor physically exists here" bitmap (see loadGround).
+    // Only consulted above ground level; level 0 is floor everywhere by definition.
+    const floorOf = new Map<string, Uint8Array>();
+
     let doorsOpened = 0;
     let doorsGated = 0;
 
@@ -368,7 +399,9 @@ async function main(): Promise<void> {
         }
 
         const lands = new Int8Array(LEVELS * SQUARE_TILES * SQUARE_TILES);
-        loadGround(lands, new Packet(zipEntries[key]), mapsquareX, mapsquareZ);
+        const floors = new Uint8Array(LEVELS * SQUARE_TILES * SQUARE_TILES);
+        loadGround(lands, new Packet(zipEntries[key]), mapsquareX, mapsquareZ, floors);
+        floorOf.set(`${mx}_${mz}`, floors);
 
         const stats = { doorsOpened: 0, doorsGated: 0 };
         loadLocations(lands, new Packet(locEntry), mapsquareX, mapsquareZ, gatedBoxes, gatedDoorTiles, extraClosed, stats);
@@ -402,6 +435,40 @@ async function main(): Promise<void> {
 
     function walkable(worldX: number, worldZ: number, level: number): boolean {
         return !isFlagged(worldX, worldZ, level, CollisionFlag.WALK_BLOCKED);
+    }
+
+    /**
+     * Walkability for the WALK GRID only (see the walk-grid pass below), which adds one
+     * rule the flood fill deliberately does not get.
+     *
+     * Above ground level, "not collision-blocked" is not enough to mean walkable. The land
+     * data only ever marks tiles that exist; the empty sky over a field is simply absent
+     * from the stream, and an absent tile reads back as flag 0 - i.e. wide open. The engine
+     * gets away with that because a player can only reach an upper storey through a
+     * staircase inside a walled building. A search has no such manners: one gap in one
+     * building's upper wall and it escapes into the sky, which is a single connected plane
+     * spanning the whole world. Measured, levels 1-3 were ~97% "walkable" sky, and the path
+     * helper cheerfully routed 67 steps from Varrock Palace's first floor to Ardougne's.
+     * Requiring a real floor keeps each storey bounded by its own building.
+     *
+     * Why only the grid: the flood fill's region ids are an input to the Archipelago logic
+     * (ValidateSeed.ts / logic.py, via the exported logic bundle), and that bundle is frozen
+     * for the duration of a playthrough - changing region ids mid-run would desync the
+     * apworld from the seed it was generated against, and parity-check.py would fail. The
+     * path helper reads distances from the grid, so correcting the grid alone fixes routing
+     * while leaving region-graph.json byte-identical. Nodes can still share an over-large
+     * sky region, but the grid BFS that measures each pair now simply finds no path between
+     * two buildings, so no impossible walk edge is ever emitted. Fold this into the flood
+     * fill at the next reseed, when regenerating the logic bundle is safe.
+     */
+    function walkableOnRealFloor(worldX: number, worldZ: number, level: number): boolean {
+        if (level > 0) {
+            const floors = floorOf.get(`${worldX >> 6}_${worldZ >> 6}`);
+            if (!floors || floors[packCoord(worldX & 63, worldZ & 63, level)] !== 1) {
+                return false;
+            }
+        }
+        return walkable(worldX, worldZ, level);
     }
 
     const regions: RegionInfo[] = [];
@@ -529,7 +596,7 @@ async function main(): Promise<void> {
                     for (let lx = 0; lx < SQUARE_TILES; lx++) {
                         const worldX = baseX + lx;
                         const worldZ = baseZ + lz;
-                        if (!walkable(worldX, worldZ, level)) {
+                        if (!walkableOnRealFloor(worldX, worldZ, level)) {
                             continue; // mask stays 0 and the walkable bit stays clear.
                         }
 
@@ -548,7 +615,7 @@ async function main(): Promise<void> {
                             if (!loadedSquares.has(`${nx >> 6}_${nz >> 6}`)) {
                                 continue;
                             }
-                            if (!walkable(nx, nz, level)) {
+                            if (!walkableOnRealFloor(nx, nz, level)) {
                                 continue;
                             }
                             if (!canTravel(level, worldX, worldZ, WALK_DIR_DX[d], WALK_DIR_DZ[d], 1, 0, CollisionType.NORMAL)) {

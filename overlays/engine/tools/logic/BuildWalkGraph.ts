@@ -191,7 +191,71 @@ async function main(): Promise<void> {
         return best ? { stand: best.stand, region: best.region } : null;
     }
 
-    function addNode(kind: NodeKind, raw: string, name: string, sideKey?: string, op?: number): WalkNode | null {
+    /**
+     * Stand-tile resolution for an entrance TRIGGER. Nearest-walkable is the right rule (a
+     * ladder inside a building belongs to that building), but it is not a COMPLETE one:
+     * a trigger's own tile is usually an unwalkable loc footprint, and when that footprint
+     * sits on a boundary the nearest walkable tiles lie on BOTH sides of it, tied on
+     * distance. resolveStandTile then breaks the tie by ring-scan order (dx/dz ascending,
+     * i.e. whatever is south-west), which is arbitrary - and picking the wrong side is not
+     * a rounding error, it silently attaches the trigger to a region the player using it is
+     * never standing in, so the graph gets an exit it can never walk to.
+     *
+     * Found 2026-08-03 on a live seed: a ship's deck ladder at 2_47_50_24_24 has deck tiles
+     * (region 1890) to its north and the level-2 mainland (region 2) to its south, both one
+     * tile away. The probe took the south tile, so the deck held two arrival nodes and no
+     * trigger - you could be dropped onto that deck and the router would insist there was no
+     * route anywhere, even with every entrance revealed. 48 regions were dead ends this way.
+     *
+     * `preferRegion` is the region of the arrival on the far side of this same physical gate
+     * - i.e. exactly where a player stands after coming back through it, which is the tile
+     * they must be on to use this trigger. When a candidate in that region exists, it wins;
+     * otherwise this degrades to plain nearest-walkable.
+     */
+    function resolveTriggerStand(tile: WorldTile, radius: number, preferRegion?: number): { stand: WorldTile; region: number } | null {
+        let best: { stand: WorldTile; region: number; snap: number; preferred: boolean } | null = null;
+
+        for (let dx = -radius; dx <= radius; dx++) {
+            for (let dz = -radius; dz <= radius; dz++) {
+                const x = tile.x + dx;
+                const z = tile.z + dz;
+                if (!grid.isWalkable(x, z, tile.level)) {
+                    continue;
+                }
+                const region = regionGraph.regionAt(x, z, tile.level);
+                if (region === 0) {
+                    continue;
+                }
+                const snap = Math.max(Math.abs(dx), Math.abs(dz));
+                const preferred = preferRegion !== undefined && region === preferRegion;
+                // Preferred region first, then nearest - so the fallback is exactly the old
+                // nearest-walkable behavior whenever the gate gives us nothing to prefer.
+                if (best === null || (preferred && !best.preferred) || (preferred === best.preferred && snap < best.snap)) {
+                    best = { stand: { level: tile.level, x, z }, region, snap, preferred };
+                }
+            }
+        }
+
+        return best ? { stand: best.stand, region: best.region } : null;
+    }
+
+    /** Region a raw coord resolves to once probed onto walkable ground, or undefined. */
+    function regionOfRaw(raw: string): number | undefined {
+        let tile: WorldTile;
+        try {
+            tile = parseRawCoord(raw);
+        } catch {
+            return undefined;
+        }
+        const stand = grid.resolveStandTile(tile.x, tile.z, tile.level, STAND_PROBE_RADIUS);
+        if (!stand) {
+            return undefined;
+        }
+        const region = regionGraph.regionAt(stand.x, stand.z, stand.level);
+        return region === 0 ? undefined : region;
+    }
+
+    function addNode(kind: NodeKind, raw: string, name: string, sideKey?: string, op?: number, preferRegion?: number): WalkNode | null {
         let tile: WorldTile;
         try {
             tile = parseRawCoord(raw);
@@ -215,7 +279,7 @@ async function main(): Promise<void> {
             stand = resolved.stand;
             region = resolved.region;
         } else {
-            const nearest = grid.resolveStandTile(tile.x, tile.z, tile.level, radius);
+            const nearest = resolveTriggerStand(tile, radius, preferRegion);
             if (!nearest) {
                 // Nothing walkable within the probe radius. Almost always a genuinely sealed
                 // spot (an arrival tile inside a quest instance, a label dropped on water) -
@@ -224,13 +288,8 @@ async function main(): Promise<void> {
                 droppedNoStand++;
                 return null;
             }
-            stand = nearest;
-            region = regionGraph.regionAt(stand.x, stand.z, stand.level);
-            if (region === 0) {
-                dropped.push(`${kind} ${raw} (${name}): stand tile ${toRawCoord(stand)} has no region`);
-                droppedNoStand++;
-                return null;
-            }
+            stand = nearest.stand;
+            region = nearest.region;
         }
 
         const snap = Math.max(Math.abs(stand.x - tile.x), Math.abs(stand.z - tile.z));
@@ -246,15 +305,22 @@ async function main(): Promise<void> {
         return node;
     }
 
-    function addSide(side: PoolSide, label: string): void {
+    // `standNextTo` is the far side's arrival: the tile this gate returns you to, which is
+    // the tile you must be standing on to use this side's trigger. It only disambiguates the
+    // probe (see resolveTriggerStand); a one-way has no far side and keeps nearest-walkable.
+    function addSide(side: PoolSide, label: string, standNextTo?: string): void {
         const sideKey = `${side.trigger}:${side.op}`;
-        addNode('trigger', side.trigger, side.description ?? label, sideKey, side.op);
+        addNode('trigger', side.trigger, side.description ?? label, sideKey, side.op, standNextTo === undefined ? undefined : regionOfRaw(standNextTo));
         addNode('arrival', side.arrival, side.description ?? label, sideKey, side.op);
     }
 
     for (const gate of pool.gates ?? []) {
-        addSide(gate.a, 'gate side a');
-        addSide(gate.b, 'gate side b');
+        // Vanilla gates are reversible - you come back the way you came - so side a's trigger
+        // and side b's arrival are the same physical spot, and vice versa. That pairing is
+        // the only evidence in the data for which side of a boundary-straddling loc a player
+        // actually uses it from, so hand each trigger its partner's arrival.
+        addSide(gate.a, 'gate side a', gate.b.arrival);
+        addSide(gate.b, 'gate side b', gate.a.arrival);
     }
     for (const oneWay of pool.oneWays ?? []) {
         addSide(oneWay, 'one-way');

@@ -4995,3 +4995,77 @@ trigger** (`ARRIVE_RADIUS = 3`), not on the player actually using the entrance. 
 comes down about three tiles before you reach the ladder and the chat already names the NEXT
 entrance while you still have to click this one. Advancing on the position/level jump instead
 would be the honest fix if it annoys anyone.
+
+## The path helper walked through the sky (walk grid, level > 0)
+
+Reported as "it told me to walk 108 steps to White Knight's Castle, but I'm stuck on the
+Falador castle wall". The route was real, the walk was not.
+
+### The defect
+
+`BuildRegionGraph`'s `walkable()` was `!isFlagged(..., WALK_BLOCKED)`. Above ground level
+that is not enough. The land stream only ever describes tiles that **exist**; the empty sky
+over a field is simply absent from it, and an absent tile reads back as flag 0 - wide open.
+Measured against the live pack:
+
+| level | tiles with land data | share |
+|-------|---------------------|-------|
+| 0 | 1,758,314 | 88.9% |
+| 1 | 168,748 | **8.5%** |
+| 2 | 47,764 | 2.4% |
+| 3 | 21,739 | 1.1% |
+
+So ~91% of level 1 was sky being treated as floor. The engine gets away with it because a
+player can only reach an upper storey through a staircase inside a walled building; a flood
+fill has no such manners. One gap in one building's upper wall and it escapes into the sky,
+which is a **single connected plane spanning the world** - a single level-1 region covering
+26 mapsquares that joined Varrock's, Falador's and Ardougne's upper floors. Walk edges only
+connect nodes sharing a region, so the invariant looked intact while the region itself was
+nonsense. Varrock -> Port Sarim happily routed "67 steps" from Varrock Palace's first floor
+to Ardougne's.
+
+The fix records, while parsing the land stream, whether each tile got **any** entry
+(height/overlay/flags/underlay) and requires that above level 0. Bridge decks are re-homed:
+a level-1 tile flagged `LINK_BELOW` describes a level-0 deck, so its floor moves down a
+level and level 1 is left as air, matching what `loadLocations` already does with its locs.
+
+### Why the flood fill deliberately did NOT get the same fix
+
+Region ids are an input to the Archipelago logic (`ValidateSeed.ts` / `logic.py` via the
+exported bundle), and that bundle is **frozen for the duration of a playthrough**. Applying
+the floor rule to the fill changed reachable regions 5151 -> 5117 and turned `parity-check.py`
+from OK to FAILURE; fixing that would mean re-exporting the logic bundle mid-run, i.e.
+desyncing the apworld from the seed it was generated against.
+
+The path helper reads distances from `ap-walk-grid.bin`, not from the fill, so
+`walkableOnRealFloor()` is used **only in the walk-grid pass**. Nodes may still share an
+over-large sky region, but the grid BFS that measures each pair then finds no path between
+two buildings, so no impossible walk edge is ever emitted. Verified: `region-graph.json`
+payload byte-identical to the committed one, parity OK, gate coverage 0 leaks / 0 false
+denials, and the routing outcome (12,946 routable pairs, **0** routes containing an
+impossible upper-floor walk) identical to the version that did change the fill. Fold it into
+the fill at the next reseed, when regenerating the bundle is safe.
+
+### Effect, and the pocket it exposed
+
+Grid walkable tiles 7,045,756 -> 1,425,761. Per level: level 0 unchanged (1,259,903 ->
+1,259,835, -68), level 1 1,887,179 -> 123,355, level 2 1,937,579 -> 29,345, level 3
+1,961,095 -> 13,158. Six nodes dropped, all one `laddermiddle` stack at `38_154_60_8` which
+has no floor data anywhere in a 7x7 around it at levels 1-3 - a ladder in the void.
+
+Named-place census fell 15,752 -> 12,946 routable of 18,090. The whole difference is **12
+places**: the Tirannwn cluster (Arandar, Elf Camp, Isafdar, Prifddinas, Tirannwn) and the
+Morytania cluster (Canifis, Haunted Woods, Mort Myre Swamp, Mort'ton, Morytania, River
+Salve, The Hollows) became closed islands, and every other origin lost exactly those 12.
+That is **pre-existing, not caused by this fix**: a level-0 grid flood from Canifis reaches
+21,186 tiles bounded at x=3400 in the *old* grid and the *new* one identically, so the Salve
+crossing was never passable to the graph. Their randomised entrances form a closed loop
+(BFS from Canifis reaches 3 regions / 7 places, 0 unresolved overrides). The sky was hiding
+it. Open question for the next reseed: whether the Salve/Arandar crossings should be
+passable to the fill, or whether the entrance pool needs a guaranteed exit from each pocket.
+
+### Diagnostic worth keeping
+
+The cheap audit that catches this whole class: for every routable place pair, flag any
+`walk` leg with `from.level > 0` whose `from` and `to` are in different mapsquares. A
+building does not span mapsquares, so any hit is an impossible walk. It went from many to 0.
